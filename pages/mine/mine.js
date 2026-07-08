@@ -6,6 +6,21 @@ Page({
     userDesc: "静态展示页，更多个人功能将在后续版本完善",
     menuItems: [
       {
+        key: "vehicleManage",
+        title: "车辆管理",
+        desc: "查看已录入车辆并按状态筛选"
+      },
+      {
+        key: "bootstrapAdmin",
+        title: "初始化管理员",
+        desc: "仅限首次配置时使用，自动把当前账号设为首个管理员"
+      },
+      {
+        key: "getOpenid",
+        title: "查询 OpenID",
+        desc: "获取当前微信用户的 OpenID 并复制"
+      },
+      {
         key: "vehicleCreate",
         title: "新增车辆",
         desc: "录入新的车辆信息"
@@ -35,6 +50,134 @@ Page({
 
   handleMenuTap(event) {
     const { key, title } = event.currentTarget.dataset
+
+    if (key === "vehicleManage") {
+      wx.navigateTo({
+        url: "/pages/vehicle-manage/vehicle-manage",
+        fail: () => {
+          wx.showToast({
+            title: "页面跳转失败",
+            icon: "none"
+          })
+        }
+      })
+      return
+    }
+
+    if (key === "bootstrapAdmin") {
+      if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
+        wx.showToast({
+          title: "云能力未初始化",
+          icon: "none"
+        })
+        return
+      }
+
+      wx.showModal({
+        title: "初始化管理员",
+        content: "仅当 roles 集合还没有任何记录时可用。确认将当前账号初始化为首个管理员？",
+        success: (modalRes) => {
+          if (!modalRes.confirm) {
+            return
+          }
+
+          wx.showLoading({
+            title: "初始化中"
+          })
+
+          wx.cloud.callFunction({
+            name: "bootstrapAdmin",
+            success: (res) => {
+              wx.hideLoading()
+
+              const result = res && res.result ? res.result : null
+              const title = result && result.message ? result.message : "初始化完成"
+
+              if (result && result.ok) {
+                wx.showModal({
+                  title: "管理员初始化结果",
+                  content: `${title}\n\nOpenID：${(result && result.openid) || ""}`,
+                  showCancel: false
+                })
+                return
+              }
+
+              wx.showModal({
+                title: "初始化失败",
+                content: title,
+                showCancel: false
+              })
+            },
+            fail: (error) => {
+              wx.hideLoading()
+              wx.showToast({
+                title: (error && (error.errMsg || error.message)) || "初始化失败",
+                icon: "none"
+              })
+            }
+          })
+        }
+      })
+      return
+    }
+
+    if (key === "getOpenid") {
+      if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
+        wx.showToast({
+          title: "云能力未初始化",
+          icon: "none"
+        })
+        return
+      }
+
+      wx.showLoading({
+        title: "查询中"
+      })
+
+      wx.cloud.callFunction({
+        name: "getOpenid",
+        success: (res) => {
+          wx.hideLoading()
+
+          const result = res && res.result ? res.result : null
+          const openid = result && result.ok ? result.openid : ""
+
+          if (!openid) {
+            wx.showToast({
+              title: "未获取到 OpenID",
+              icon: "none"
+            })
+            return
+          }
+
+          wx.setClipboardData({
+            data: openid,
+            success: () => {
+              wx.showModal({
+                title: "OpenID 已复制",
+                content: openid,
+                showCancel: false
+              })
+            },
+            fail: () => {
+              wx.showModal({
+                title: "当前 OpenID",
+                content: openid,
+                showCancel: false
+              })
+            }
+          })
+        },
+        fail: (error) => {
+          wx.hideLoading()
+          wx.showToast({
+            title: (error && (error.errMsg || error.message)) || "查询失败",
+            icon: "none"
+          })
+        }
+      })
+      return
+    }
 
     if (key === "vehicleCreate") {
       wx.navigateTo({

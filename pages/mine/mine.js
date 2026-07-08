@@ -6,6 +6,11 @@ Page({
     userDesc: "静态展示页，更多个人功能将在后续版本完善",
     menuItems: [
       {
+        key: "vehicleCreate",
+        title: "新增车辆",
+        desc: "录入新的车辆信息"
+      },
+      {
         key: "bookings",
         title: "我的预约",
         desc: "查看已提交的预约咨询"
@@ -29,7 +34,20 @@ Page({
   },
 
   handleMenuTap(event) {
-    const { title } = event.currentTarget.dataset
+    const { key, title } = event.currentTarget.dataset
+
+    if (key === "vehicleCreate") {
+      wx.navigateTo({
+        url: "/pages/vehicle-create/vehicle-create",
+        fail: () => {
+          wx.showToast({
+            title: "页面跳转失败",
+            icon: "none"
+          })
+        }
+      })
+      return
+    }
 
     wx.showToast({
       title: `${title} 即将开放`,

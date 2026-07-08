@@ -1,0 +1,13 @@
+{
+  "name": "2826carplay",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "test": "jest",
+    "test:unit": "jest __tests__/shared.vehicle.test.js",
+    "test:integration": "jest __tests__/vehicleCreate.int.test.js"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  }
+}

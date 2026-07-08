@@ -170,3 +170,82 @@ MVP 本地 mock 数据版本
 - 合同系统
 
 以上功能必须在第一版 MVP 完成后再评估。
+
+## 9. 新增车辆（管理员）
+
+“新增车辆”用于在云开发数据库中创建车辆记录，入口位于“我的”页面。该功能依赖微信云开发（云函数 + 云数据库），未开通或未部署时不可用。
+
+### 9.1 表单填写规范
+
+必填字段：
+
+- 车牌号（plateNumber）
+  - 自动转为大写并去除空格
+  - 仅允许中文省份简称 + 字母数字组合（支持新能源号牌），长度不超过 8
+  - 示例：京A12345、沪AD12345、粤B12345D
+- 车辆类型（vehicleType，枚举）
+  - sedan（轿车）
+  - suv（SUV）
+  - mpv（MPV）
+  - sports（跑车）
+  - truck（卡车）
+  - other（其他）
+- 品牌型号（brandModel）
+  - 长度 1-50
+  - 建议格式：品牌 + 车系/型号，例如“BMW 3系 330i”
+- 注册日期（registerDate）
+  - 格式必须为 YYYY-MM-DD
+  - 不得晚于当天
+- 使用状态（status，枚举）
+  - active（在用）
+  - idle（闲置）
+  - maintenance（维修）
+  - retired（停用）
+
+### 9.2 权限控制与 roles 集合配置
+
+云函数 `vehicleCreate` 会使用调用者的 openid 做鉴权：仅当 `roles` 集合中存在该 openid 且具备 admin 标记时，才允许新增车辆。
+
+roles 集合的 admin 配置方式（满足任一即可）：
+
+- 方式一：单字段 role
+  - `{ "openid": "OPENID_XXX", "role": "admin" }`
+- 方式二：数组字段 roles
+  - `{ "openid": "OPENID_XXX", "roles": ["admin"] }`
+- 方式三：布尔字段
+  - `{ "openid": "OPENID_XXX", "isAdmin": true }`
+  - 或 `{ "openid": "OPENID_XXX", "admin": true }`
+
+openid 获取方式：
+
+- 方式一：通过云函数上下文获取
+  - 云函数内可通过 `cloud.getWXContext().OPENID` 获取当前调用者 openid
+  - 可临时创建一个仅返回 openid 的云函数用于自助查询，得到 openid 后再写入 roles 集合
+- 方式二：从云函数日志获取
+  - 当出现 `FORBIDDEN` 或 `INTERNAL_ERROR` 时，云函数日志中通常能定位到调用者 openid（取决于日志输出与调用路径）
+
+### 9.3 常见错误码与排查
+
+错误码说明（以云函数返回为准）：
+
+- FORBIDDEN：权限不足
+  - 排查：确认已创建 `roles` 集合；确认存在 `{ openid: 当前用户openid }` 的记录；确认记录包含 admin 标记（role/roles/isAdmin/admin 任一）
+  - 排查：确认调用时确实在同一云环境中（多环境时 openid 不变但数据可能写在不同环境的库中）
+- VALIDATION_ERROR：参数校验失败
+  - 排查：检查必填字段是否都已填写
+  - 排查：车牌号是否符合号牌规则（含新能源号牌），是否包含空格或特殊字符
+  - 排查：注册日期是否为 YYYY-MM-DD 且不晚于当天
+  - 排查：vehicleType、status 是否为枚举值（见 9.1）
+- DUPLICATE_PLATE：车牌号已存在
+  - 排查：在 `vehicles` 集合中按 `plateNumber` 查询是否已存在同车牌记录
+  - 处理：如确需录入，先清理或更正已存在记录（确保车牌号唯一）
+- INTERNAL_ERROR：系统繁忙/内部异常
+  - 排查：确认已开通微信云开发并已选择/绑定有效云环境
+  - 排查：确认云函数 `vehicleCreate` 已上传并部署成功（开发者工具云函数面板可查看）
+  - 排查：确认前端已初始化云能力
+    - 页面会在 onLoad 时尝试 `wx.cloud.init({ traceUser: true })`
+    - 若项目有多个云环境，需在 init 时显式指定 `env`，确保与云函数部署环境一致
+  - 排查：确认云数据库集合存在
+    - `roles`：用于鉴权
+    - `vehicles`：用于写入车辆数据
+  - 排查：查看云函数日志，定位具体异常信息（集合不存在、权限、参数结构不符合等）

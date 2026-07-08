@@ -1,5 +1,5 @@
 {
-  "appid": "wxa2cb9dfcbf22856a",
+  "appid": "wx5c1892bfed56e0d1",
   "compileType": "miniprogram",
   "libVersion": "trial",
   "packOptions": {
@@ -38,5 +38,6 @@
   },
   "simulatorType": "wechat",
   "simulatorPluginLibVersion": {},
-  "projectname": "jijing-garage"
+  "projectname": "jijing-garage",
+  "cloudfunctionRoot": "cloudfunctions/"
 }

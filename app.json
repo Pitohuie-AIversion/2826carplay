@@ -3,7 +3,8 @@
     "pages/garage/garage",
     "pages/car-detail/car-detail",
     "pages/booking/booking",
-    "pages/mine/mine"
+    "pages/mine/mine",
+    "pages/vehicle-create/vehicle-create"
   ],
   "window": {
     "navigationBarTitleText": "极境车库",

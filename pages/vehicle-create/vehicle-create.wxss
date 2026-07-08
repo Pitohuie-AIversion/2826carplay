@@ -1,0 +1,90 @@
+.vehicle-create-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 24rpx 24rpx 56rpx;
+  background: #101010;
+  box-sizing: border-box;
+}
+
+.card {
+  margin-bottom: 24rpx;
+  padding: 30rpx;
+  border: 1rpx solid #3a3a3a;
+  border-radius: 16rpx;
+  background: #181818;
+  box-sizing: border-box;
+}
+
+.header-card {
+  background: linear-gradient(180deg, #1c1c1c, #151515);
+}
+
+.page-title {
+  color: #ffffff;
+  font-size: 34rpx;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.page-desc {
+  margin-top: 14rpx;
+  color: #b8b8b8;
+  font-size: 25rpx;
+  line-height: 1.7;
+}
+
+.form-item {
+  margin-top: 24rpx;
+}
+
+.form-item:first-child {
+  margin-top: 0;
+}
+
+.form-label {
+  margin-bottom: 12rpx;
+  color: #ffffff;
+  font-size: 26rpx;
+  line-height: 1.4;
+}
+
+.form-input,
+.form-picker {
+  width: 100%;
+  padding: 24rpx 22rpx;
+  border: 1rpx solid #323232;
+  border-radius: 14rpx;
+  background: #141414;
+  color: #ffffff;
+  font-size: 26rpx;
+  line-height: 1.5;
+  box-sizing: border-box;
+}
+
+.form-picker {
+  color: #7f7f7f;
+}
+
+.form-picker-filled {
+  color: #ffffff;
+}
+
+.submit-button {
+  height: 92rpx;
+  margin-top: 12rpx;
+  border-radius: 14rpx;
+  background: #2f80ed;
+  color: #ffffff;
+  font-size: 30rpx;
+  line-height: 92rpx;
+}
+
+.submit-button-disabled {
+  background: #6f8fbc;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.submit-button::after {
+  border: 0;
+}

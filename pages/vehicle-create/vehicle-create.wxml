@@ -1,0 +1,67 @@
+<view class="vehicle-create-page">
+  <view class="card header-card">
+    <view class="page-title">新增车辆</view>
+    <view class="page-desc">请按实际车辆信息填写，提交后将创建车辆记录。</view>
+  </view>
+
+  <view class="card form-card">
+    <view class="form-item">
+      <view class="form-label">车牌号</view>
+      <input
+        class="form-input"
+        placeholder="例如 京A12345 / 粤BDF1234"
+        value="{{form.plateNumber}}"
+        maxlength="8"
+        bindinput="handlePlateInput"
+      />
+    </view>
+
+    <view class="form-item">
+      <view class="form-label">车辆类型</view>
+      <picker mode="selector" range="{{vehicleTypeLabels}}" value="{{vehicleTypeIndex}}" bindchange="handleVehicleTypeChange">
+        <view class="form-picker {{form.vehicleType ? 'form-picker-filled' : ''}}">
+          {{vehicleTypeLabel || '请选择车辆类型'}}
+        </view>
+      </picker>
+    </view>
+
+    <view class="form-item">
+      <view class="form-label">品牌型号</view>
+      <input
+        class="form-input"
+        placeholder="例如 BMW 740Li"
+        value="{{form.brandModel}}"
+        maxlength="50"
+        data-field="brandModel"
+        bindinput="handleTextInput"
+      />
+    </view>
+
+    <view class="form-item">
+      <view class="form-label">注册日期</view>
+      <picker mode="date" value="{{form.registerDate}}" end="{{today}}" bindchange="handleDateChange">
+        <view class="form-picker {{form.registerDate ? 'form-picker-filled' : ''}}">
+          {{form.registerDate || '请选择注册日期'}}
+        </view>
+      </picker>
+    </view>
+
+    <view class="form-item">
+      <view class="form-label">使用状态</view>
+      <picker mode="selector" range="{{statusLabels}}" value="{{statusIndex}}" bindchange="handleStatusChange">
+        <view class="form-picker {{form.status ? 'form-picker-filled' : ''}}">
+          {{statusLabel || '请选择使用状态'}}
+        </view>
+      </picker>
+    </view>
+  </view>
+
+  <button
+    class="submit-button {{isSubmitting ? 'submit-button-disabled' : ''}}"
+    bindtap="handleSubmit"
+    disabled="{{isSubmitting}}"
+    loading="{{isSubmitting}}"
+  >
+    {{isSubmitting ? '提交中' : '提交'}}
+  </button>
+</view>

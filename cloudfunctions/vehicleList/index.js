@@ -145,6 +145,8 @@ exports.main = async (event) => {
       vin: item.vin || "",
       engineNumber: item.engineNumber || "",
       note: item.note || "",
+      imageList: Array.isArray(item.imageList) ? item.imageList.filter(Boolean) : [],
+      coverImage: item.coverImage || "",
       createdByOpenid: item.createdByOpenid || "",
       createdAt: formatTime(item.createdAt),
       updatedAt: formatTime(item.updatedAt)
@@ -165,7 +167,10 @@ exports.main = async (event) => {
       filters,
       total: filteredList.length,
       stats: buildStats(filteredList),
-      list: filteredList
+      list: filteredList.map((item) => ({
+        ...item,
+        imageCount: Array.isArray(item.imageList) ? item.imageList.length : 0
+      }))
     }
   } catch (error) {
     console.error({

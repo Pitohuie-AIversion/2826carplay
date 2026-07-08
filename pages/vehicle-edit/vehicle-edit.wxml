@@ -1,0 +1,68 @@
+<view class="vehicle-edit-page">
+  <view class="hero-card">
+    <view class="hero-title">编辑车辆</view>
+    <view class="hero-desc">修改车辆基础信息并保存到云数据库。</view>
+  </view>
+
+  <view class="loading-card" wx:if="{{loading}}">
+    <view class="loading-text">车辆信息加载中...</view>
+  </view>
+
+  <view wx:else>
+    <view class="form-card">
+      <view class="field-group">
+        <view class="field-label">车牌号</view>
+        <input
+          class="field-input"
+          placeholder="例如：京A12345"
+          value="{{form.plateNumber}}"
+          maxlength="8"
+          bindinput="handlePlateInput"
+        />
+      </view>
+
+      <view class="field-group">
+        <view class="field-label">车辆类型</view>
+        <picker range="{{vehicleTypeLabels}}" value="{{vehicleTypeIndex}}" bindchange="handleVehicleTypeChange">
+          <view class="picker-field {{form.vehicleType ? '' : 'picker-field-placeholder'}}">
+            {{vehicleTypeLabel || "请选择车辆类型"}}
+          </view>
+        </picker>
+      </view>
+
+      <view class="field-group">
+        <view class="field-label">品牌型号</view>
+        <input
+          class="field-input"
+          placeholder="例如：BMW 740Li"
+          value="{{form.brandModel}}"
+          maxlength="50"
+          data-field="brandModel"
+          bindinput="handleTextInput"
+        />
+      </view>
+
+      <view class="field-group">
+        <view class="field-label">注册日期</view>
+        <picker mode="date" end="{{today}}" value="{{form.registerDate}}" bindchange="handleDateChange">
+          <view class="picker-field {{form.registerDate ? '' : 'picker-field-placeholder'}}">
+            {{form.registerDate || "请选择注册日期"}}
+          </view>
+        </picker>
+      </view>
+
+      <view class="field-group">
+        <view class="field-label">使用状态</view>
+        <picker range="{{statusLabels}}" value="{{statusIndex}}" bindchange="handleStatusChange">
+          <view class="picker-field {{form.status ? '' : 'picker-field-placeholder'}}">
+            {{statusLabel || "请选择使用状态"}}
+          </view>
+        </picker>
+      </view>
+    </view>
+
+    <button class="submit-button" bindtap="handleSubmit" loading="{{isSubmitting}}" disabled="{{isSubmitting}}">
+      {{isSubmitting ? "保存中" : "保存修改"}}
+    </button>
+  </view>
+</view>

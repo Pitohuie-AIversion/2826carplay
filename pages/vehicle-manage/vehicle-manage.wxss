@@ -167,6 +167,56 @@
   align-items: flex-start;
 }
 
+.vehicle-card-top {
+  display: flex;
+  align-items: flex-start;
+}
+
+.vehicle-cover-wrap {
+  position: relative;
+  width: 220rpx;
+  margin-right: 20rpx;
+  flex-shrink: 0;
+}
+
+.vehicle-cover {
+  width: 220rpx;
+  height: 164rpx;
+  border-radius: 14rpx;
+  background: #242424;
+}
+
+.vehicle-cover-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1rpx dashed #444444;
+  box-sizing: border-box;
+}
+
+.vehicle-cover-placeholder-text {
+  color: #8e8e8e;
+  font-size: 24rpx;
+  line-height: 1.5;
+}
+
+.image-count-badge {
+  position: absolute;
+  right: 10rpx;
+  bottom: 10rpx;
+  padding: 8rpx 14rpx;
+  border-radius: 999rpx;
+  background: rgba(0, 0, 0, 0.62);
+  color: #ffffff;
+  font-size: 20rpx;
+  line-height: 1;
+}
+
+.vehicle-main {
+  flex: 1;
+  min-width: 0;
+}
+
 .plate-number {
   color: #ffffff;
   font-size: 34rpx;
@@ -231,6 +281,77 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.card-action-row {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin-top: 20rpx;
+  flex-wrap: wrap;
+}
+
+.edit-button {
+  min-width: 180rpx;
+  height: 72rpx;
+  margin: 0;
+  border-radius: 12rpx;
+  background: #2f80ed;
+  color: #ffffff;
+  font-size: 26rpx;
+  line-height: 72rpx;
+}
+
+.detail-button {
+  min-width: 180rpx;
+  height: 72rpx;
+  margin: 0 0 16rpx;
+  border-radius: 12rpx;
+  background: #4f4f4f;
+  color: #ffffff;
+  font-size: 26rpx;
+  line-height: 72rpx;
+}
+
+.retire-button {
+  min-width: 180rpx;
+  height: 72rpx;
+  margin: 0 0 16rpx 16rpx;
+  border-radius: 12rpx;
+  background: #eb5757;
+  color: #ffffff;
+  font-size: 26rpx;
+  line-height: 72rpx;
+}
+
+.restore-button {
+  min-width: 180rpx;
+  height: 72rpx;
+  margin: 0 0 16rpx 16rpx;
+  border-radius: 12rpx;
+  background: #27ae60;
+  color: #ffffff;
+  font-size: 26rpx;
+  line-height: 72rpx;
+}
+
+.delete-button {
+  min-width: 180rpx;
+  height: 72rpx;
+  margin: 0 0 16rpx 16rpx;
+  border-radius: 12rpx;
+  background: #8b1e1e;
+  color: #ffffff;
+  font-size: 26rpx;
+  line-height: 72rpx;
+}
+
+.detail-button::after,
+.edit-button::after,
+.retire-button::after,
+.restore-button::after,
+.delete-button::after {
+  border: 0;
 }
 
 .empty-title {

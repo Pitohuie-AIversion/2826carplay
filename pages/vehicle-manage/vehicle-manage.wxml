@@ -51,31 +51,69 @@
 
   <view class="vehicle-list" wx:elif="{{list.length}}">
     <view wx:for="{{list}}" wx:key="id" class="vehicle-card">
-      <view class="vehicle-card-head">
-        <view>
-          <view class="plate-number">{{item.plateNumber}}</view>
-          <view class="brand-model">{{item.brandModel}}</view>
+      <view class="vehicle-card-top">
+        <view class="vehicle-cover-wrap" data-id="{{item.id}}" bindtap="handleViewDetail">
+          <image wx:if="{{item.coverImage}}" class="vehicle-cover" src="{{item.coverImage}}" mode="aspectFill" />
+          <view wx:else class="vehicle-cover vehicle-cover-placeholder">
+            <view class="vehicle-cover-placeholder-text">暂无图片</view>
+          </view>
+          <view class="image-count-badge">共 {{item.imageCount || 0}} 张</view>
         </view>
-        <view class="vehicle-status {{item.statusClass}}">{{item.statusText}}</view>
+
+        <view class="vehicle-main">
+          <view class="vehicle-card-head">
+            <view>
+              <view class="plate-number">{{item.plateNumber}}</view>
+              <view class="brand-model">{{item.brandModel}}</view>
+            </view>
+            <view class="vehicle-status {{item.statusClass}}">{{item.statusText}}</view>
+          </view>
+
+          <view class="vehicle-meta-grid">
+            <view class="meta-item">
+              <view class="meta-label">车辆类型</view>
+              <view class="meta-value">{{item.vehicleTypeText}}</view>
+            </view>
+            <view class="meta-item">
+              <view class="meta-label">注册日期</view>
+              <view class="meta-value">{{item.registerDate}}</view>
+            </view>
+            <view class="meta-item">
+              <view class="meta-label">更新时间</view>
+              <view class="meta-value">{{item.updatedAtText || "--"}}</view>
+            </view>
+            <view class="meta-item">
+              <view class="meta-label">创建人</view>
+              <view class="meta-value meta-value-ellipsis">{{item.createdByOpenid || "--"}}</view>
+            </view>
+          </view>
+        </view>
       </view>
 
-      <view class="vehicle-meta-grid">
-        <view class="meta-item">
-          <view class="meta-label">车辆类型</view>
-          <view class="meta-value">{{item.vehicleTypeText}}</view>
-        </view>
-        <view class="meta-item">
-          <view class="meta-label">注册日期</view>
-          <view class="meta-value">{{item.registerDate}}</view>
-        </view>
-        <view class="meta-item">
-          <view class="meta-label">更新时间</view>
-          <view class="meta-value">{{item.updatedAtText || "--"}}</view>
-        </view>
-        <view class="meta-item">
-          <view class="meta-label">创建人</view>
-          <view class="meta-value meta-value-ellipsis">{{item.createdByOpenid || "--"}}</view>
-        </view>
+      <view class="card-action-row">
+        <button class="detail-button" data-id="{{item.id}}" bindtap="handleViewDetail">查看详情</button>
+        <button class="edit-button" data-id="{{item.id}}" bindtap="handleEdit">编辑车辆</button>
+        <button
+          wx:if="{{item.status !== 'retired'}}"
+          class="retire-button"
+          data-id="{{item.id}}"
+          data-plate-number="{{item.plateNumber}}"
+          bindtap="handleRetire"
+        >
+          停用车辆
+        </button>
+        <button
+          wx:else
+          class="restore-button"
+          data-id="{{item.id}}"
+          data-plate-number="{{item.plateNumber}}"
+          bindtap="handleRestore"
+        >
+          恢复启用
+        </button>
+        <button class="delete-button" data-id="{{item.id}}" data-plate-number="{{item.plateNumber}}" bindtap="handleDelete">
+          删除车辆
+        </button>
       </view>
     </view>
   </view>

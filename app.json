@@ -5,7 +5,9 @@
     "pages/booking/booking",
     "pages/mine/mine",
     "pages/vehicle-create/vehicle-create",
-    "pages/vehicle-manage/vehicle-manage"
+    "pages/vehicle-manage/vehicle-manage",
+    "pages/vehicle-edit/vehicle-edit",
+    "pages/vehicle-detail-manage/vehicle-detail-manage"
   ],
   "window": {
     "navigationBarTitleText": "极境车库",

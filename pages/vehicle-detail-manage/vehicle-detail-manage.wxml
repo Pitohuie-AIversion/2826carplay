@@ -1,0 +1,115 @@
+<view class="vehicle-detail-page">
+  <view class="hero-card">
+    <view class="hero-title">车辆详情管理</view>
+    <view class="hero-desc">查看车辆完整信息，并从详情页继续编辑。</view>
+  </view>
+
+  <view class="loading-card" wx:if="{{loading}}">
+    <view class="loading-text">车辆详情加载中...</view>
+  </view>
+
+  <view wx:elif="{{detail}}" class="detail-wrap">
+    <view class="summary-card">
+      <view>
+        <view class="plate-number">{{detail.plateNumber}}</view>
+        <view class="brand-model">{{detail.brandModel}}</view>
+      </view>
+      <view class="vehicle-status {{detail.statusClass}}">{{detail.statusText}}</view>
+    </view>
+
+    <view class="section-card">
+      <view class="section-title">基础信息</view>
+      <view class="info-grid">
+        <view class="info-item">
+          <view class="info-label">车辆类型</view>
+          <view class="info-value">{{detail.vehicleTypeText}}</view>
+        </view>
+        <view class="info-item">
+          <view class="info-label">注册日期</view>
+          <view class="info-value">{{detail.registerDate || "--"}}</view>
+        </view>
+        <view class="info-item">
+          <view class="info-label">VIN</view>
+          <view class="info-value">{{detail.vinText}}</view>
+        </view>
+        <view class="info-item">
+          <view class="info-label">发动机号</view>
+          <view class="info-value">{{detail.engineNumberText}}</view>
+        </view>
+      </view>
+    </view>
+
+    <view class="section-card">
+      <view class="section-title">管理信息</view>
+      <view class="info-grid">
+        <view class="info-item">
+          <view class="info-label">车辆ID</view>
+          <view class="info-value info-value-ellipsis">{{detail.id}}</view>
+        </view>
+        <view class="info-item">
+          <view class="info-label">创建人</view>
+          <view class="info-value info-value-ellipsis">{{detail.createdByOpenidText}}</view>
+        </view>
+        <view class="info-item">
+          <view class="info-label">创建时间</view>
+          <view class="info-value">{{detail.createdAtText}}</view>
+        </view>
+        <view class="info-item">
+          <view class="info-label">更新时间</view>
+          <view class="info-value">{{detail.updatedAtText}}</view>
+        </view>
+      </view>
+    </view>
+
+    <view class="section-card">
+      <view class="section-title">备注信息</view>
+      <view class="note-box">{{detail.noteText}}</view>
+    </view>
+
+    <view class="section-card">
+      <view class="image-header">
+        <view>
+          <view class="section-title">车辆图片</view>
+          <view class="image-desc">已上传 {{detail.imageCount}} / 9 张，可设置封面。</view>
+        </view>
+        <button class="upload-button" bindtap="handleUploadImages" loading="{{uploading}}" disabled="{{uploading}}">
+          {{uploading ? "上传中" : "上传图片"}}
+        </button>
+      </view>
+
+      <view wx:if="{{detail.imageItems.length}}" class="image-list">
+        <view wx:for="{{detail.imageItems}}" wx:key="fileId" class="image-card">
+          <image class="vehicle-image" src="{{item.fileId}}" mode="aspectFill" bindtap="handlePreviewImage" data-file-id="{{item.fileId}}" />
+          <view class="image-badge" wx:if="{{item.isCover}}">封面</view>
+          <view class="image-action-row">
+            <button
+              class="mini-button secondary-mini-button"
+              wx:if="{{!item.isCover}}"
+              data-file-id="{{item.fileId}}"
+              bindtap="handleSetCover"
+            >
+              设为封面
+            </button>
+            <view wx:else class="mini-placeholder">当前封面</view>
+            <button class="mini-button danger-mini-button" data-file-id="{{item.fileId}}" bindtap="handleRemoveImage">
+              移除图片
+            </button>
+          </view>
+        </view>
+      </view>
+
+      <view wx:else class="empty-image-box">
+        <view class="loading-text">当前还没有上传车辆图片</view>
+      </view>
+    </view>
+
+    <view class="action-row">
+      <button class="secondary-button" bindtap="handleBackList">返回列表</button>
+      <button class="primary-button" bindtap="handleEdit">编辑车辆</button>
+    </view>
+  </view>
+
+  <view class="loading-card" wx:else>
+    <view class="loading-text">暂无车辆详情</view>
+  </view>
+</view>

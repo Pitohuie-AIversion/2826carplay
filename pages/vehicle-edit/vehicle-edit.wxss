@@ -1,0 +1,86 @@
+.vehicle-edit-page {
+  min-height: 100vh;
+  padding: 24rpx 24rpx 56rpx;
+  background: #101010;
+  box-sizing: border-box;
+}
+
+.hero-card,
+.form-card,
+.loading-card {
+  margin-bottom: 24rpx;
+  padding: 30rpx;
+  border: 1rpx solid #3a3a3a;
+  border-radius: 16rpx;
+  background: #181818;
+  box-sizing: border-box;
+}
+
+.hero-card {
+  background: linear-gradient(180deg, #1c1c1c, #151515);
+}
+
+.hero-title {
+  color: #ffffff;
+  font-size: 34rpx;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.hero-desc,
+.loading-text {
+  margin-top: 12rpx;
+  color: #b8b8b8;
+  font-size: 24rpx;
+  line-height: 1.7;
+}
+
+.field-group {
+  margin-bottom: 28rpx;
+}
+
+.field-group:last-child {
+  margin-bottom: 0;
+}
+
+.field-label {
+  margin-bottom: 12rpx;
+  color: #ffffff;
+  font-size: 28rpx;
+  line-height: 1.4;
+}
+
+.field-input,
+.picker-field {
+  min-height: 88rpx;
+  padding: 24rpx;
+  border: 1rpx solid #343434;
+  border-radius: 14rpx;
+  background: #121212;
+  color: #ffffff;
+  font-size: 28rpx;
+  line-height: 1.4;
+  box-sizing: border-box;
+}
+
+.picker-field {
+  display: flex;
+  align-items: center;
+}
+
+.picker-field-placeholder {
+  color: #7f7f7f;
+}
+
+.submit-button {
+  height: 92rpx;
+  border-radius: 14rpx;
+  background: #2f80ed;
+  color: #ffffff;
+  font-size: 30rpx;
+  line-height: 92rpx;
+}
+
+.submit-button::after {
+  border: 0;
+}

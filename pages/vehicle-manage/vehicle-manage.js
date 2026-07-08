@@ -76,6 +76,14 @@ Page({
     this.fetchList()
   },
 
+  onShow() {
+    if (this.data.loading) {
+      return
+    }
+
+    this.fetchList()
+  },
+
   onPullDownRefresh() {
     this.fetchList(() => {
       wx.stopPullDownRefresh()
@@ -120,6 +128,249 @@ Page({
   handleGoCreate() {
     wx.navigateTo({
       url: "/pages/vehicle-create/vehicle-create"
+    })
+  },
+
+  handleEdit(event) {
+    const id = String(event.currentTarget.dataset.id || "").trim()
+
+    if (!id) {
+      wx.showToast({
+        title: "缺少车辆ID",
+        icon: "none"
+      })
+      return
+    }
+
+    wx.navigateTo({
+      url: `/pages/vehicle-edit/vehicle-edit?id=${id}`
+    })
+  },
+
+  handleViewDetail(event) {
+    const id = String(event.currentTarget.dataset.id || "").trim()
+
+    if (!id) {
+      wx.showToast({
+        title: "缺少车辆ID",
+        icon: "none"
+      })
+      return
+    }
+
+    wx.navigateTo({
+      url: `/pages/vehicle-detail-manage/vehicle-detail-manage?id=${id}`
+    })
+  },
+
+  handleRetire(event) {
+    const id = String(event.currentTarget.dataset.id || "").trim()
+    const plateNumber = String(event.currentTarget.dataset.plateNumber || "").trim()
+
+    if (!id) {
+      wx.showToast({
+        title: "缺少车辆ID",
+        icon: "none"
+      })
+      return
+    }
+
+    wx.showModal({
+      title: "停用车辆",
+      content: `确认将车辆 ${plateNumber || id} 标记为停用？`,
+      success: (modalRes) => {
+        if (!modalRes.confirm) {
+          return
+        }
+
+        this.retireVehicle(id)
+      }
+    })
+  },
+
+  handleRestore(event) {
+    const id = String(event.currentTarget.dataset.id || "").trim()
+    const plateNumber = String(event.currentTarget.dataset.plateNumber || "").trim()
+
+    if (!id) {
+      wx.showToast({
+        title: "缺少车辆ID",
+        icon: "none"
+      })
+      return
+    }
+
+    wx.showModal({
+      title: "恢复启用",
+      content: `确认将车辆 ${plateNumber || id} 恢复为可管理状态？`,
+      success: (modalRes) => {
+        if (!modalRes.confirm) {
+          return
+        }
+
+        this.restoreVehicle(id)
+      }
+    })
+  },
+
+  handleDelete(event) {
+    const id = String(event.currentTarget.dataset.id || "").trim()
+    const plateNumber = String(event.currentTarget.dataset.plateNumber || "").trim()
+
+    if (!id) {
+      wx.showToast({
+        title: "缺少车辆ID",
+        icon: "none"
+      })
+      return
+    }
+
+    wx.showModal({
+      title: "删除车辆",
+      content: `确认删除车辆 ${plateNumber || id}？删除后不可恢复。`,
+      confirmColor: "#eb5757",
+      success: (modalRes) => {
+        if (!modalRes.confirm) {
+          return
+        }
+
+        this.deleteVehicle(id)
+      }
+    })
+  },
+
+  retireVehicle(id) {
+    if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
+      wx.showToast({
+        title: "云能力未初始化",
+        icon: "none"
+      })
+      return
+    }
+
+    wx.showLoading({
+      title: "停用中"
+    })
+
+    wx.cloud.callFunction({
+      name: "vehicleRetire",
+      data: { id },
+      success: (res) => {
+        wx.hideLoading()
+
+        const result = res && res.result ? res.result : null
+        if (!result || !result.ok) {
+          wx.showToast({
+            title: (result && result.message) || "停用失败",
+            icon: "none"
+          })
+          return
+        }
+
+        wx.showToast({
+          title: result.message || "停用成功",
+          icon: "success"
+        })
+
+        this.fetchList()
+      },
+      fail: (error) => {
+        wx.hideLoading()
+        wx.showToast({
+          title: (error && (error.errMsg || error.message)) || "停用失败",
+          icon: "none"
+        })
+      }
+    })
+  },
+
+  restoreVehicle(id) {
+    if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
+      wx.showToast({
+        title: "云能力未初始化",
+        icon: "none"
+      })
+      return
+    }
+
+    wx.showLoading({
+      title: "恢复中"
+    })
+
+    wx.cloud.callFunction({
+      name: "vehicleRestore",
+      data: { id },
+      success: (res) => {
+        wx.hideLoading()
+
+        const result = res && res.result ? res.result : null
+        if (!result || !result.ok) {
+          wx.showToast({
+            title: (result && result.message) || "恢复失败",
+            icon: "none"
+          })
+          return
+        }
+
+        wx.showToast({
+          title: result.message || "恢复成功",
+          icon: "success"
+        })
+
+        this.fetchList()
+      },
+      fail: (error) => {
+        wx.hideLoading()
+        wx.showToast({
+          title: (error && (error.errMsg || error.message)) || "恢复失败",
+          icon: "none"
+        })
+      }
+    })
+  },
+
+  deleteVehicle(id) {
+    if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
+      wx.showToast({
+        title: "云能力未初始化",
+        icon: "none"
+      })
+      return
+    }
+
+    wx.showLoading({
+      title: "删除中"
+    })
+
+    wx.cloud.callFunction({
+      name: "vehicleDelete",
+      data: { id },
+      success: (res) => {
+        wx.hideLoading()
+
+        const result = res && res.result ? res.result : null
+        if (!result || !result.ok) {
+          wx.showToast({
+            title: (result && result.message) || "删除失败",
+            icon: "none"
+          })
+          return
+        }
+
+        wx.showToast({
+          title: result.message || "删除成功",
+          icon: "success"
+        })
+
+        this.fetchList()
+      },
+      fail: (error) => {
+        wx.hideLoading()
+        wx.showToast({
+          title: (error && (error.errMsg || error.message)) || "删除失败",
+          icon: "none"
+        })
+      }
     })
   },
 

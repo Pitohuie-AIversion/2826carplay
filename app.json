@@ -1,0 +1,17 @@
+{
+  "pages": [
+    "pages/garage/garage",
+    "pages/car-detail/car-detail",
+    "pages/booking/booking",
+    "pages/mine/mine"
+  ],
+  "window": {
+    "navigationBarTitleText": "极境车库",
+    "navigationBarBackgroundColor": "#101010",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#101010",
+    "backgroundTextStyle": "light"
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

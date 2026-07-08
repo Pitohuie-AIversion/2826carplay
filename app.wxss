@@ -1,0 +1,41 @@
+page {
+  background: #101010;
+  color: #ffffff;
+  font-family: Arial, sans-serif;
+  line-height: 1.5;
+}
+
+view,
+text,
+button,
+input,
+textarea,
+swiper,
+swiper-item,
+image,
+scroll-view {
+  box-sizing: border-box;
+}
+
+button {
+  border-radius: 14rpx;
+}
+
+.page-placeholder {
+  min-height: 100vh;
+  padding: 40rpx 32rpx;
+  box-sizing: border-box;
+}
+
+.page-title {
+  font-size: 40rpx;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.page-desc {
+  margin-top: 16rpx;
+  font-size: 28rpx;
+  line-height: 1.6;
+  color: #b8b8b8;
+}

@@ -1,0 +1,79 @@
+<view class="detail-page" wx:if="{{car}}">
+  <swiper class="hero-swiper" indicator-dots="{{true}}" autoplay="{{false}}" circular="{{true}}">
+    <swiper-item wx:for="{{car.images}}" wx:key="*this">
+      <image class="hero-image" src="{{item}}" mode="aspectFill" />
+    </swiper-item>
+  </swiper>
+
+  <view class="summary-card">
+    <view class="summary-top">
+      <view>
+        <view class="car-name">{{car.name}}</view>
+        <view class="car-nickname">{{car.nickname}}</view>
+      </view>
+      <view class="car-status {{car.statusClass}}">{{car.statusText}}</view>
+    </view>
+
+    <view class="car-price">{{car.priceText}}</view>
+
+    <view class="tag-list">
+      <text wx:for="{{car.tags}}" wx:key="*this" class="tag-item">{{item}}</text>
+    </view>
+  </view>
+
+  <view class="notice-card" wx:if="{{car.statusNoticeText}}">
+    <view class="notice-title">当前状态说明</view>
+    <view class="notice-text">{{car.statusNoticeText}}</view>
+  </view>
+
+  <view class="info-card">
+    <view class="section-title">车辆简介</view>
+    <view class="section-text">{{car.description}}</view>
+  </view>
+
+  <view class="info-card">
+    <view class="section-title">基础信息</view>
+    <view class="info-grid">
+      <view class="info-item">
+        <view class="info-label">品牌</view>
+        <view class="info-value">{{car.brand}}</view>
+      </view>
+      <view class="info-item">
+        <view class="info-label">城市</view>
+        <view class="info-value">{{car.location}}</view>
+      </view>
+      <view class="info-item">
+        <view class="info-label">变速箱</view>
+        <view class="info-value">{{car.transmissionText}}</view>
+      </view>
+      <view class="info-item">
+        <view class="info-label">燃油类型</view>
+        <view class="info-value">{{car.fuelTypeText}}</view>
+      </view>
+      <view class="info-item">
+        <view class="info-label">座位数</view>
+        <view class="info-value">{{car.seats}} 座</view>
+      </view>
+      <view class="info-item">
+        <view class="info-label">车辆编号</view>
+        <view class="info-value">{{car.id}}</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="info-card">
+    <view class="section-title">租赁说明</view>
+    <view wx:for="{{rentalTips}}" wx:key="*this" class="section-text">{{item}}</view>
+  </view>
+
+  <view class="detail-bottom-bar">
+    <button class="action-button action-primary" bindtap="handleBookingTap">{{car.primaryActionText}}</button>
+    <button class="action-button action-secondary action-button-offset" bindtap="handlePhoneCall">电话咨询</button>
+  </view>
+</view>
+
+<view class="empty-page" wx:else>
+  <view class="empty-title">车辆详情</view>
+  <view class="empty-desc">{{notFoundText}}</view>
+  <button class="empty-action" bindtap="handleBackGarage">返回车库首页</button>
+</view>

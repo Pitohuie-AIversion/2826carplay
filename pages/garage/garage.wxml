@@ -1,0 +1,50 @@
+<view class="garage-page">
+  <view class="garage-header">
+    <view class="page-title">{{pageTitle}}</view>
+    <view class="page-desc">{{pageSubtitle}}</view>
+  </view>
+
+  <scroll-view class="category-scroll" scroll-x enable-flex show-scrollbar="{{false}}">
+    <view class="category-list">
+      <view
+        wx:for="{{categories}}"
+        wx:key="id"
+        class="category-item {{currentCategory === item.id ? 'category-item-active' : ''}}"
+        data-category-id="{{item.id}}"
+        bindtap="handleCategoryTap"
+      >
+        <text>{{item.name}}</text>
+        <text class="category-count">{{item.count}}</text>
+      </view>
+    </view>
+  </scroll-view>
+
+  <view class="summary-panel">
+    <view class="summary-copy">
+      <view class="summary-title">{{categorySummary.name || '当前分类'}}</view>
+      <view class="summary-desc">共 {{categorySummary.total}} 台车，可立即预约 {{categorySummary.available}} 台</view>
+    </view>
+    <view class="summary-phone" bindtap="handlePhoneCall">客服 {{servicePhone}}</view>
+  </view>
+
+  <view class="car-list" wx:if="{{filteredCars.length}}">
+    <car-card
+      wx:for="{{filteredCars}}"
+      wx:key="id"
+      car="{{item}}"
+      bind:cardtap="handleCarTap"
+    />
+  </view>
+
+  <view class="empty-state" wx:else>
+    <view class="empty-title">暂无车辆</view>
+    <view class="empty-desc">{{emptyText}}</view>
+  </view>
+
+  <view class="bottom-bar">
+    <button class="bottom-action action-contact" open-type="contact">客服</button>
+    <button class="bottom-action bottom-action-offset" bindtap="handlePhoneCall">电话</button>
+    <button class="bottom-action bottom-action-offset" open-type="share">分享</button>
+    <button class="bottom-action bottom-action-offset" bindtap="handleMineTap">我的</button>
+  </view>
+</view>

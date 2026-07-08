@@ -1,0 +1,91 @@
+<view class="booking-page" wx:if="{{carName}}">
+  <view class="booking-card car-card">
+    <view class="section-title">预约车辆</view>
+    <view class="car-name">{{carName}}</view>
+    <view class="section-desc">提交预约后，客服将与您确认车辆档期和具体细节。</view>
+  </view>
+
+  <view class="booking-card">
+    <view class="section-title">填写信息</view>
+
+    <view class="form-item">
+      <view class="form-label">姓名</view>
+      <input
+        class="form-input"
+        placeholder="请输入姓名"
+        value="{{form.userName}}"
+        data-field="userName"
+        bindinput="handleInput"
+      />
+    </view>
+
+    <view class="form-item">
+      <view class="form-label">手机号</view>
+      <input
+        class="form-input"
+        type="digit"
+        maxlength="11"
+        placeholder="请输入手机号"
+        value="{{form.phone}}"
+        data-field="phone"
+        bindinput="handleInput"
+      />
+    </view>
+
+    <view class="form-item">
+      <view class="form-label">取车日期</view>
+      <picker mode="date" value="{{form.startDate}}" start="{{today}}" data-field="startDate" bindchange="handleDateChange">
+        <view class="form-picker {{form.startDate ? 'form-picker-filled' : ''}}">
+          {{form.startDate || '请选择取车日期'}}
+        </view>
+      </picker>
+    </view>
+
+    <view class="form-item">
+      <view class="form-label">还车日期</view>
+      <picker mode="date" value="{{form.endDate}}" start="{{endMinDate}}" data-field="endDate" bindchange="handleDateChange">
+        <view class="form-picker {{form.endDate ? 'form-picker-filled' : ''}}">
+          {{form.endDate || '请选择还车日期'}}
+        </view>
+      </picker>
+    </view>
+
+    <view class="form-item">
+      <view class="form-label">城市</view>
+      <input
+        class="form-input"
+        placeholder="请输入取车城市"
+        value="{{form.city}}"
+        data-field="city"
+        bindinput="handleInput"
+      />
+    </view>
+
+    <view class="form-item">
+      <view class="form-label">备注</view>
+      <textarea
+        class="form-textarea"
+        placeholder="请输入备注信息"
+        value="{{form.note}}"
+        data-field="note"
+        bindinput="handleInput"
+        maxlength="200"
+      />
+    </view>
+  </view>
+
+  <view class="booking-card">
+    <view class="section-title">说明</view>
+    <view class="section-desc">{{privacyTip}}</view>
+  </view>
+
+  <button class="submit-button {{isSubmitting ? 'submit-button-disabled' : ''}}" bindtap="handleSubmit" disabled="{{isSubmitting}}">
+    {{submitButtonText}}
+  </button>
+</view>
+
+<view class="empty-page" wx:else>
+  <view class="empty-title">预约咨询</view>
+  <view class="empty-desc">{{notFoundText}}</view>
+  <button class="empty-action" bindtap="handleBackGarage">返回车库首页</button>
+</view>

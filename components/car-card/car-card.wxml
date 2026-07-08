@@ -1,0 +1,19 @@
+<view class="car-card" bindtap="handleTap">
+  <image class="car-cover" src="{{car.cover}}" mode="aspectFill" />
+  <view class="car-overlay">
+    <view class="car-top">
+      <view class="car-nickname">{{car.nickname}}</view>
+      <view class="car-status {{car.statusClass}}">{{car.statusText}}</view>
+    </view>
+
+    <view class="car-bottom">
+      <view class="car-meta">
+        <view class="car-name">{{car.name}}</view>
+        <view class="car-tags">
+          <text wx:for="{{car.tags}}" wx:key="*this" class="car-tag">{{item}}</text>
+        </view>
+      </view>
+      <view class="car-price">{{car.priceText}}</view>
+    </view>
+  </view>
+</view>

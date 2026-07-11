@@ -1,5 +1,5 @@
 const cloud = require("wx-server-sdk")
-const vehicleUtils = require("./shared/vehicle")
+const vehicleUtils = require("./vehicle")
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
@@ -64,6 +64,8 @@ exports.main = async (event) => {
     const addRes = await db.collection("vehicles").add({
       data: {
         ...payload,
+        imageList: [],
+        coverImage: "",
         createdAt: now,
         updatedAt: now,
         createdByOpenid: openid

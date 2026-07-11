@@ -54,6 +54,49 @@ Page({
     }
   },
 
+  navigateToImageManage(id) {
+    if (!id) {
+      this.finishSubmitFlow()
+      return
+    }
+
+    wx.redirectTo({
+      url: `/pages/vehicle-detail-manage/vehicle-detail-manage?id=${id}`,
+      fail: () => {
+        wx.navigateTo({
+          url: `/pages/vehicle-detail-manage/vehicle-detail-manage?id=${id}`,
+          fail: () => {
+            this.finishSubmitFlow()
+          }
+        })
+      }
+    })
+  },
+
+  finishSubmitFlow() {
+    const pages = getCurrentPages()
+    if (pages.length > 1) {
+      wx.navigateBack({
+        delta: 1,
+        fail: () => {
+          wx.redirectTo({
+            url: "/pages/mine/mine"
+          })
+        }
+      })
+      return
+    }
+
+    wx.redirectTo({
+      url: "/pages/mine/mine",
+      fail: () => {
+        wx.reLaunch({
+          url: "/pages/mine/mine"
+        })
+      }
+    })
+  },
+
   onLoad() {
     const app = getApp()
     const env =
@@ -179,35 +222,27 @@ Page({
         const result = res && res.result ? res.result : null
 
         if (result && result.ok) {
-          wx.showToast({
-            title: "新增成功",
-            icon: "success",
-            duration: 1200
+          this.setData({
+            isSubmitting: false
           })
 
-          setTimeout(() => {
-            const pages = getCurrentPages()
-            if (pages.length > 1) {
-              wx.navigateBack({
-                delta: 1,
-                fail: () => {
-                  wx.redirectTo({
-                    url: "/pages/mine/mine"
-                  })
-                }
-              })
-              return
-            }
-
-            wx.redirectTo({
-              url: "/pages/mine/mine",
-              fail: () => {
-                wx.reLaunch({
-                  url: "/pages/mine/mine"
-                })
+          wx.showModal({
+            title: "新增成功",
+            content: "车辆已创建，是否现在上传车辆图片？",
+            confirmText: "去上传",
+            cancelText: "稍后",
+            success: (modalRes) => {
+              if (modalRes.confirm) {
+                this.navigateToImageManage(result.id)
+                return
               }
-            })
-          }, 900)
+
+              this.finishSubmitFlow()
+            },
+            fail: () => {
+              this.finishSubmitFlow()
+            }
+          })
           return
         }
 

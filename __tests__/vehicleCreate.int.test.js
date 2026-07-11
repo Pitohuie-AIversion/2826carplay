@@ -88,6 +88,8 @@ describe("cloudfunctions/vehicleCreate integration", () => {
         brandModel: "Toyota",
         registerDate: "2026-07-08",
         status: "active",
+        imageList: [],
+        coverImage: "",
         createdAt: mocks.serverDateValue,
         updatedAt: mocks.serverDateValue,
         createdByOpenid: "admin_openid"

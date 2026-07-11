@@ -73,6 +73,7 @@
 }
 
 .submit-button {
+  flex: 1;
   height: 92rpx;
   border-radius: 14rpx;
   background: #2f80ed;
@@ -81,6 +82,23 @@
   line-height: 92rpx;
 }
 
+.action-row {
+  display: flex;
+  gap: 20rpx;
+}
+
+.secondary-button {
+  flex: 1;
+  height: 92rpx;
+  border: 1rpx solid #3a3a3a;
+  border-radius: 14rpx;
+  background: #181818;
+  color: #ffffff;
+  font-size: 30rpx;
+  line-height: 92rpx;
+}
+
+.secondary-button::after,
 .submit-button::after {
   border: 0;
 }

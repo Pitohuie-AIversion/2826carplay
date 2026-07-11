@@ -224,6 +224,16 @@ Page({
     })
   },
 
+  handleManageImages() {
+    if (!this.data.id || this.data.loading) {
+      return
+    }
+
+    wx.navigateTo({
+      url: `/pages/vehicle-detail-manage/vehicle-detail-manage?id=${this.data.id}`
+    })
+  },
+
   getValidationMessage(result) {
     const details = result && result.details
     const errors = details && details.errors

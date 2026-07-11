@@ -34,6 +34,24 @@
   line-height: 1.7;
 }
 
+.tip-card {
+  background: #151515;
+}
+
+.tip-title {
+  color: #ffffff;
+  font-size: 28rpx;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.tip-desc {
+  margin-top: 12rpx;
+  color: #a8a8a8;
+  font-size: 24rpx;
+  line-height: 1.7;
+}
+
 .form-item {
   margin-top: 24rpx;
 }

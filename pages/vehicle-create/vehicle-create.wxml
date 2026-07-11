@@ -1,7 +1,12 @@
 <view class="vehicle-create-page">
   <view class="card header-card">
     <view class="page-title">新增车辆</view>
-    <view class="page-desc">请按实际车辆信息填写，提交后将创建车辆记录。</view>
+    <view class="page-desc">请按实际车辆信息填写，提交后可直接进入图片管理继续上传车辆图片。</view>
+  </view>
+
+  <view class="card tip-card">
+    <view class="tip-title">图片上传说明</view>
+    <view class="tip-desc">车辆创建成功后，可立即进入详情页上传图片、设置封面并管理已上传素材。</view>
   </view>
 
   <view class="card form-card">

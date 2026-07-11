@@ -1,7 +1,7 @@
 <view class="vehicle-edit-page">
   <view class="hero-card">
     <view class="hero-title">编辑车辆</view>
-    <view class="hero-desc">修改车辆基础信息并保存到云数据库。</view>
+    <view class="hero-desc">修改车辆基础信息并保存到云数据库，也可进入图片管理维护车辆封面与相册。</view>
   </view>
 
   <view class="loading-card" wx:if="{{loading}}">
@@ -61,8 +61,13 @@
       </view>
     </view>
 
-    <button class="submit-button" bindtap="handleSubmit" loading="{{isSubmitting}}" disabled="{{isSubmitting}}">
-      {{isSubmitting ? "保存中" : "保存修改"}}
-    </button>
+    <view class="action-row">
+      <button class="secondary-button" bindtap="handleManageImages" disabled="{{loading || isSubmitting}}">
+        管理图片
+      </button>
+      <button class="submit-button" bindtap="handleSubmit" loading="{{isSubmitting}}" disabled="{{isSubmitting}}">
+        {{isSubmitting ? "保存中" : "保存修改"}}
+      </button>
+    </view>
   </view>
 </view>

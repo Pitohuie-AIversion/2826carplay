@@ -9,10 +9,12 @@ App({
         env: this.globalData.cloudEnvId,
         traceUser: true
       })
-    } catch (error) {}
+    } catch (error) {
+      return
+    }
   },
 
   globalData: {
-    cloudEnvId: "cloud1-d8gtmns36320e045e"
+    cloudEnvId: "cloud1-d8gtmns36320e045e",
   }
 })

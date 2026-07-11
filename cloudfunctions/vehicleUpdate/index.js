@@ -1,5 +1,5 @@
 const cloud = require("wx-server-sdk")
-const vehicleUtils = require("./shared/vehicle")
+const vehicleUtils = require("./vehicle")
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 

@@ -54,13 +54,20 @@ describe("cloudfunctions/vehicleDelete integration", () => {
   test("admin 合法删除车辆", async () => {
     const mocks = createMockDb({
       rolesData: [{ role: "admin" }],
-      currentData: { _id: "car_1", plateNumber: "京A12345" },
+      currentData: {
+        _id: "car_1",
+        plateNumber: "京A12345",
+        imageList: ["cloud://img1", "cloud://img2"],
+        coverImage: "cloud://img2"
+      },
       removeResult: { stats: { removed: 1 } }
     })
 
     const vehicleDelete = await loadVehicleDeleteWith({ openid: "admin_openid", mockDb: mocks.db })
 
     const res = await vehicleDelete.main({ id: "car_1" })
+
+    const cloud = require("wx-server-sdk")
 
     expect(res).toEqual({
       ok: true,
@@ -70,6 +77,9 @@ describe("cloudfunctions/vehicleDelete integration", () => {
     expect(mocks.rolesWhere).toHaveBeenCalledWith({ openid: "admin_openid" })
     expect(mocks.vehiclesDoc).toHaveBeenCalledWith("car_1")
     expect(mocks.remove).toHaveBeenCalledTimes(1)
+    expect(cloud.deleteFile).toHaveBeenCalledWith({
+      fileList: ["cloud://img1", "cloud://img2"]
+    })
   })
 
   test("缺少 id 返回 VALIDATION_ERROR", async () => {

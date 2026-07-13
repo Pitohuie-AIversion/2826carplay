@@ -22,7 +22,7 @@
 
 .hero-title {
   color: #ffffff;
-  font-size: 34rpx;
+  font-size: 32rpx;
   font-weight: 700;
   line-height: 1.4;
 }
@@ -39,14 +39,14 @@
   margin-bottom: 28rpx;
 }
 
-.field-group:last-child {
+.field-group-last {
   margin-bottom: 0;
 }
 
 .field-label {
   margin-bottom: 12rpx;
   color: #ffffff;
-  font-size: 28rpx;
+  font-size: 24rpx;
   line-height: 1.4;
 }
 
@@ -58,8 +58,21 @@
   border-radius: 14rpx;
   background: #121212;
   color: #ffffff;
+  font-size: 24rpx;
+  line-height: 1.5;
+  box-sizing: border-box;
+}
+
+.field-textarea {
+  width: 100%;
+  min-height: 168rpx;
+  padding: 24rpx;
+  border: 1rpx solid #343434;
+  border-radius: 14rpx;
+  background: #121212;
+  color: #ffffff;
   font-size: 28rpx;
-  line-height: 1.4;
+  line-height: 1.6;
   box-sizing: border-box;
 }
 
@@ -78,8 +91,12 @@
   border-radius: 14rpx;
   background: #2f80ed;
   color: #ffffff;
-  font-size: 30rpx;
+  padding: 0 18rpx;
+  font-size: 28rpx;
   line-height: 92rpx;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .action-row {
@@ -94,8 +111,12 @@
   border-radius: 14rpx;
   background: #181818;
   color: #ffffff;
-  font-size: 30rpx;
+  padding: 0 18rpx;
+  font-size: 28rpx;
   line-height: 92rpx;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .secondary-button::after,

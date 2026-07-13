@@ -72,7 +72,13 @@ describe("cloudfunctions/vehicleCreate integration", () => {
       vehicleType: "sedan",
       brandModel: "Toyota",
       registerDate: "2026-07-08",
-      status: "active"
+      status: "active",
+      location: "杭州",
+      transmission: "automatic",
+      fuelType: "gasoline",
+      seats: 5,
+      priceDay: 699,
+      note: "门店主推"
     })
 
     expect(res).toEqual({ ok: true, id: "new_id" })
@@ -88,6 +94,12 @@ describe("cloudfunctions/vehicleCreate integration", () => {
         brandModel: "Toyota",
         registerDate: "2026-07-08",
         status: "active",
+        location: "杭州",
+        transmission: "automatic",
+        fuelType: "gasoline",
+        seats: 5,
+        priceDay: 699,
+        note: "门店主推",
         imageList: [],
         coverImage: "",
         createdAt: mocks.serverDateValue,

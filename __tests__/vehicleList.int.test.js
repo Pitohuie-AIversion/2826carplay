@@ -59,6 +59,11 @@ describe("cloudfunctions/vehicleList integration", () => {
           brandModel: "BMW 740Li",
           registerDate: "2024-01-01",
           status: "active",
+          location: "杭州",
+          transmission: "automatic",
+          fuelType: "gasoline",
+          seats: 5,
+          priceDay: 1299,
           createdByOpenid: "admin_1",
           updatedAt: "2026-07-08T10:00:00.000Z"
         },
@@ -69,6 +74,11 @@ describe("cloudfunctions/vehicleList integration", () => {
           brandModel: "Audi Q5",
           registerDate: "2023-05-10",
           status: "maintenance",
+          location: "上海",
+          transmission: "automatic",
+          fuelType: "gasoline",
+          seats: 5,
+          priceDay: 899,
           createdByOpenid: "admin_2",
           updatedAt: "2026-07-08T08:00:00.000Z"
         }
@@ -93,6 +103,8 @@ describe("cloudfunctions/vehicleList integration", () => {
     })
     expect(res.list[0].id).toBe("v1")
     expect(res.list[0].plateNumber).toBe("京A12345")
+    expect(res.list[0].location).toBe("杭州")
+    expect(res.list[0].priceDay).toBe(1299)
     expect(mocks.rolesWhere).toHaveBeenCalledWith({ openid: "admin_openid" })
     expect(mocks.rolesLimit).toHaveBeenCalledWith(20)
     expect(mocks.vehiclesLimit).toHaveBeenCalledWith(100)
@@ -108,7 +120,8 @@ describe("cloudfunctions/vehicleList integration", () => {
           vehicleType: "sedan",
           brandModel: "BMW 740Li",
           registerDate: "2024-01-01",
-          status: "active"
+          status: "active",
+          location: "杭州"
         },
         {
           _id: "v2",
@@ -116,7 +129,8 @@ describe("cloudfunctions/vehicleList integration", () => {
           vehicleType: "suv",
           brandModel: "Audi Q5",
           registerDate: "2023-05-10",
-          status: "maintenance"
+          status: "maintenance",
+          location: "上海"
         }
       ]
     })
@@ -144,7 +158,8 @@ describe("cloudfunctions/vehicleList integration", () => {
           vehicleType: "sedan",
           brandModel: "BMW 740Li",
           registerDate: "2024-01-01",
-          status: "active"
+          status: "active",
+          location: "杭州"
         },
         {
           _id: "v2",
@@ -152,7 +167,8 @@ describe("cloudfunctions/vehicleList integration", () => {
           vehicleType: "suv",
           brandModel: "Audi Q5",
           registerDate: "2023-05-10",
-          status: "maintenance"
+          status: "maintenance",
+          location: "上海"
         }
       ]
     })
@@ -163,6 +179,45 @@ describe("cloudfunctions/vehicleList integration", () => {
     })
 
     const res = await vehicleList.main({ keyword: "audi" })
+
+    expect(res.ok).toBe(true)
+    expect(res.total).toBe(1)
+    expect(res.list[0].id).toBe("v2")
+  })
+
+  test("admin 可按扩展展示字段关键词筛选车辆", async () => {
+    const mocks = createMockDb({
+      rolesData: [{ role: "admin" }],
+      vehiclesData: [
+        {
+          _id: "v1",
+          plateNumber: "京A12345",
+          vehicleType: "sedan",
+          brandModel: "BMW 740Li",
+          registerDate: "2024-01-01",
+          status: "active",
+          location: "杭州",
+          fuelType: "gasoline"
+        },
+        {
+          _id: "v2",
+          plateNumber: "沪B67890",
+          vehicleType: "suv",
+          brandModel: "Audi Q5",
+          registerDate: "2023-05-10",
+          status: "maintenance",
+          location: "上海",
+          fuelType: "electric"
+        }
+      ]
+    })
+
+    const vehicleList = await loadVehicleListWith({
+      openid: "admin_openid",
+      mockDb: mocks.db
+    })
+
+    const res = await vehicleList.main({ keyword: "上海" })
 
     expect(res.ok).toBe(true)
     expect(res.total).toBe(1)

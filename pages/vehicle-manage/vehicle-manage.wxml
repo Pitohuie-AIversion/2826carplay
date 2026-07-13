@@ -9,7 +9,7 @@
     <view class="search-row">
       <input
         class="search-input"
-        placeholder="搜索车牌号 / 品牌型号"
+        placeholder="搜索车牌号 / 品牌型号 / 城市"
         value="{{keyword}}"
         bindinput="handleKeywordInput"
         bindconfirm="handleKeywordConfirm"
@@ -77,6 +77,26 @@
             <view class="meta-item">
               <view class="meta-label">注册日期</view>
               <view class="meta-value">{{item.registerDate}}</view>
+            </view>
+            <view class="meta-item">
+              <view class="meta-label">取车城市</view>
+              <view class="meta-value">{{item.locationText}}</view>
+            </view>
+            <view class="meta-item">
+              <view class="meta-label">日租金</view>
+              <view class="meta-value">{{item.priceDayText}}</view>
+            </view>
+            <view class="meta-item">
+              <view class="meta-label">变速箱</view>
+              <view class="meta-value">{{item.transmissionText}}</view>
+            </view>
+            <view class="meta-item">
+              <view class="meta-label">燃油类型</view>
+              <view class="meta-value">{{item.fuelTypeText}}</view>
+            </view>
+            <view class="meta-item">
+              <view class="meta-label">座位数</view>
+              <view class="meta-value">{{item.seatsText}}</view>
             </view>
             <view class="meta-item">
               <view class="meta-label">更新时间</view>

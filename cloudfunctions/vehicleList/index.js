@@ -101,6 +101,7 @@ function matchesKeyword(item, keyword) {
   }
 
   const source = [item.plateNumber, item.brandModel, item.vehicleType, item.status]
+    .concat([item.location, item.transmission, item.fuelType, item.priceDay])
     .filter(Boolean)
     .join(" ")
     .toUpperCase()
@@ -142,6 +143,11 @@ exports.main = async (event) => {
       brandModel: item.brandModel || "",
       registerDate: item.registerDate || "",
       status: item.status || "",
+      location: item.location || "",
+      transmission: item.transmission || "",
+      fuelType: item.fuelType || "",
+      seats: item.seats === undefined ? null : item.seats,
+      priceDay: item.priceDay === undefined ? null : item.priceDay,
       vin: item.vin || "",
       engineNumber: item.engineNumber || "",
       note: item.note || "",

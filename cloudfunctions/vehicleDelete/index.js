@@ -48,6 +48,44 @@ async function isAdminOpenid(openid) {
   return list.some((item) => hasAdminRole(item))
 }
 
+function normalizeStringArray(input) {
+  if (!Array.isArray(input)) {
+    return []
+  }
+
+  const result = []
+  input.forEach((item) => {
+    const value = String(item || "").trim()
+    if (value && !result.includes(value)) {
+      result.push(value)
+    }
+  })
+
+  return result
+}
+
+async function deleteFilesBestEffort(fileList, context) {
+  const list = normalizeStringArray(fileList)
+  if (!list.length) {
+    return
+  }
+
+  try {
+    await cloud.deleteFile({ fileList: list })
+  } catch (error) {
+    console.error({
+      function: "vehicleDelete",
+      stage: "deleteFile",
+      fileCount: list.length,
+      fileList: list,
+      context: context || {},
+      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
+      stack: error && error.stack ? error.stack : "",
+      createdAt: new Date().toISOString()
+    })
+  }
+}
+
 exports.main = async (event) => {
   const wxContext = cloud.getWXContext()
   const openid = wxContext && wxContext.OPENID ? wxContext.OPENID : ""
@@ -72,6 +110,10 @@ exports.main = async (event) => {
     }
 
     await db.collection("vehicles").doc(id).remove()
+
+    const coverImage = String((current && current.coverImage) || "").trim()
+    const fileList = normalizeStringArray(current && current.imageList).concat(coverImage ? [coverImage] : [])
+    await deleteFilesBestEffort(fileList, { openid, id })
 
     return {
       ok: true,

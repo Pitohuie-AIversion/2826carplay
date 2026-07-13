@@ -1,14 +1,24 @@
-// Phase 9 note:
-// 当前首页直接读取本地 mock 数据。
-// 后续接入云数据库时，可在这里替换为云端读取或统一数据服务层，
-// 但 filteredCars / currentCategory / carId 跳转逻辑应保持不变。
-const cars = require("../../data/cars")
-const categories = require("../../data/categories")
+const mockCars = require("../../data/cars")
+const mockCategories = require("../../data/categories")
+
+const CATEGORY_LABEL_MAP = {
+  all: "全部",
+  sedan: "轿车",
+  suv: "SUV",
+  mpv: "MPV",
+  sports: "跑车",
+  truck: "卡车",
+  other: "其他"
+}
+
+mockCategories.forEach((item) => {
+  CATEGORY_LABEL_MAP[item.id] = item.name
+})
 
 function getStatusText(status, fallbackText) {
   const statusTextMap = {
     available: "在库",
-    rented: "已租出",
+    rented: "在用",
     maintenance: "维护中",
     reserved: "已预约"
   }
@@ -31,21 +41,65 @@ function attachStatusClass(car) {
   }
 }
 
-function buildCategoriesWithCount(categoryList, carList) {
-  return categoryList.map((category) => {
-    const count = carList.filter((car) => car.category === category.id).length
+function sortCars(carList) {
+  return carList
+    .slice()
+    .sort((prev, next) => {
+      const prevSort = Number(prev.sort || 0)
+      const nextSort = Number(next.sort || 0)
+      if (prevSort > 1000000 || nextSort > 1000000) {
+        return nextSort - prevSort
+      }
 
-    return {
-      ...category,
-      count
+      return prevSort - nextSort
+    })
+    .map(attachStatusClass)
+}
+
+function buildCategoriesWithCount(carList) {
+  const countMap = {}
+
+  carList.forEach((car) => {
+    const categoryId = String(car.category || "").trim()
+    if (!categoryId) {
+      return
     }
+
+    countMap[categoryId] = (countMap[categoryId] || 0) + 1
   })
+
+  const dynamicCategories = Object.keys(countMap)
+    .sort()
+    .map((id) => ({
+      id,
+      name: CATEGORY_LABEL_MAP[id] || id,
+      count: countMap[id]
+    }))
+
+  return [
+    {
+      id: "all",
+      name: "全部",
+      count: carList.length
+    }
+  ].concat(dynamicCategories)
+}
+
+function buildCategorySummary(categoryId, categories, filteredCars) {
+  const currentCategory = categories.find((category) => category.id === categoryId) || {}
+  const availableCars = filteredCars.filter((car) => car.status === "available").length
+
+  return {
+    name: currentCategory.name || "",
+    total: filteredCars.length,
+    available: availableCars
+  }
 }
 
 Page({
   data: {
     pageTitle: "极境车库",
-    pageSubtitle: "精选个性车型，预约你的下一次驾驶体验",
+    pageSubtitle: "后台车辆资料已接入首页展示，上传封面后会同步展示到车库首页",
     emptyText: "当前分类暂无车辆，更多车型即将入库",
     categorySummary: {
       name: "",
@@ -53,39 +107,86 @@ Page({
       available: 0
     },
     servicePhone: "4008001234",
-    currentCategory: "mini_fun",
+    currentCategory: "all",
     categories: [],
     cars: [],
     filteredCars: []
   },
 
   onLoad() {
-    const sortedCars = cars
-      .slice()
-      .sort((prev, next) => prev.sort - next.sort)
-      .map(attachStatusClass)
+    const app = getApp()
+    const env =
+      app &&
+      app.globalData &&
+      app.globalData.cloudEnvId
+        ? app.globalData.cloudEnvId
+        : undefined
+
+    if (wx.cloud && typeof wx.cloud.init === "function") {
+      try {
+        wx.cloud.init({
+          env,
+          traceUser: true
+        })
+      } catch (error) {}
+    }
+
+    this.loadCars()
+  },
+
+  onShow() {
+    this.loadCars()
+  },
+
+  loadCars() {
+    if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
+      this.applyCars(mockCars)
+      return
+    }
+
+    wx.cloud.callFunction({
+      name: "garageVehicleList",
+      data: {},
+      success: (res) => {
+        const result = res && res.result ? res.result : null
+        if (!result || !result.ok || !Array.isArray(result.list)) {
+          this.applyCars(mockCars)
+          return
+        }
+
+        this.applyCars(result.list)
+      },
+      fail: () => {
+        this.applyCars(mockCars)
+      }
+    })
+  },
+
+  applyCars(carList) {
+    const sortedCars = sortCars(Array.isArray(carList) ? carList : [])
+    const categories = buildCategoriesWithCount(sortedCars)
+    const categoryIds = categories.map((item) => item.id)
+    const nextCategory = categoryIds.includes(this.data.currentCategory) ? this.data.currentCategory : "all"
 
     this.setData({
-      categories: buildCategoriesWithCount(categories, sortedCars),
+      categories,
       cars: sortedCars
     })
 
-    this.filterCars(this.data.currentCategory)
+    this.filterCars(nextCategory)
   },
 
   filterCars(categoryId) {
-    const filteredCars = this.data.cars.filter((car) => car.category === categoryId)
-    const currentCategory = this.data.categories.find((category) => category.id === categoryId) || {}
-    const availableCars = filteredCars.filter((car) => car.status === "available").length
+    const nextCategory = categoryId || "all"
+    const filteredCars =
+      nextCategory === "all"
+        ? this.data.cars.slice()
+        : this.data.cars.filter((car) => car.category === nextCategory)
 
     this.setData({
-      currentCategory: categoryId,
+      currentCategory: nextCategory,
       filteredCars,
-      categorySummary: {
-        name: currentCategory.name || "",
-        total: filteredCars.length,
-        available: availableCars
-      }
+      categorySummary: buildCategorySummary(nextCategory, this.data.categories, filteredCars)
     })
   },
 

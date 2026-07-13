@@ -31,6 +31,17 @@ const VEHICLE_TYPE_LABEL_MAP = {
   other: "其他"
 }
 
+const TRANSMISSION_LABEL_MAP = {
+  manual: "手动挡",
+  automatic: "自动挡"
+}
+
+const FUEL_TYPE_LABEL_MAP = {
+  gasoline: "燃油",
+  electric: "纯电",
+  hybrid: "混动"
+}
+
 function formatDisplayTime(value) {
   if (!value) {
     return ""
@@ -57,6 +68,14 @@ function buildStatusSummary(stats) {
     { key: "maintenance", label: "维修", value: stats.maintenance || 0 },
     { key: "retired", label: "停用", value: stats.retired || 0 }
   ]
+}
+
+function formatPriceDayText(priceDay) {
+  if (Number.isInteger(priceDay) && priceDay > 0) {
+    return `￥${priceDay} / 24小时`
+  }
+
+  return "--"
 }
 
 Page({
@@ -425,7 +444,13 @@ Page({
               statusText: STATUS_LABEL_MAP[item.status] || item.status || "未知",
               statusClass: STATUS_CLASS_MAP[item.status] || "status-idle",
               vehicleTypeText: VEHICLE_TYPE_LABEL_MAP[item.vehicleType] || item.vehicleType || "未知",
-              updatedAtText: formatDisplayTime(item.updatedAt || item.createdAt)
+              updatedAtText: formatDisplayTime(item.updatedAt || item.createdAt),
+              locationText: item.location ? String(item.location).trim() : "--",
+              priceDayText: formatPriceDayText(item.priceDay),
+              transmissionText:
+                TRANSMISSION_LABEL_MAP[item.transmission] || (item.transmission ? String(item.transmission) : "--"),
+              fuelTypeText: FUEL_TYPE_LABEL_MAP[item.fuelType] || (item.fuelType ? String(item.fuelType) : "--"),
+              seatsText: Number.isInteger(item.seats) && item.seats > 0 ? `${item.seats} 座` : "--"
             }))
           : []
 

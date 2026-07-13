@@ -2,7 +2,9 @@ const {
   isValidPlateNumber,
   isValidYmdDate,
   validateVehicle,
-  normalizePlateNumber
+  normalizePlateNumber,
+  TRANSMISSION_TYPES,
+  FUEL_TYPES
 } = require("../shared/vehicle")
 
 beforeAll(() => {
@@ -109,11 +111,43 @@ describe("shared/vehicle.js validateVehicle", () => {
       brandModel: "  Toyota  ",
       registerDate: "2026-07-08",
       status: "active",
+      location: "  杭州  ",
+      transmission: "automatic",
+      fuelType: "gasoline",
+      seats: "5",
+      priceDay: "699",
       note: "  ok "
     })
     expect(res.ok).toBe(true)
+    expect(TRANSMISSION_TYPES).toContain("automatic")
+    expect(FUEL_TYPES).toContain("gasoline")
     expect(res.value.plateNumber).toBe("京A12345")
     expect(res.value.brandModel).toBe("Toyota")
+    expect(res.value.location).toBe("杭州")
+    expect(res.value.transmission).toBe("automatic")
+    expect(res.value.fuelType).toBe("gasoline")
+    expect(res.value.seats).toBe(5)
+    expect(res.value.priceDay).toBe(699)
     expect(res.value.note).toBe("ok")
+  })
+
+  test("validateVehicle rejects invalid optional display fields", () => {
+    const res = validateVehicle({
+      plateNumber: "京A12345",
+      vehicleType: "sedan",
+      brandModel: "Toyota",
+      registerDate: "2026-07-08",
+      status: "active",
+      transmission: "cvt",
+      fuelType: "diesel",
+      seats: "10",
+      priceDay: "abc"
+    })
+
+    expect(res.ok).toBe(false)
+    expect(res.details.errors.some((e) => e.field === "transmission")).toBe(true)
+    expect(res.details.errors.some((e) => e.field === "fuelType")).toBe(true)
+    expect(res.details.errors.some((e) => e.field === "seats")).toBe(true)
+    expect(res.details.errors.some((e) => e.field === "priceDay")).toBe(true)
   })
 })

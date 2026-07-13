@@ -42,16 +42,17 @@
 
 .profile-name {
   color: #ffffff;
-  font-size: 34rpx;
+  font-size: 32rpx;
   font-weight: 600;
-  line-height: 1.4;
+  line-height: 1.45;
+  word-break: break-word;
 }
 
 .profile-brand {
   margin-top: 8rpx;
   color: #d0d0d0;
   font-size: 24rpx;
-  line-height: 1.4;
+  line-height: 1.6;
 }
 
 .profile-desc,
@@ -65,9 +66,9 @@
 
 .section-title {
   color: #ffffff;
-  font-size: 30rpx;
+  font-size: 28rpx;
   font-weight: 600;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .menu-item {
@@ -85,22 +86,26 @@
 
 .menu-title {
   color: #ffffff;
-  font-size: 28rpx;
+  font-size: 26rpx;
   line-height: 1.5;
 }
 
 .menu-arrow {
   flex-shrink: 0;
   color: #7f7f7f;
-  font-size: 28rpx;
+  font-size: 26rpx;
 }
 
 .action-button {
   height: 88rpx;
   margin-top: 20rpx;
   border-radius: 14rpx;
-  font-size: 28rpx;
+  padding: 0 16rpx;
+  font-size: 26rpx;
   line-height: 88rpx;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .action-button-offset {

@@ -59,6 +59,61 @@
         </view>
       </picker>
     </view>
+
+    <view class="form-item">
+      <view class="form-label">取车城市</view>
+      <input class="form-input" placeholder="例如 杭州" value="{{form.location}}" maxlength="20" data-field="location" bindinput="handleTextInput" />
+    </view>
+
+    <view class="form-item">
+      <view class="form-label">日租金</view>
+      <input class="form-input" type="number" placeholder="例如 699" value="{{form.priceDay}}" maxlength="5" data-field="priceDay" bindinput="handleTextInput" />
+    </view>
+
+    <view class="form-item">
+      <view class="form-label">变速箱</view>
+      <picker mode="selector" range="{{transmissionLabels}}" value="{{transmissionIndex}}" bindchange="handleTransmissionChange">
+        <view class="form-picker {{form.transmission ? 'form-picker-filled' : ''}}">
+          {{transmissionLabel || '请选择变速箱'}}
+        </view>
+      </picker>
+    </view>
+
+    <view class="form-item">
+      <view class="form-label">燃油类型</view>
+      <picker mode="selector" range="{{fuelTypeLabels}}" value="{{fuelTypeIndex}}" bindchange="handleFuelTypeChange">
+        <view class="form-picker {{form.fuelType ? 'form-picker-filled' : ''}}">
+          {{fuelTypeLabel || '请选择燃油类型'}}
+        </view>
+      </picker>
+    </view>
+
+    <view class="form-item">
+      <view class="form-label">座位数</view>
+      <input class="form-input" type="number" placeholder="例如 5" value="{{form.seats}}" maxlength="1" data-field="seats" bindinput="handleTextInput" />
+    </view>
+
+    <view class="form-item">
+      <view class="form-label">VIN</view>
+      <input class="form-input" placeholder="可选，最多 32 位" value="{{form.vin}}" maxlength="32" data-field="vin" bindinput="handleTextInput" />
+    </view>
+
+    <view class="form-item">
+      <view class="form-label">发动机号</view>
+      <input class="form-input" placeholder="可选，最多 32 位" value="{{form.engineNumber}}" maxlength="32" data-field="engineNumber" bindinput="handleTextInput" />
+    </view>
+
+    <view class="form-item">
+      <view class="form-label">备注说明</view>
+      <textarea
+        class="form-textarea"
+        placeholder="可填写车辆亮点、租赁提示等说明"
+        value="{{form.note}}"
+        maxlength="200"
+        data-field="note"
+        bindinput="handleTextInput"
+      />
+    </view>
   </view>
 
   <button

@@ -1,5 +1,9 @@
 <view class="car-card" bindtap="handleTap">
-  <image class="car-cover" src="{{car.cover}}" mode="aspectFill" />
+  <image wx:if="{{car.cover}}" class="car-cover" src="{{car.cover}}" mode="aspectFill" />
+  <view wx:else class="car-cover car-cover-placeholder">
+    <view class="car-cover-placeholder-title">{{car.brand || car.name}}</view>
+    <view class="car-cover-placeholder-desc">{{car.coverPlaceholderText || '待上传车辆封面'}}</view>
+  </view>
   <view class="car-overlay">
     <view class="car-top">
       <view class="car-nickname">{{car.nickname}}</view>

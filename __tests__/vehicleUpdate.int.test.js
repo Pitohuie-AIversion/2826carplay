@@ -77,7 +77,13 @@ describe("cloudfunctions/vehicleUpdate integration", () => {
       vehicleType: "sedan",
       brandModel: "BMW 740Li",
       registerDate: "2026-07-08",
-      status: "idle"
+      status: "idle",
+      location: "杭州",
+      transmission: "automatic",
+      fuelType: "gasoline",
+      seats: 5,
+      priceDay: 1299,
+      note: "行政旗舰"
     })
 
     expect(res).toEqual({ ok: true, id: "car_1" })
@@ -91,6 +97,12 @@ describe("cloudfunctions/vehicleUpdate integration", () => {
         brandModel: "BMW 740Li",
         registerDate: "2026-07-08",
         status: "idle",
+        location: "杭州",
+        transmission: "automatic",
+        fuelType: "gasoline",
+        seats: 5,
+        priceDay: 1299,
+        note: "行政旗舰",
         updatedAt: mocks.serverDateValue
       }
     })

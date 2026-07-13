@@ -86,6 +86,28 @@ function normalizeEvent(event) {
   }
 }
 
+async function deleteFilesBestEffort(fileList, context) {
+  const list = normalizeStringArray(fileList)
+  if (!list.length) {
+    return
+  }
+
+  try {
+    await cloud.deleteFile({ fileList: list })
+  } catch (error) {
+    console.error({
+      function: "vehicleImageUpdate",
+      stage: "deleteFile",
+      fileCount: list.length,
+      fileList: list,
+      context: context || {},
+      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
+      stack: error && error.stack ? error.stack : "",
+      createdAt: new Date().toISOString()
+    })
+  }
+}
+
 exports.main = async (event) => {
   const wxContext = cloud.getWXContext()
   const openid = wxContext && wxContext.OPENID ? wxContext.OPENID : ""
@@ -118,6 +140,7 @@ exports.main = async (event) => {
     const state = buildImageState(current)
     let nextImageList = state.imageList.slice()
     let nextCoverImage = state.coverImage
+    const shouldDeleteFile = input.action === "remove" && input.fileId && state.imageList.includes(input.fileId)
 
     if (input.action === "add") {
       if (!input.fileIds.length) {
@@ -179,6 +202,10 @@ exports.main = async (event) => {
         updatedAt: db.serverDate()
       }
     })
+
+    if (shouldDeleteFile) {
+      await deleteFilesBestEffort([input.fileId], { openid, id: input.id, action: input.action })
+    }
 
     return {
       ok: true,

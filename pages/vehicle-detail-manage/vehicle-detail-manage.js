@@ -21,6 +21,17 @@ const VEHICLE_TYPE_LABEL_MAP = {
   other: "其他"
 }
 
+const TRANSMISSION_LABEL_MAP = {
+  manual: "手动挡",
+  automatic: "自动挡"
+}
+
+const FUEL_TYPE_LABEL_MAP = {
+  gasoline: "燃油",
+  electric: "纯电",
+  hybrid: "混动"
+}
+
 function formatDisplayTime(value) {
   if (!value) {
     return "--"
@@ -63,6 +74,11 @@ function formatDetail(detail) {
     statusText: STATUS_LABEL_MAP[detail.status] || detail.status || "未知",
     statusClass: STATUS_CLASS_MAP[detail.status] || "status-idle",
     vehicleTypeText: VEHICLE_TYPE_LABEL_MAP[detail.vehicleType] || detail.vehicleType || "未知",
+    transmissionText: TRANSMISSION_LABEL_MAP[detail.transmission] || detail.transmission || "--",
+    fuelTypeText: FUEL_TYPE_LABEL_MAP[detail.fuelType] || detail.fuelType || "--",
+    seatsText: detail.seats ? `${detail.seats} 座` : "--",
+    locationText: detail.location || "--",
+    priceDayText: detail.priceDay || detail.priceDay === 0 ? `￥${detail.priceDay} / 24小时` : "--",
     createdAtText: formatDisplayTime(detail.createdAt),
     updatedAtText: formatDisplayTime(detail.updatedAt),
     vinText: detail.vin || "--",

@@ -1,10 +1,4 @@
-// Phase 9 note:
-// 当前预约页只做本地表单校验与提交提示，不创建真实订单。
-// 后续如接入云数据库，可在保留当前表单字段的前提下，
-// 将提交结果写入 bookings 集合或云端接口。
-// 建议预约字段继续保持：
-// carId, carName, userName, phone, startDate, endDate, city, note, status, createdAt
-const cars = require("../../data/cars")
+const mockCars = require("../../data/cars")
 
 function formatDate(date) {
   const year = date.getFullYear()
@@ -36,13 +30,61 @@ Page({
   },
 
   onLoad(options) {
-    const carId = options.carId || ""
-    const car = cars.find((item) => item.id === carId)
+    const app = getApp()
+    const env =
+      app &&
+      app.globalData &&
+      app.globalData.cloudEnvId
+        ? app.globalData.cloudEnvId
+        : undefined
 
+    if (wx.cloud && typeof wx.cloud.init === "function") {
+      try {
+        wx.cloud.init({
+          env,
+          traceUser: true
+        })
+      } catch (error) {}
+    }
+
+    const carId = String((options && options.carId) || "").trim()
     this.setData({
-      carId,
-      carName: car ? car.name : "",
-      "form.city": car ? car.location : ""
+      carId
+    })
+
+    this.loadBookingCar(carId)
+  },
+
+  loadBookingCar(carId) {
+    if (!carId) {
+      this.applyCar(null)
+      return
+    }
+
+    if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
+      this.applyCar(mockCars.find((item) => item.id === carId) || null)
+      return
+    }
+
+    wx.cloud.callFunction({
+      name: "garageVehicleList",
+      data: {},
+      success: (res) => {
+        const result = res && res.result ? res.result : null
+        const list = result && result.ok && Array.isArray(result.list) ? result.list : []
+        const car = list.find((item) => item.id === carId) || mockCars.find((item) => item.id === carId) || null
+        this.applyCar(car)
+      },
+      fail: () => {
+        this.applyCar(mockCars.find((item) => item.id === carId) || null)
+      }
+    })
+  },
+
+  applyCar(car) {
+    this.setData({
+      carName: car ? car.name || "" : "",
+      "form.city": car ? car.location || "" : ""
     })
 
     wx.setNavigationBarTitle({

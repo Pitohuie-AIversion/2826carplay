@@ -44,6 +44,11 @@ function normalizeUpdateInput(event) {
     brandModel: payload.brandModel,
     registerDate: payload.registerDate,
     status: payload.status,
+    location: payload.location,
+    transmission: payload.transmission,
+    fuelType: payload.fuelType,
+    seats: payload.seats,
+    priceDay: payload.priceDay,
     vin: payload.vin,
     engineNumber: payload.engineNumber,
     note: payload.note

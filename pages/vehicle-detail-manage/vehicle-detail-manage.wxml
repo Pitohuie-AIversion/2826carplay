@@ -29,6 +29,26 @@
           <view class="info-value">{{detail.registerDate || "--"}}</view>
         </view>
         <view class="info-item">
+          <view class="info-label">取车城市</view>
+          <view class="info-value">{{detail.locationText}}</view>
+        </view>
+        <view class="info-item">
+          <view class="info-label">日租金</view>
+          <view class="info-value">{{detail.priceDayText}}</view>
+        </view>
+        <view class="info-item">
+          <view class="info-label">变速箱</view>
+          <view class="info-value">{{detail.transmissionText}}</view>
+        </view>
+        <view class="info-item">
+          <view class="info-label">燃油类型</view>
+          <view class="info-value">{{detail.fuelTypeText}}</view>
+        </view>
+        <view class="info-item">
+          <view class="info-label">座位数</view>
+          <view class="info-value">{{detail.seatsText}}</view>
+        </view>
+        <view class="info-item">
           <view class="info-label">VIN</view>
           <view class="info-value">{{detail.vinText}}</view>
         </view>

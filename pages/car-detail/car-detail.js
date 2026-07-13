@@ -1,13 +1,9 @@
-// Phase 9 note:
-// 当前详情页按 carId 从本地 mock 数据中查询车辆。
-// 后续如接入云数据库，仍应继续以 carId 作为唯一查询条件，
-// 这里只替换数据来源，不改变页面展示结构与跳转逻辑。
-const cars = require("../../data/cars")
+const mockCars = require("../../data/cars")
 
 function getStatusText(status, fallbackText) {
   const statusTextMap = {
     available: "在库",
-    rented: "已租出",
+    rented: "在用",
     maintenance: "维护中",
     reserved: "已预约"
   }
@@ -33,19 +29,21 @@ function attachStatusClass(car) {
 function formatCarViewModel(car) {
   const transmissionMap = {
     manual: "手动挡",
-    automatic: "自动挡"
+    automatic: "自动挡",
+    unknown: "--"
   }
 
   const fuelTypeMap = {
     gasoline: "燃油",
     electric: "纯电",
-    hybrid: "混动"
+    hybrid: "混动",
+    unknown: "--"
   }
 
   const statusNoticeMap = {
     available: "",
     reserved: "该车当前已被预约，可先提交咨询，由客服为您确认候补档期或推荐相近车型。",
-    rented: "该车当前已租出，可先提交咨询，由客服为您确认预计归还时间或推荐相近车型。",
+    rented: "该车当前正在使用中，可先提交咨询，由客服为您确认可预约时间。",
     maintenance: "该车当前维护中，可先提交咨询，由客服为您确认恢复时间或推荐相近车型。"
   }
 
@@ -57,13 +55,19 @@ function formatCarViewModel(car) {
   }
 
   const statusCar = attachStatusClass(car)
+  const images = Array.isArray(car.images) && car.images.length ? car.images : car.cover ? [car.cover] : []
 
   return {
     ...statusCar,
+    images,
+    hasImages: images.length > 0,
     statusNoticeText: statusNoticeMap[car.status] || "",
     primaryActionText: primaryActionTextMap[car.status] || "立即预约",
-    transmissionText: transmissionMap[car.transmission] || car.transmission || "-",
-    fuelTypeText: fuelTypeMap[car.fuelType] || car.fuelType || "-"
+    transmissionText: transmissionMap[car.transmission] || car.transmission || "--",
+    fuelTypeText: fuelTypeMap[car.fuelType] || car.fuelType || "--",
+    seatsText: car.seatsText || (car.seats ? `${car.seats} 座` : "--"),
+    brand: car.brand || "未知品牌",
+    location: car.location || "门店咨询"
   }
 }
 
@@ -80,12 +84,60 @@ Page({
   },
 
   onLoad(options) {
-    const carId = options.carId || ""
-    const targetCar = cars.find((item) => item.id === carId)
+    const app = getApp()
+    const env =
+      app &&
+      app.globalData &&
+      app.globalData.cloudEnvId
+        ? app.globalData.cloudEnvId
+        : undefined
 
+    if (wx.cloud && typeof wx.cloud.init === "function") {
+      try {
+        wx.cloud.init({
+          env,
+          traceUser: true
+        })
+      } catch (error) {}
+    }
+
+    const carId = String((options && options.carId) || "").trim()
+    this.setData({
+      carId
+    })
+
+    this.loadCarDetail(carId)
+  },
+
+  loadCarDetail(carId) {
+    if (!carId) {
+      this.applyCar(null)
+      return
+    }
+
+    if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
+      this.applyCar(mockCars.find((item) => item.id === carId) || null)
+      return
+    }
+
+    wx.cloud.callFunction({
+      name: "garageVehicleList",
+      data: {},
+      success: (res) => {
+        const result = res && res.result ? res.result : null
+        const list = result && result.ok && Array.isArray(result.list) ? result.list : []
+        const targetCar = list.find((item) => item.id === carId) || mockCars.find((item) => item.id === carId) || null
+        this.applyCar(targetCar)
+      },
+      fail: () => {
+        this.applyCar(mockCars.find((item) => item.id === carId) || null)
+      }
+    })
+  },
+
+  applyCar(targetCar) {
     if (!targetCar) {
       this.setData({
-        carId,
         car: null
       })
       wx.setNavigationBarTitle({
@@ -95,12 +147,11 @@ Page({
     }
 
     this.setData({
-      carId,
       car: formatCarViewModel(targetCar)
     })
 
     wx.setNavigationBarTitle({
-      title: targetCar.name
+      title: targetCar.name || "车辆详情"
     })
   },
 

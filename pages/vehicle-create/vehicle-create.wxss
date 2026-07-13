@@ -22,7 +22,7 @@
 
 .page-title {
   color: #ffffff;
-  font-size: 34rpx;
+  font-size: 32rpx;
   font-weight: 600;
   line-height: 1.4;
 }
@@ -30,7 +30,7 @@
 .page-desc {
   margin-top: 14rpx;
   color: #b8b8b8;
-  font-size: 25rpx;
+  font-size: 24rpx;
   line-height: 1.7;
 }
 
@@ -40,9 +40,9 @@
 
 .tip-title {
   color: #ffffff;
-  font-size: 28rpx;
+  font-size: 26rpx;
   font-weight: 600;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .tip-desc {
@@ -63,7 +63,7 @@
 .form-label {
   margin-bottom: 12rpx;
   color: #ffffff;
-  font-size: 26rpx;
+  font-size: 24rpx;
   line-height: 1.4;
 }
 
@@ -75,7 +75,7 @@
   border-radius: 14rpx;
   background: #141414;
   color: #ffffff;
-  font-size: 26rpx;
+  font-size: 24rpx;
   line-height: 1.5;
   box-sizing: border-box;
 }
@@ -88,14 +88,31 @@
   color: #ffffff;
 }
 
+.form-textarea {
+  width: 100%;
+  min-height: 168rpx;
+  padding: 24rpx 22rpx;
+  border: 1rpx solid #323232;
+  border-radius: 14rpx;
+  background: #141414;
+  color: #ffffff;
+  font-size: 26rpx;
+  line-height: 1.6;
+  box-sizing: border-box;
+ }
+
 .submit-button {
   height: 92rpx;
   margin-top: 12rpx;
   border-radius: 14rpx;
   background: #2f80ed;
   color: #ffffff;
-  font-size: 30rpx;
+  padding: 0 18rpx;
+  font-size: 28rpx;
   line-height: 92rpx;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .submit-button-disabled {

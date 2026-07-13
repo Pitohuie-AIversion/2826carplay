@@ -7,6 +7,7 @@ function createCloud() {
     init: jest.fn(),
     database: jest.fn(() => mockDb),
     getWXContext: jest.fn(() => mockContext),
+    deleteFile: jest.fn().mockResolvedValue({ fileList: [] }),
     __setMockContext: (ctx) => {
       mockContext = ctx
     },
@@ -19,6 +20,7 @@ function createCloud() {
       cloud.init.mockClear()
       cloud.database.mockClear()
       cloud.getWXContext.mockClear()
+      cloud.deleteFile.mockClear()
     }
   }
 

@@ -2,6 +2,10 @@ const VEHICLE_TYPES = ["sedan", "suv", "mpv", "sports", "truck", "other"]
 
 const VEHICLE_STATUSES = ["active", "idle", "maintenance", "retired"]
 
+const TRANSMISSION_TYPES = ["manual", "automatic"]
+
+const FUEL_TYPES = ["gasoline", "electric", "hybrid"]
+
 const REQUIRED_FIELDS = ["plateNumber", "vehicleType", "brandModel", "registerDate", "status"]
 
 const PROVINCES = "京津沪渝冀豫云辽黑湘皖鲁新苏浙赣鄂桂甘晋蒙陕吉闽贵粤青藏川宁琼"
@@ -34,6 +38,32 @@ function createOk(value) {
 
 function normalizePlateNumber(input) {
   return String(input || "").trim().toUpperCase()
+}
+
+function normalizeOptionalText(input) {
+  if (input === undefined || input === null) {
+    return undefined
+  }
+
+  const value = String(input || "").trim()
+  return value || undefined
+}
+
+function normalizeOptionalInt(input) {
+  if (input === undefined || input === null || input === "") {
+    return undefined
+  }
+
+  const normalized = String(input).trim()
+  if (!normalized) {
+    return undefined
+  }
+
+  if (!/^\d+$/.test(normalized)) {
+    return Number.NaN
+  }
+
+  return Number(normalized)
 }
 
 function isValidPlateNumber(plateNumber) {
@@ -97,10 +127,14 @@ function normalizeVehicleInput(input) {
   const vehicleType = payload.vehicleType
   const status = payload.status
 
-  const vin = payload.vin === undefined ? undefined : String(payload.vin || "").trim()
-  const engineNumber =
-    payload.engineNumber === undefined ? undefined : String(payload.engineNumber || "").trim()
-  const note = payload.note === undefined ? undefined : String(payload.note || "").trim()
+  const location = normalizeOptionalText(payload.location)
+  const transmission = normalizeOptionalText(payload.transmission)
+  const fuelType = normalizeOptionalText(payload.fuelType)
+  const vin = normalizeOptionalText(payload.vin)
+  const engineNumber = normalizeOptionalText(payload.engineNumber)
+  const note = normalizeOptionalText(payload.note)
+  const seats = normalizeOptionalInt(payload.seats)
+  const priceDay = normalizeOptionalInt(payload.priceDay)
 
   const normalized = {
     plateNumber,
@@ -118,6 +152,21 @@ function normalizeVehicleInput(input) {
   }
   if (note !== undefined) {
     normalized.note = note
+  }
+  if (location !== undefined) {
+    normalized.location = location
+  }
+  if (transmission !== undefined) {
+    normalized.transmission = transmission
+  }
+  if (fuelType !== undefined) {
+    normalized.fuelType = fuelType
+  }
+  if (seats !== undefined) {
+    normalized.seats = seats
+  }
+  if (priceDay !== undefined) {
+    normalized.priceDay = priceDay
   }
 
   return normalized
@@ -153,6 +202,24 @@ function validateVehicle(input) {
       message: "车辆状态不合法",
       value: value.status,
       allowed: VEHICLE_STATUSES
+    })
+  }
+
+  if (value.transmission && !TRANSMISSION_TYPES.includes(value.transmission)) {
+    errors.push({
+      field: "transmission",
+      message: "变速箱类型不合法",
+      value: value.transmission,
+      allowed: TRANSMISSION_TYPES
+    })
+  }
+
+  if (value.fuelType && !FUEL_TYPES.includes(value.fuelType)) {
+    errors.push({
+      field: "fuelType",
+      message: "燃油类型不合法",
+      value: value.fuelType,
+      allowed: FUEL_TYPES
     })
   }
 
@@ -203,6 +270,24 @@ function validateVehicle(input) {
     }
   }
 
+  if (value.location !== undefined) {
+    if (value.location.length > 20) {
+      errors.push({ field: "location", message: "城市长度不能超过 20", value: value.location })
+    }
+  }
+
+  if (value.seats !== undefined) {
+    if (!Number.isInteger(value.seats) || value.seats < 1 || value.seats > 9) {
+      errors.push({ field: "seats", message: "座位数需为 1-9 的整数", value: value.seats })
+    }
+  }
+
+  if (value.priceDay !== undefined) {
+    if (!Number.isInteger(value.priceDay) || value.priceDay < 0 || value.priceDay > 99999) {
+      errors.push({ field: "priceDay", message: "日租金需为 0-99999 的整数", value: value.priceDay })
+    }
+  }
+
   if (errors.length) {
     return createError("VALIDATION_ERROR", "参数校验失败", { errors })
   }
@@ -213,8 +298,12 @@ function validateVehicle(input) {
 module.exports = {
   VEHICLE_TYPES,
   VEHICLE_STATUSES,
+  TRANSMISSION_TYPES,
+  FUEL_TYPES,
   REQUIRED_FIELDS,
   normalizePlateNumber,
+  normalizeOptionalText,
+  normalizeOptionalInt,
   isValidPlateNumber,
   isValidYmdDate,
   normalizeVehicleInput,
@@ -222,4 +311,3 @@ module.exports = {
   createError,
   createOk
 }
-

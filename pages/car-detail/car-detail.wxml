@@ -1,9 +1,14 @@
 <view class="detail-page" wx:if="{{car}}">
-  <swiper class="hero-swiper" indicator-dots="{{true}}" autoplay="{{false}}" circular="{{true}}">
+  <swiper wx:if="{{car.hasImages}}" class="hero-swiper" indicator-dots="{{true}}" autoplay="{{false}}" circular="{{true}}">
     <swiper-item wx:for="{{car.images}}" wx:key="*this">
       <image class="hero-image" src="{{item}}" mode="aspectFill" />
     </swiper-item>
   </swiper>
+  <view wx:else class="hero-swiper hero-placeholder">
+    <view class="hero-placeholder-brand">{{car.brand}}</view>
+    <view class="hero-placeholder-name">{{car.name}}</view>
+    <view class="hero-placeholder-text">该车辆暂未上传展示图片</view>
+  </view>
 
   <view class="summary-card">
     <view class="summary-top">
@@ -52,7 +57,7 @@
       </view>
       <view class="info-item">
         <view class="info-label">座位数</view>
-        <view class="info-value">{{car.seats}} 座</view>
+        <view class="info-value">{{car.seatsText}}</view>
       </view>
       <view class="info-item">
         <view class="info-label">车辆编号</view>

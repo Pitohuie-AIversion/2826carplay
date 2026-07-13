@@ -134,6 +134,8 @@ describe("cloudfunctions/vehicleImageUpdate integration", () => {
       fileId: "cloud://img1"
     })
 
+    const cloud = require("wx-server-sdk")
+
     expect(res).toEqual({
       ok: true,
       id: "car_1",
@@ -141,6 +143,9 @@ describe("cloudfunctions/vehicleImageUpdate integration", () => {
       imageList: ["cloud://img2"],
       coverImage: "cloud://img2",
       imageCount: 1
+    })
+    expect(cloud.deleteFile).toHaveBeenCalledWith({
+      fileList: ["cloud://img1"]
     })
   })
 

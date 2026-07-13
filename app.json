@@ -4,6 +4,7 @@
     "pages/car-detail/car-detail",
     "pages/booking/booking",
     "pages/mine/mine",
+    "pages/bookings/bookings",
     "pages/vehicle-create/vehicle-create",
     "pages/vehicle-manage/vehicle-manage",
     "pages/vehicle-edit/vehicle-edit",

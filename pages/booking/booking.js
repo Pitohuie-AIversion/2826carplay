@@ -189,30 +189,80 @@ Page({
 
     this.setData({
       isSubmitting: true,
-      submitButtonText: "已提交"
+      submitButtonText: "提交中"
     })
 
-    wx.showToast({
-      title: this.data.submitText,
-      icon: "none",
-      duration: 2500
-    })
+    if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
+      wx.showToast({
+        title: "云能力未初始化",
+        icon: "none"
+      })
 
-    setTimeout(() => {
       this.setData({
         isSubmitting: false,
-        submitButtonText: "提交预约",
-        form: {
-          userName: "",
-          phone: "",
-          startDate: "",
-          endDate: "",
-          city: defaultCity,
-          note: ""
-        },
-        endMinDate: this.data.today
+        submitButtonText: "提交预约"
       })
-    }, 2500)
+      return
+    }
+
+    wx.cloud.callFunction({
+      name: "bookingCreate",
+      data: {
+        vehicleId: this.data.carId,
+        userName: this.data.form.userName,
+        phone: this.data.form.phone,
+        startDate: this.data.form.startDate,
+        endDate: this.data.form.endDate,
+        city: this.data.form.city,
+        note: this.data.form.note
+      },
+      success: (res) => {
+        const result = res && res.result ? res.result : null
+        if (!result || !result.ok) {
+          wx.showToast({
+            title: (result && result.message) || "预约提交失败",
+            icon: "none"
+          })
+          this.setData({
+            isSubmitting: false,
+            submitButtonText: "提交预约"
+          })
+          return
+        }
+
+        wx.showToast({
+          title: this.data.submitText,
+          icon: "none",
+          duration: 2500
+        })
+
+        setTimeout(() => {
+          this.setData({
+            isSubmitting: false,
+            submitButtonText: "提交预约",
+            form: {
+              userName: "",
+              phone: "",
+              startDate: "",
+              endDate: "",
+              city: defaultCity,
+              note: ""
+            },
+            endMinDate: this.data.today
+          })
+        }, 2500)
+      },
+      fail: (error) => {
+        wx.showToast({
+          title: (error && (error.errMsg || error.message)) || "预约提交失败",
+          icon: "none"
+        })
+        this.setData({
+          isSubmitting: false,
+          submitButtonText: "提交预约"
+        })
+      }
+    })
   },
 
   handleBackGarage() {

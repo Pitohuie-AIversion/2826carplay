@@ -39,5 +39,6 @@
   "simulatorType": "wechat",
   "simulatorPluginLibVersion": {},
   "projectname": "jijing-garage",
-  "cloudfunctionRoot": "cloudfunctions/"
+  "cloudfunctionRoot": "cloudfunctions/",
+  "cloudfunctionTemplateRoot": "cloudfunctionTemplate/"
 }

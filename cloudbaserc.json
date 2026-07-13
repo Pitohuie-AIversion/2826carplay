@@ -1,0 +1,43 @@
+{
+  "$schema": "https://static.cloudbase.net/cli/cloudbaserc.schema.json",
+  "envId": "cloud1-d8gtmns36320e045e",
+  "functionRoot": "./cloudfunctions",
+  "functions": [
+    {
+      "name": "vehicleImageUpdate",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs16.13",
+      "memorySize": 256,
+      "installDependency": false
+    },
+    {
+      "name": "vehicleDelete",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs16.13",
+      "memorySize": 256,
+      "installDependency": false
+    },
+    {
+      "name": "bookingCreate",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs16.13",
+      "memorySize": 256,
+      "installDependency": false
+    },
+    {
+      "name": "bookingMyList",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs16.13",
+      "memorySize": 256,
+      "installDependency": false
+    }
+  ]
+}

@@ -192,6 +192,19 @@ Page({
       return
     }
 
+    if (key === "bookings") {
+      wx.navigateTo({
+        url: "/pages/bookings/bookings",
+        fail: () => {
+          wx.showToast({
+            title: "页面跳转失败",
+            icon: "none"
+          })
+        }
+      })
+      return
+    }
+
     wx.showToast({
       title: `${title} 即将开放`,
       icon: "none"

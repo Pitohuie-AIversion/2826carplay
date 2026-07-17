@@ -1,7 +1,7 @@
 Page({
   data: {
     brandName: "极境车库",
-    servicePhone: "4008001234",
+    servicePhone: "15715710090",
     userName: "车库来访者",
     userDesc: "静态展示页，更多个人功能将在后续版本完善",
     menuItems: [
@@ -9,6 +9,11 @@ Page({
         key: "vehicleManage",
         title: "车辆管理",
         desc: "查看已录入车辆并按状态筛选"
+      },
+      {
+        key: "bookingManage",
+        title: "预约管理",
+        desc: "管理员查看全部预约并更新状态"
       },
       {
         key: "bootstrapAdmin",
@@ -46,6 +51,24 @@ Page({
         desc: "价格、档期、押金和规则以客服最终确认为准"
       }
     ]
+  },
+
+  onLoad() {
+    let envVersion = "release"
+    try {
+      const info = wx.getAccountInfoSync ? wx.getAccountInfoSync() : null
+      envVersion =
+        info && info.miniProgram && info.miniProgram.envVersion
+          ? info.miniProgram.envVersion
+          : envVersion
+    } catch (error) {}
+
+    if (envVersion === "release") {
+      const nextMenuItems = this.data.menuItems.filter((item) => item.key !== "bootstrapAdmin")
+      this.setData({
+        menuItems: nextMenuItems
+      })
+    }
   },
 
   handleMenuTap(event) {
@@ -97,6 +120,15 @@ Page({
                 wx.showModal({
                   title: "管理员初始化结果",
                   content: `${title}\n\nOpenID：${(result && result.openid) || ""}`,
+                  showCancel: false
+                })
+                return
+              }
+
+              if (result && result.code === "BOOTSTRAP_TOKEN_REQUIRED") {
+                wx.showModal({
+                  title: "初始化失败",
+                  content: "管理员初始化已加锁，请在云函数控制台配置 BOOTSTRAP_TOKEN 后再初始化。",
                   showCancel: false
                 })
                 return
@@ -182,6 +214,19 @@ Page({
     if (key === "vehicleCreate") {
       wx.navigateTo({
         url: "/pages/vehicle-create/vehicle-create",
+        fail: () => {
+          wx.showToast({
+            title: "页面跳转失败",
+            icon: "none"
+          })
+        }
+      })
+      return
+    }
+
+    if (key === "bookingManage") {
+      wx.navigateTo({
+        url: "/pages/booking-manage/booking-manage",
         fail: () => {
           wx.showToast({
             title: "页面跳转失败",

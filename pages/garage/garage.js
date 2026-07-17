@@ -3,12 +3,12 @@ const mockCategories = require("../../data/categories")
 
 const CATEGORY_LABEL_MAP = {
   all: "全部",
-  sedan: "轿车",
-  suv: "SUV",
-  mpv: "MPV",
-  sports: "跑车",
-  truck: "卡车",
-  other: "其他"
+  luxury_sedan: "豪华轿车",
+  city_suv: "城市SUV",
+  offroad: "硬派越野",
+  supercar: "超级跑车",
+  commuter_ev: "代步电车",
+  pickup: "皮卡"
 }
 
 mockCategories.forEach((item) => {
@@ -68,7 +68,17 @@ function buildCategoriesWithCount(carList) {
     countMap[categoryId] = (countMap[categoryId] || 0) + 1
   })
 
+  const baseCategories = mockCategories
+    .map((item) => ({
+      id: String(item && item.id ? item.id : "").trim(),
+      name: String(item && item.name ? item.name : "").trim()
+    }))
+    .filter((item) => item.id)
+
+  const baseCategoryIds = baseCategories.map((item) => item.id)
+
   const dynamicCategories = Object.keys(countMap)
+    .filter((id) => !baseCategoryIds.includes(id))
     .sort()
     .map((id) => ({
       id,
@@ -76,13 +86,21 @@ function buildCategoriesWithCount(carList) {
       count: countMap[id]
     }))
 
+  const mergedBase = baseCategories.map((item) => ({
+    id: item.id,
+    name: item.name || CATEGORY_LABEL_MAP[item.id] || item.id,
+    count: countMap[item.id] || 0
+  }))
+
   return [
     {
       id: "all",
       name: "全部",
       count: carList.length
     }
-  ].concat(dynamicCategories)
+  ]
+    .concat(mergedBase)
+    .concat(dynamicCategories)
 }
 
 function buildCategorySummary(categoryId, categories, filteredCars) {
@@ -106,7 +124,7 @@ Page({
       total: 0,
       available: 0
     },
-    servicePhone: "4008001234",
+    servicePhone: "15715710090",
     currentCategory: "all",
     categories: [],
     cars: [],

@@ -35,6 +35,30 @@ async function isAdminOpenid(openid) {
   return list.some((item) => hasAdminRole(item))
 }
 
+async function writeErrorLogBestEffort(payload) {
+  try {
+    await db.collection("error_logs").add({
+      data: {
+        ...payload,
+        createdAt: db.serverDate()
+      }
+    })
+  } catch (error) {
+    const message = error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error)
+    if (String(message).includes("Unexpected collection:")) {
+      return
+    }
+
+    console.error({
+      function: "vehicleCreate",
+      stage: "errorLog",
+      errorMessage: message,
+      stack: error && error.stack ? error.stack : "",
+      createdAt: new Date().toISOString()
+    })
+  }
+}
+
 exports.main = async (event) => {
   const wxContext = cloud.getWXContext()
   const openid = wxContext && wxContext.OPENID ? wxContext.OPENID : ""
@@ -74,6 +98,15 @@ exports.main = async (event) => {
 
     return { ok: true, id: addRes && addRes._id ? addRes._id : "" }
   } catch (error) {
+    await writeErrorLogBestEffort({
+      function: "vehicleCreate",
+      openid,
+      plateNumber,
+      input: event && typeof event === "object" ? event : {},
+      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
+      stack: error && error.stack ? error.stack : ""
+    })
+
     console.error({
       function: "vehicleCreate",
       openid,

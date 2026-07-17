@@ -9,17 +9,17 @@
       <view
         wx:for="{{categories}}"
         wx:key="id"
-        class="category-item {{currentCategory === item.id ? 'category-item-active' : ''}}"
+        class="category-item ui-pill {{currentCategory === item.id ? 'ui-pill-active' : ''}}"
         data-category-id="{{item.id}}"
         bindtap="handleCategoryTap"
       >
         <text>{{item.name}}</text>
-        <text class="category-count">{{item.count}}</text>
+        <text class="category-count ui-badge">{{item.count}}</text>
       </view>
     </view>
   </scroll-view>
 
-  <view class="summary-panel">
+  <view class="summary-panel ui-card ui-card-soft">
     <view class="summary-copy">
       <view class="summary-title">{{categorySummary.name || '当前分类'}}</view>
       <view class="summary-desc">共 {{categorySummary.total}} 台车，可立即预约 {{categorySummary.available}} 台</view>
@@ -42,9 +42,9 @@
   </view>
 
   <view class="bottom-bar">
-    <button class="bottom-action action-contact" open-type="contact">客服</button>
-    <button class="bottom-action bottom-action-offset" bindtap="handlePhoneCall">电话</button>
-    <button class="bottom-action bottom-action-offset" open-type="share">分享</button>
-    <button class="bottom-action bottom-action-offset" bindtap="handleMineTap">我的</button>
+    <button class="bottom-action ui-btn ui-btn-ghost action-contact" open-type="contact">客服</button>
+    <button class="bottom-action ui-btn ui-btn-ghost bottom-action-offset" bindtap="handlePhoneCall">电话</button>
+    <button class="bottom-action ui-btn ui-btn-ghost bottom-action-offset" open-type="share">分享</button>
+    <button class="bottom-action ui-btn ui-btn-ghost bottom-action-offset" bindtap="handleMineTap">我的</button>
   </view>
 </view>

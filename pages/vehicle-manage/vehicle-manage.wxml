@@ -1,21 +1,21 @@
 <view class="vehicle-manage-page">
-  <view class="hero-card">
+  <view class="hero-card ui-card ui-card-gradient">
     <view class="hero-title">车辆管理</view>
     <view class="hero-desc">查看已录入车辆，支持按状态和关键词筛选。</view>
-    <button class="hero-button" bindtap="handleGoCreate">新增车辆</button>
+    <button class="hero-button ui-btn ui-btn-primary" bindtap="handleGoCreate">新增车辆</button>
   </view>
 
-  <view class="section-card">
+  <view class="section-card ui-card">
     <view class="search-row">
       <input
-        class="search-input"
+        class="search-input ui-input"
         placeholder="搜索车牌号 / 品牌型号 / 城市"
         value="{{keyword}}"
         bindinput="handleKeywordInput"
         bindconfirm="handleKeywordConfirm"
         confirm-type="search"
       />
-      <button class="search-button" bindtap="handleKeywordConfirm">查询</button>
+      <button class="search-button ui-btn ui-btn-primary" bindtap="handleKeywordConfirm">查询</button>
     </view>
 
     <scroll-view class="status-scroll" scroll-x enable-flex show-scrollbar="{{false}}">
@@ -23,7 +23,7 @@
         <view
           wx:for="{{statusOptions}}"
           wx:key="value"
-          class="status-item {{currentStatus === item.value ? 'status-item-active' : ''}}"
+          class="status-item ui-pill {{currentStatus === item.value ? 'ui-pill-active' : ''}}"
           data-status="{{item.value}}"
           bindtap="handleStatusTap"
         >
@@ -34,14 +34,62 @@
 
     <view class="action-row">
       <view class="result-count">共 {{total}} 条记录</view>
-      <button class="reset-button" bindtap="handleReset">重置筛选</button>
+      <button class="reset-button ui-btn ui-btn-ghost" bindtap="handleReset">重置筛选</button>
     </view>
   </view>
 
-  <view class="summary-grid">
-    <view wx:for="{{summaryItems}}" wx:key="key" class="summary-item">
-      <view class="summary-value">{{item.value}}</view>
-      <view class="summary-label">{{item.label}}</view>
+  <view class="dashboard-card ui-card ui-card-gradient">
+    <view class="dashboard-head">
+      <view class="dashboard-title">运营看板</view>
+      <view class="dashboard-desc">基于全部车辆统计，不受当前筛选影响</view>
+    </view>
+    <view class="summary-grid">
+      <view wx:for="{{summaryItems}}" wx:key="key" class="summary-item">
+        <view class="summary-value">{{item.value}}</view>
+        <view class="summary-label">{{item.label}}</view>
+      </view>
+    </view>
+
+    <view class="ratio-card">
+      <view class="ratio-head">
+        <view class="dashboard-title">状态占比</view>
+        <view class="dashboard-desc">口径：在库/在用/维修中（不含停用）</view>
+      </view>
+      <view class="ratio-bar">
+        <view
+          wx:for="{{statusRatioSegments}}"
+          wx:key="key"
+          wx:for-item="seg"
+          class="ratio-seg {{seg.className}}"
+          style="width: {{seg.percent}}%;"
+        ></view>
+      </view>
+      <view class="ratio-legend">
+        <view wx:for="{{statusRatioSegments}}" wx:key="key" wx:for-item="seg" class="legend-item">
+          <view class="legend-dot {{seg.className}}"></view>
+          <view class="legend-text">{{seg.label}} {{seg.value}}（{{seg.percentText}}）</view>
+        </view>
+      </view>
+    </view>
+
+    <view class="recent-block">
+      <view class="recent-head">
+        <view class="dashboard-title">近 7 天新增车辆</view>
+        <view class="dashboard-desc">展示最近新增的 5 辆车，可直接查看详情</view>
+      </view>
+
+      <view wx:if="{{recentAddedList.length}}" class="recent-list">
+        <view wx:for="{{recentAddedList}}" wx:key="id" class="recent-item" data-id="{{item.id}}" bindtap="handleViewDetail">
+          <view class="recent-main">
+            <view class="recent-plate">{{item.plateNumber || "--"}}</view>
+            <view class="recent-model">{{item.brandModel}}</view>
+            <view class="recent-meta">新增时间：{{item.createdAtText || "--"}} · 城市：{{item.locationText}}</view>
+          </view>
+          <view class="vehicle-status ui-status {{item.statusClass}}">{{item.statusText}}</view>
+        </view>
+      </view>
+
+      <view wx:else class="recent-empty">近 7 天暂无新增车辆</view>
     </view>
   </view>
 
@@ -50,7 +98,7 @@
   </view>
 
   <view class="vehicle-list" wx:elif="{{list.length}}">
-    <view wx:for="{{list}}" wx:key="id" class="vehicle-card">
+    <view wx:for="{{list}}" wx:key="id" class="vehicle-card ui-card">
       <view class="vehicle-card-top">
         <view class="vehicle-cover-wrap" data-id="{{item.id}}" bindtap="handleViewDetail">
           <image wx:if="{{item.coverImage}}" class="vehicle-cover" src="{{item.coverImage}}" mode="aspectFill" />
@@ -66,7 +114,7 @@
               <view class="plate-number">{{item.plateNumber}}</view>
               <view class="brand-model">{{item.brandModel}}</view>
             </view>
-            <view class="vehicle-status {{item.statusClass}}">{{item.statusText}}</view>
+            <view class="vehicle-status ui-status {{item.statusClass}}">{{item.statusText}}</view>
           </view>
 
           <view class="vehicle-meta-grid">
@@ -110,12 +158,31 @@
         </view>
       </view>
 
+      <view wx:if="{{item.status !== 'retired'}}" class="status-op-card">
+        <view class="status-op-title">状态操作</view>
+        <view class="status-op-row">
+          <button
+            wx:for="{{statusOpOptions}}"
+            wx:key="value"
+            wx:for-item="op"
+            class="status-op-btn {{item.status === op.value ? 'status-op-btn-active' : ''}}"
+            data-id="{{item.id}}"
+            data-status="{{op.value}}"
+            data-current-status="{{item.status}}"
+            data-plate-number="{{item.plateNumber}}"
+            bindtap="handleUpdateStatus"
+          >
+            {{op.label}}
+          </button>
+        </view>
+      </view>
+
       <view class="card-action-row">
-        <button class="detail-button" data-id="{{item.id}}" bindtap="handleViewDetail">查看详情</button>
-        <button class="edit-button" data-id="{{item.id}}" bindtap="handleEdit">编辑车辆</button>
+        <button class="detail-button ui-btn ui-btn-ghost" data-id="{{item.id}}" bindtap="handleViewDetail">查看详情</button>
+        <button class="edit-button ui-btn ui-btn-primary" data-id="{{item.id}}" bindtap="handleEdit">编辑车辆</button>
         <button
           wx:if="{{item.status !== 'retired'}}"
-          class="retire-button"
+          class="retire-button ui-btn ui-btn-danger"
           data-id="{{item.id}}"
           data-plate-number="{{item.plateNumber}}"
           bindtap="handleRetire"
@@ -124,21 +191,26 @@
         </button>
         <button
           wx:else
-          class="restore-button"
+          class="restore-button ui-btn ui-btn-success"
           data-id="{{item.id}}"
           data-plate-number="{{item.plateNumber}}"
           bindtap="handleRestore"
         >
           恢复启用
         </button>
-        <button class="delete-button" data-id="{{item.id}}" data-plate-number="{{item.plateNumber}}" bindtap="handleDelete">
+        <button class="delete-button ui-btn ui-btn-danger-ghost" data-id="{{item.id}}" data-plate-number="{{item.plateNumber}}" bindtap="handleDelete">
           删除车辆
         </button>
       </view>
     </view>
+
+    <view class="load-more">
+      <button wx:if="{{hasMore && !loading}}" class="load-more-btn ui-btn ui-btn-ghost" bindtap="handleLoadMore">加载更多</button>
+      <view wx:elif="{{!hasMore}}" class="load-more-end">已加载全部</view>
+    </view>
   </view>
 
-  <view class="empty-card" wx:else>
+  <view class="empty-card ui-card" wx:else>
     <view class="empty-title">{{emptyTitle}}</view>
     <view class="empty-desc">{{emptyDesc}}</view>
   </view>

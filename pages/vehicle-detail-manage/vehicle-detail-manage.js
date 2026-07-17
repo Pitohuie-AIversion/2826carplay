@@ -12,6 +12,12 @@ const STATUS_CLASS_MAP = {
   retired: "status-retired"
 }
 
+const STATUS_OP_OPTIONS = [
+  { value: "idle", label: "设为闲置" },
+  { value: "active", label: "设为在用" },
+  { value: "maintenance", label: "设为维修" }
+]
+
 const VEHICLE_TYPE_LABEL_MAP = {
   sedan: "轿车",
   suv: "SUV",
@@ -93,11 +99,46 @@ function getFileExtension(filePath) {
   return match && match[1] ? match[1].toLowerCase() : "jpg"
 }
 
+function normalizeStringArray(input) {
+  if (!Array.isArray(input)) {
+    return []
+  }
+
+  const result = []
+  input.forEach((item) => {
+    const value = String(item || "").trim()
+    if (value && !result.includes(value)) {
+      result.push(value)
+    }
+  })
+  return result
+}
+
+function deleteFilesBestEffort(fileList) {
+  const list = normalizeStringArray(fileList)
+  if (!list.length) {
+    return
+  }
+
+  if (!wx.cloud || typeof wx.cloud.deleteFile !== "function") {
+    return
+  }
+
+  try {
+    wx.cloud.deleteFile({
+      fileList: list,
+      fail: () => {}
+    })
+  } catch (error) {}
+}
+
 Page({
   data: {
     id: "",
     loading: true,
     uploading: false,
+    updatingStatus: false,
+    statusOpOptions: STATUS_OP_OPTIONS,
     detail: null
   },
 
@@ -214,6 +255,238 @@ Page({
     })
   },
 
+  handleUpdateStatus(event) {
+    if (this.data.updatingStatus || this.data.loading) {
+      return
+    }
+
+    const status = String(event.currentTarget.dataset.status || "").trim()
+    const detail = this.data.detail || {}
+    const id = this.data.id
+    const currentStatus = String(detail.status || "").trim()
+    const plateNumber = String(detail.plateNumber || "").trim()
+
+    if (!id || !status) {
+      return
+    }
+
+    if (status === currentStatus) {
+      return
+    }
+
+    const statusText = STATUS_LABEL_MAP[status] || status
+
+    wx.showModal({
+      title: "更新状态",
+      content: `确认将车辆 ${plateNumber || id} 状态更新为「${statusText}」？`,
+      success: (modalRes) => {
+        if (!modalRes.confirm) {
+          return
+        }
+
+        this.updateVehicleStatus(id, status)
+      }
+    })
+  },
+
+  handleRetire() {
+    const detail = this.data.detail || {}
+    const id = this.data.id
+    const plateNumber = String(detail.plateNumber || "").trim()
+
+    if (!id || this.data.updatingStatus) {
+      return
+    }
+
+    wx.showModal({
+      title: "停用车辆",
+      content: `确认将车辆 ${plateNumber || id} 标记为停用？`,
+      confirmColor: "#eb5757",
+      success: (modalRes) => {
+        if (!modalRes.confirm) {
+          return
+        }
+
+        this.retireVehicle(id)
+      }
+    })
+  },
+
+  handleRestore() {
+    const detail = this.data.detail || {}
+    const id = this.data.id
+    const plateNumber = String(detail.plateNumber || "").trim()
+
+    if (!id || this.data.updatingStatus) {
+      return
+    }
+
+    wx.showModal({
+      title: "恢复启用",
+      content: `确认将车辆 ${plateNumber || id} 恢复为可管理状态？`,
+      success: (modalRes) => {
+        if (!modalRes.confirm) {
+          return
+        }
+
+        this.restoreVehicle(id)
+      }
+    })
+  },
+
+  updateVehicleStatus(id, status) {
+    if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
+      wx.showToast({
+        title: "云能力未初始化",
+        icon: "none"
+      })
+      return
+    }
+
+    this.setData({
+      updatingStatus: true
+    })
+
+    wx.showLoading({
+      title: "更新中"
+    })
+
+    wx.cloud.callFunction({
+      name: "vehicleUpdateStatus",
+      data: { id, status },
+      success: (res) => {
+        wx.hideLoading()
+        const result = res && res.result ? res.result : null
+        if (!result || !result.ok) {
+          this.setData({ updatingStatus: false })
+          wx.showToast({
+            title: (result && result.message) || "更新失败",
+            icon: "none"
+          })
+          return
+        }
+
+        wx.showToast({
+          title: result.message || "状态已更新",
+          icon: "success"
+        })
+        this.fetchDetail(id, () => {
+          this.setData({ updatingStatus: false })
+        })
+      },
+      fail: (error) => {
+        wx.hideLoading()
+        this.setData({ updatingStatus: false })
+        wx.showToast({
+          title: (error && (error.errMsg || error.message)) || "更新失败",
+          icon: "none"
+        })
+      }
+    })
+  },
+
+  retireVehicle(id) {
+    if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
+      wx.showToast({
+        title: "云能力未初始化",
+        icon: "none"
+      })
+      return
+    }
+
+    this.setData({
+      updatingStatus: true
+    })
+
+    wx.showLoading({
+      title: "停用中"
+    })
+
+    wx.cloud.callFunction({
+      name: "vehicleRetire",
+      data: { id },
+      success: (res) => {
+        wx.hideLoading()
+        const result = res && res.result ? res.result : null
+        if (!result || !result.ok) {
+          this.setData({ updatingStatus: false })
+          wx.showToast({
+            title: (result && result.message) || "停用失败",
+            icon: "none"
+          })
+          return
+        }
+
+        wx.showToast({
+          title: result.message || "停用成功",
+          icon: "success"
+        })
+        this.fetchDetail(id, () => {
+          this.setData({ updatingStatus: false })
+        })
+      },
+      fail: (error) => {
+        wx.hideLoading()
+        this.setData({ updatingStatus: false })
+        wx.showToast({
+          title: (error && (error.errMsg || error.message)) || "停用失败",
+          icon: "none"
+        })
+      }
+    })
+  },
+
+  restoreVehicle(id) {
+    if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
+      wx.showToast({
+        title: "云能力未初始化",
+        icon: "none"
+      })
+      return
+    }
+
+    this.setData({
+      updatingStatus: true
+    })
+
+    wx.showLoading({
+      title: "恢复中"
+    })
+
+    wx.cloud.callFunction({
+      name: "vehicleRestore",
+      data: { id },
+      success: (res) => {
+        wx.hideLoading()
+        const result = res && res.result ? res.result : null
+        if (!result || !result.ok) {
+          this.setData({ updatingStatus: false })
+          wx.showToast({
+            title: (result && result.message) || "恢复失败",
+            icon: "none"
+          })
+          return
+        }
+
+        wx.showToast({
+          title: result.message || "恢复成功",
+          icon: "success"
+        })
+        this.fetchDetail(id, () => {
+          this.setData({ updatingStatus: false })
+        })
+      },
+      fail: (error) => {
+        wx.hideLoading()
+        this.setData({ updatingStatus: false })
+        wx.showToast({
+          title: (error && (error.errMsg || error.message)) || "恢复失败",
+          icon: "none"
+        })
+      }
+    })
+  },
+
   handleBackList() {
     wx.navigateBack({
       delta: 1,
@@ -295,7 +568,7 @@ Page({
         this.persistImageChange({
           action: "add",
           fileIds: uploadedFileIds
-        })
+        }, uploadedFileIds)
         return
       }
 
@@ -317,6 +590,7 @@ Page({
           this.setData({
             uploading: false
           })
+          deleteFilesBestEffort(uploadedFileIds)
           wx.showToast({
             title: (error && (error.errMsg || error.message)) || "图片上传失败",
             icon: "none"
@@ -362,12 +636,13 @@ Page({
     })
   },
 
-  persistImageChange(payload) {
+  persistImageChange(payload, cleanupFileIds) {
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       wx.hideLoading()
       this.setData({
         uploading: false
       })
+      deleteFilesBestEffort(cleanupFileIds)
       wx.showToast({
         title: "云能力未初始化",
         icon: "none"
@@ -396,6 +671,7 @@ Page({
           this.setData({
             uploading: false
           })
+          deleteFilesBestEffort(cleanupFileIds)
           wx.showToast({
             title: (result && result.message) || "图片操作失败",
             icon: "none"
@@ -429,6 +705,7 @@ Page({
         this.setData({
           uploading: false
         })
+        deleteFilesBestEffort(cleanupFileIds)
         wx.showToast({
           title: (error && (error.errMsg || error.message)) || "图片操作失败",
           icon: "none"

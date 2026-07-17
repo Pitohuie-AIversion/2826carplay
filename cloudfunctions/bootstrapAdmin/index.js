@@ -24,9 +24,11 @@ function hasAdminRole(record) {
   return false
 }
 
-exports.main = async () => {
+exports.main = async (event) => {
   const context = cloud.getWXContext()
   const openid = context && context.OPENID ? context.OPENID : ""
+  const token = String(event && event.token ? event.token : "").trim()
+  const requiredToken = String(process.env.BOOTSTRAP_TOKEN || "").trim()
 
   try {
     const existed = await db.collection("roles").limit(100).get()
@@ -48,6 +50,14 @@ exports.main = async () => {
         ok: false,
         code: "BOOTSTRAP_LOCKED",
         message: "管理员已初始化，请联系现有管理员分配权限"
+      }
+    }
+
+    if (requiredToken && token !== requiredToken) {
+      return {
+        ok: false,
+        code: "BOOTSTRAP_TOKEN_REQUIRED",
+        message: "管理员初始化已加锁，请联系开发人员获取口令"
       }
     }
 

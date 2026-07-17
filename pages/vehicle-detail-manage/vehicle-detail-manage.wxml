@@ -1,23 +1,46 @@
 <view class="vehicle-detail-page">
-  <view class="hero-card">
+  <view class="hero-card ui-card ui-card-gradient">
     <view class="hero-title">车辆详情管理</view>
     <view class="hero-desc">查看车辆完整信息，并从详情页继续编辑。</view>
   </view>
 
-  <view class="loading-card" wx:if="{{loading}}">
+  <view class="loading-card ui-card" wx:if="{{loading}}">
     <view class="loading-text">车辆详情加载中...</view>
   </view>
 
   <view wx:elif="{{detail}}" class="detail-wrap">
-    <view class="summary-card">
+    <view class="summary-card ui-card">
       <view>
         <view class="plate-number">{{detail.plateNumber}}</view>
         <view class="brand-model">{{detail.brandModel}}</view>
       </view>
-      <view class="vehicle-status {{detail.statusClass}}">{{detail.statusText}}</view>
+      <view class="vehicle-status ui-status {{detail.statusClass}}">{{detail.statusText}}</view>
     </view>
 
-    <view class="section-card">
+    <view class="section-card ui-card">
+      <view class="section-title">状态操作</view>
+      <view wx:if="{{detail.status !== 'retired'}}">
+        <view class="status-op-row">
+          <button
+            wx:for="{{statusOpOptions}}"
+            wx:key="value"
+            wx:for-item="op"
+            class="status-op-btn {{detail.status === op.value ? 'status-op-btn-active' : ''}}"
+            data-status="{{op.value}}"
+            bindtap="handleUpdateStatus"
+            disabled="{{updatingStatus}}"
+          >
+            {{op.label}}
+          </button>
+        </view>
+        <button class="retire-inline-btn ui-btn ui-btn-danger" bindtap="handleRetire" disabled="{{updatingStatus}}">停用车辆</button>
+      </view>
+      <view wx:else>
+        <button class="restore-inline-btn ui-btn ui-btn-primary" bindtap="handleRestore" disabled="{{updatingStatus}}">恢复启用</button>
+      </view>
+    </view>
+
+    <view class="section-card ui-card">
       <view class="section-title">基础信息</view>
       <view class="info-grid">
         <view class="info-item">
@@ -59,7 +82,7 @@
       </view>
     </view>
 
-    <view class="section-card">
+    <view class="section-card ui-card">
       <view class="section-title">管理信息</view>
       <view class="info-grid">
         <view class="info-item">
@@ -81,18 +104,18 @@
       </view>
     </view>
 
-    <view class="section-card">
+    <view class="section-card ui-card">
       <view class="section-title">备注信息</view>
       <view class="note-box">{{detail.noteText}}</view>
     </view>
 
-    <view class="section-card">
+    <view class="section-card ui-card">
       <view class="image-header">
         <view>
           <view class="section-title">车辆图片</view>
           <view class="image-desc">已上传 {{detail.imageCount}} / 9 张，可设置封面。</view>
         </view>
-        <button class="upload-button" bindtap="handleUploadImages" loading="{{uploading}}" disabled="{{uploading}}">
+        <button class="upload-button ui-btn ui-btn-primary" bindtap="handleUploadImages" loading="{{uploading}}" disabled="{{uploading}}">
           {{uploading ? "上传中" : "上传图片"}}
         </button>
       </view>
@@ -124,12 +147,12 @@
     </view>
 
     <view class="action-row">
-      <button class="secondary-button" bindtap="handleBackList">返回列表</button>
-      <button class="primary-button" bindtap="handleEdit">编辑车辆</button>
+      <button class="secondary-button ui-btn ui-btn-ghost" bindtap="handleBackList">返回列表</button>
+      <button class="primary-button ui-btn ui-btn-primary" bindtap="handleEdit">编辑车辆</button>
     </view>
   </view>
 
-  <view class="loading-card" wx:else>
+  <view class="loading-card ui-card" wx:else>
     <view class="loading-text">暂无车辆详情</view>
   </view>
 </view>

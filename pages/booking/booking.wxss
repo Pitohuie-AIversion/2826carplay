@@ -17,16 +17,17 @@
 
 .section-title {
   color: #ffffff;
-  font-size: 30rpx;
+  font-size: 28rpx;
   font-weight: 600;
-  line-height: 1.4;
+  line-height: 1.35;
 }
 
 .section-desc {
   margin-top: 14rpx;
   color: #b8b8b8;
-  font-size: 25rpx;
-  line-height: 1.7;
+  font-size: 24rpx;
+  line-height: 1.65;
+  word-break: break-word;
 }
 
 .car-card {
@@ -36,9 +37,10 @@
 .car-name {
   margin-top: 18rpx;
   color: #ffffff;
-  font-size: 36rpx;
+  font-size: 30rpx;
   font-weight: 600;
-  line-height: 1.4;
+  line-height: 1.35;
+  word-break: break-word;
 }
 
 .form-item {
@@ -48,7 +50,7 @@
 .form-label {
   margin-bottom: 12rpx;
   color: #ffffff;
-  font-size: 26rpx;
+  font-size: 24rpx;
   line-height: 1.4;
 }
 
@@ -56,12 +58,12 @@
 .form-picker,
 .form-textarea {
   width: 100%;
-  padding: 24rpx 22rpx;
+  padding: 22rpx 20rpx;
   border: 1rpx solid #323232;
   border-radius: 14rpx;
   background: #141414;
   color: #ffffff;
-  font-size: 26rpx;
+  font-size: 24rpx;
   line-height: 1.5;
   box-sizing: border-box;
 }
@@ -79,13 +81,19 @@
 }
 
 .submit-button {
-  height: 92rpx;
+  width: 100%;
+  min-height: 88rpx;
   margin-top: 12rpx;
+  padding: 0 24rpx;
   border-radius: 14rpx;
   background: #2f80ed;
   color: #ffffff;
-  font-size: 30rpx;
-  line-height: 92rpx;
+  font-size: 26rpx;
+  line-height: 88rpx;
+  box-sizing: border-box;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .submit-button-disabled {
@@ -98,13 +106,19 @@
 }
 
 .empty-action {
-  height: 88rpx;
+  width: 100%;
+  min-height: 84rpx;
   margin-top: 24rpx;
+  padding: 0 24rpx;
   border-radius: 14rpx;
   background: #2f80ed;
   color: #ffffff;
-  font-size: 28rpx;
-  line-height: 88rpx;
+  font-size: 24rpx;
+  line-height: 84rpx;
+  box-sizing: border-box;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .empty-action::after {
@@ -118,13 +132,14 @@
 
 .empty-title {
   color: #ffffff;
-  font-size: 34rpx;
-  line-height: 1.4;
+  font-size: 30rpx;
+  line-height: 1.35;
 }
 
 .empty-desc {
   margin-top: 16rpx;
   color: #b8b8b8;
-  font-size: 26rpx;
+  font-size: 24rpx;
   line-height: 1.6;
+  word-break: break-word;
 }

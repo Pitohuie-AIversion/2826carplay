@@ -1,5 +1,5 @@
 <view class="mine-page">
-  <view class="profile-card">
+  <view class="profile-card ui-card ui-card-gradient">
     <view class="avatar-placeholder">GL</view>
     <view class="profile-info">
       <view class="profile-name">{{userName}}</view>
@@ -8,7 +8,7 @@
     </view>
   </view>
 
-  <view class="section-card">
+  <view class="section-card ui-card">
     <view class="section-title">我的服务</view>
     <view
       wx:for="{{menuItems}}"
@@ -26,16 +26,16 @@
     </view>
   </view>
 
-  <view class="section-card">
+  <view class="section-card ui-card">
     <view class="section-title">联系客服</view>
     <view class="section-desc">如需确认车辆档期、价格或取还车规则，可直接联系在线客服。</view>
-    <button class="action-button action-secondary" open-type="contact">联系在线客服</button>
-    <button class="action-button action-secondary action-button-offset" bindtap="handlePhoneCall">拨打客服电话</button>
+    <button class="action-button ui-btn ui-btn-ghost" open-type="contact">联系在线客服</button>
+    <button class="action-button ui-btn ui-btn-ghost action-button-offset" bindtap="handlePhoneCall">拨打客服电话</button>
   </view>
 
-  <view class="section-card">
+  <view class="section-card ui-card">
     <view class="section-title">返回首页</view>
     <view class="section-desc">回到车库首页继续浏览车辆与预约咨询。</view>
-    <button class="action-button action-primary" bindtap="handleBackHome">返回车库首页</button>
+    <button class="action-button ui-btn ui-btn-primary" bindtap="handleBackHome">返回车库首页</button>
   </view>
 </view>

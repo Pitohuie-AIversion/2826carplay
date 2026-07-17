@@ -85,6 +85,26 @@ function formatTime(input) {
   return ""
 }
 
+function toTimestamp(input) {
+  if (!input) {
+    return 0
+  }
+
+  if (typeof input === "string") {
+    return new Date(input).getTime() || 0
+  }
+
+  if (input instanceof Date) {
+    return input.getTime() || 0
+  }
+
+  if (typeof input === "object" && typeof input.toDate === "function") {
+    return input.toDate().getTime() || 0
+  }
+
+  return 0
+}
+
 function buildStats(list) {
   return {
     total: list.length,
@@ -92,6 +112,21 @@ function buildStats(list) {
     idle: list.filter((item) => item.status === "idle").length,
     maintenance: list.filter((item) => item.status === "maintenance").length,
     retired: list.filter((item) => item.status === "retired").length
+  }
+}
+
+function buildDashboardStats(list) {
+  const now = Date.now()
+  const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000
+
+  return {
+    idle: list.filter((item) => item.status === "idle").length,
+    active: list.filter((item) => item.status === "active").length,
+    maintenance: list.filter((item) => item.status === "maintenance").length,
+    recentAdded7d: list.filter((item) => {
+      const createdAt = toTimestamp(item.createdAt)
+      return createdAt >= sevenDaysAgo && createdAt <= now
+    }).length
   }
 }
 
@@ -117,9 +152,34 @@ function sortList(list) {
   })
 }
 
+function buildRecentAddedList(list) {
+  const now = Date.now()
+  const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000
+
+  return list
+    .filter((item) => {
+      const createdAt = toTimestamp(item.createdAt)
+      return createdAt >= sevenDaysAgo && createdAt <= now
+    })
+    .sort((prev, next) => toTimestamp(next.createdAt) - toTimestamp(prev.createdAt))
+    .slice(0, 5)
+    .map((item) => ({
+      id: item.id,
+      plateNumber: item.plateNumber,
+      brandModel: item.brandModel,
+      status: item.status,
+      location: item.location,
+      createdAt: item.createdAt
+    }))
+}
+
 exports.main = async (event) => {
   const wxContext = cloud.getWXContext()
   const openid = wxContext && wxContext.OPENID ? wxContext.OPENID : ""
+  const pageRaw = Number(event && event.page)
+  const pageSizeRaw = Number(event && event.pageSize)
+  const page = Number.isFinite(pageRaw) && pageRaw > 0 ? Math.floor(pageRaw) : 0
+  const pageSize = Number.isFinite(pageSizeRaw) && pageSizeRaw > 0 ? Math.min(Math.max(Math.floor(pageSizeRaw), 1), 100) : 0
 
   try {
     const allowed = await isAdminOpenid(openid)
@@ -168,12 +228,26 @@ exports.main = async (event) => {
       })
     )
 
+    const offset = pageSize ? page * pageSize : 0
+    const list = pageSize ? filteredList.slice(offset, offset + pageSize) : filteredList
+
+    const pagination = pageSize
+      ? {
+          page,
+          pageSize,
+          hasMore: Boolean(offset + pageSize < filteredList.length)
+        }
+      : {}
+
     return {
       ok: true,
       filters,
       total: filteredList.length,
       stats: buildStats(filteredList),
-      list: filteredList.map((item) => ({
+      dashboard: buildDashboardStats(formattedList),
+      recentAddedList: buildRecentAddedList(formattedList),
+      ...pagination,
+      list: list.map((item) => ({
         ...item,
         imageCount: Array.isArray(item.imageList) ? item.imageList.length : 0
       }))

@@ -1,0 +1,72 @@
+.detail-page {
+  padding: 24rpx 24rpx 48rpx;
+  box-sizing: border-box;
+  color: #ffffff;
+  background: #101010;
+}
+
+.header-card,
+.info-card,
+.note-card {
+  padding: 24rpx;
+  margin-bottom: 18rpx;
+  box-sizing: border-box;
+}
+
+.booking-name {
+  font-size: 30rpx;
+  font-weight: 600;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.booking-status {
+  display: inline-block;
+  margin-top: 14rpx;
+  max-width: 220rpx;
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.info-row {
+  margin-bottom: 18rpx;
+}
+
+.info-row-end {
+  margin-bottom: 0;
+}
+
+.info-label {
+  font-size: 22rpx;
+  color: rgba(255, 255, 255, 0.68);
+  margin-bottom: 8rpx;
+}
+
+.info-value {
+  font-size: 24rpx;
+  line-height: 1.6;
+  word-break: break-all;
+}
+
+.note-title {
+  font-size: 22rpx;
+  color: rgba(255, 255, 255, 0.68);
+  margin-bottom: 8rpx;
+}
+
+.note-content {
+  font-size: 24rpx;
+  line-height: 1.65;
+  word-break: break-word;
+}
+
+.actions {
+  margin-top: 10rpx;
+}
+
+.cancel-btn {
+  width: 100%;
+  box-sizing: border-box;
+}

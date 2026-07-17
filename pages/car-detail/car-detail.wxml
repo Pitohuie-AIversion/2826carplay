@@ -10,13 +10,13 @@
     <view class="hero-placeholder-text">该车辆暂未上传展示图片</view>
   </view>
 
-  <view class="summary-card">
+  <view class="summary-card ui-card">
     <view class="summary-top">
       <view>
         <view class="car-name">{{car.name}}</view>
         <view class="car-nickname">{{car.nickname}}</view>
       </view>
-      <view class="car-status {{car.statusClass}}">{{car.statusText}}</view>
+      <view class="car-status ui-status {{car.statusClass}}">{{car.statusText}}</view>
     </view>
 
     <view class="car-price">{{car.priceText}}</view>
@@ -26,17 +26,17 @@
     </view>
   </view>
 
-  <view class="notice-card" wx:if="{{car.statusNoticeText}}">
+  <view class="notice-card ui-card" wx:if="{{car.statusNoticeText}}">
     <view class="notice-title">当前状态说明</view>
     <view class="notice-text">{{car.statusNoticeText}}</view>
   </view>
 
-  <view class="info-card">
+  <view class="info-card ui-card">
     <view class="section-title">车辆简介</view>
     <view class="section-text">{{car.description}}</view>
   </view>
 
-  <view class="info-card">
+  <view class="info-card ui-card">
     <view class="section-title">基础信息</view>
     <view class="info-grid">
       <view class="info-item">
@@ -66,19 +66,19 @@
     </view>
   </view>
 
-  <view class="info-card">
+  <view class="info-card ui-card">
     <view class="section-title">租赁说明</view>
     <view wx:for="{{rentalTips}}" wx:key="*this" class="section-text">{{item}}</view>
   </view>
 
   <view class="detail-bottom-bar">
-    <button class="action-button action-primary" bindtap="handleBookingTap">{{car.primaryActionText}}</button>
-    <button class="action-button action-secondary action-button-offset" bindtap="handlePhoneCall">电话咨询</button>
+    <button class="action-button ui-btn ui-btn-primary" bindtap="handleBookingTap">{{car.primaryActionText}}</button>
+    <button class="action-button ui-btn ui-btn-ghost action-button-offset" bindtap="handlePhoneCall">电话咨询</button>
   </view>
 </view>
 
-<view class="empty-page" wx:else>
+<view class="empty-page ui-card" wx:else>
   <view class="empty-title">车辆详情</view>
   <view class="empty-desc">{{notFoundText}}</view>
-  <button class="empty-action" bindtap="handleBackGarage">返回车库首页</button>
+  <button class="empty-action ui-btn ui-btn-primary" bindtap="handleBackGarage">返回车库首页</button>
 </view>

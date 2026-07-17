@@ -80,6 +80,30 @@ function validateInput(input) {
   return errors
 }
 
+async function writeErrorLogBestEffort(payload) {
+  try {
+    await db.collection("error_logs").add({
+      data: {
+        ...payload,
+        createdAt: db.serverDate()
+      }
+    })
+  } catch (error) {
+    const message = error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error)
+    if (String(message).includes("Unexpected collection:")) {
+      return
+    }
+
+    console.error({
+      function: "bookingCreate",
+      stage: "errorLog",
+      errorMessage: message,
+      stack: error && error.stack ? error.stack : "",
+      createdAt: new Date().toISOString()
+    })
+  }
+}
+
 exports.main = async (event) => {
   const wxContext = cloud.getWXContext()
   const openid = wxContext && wxContext.OPENID ? wxContext.OPENID : ""
@@ -132,6 +156,15 @@ exports.main = async (event) => {
       message: "预约信息已提交，客服将尽快联系您"
     }
   } catch (error) {
+    await writeErrorLogBestEffort({
+      function: "bookingCreate",
+      openid,
+      vehicleId: input.vehicleId,
+      input,
+      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
+      stack: error && error.stack ? error.stack : ""
+    })
+
     console.error({
       function: "bookingCreate",
       openid,
@@ -144,4 +177,3 @@ exports.main = async (event) => {
     return createError("INTERNAL_ERROR", "预约提交失败，请稍后重试")
   }
 }
-

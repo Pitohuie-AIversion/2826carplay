@@ -29,6 +29,24 @@ const STATUS_MAP = {
 }
 
 const PERFORMANCE_BRANDS = ["PORSCHE", "FERRARI", "LAMBORGHINI", "MCLAREN", "LOTUS", "ASTON"]
+const OFFROAD_BRANDS = [
+  "JEEP",
+  "WRANGLER",
+  "DEFENDER",
+  "BRONCO",
+  "LAND",
+  "RANGE",
+  "G-CLASS",
+  "G63",
+  "G500",
+  "坦克",
+  "牧马人",
+  "卫士",
+  "普拉多",
+  "陆巡",
+  "帕杰罗",
+  "途乐"
+]
 const LUXURY_BRANDS = [
   "BMW",
   "MERCEDES",
@@ -89,22 +107,35 @@ function getBrand(brandModel) {
   return value.split(/\s+/)[0] || value
 }
 
-function inferCategory(vehicleType, brandModel) {
+function inferCategory(vehicleType, brandModel, fuelType) {
   const upperBrandModel = String(brandModel || "").trim().toUpperCase()
+  const normalizedFuelType = String(fuelType || "").trim().toLowerCase()
+
+  if (vehicleType === "truck") {
+    return "pickup"
+  }
+
+  if (normalizedFuelType === "electric") {
+    return "commuter_ev"
+  }
 
   if (vehicleType === "sports" || PERFORMANCE_BRANDS.some((item) => upperBrandModel.includes(item))) {
-    return "performance"
+    return "supercar"
   }
 
-  if (MINI_FUN_BRANDS.some((item) => upperBrandModel.includes(item))) {
-    return "mini_fun"
+  if (vehicleType === "suv" && OFFROAD_BRANDS.some((item) => upperBrandModel.includes(item))) {
+    return "offroad"
   }
 
-  if (LUXURY_BRANDS.some((item) => upperBrandModel.includes(item))) {
-    return "luxury"
+  if (vehicleType === "suv" || vehicleType === "mpv") {
+    return "city_suv"
   }
 
-  return "classic_fuel"
+  if (vehicleType === "sedan" || LUXURY_BRANDS.some((item) => upperBrandModel.includes(item)) || MINI_FUN_BRANDS.some((item) => upperBrandModel.includes(item))) {
+    return "luxury_sedan"
+  }
+
+  return "luxury_sedan"
 }
 
 function buildNickname(plateNumber, vehicleTypeText) {
@@ -152,11 +183,12 @@ function buildImages(vehicle) {
   const imageList = Array.isArray(vehicle && vehicle.imageList) ? vehicle.imageList.filter(Boolean) : []
   const coverImage = String((vehicle && vehicle.coverImage) || "").trim()
 
-  if (coverImage && !imageList.includes(coverImage)) {
-    return [coverImage].concat(imageList)
+  if (!coverImage) {
+    return imageList
   }
 
-  return imageList
+  const restImages = imageList.filter((fileId) => fileId !== coverImage)
+  return [coverImage].concat(restImages)
 }
 
 function mapVehicle(vehicle) {
@@ -171,13 +203,14 @@ function mapVehicle(vehicle) {
   const coverPlaceholderText = brandModel || plateNumber || vehicleTypeText
   const seats = Number.isInteger(vehicle && vehicle.seats) ? vehicle.seats : ""
   const priceDay = Number.isInteger(vehicle && vehicle.priceDay) ? vehicle.priceDay : 0
+  const fuelType = String((vehicle && vehicle.fuelType) || "").trim() || "unknown"
 
   return {
     id: String((vehicle && vehicle._id) || (vehicle && vehicle.id) || "").trim(),
     name: brandModel || plateNumber || "未命名车辆",
     nickname: buildNickname(plateNumber, vehicleTypeText),
     brand: getBrand(brandModel),
-    category: inferCategory(vehicleType, brandModel),
+    category: inferCategory(vehicleType, brandModel, fuelType),
     priceDay,
     priceText: buildPriceText(priceDay),
     status: mappedStatus.status,
@@ -185,7 +218,7 @@ function mapVehicle(vehicle) {
     location: String((vehicle && vehicle.location) || "").trim() || "门店咨询",
     tags: buildTags(vehicle, vehicleTypeText),
     transmission: String((vehicle && vehicle.transmission) || "").trim() || "unknown",
-    fuelType: String((vehicle && vehicle.fuelType) || "").trim() || "unknown",
+    fuelType,
     seats,
     seatsText: seats ? `${seats} 座` : "--",
     cover,
@@ -200,9 +233,18 @@ function mapVehicle(vehicle) {
   }
 }
 
-exports.main = async () => {
+exports.main = async (event) => {
   try {
-    const res = await db.collection("vehicles").limit(100).get()
+    const payload = event && typeof event === "object" ? event : {}
+    const pageRaw = Number(payload.page)
+    const pageSizeRaw = Number(payload.pageSize)
+    const page = Number.isFinite(pageRaw) && pageRaw > 0 ? Math.floor(pageRaw) : 0
+    const pageSize = Number.isFinite(pageSizeRaw) && pageSizeRaw > 0 ? Math.min(Math.max(Math.floor(pageSizeRaw), 1), 100) : 0
+
+    const query = db.collection("vehicles")
+    const res = pageSize
+      ? await query.orderBy("updatedAt", "desc").skip(page * pageSize).limit(pageSize).get()
+      : await query.limit(100).get()
     const rawList = res && Array.isArray(res.data) ? res.data : []
 
     const list = rawList
@@ -210,8 +252,16 @@ exports.main = async () => {
       .map(mapVehicle)
       .sort((prev, next) => next.sort - prev.sort)
 
+    const pagination = pageSize
+      ? {
+          page,
+          pageSize
+        }
+      : {}
+
     return {
       ok: true,
+      ...pagination,
       list
     }
   } catch (error) {

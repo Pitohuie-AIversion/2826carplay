@@ -22,6 +22,12 @@ const STATUS_CLASS_MAP = {
   retired: "status-retired"
 }
 
+const STATUS_OP_OPTIONS = [
+  { value: "idle", label: "设为闲置" },
+  { value: "active", label: "设为在用" },
+  { value: "maintenance", label: "设为维修" }
+]
+
 const VEHICLE_TYPE_LABEL_MAP = {
   sedan: "轿车",
   suv: "SUV",
@@ -41,6 +47,8 @@ const FUEL_TYPE_LABEL_MAP = {
   electric: "纯电",
   hybrid: "混动"
 }
+
+const DEFAULT_PAGE_SIZE = 20
 
 function formatDisplayTime(value) {
   if (!value) {
@@ -62,12 +70,61 @@ function formatDisplayTime(value) {
 
 function buildStatusSummary(stats) {
   return [
-    { key: "total", label: "总数", value: stats.total || 0 },
+    { key: "idle", label: "在库", value: stats.idle || 0 },
     { key: "active", label: "在用", value: stats.active || 0 },
-    { key: "idle", label: "闲置", value: stats.idle || 0 },
-    { key: "maintenance", label: "维修", value: stats.maintenance || 0 },
-    { key: "retired", label: "停用", value: stats.retired || 0 }
+    { key: "maintenance", label: "维修中", value: stats.maintenance || 0 },
+    { key: "recentAdded7d", label: "近7天新增", value: stats.recentAdded7d || 0 }
   ]
+}
+
+function buildStatusRatioSegments(stats) {
+  const idle = Number(stats && stats.idle) || 0
+  const active = Number(stats && stats.active) || 0
+  const maintenance = Number(stats && stats.maintenance) || 0
+  const total = idle + active + maintenance
+
+  const base = [
+    { key: "idle", label: "在库", value: idle, className: "ratio-idle" },
+    { key: "active", label: "在用", value: active, className: "ratio-active" },
+    { key: "maintenance", label: "维修中", value: maintenance, className: "ratio-maintenance" }
+  ]
+
+  if (!total) {
+    return base.map((item) => ({
+      ...item,
+      percent: 0,
+      percentText: "0%"
+    }))
+  }
+
+  const rawPercents = base.map((item) => (item.value / total) * 100)
+  const floors = rawPercents.map((value) => Math.floor(value))
+  let used = floors.reduce((sum, n) => sum + n, 0)
+  let remain = 100 - used
+
+  const order = rawPercents
+    .map((value, index) => ({
+      index,
+      frac: value - floors[index]
+    }))
+    .sort((a, b) => b.frac - a.frac)
+
+  const percents = floors.slice()
+  let i = 0
+  while (remain > 0 && i < order.length) {
+    percents[order[i].index] += 1
+    remain -= 1
+    i += 1
+    if (i >= order.length) {
+      i = 0
+    }
+  }
+
+  return base.map((item, index) => ({
+    ...item,
+    percent: percents[index],
+    percentText: `${percents[index]}%`
+  }))
 }
 
 function formatPriceDayText(priceDay) {
@@ -78,15 +135,38 @@ function formatPriceDayText(priceDay) {
   return "--"
 }
 
+function buildRecentAddedViewModel(list) {
+  if (!Array.isArray(list)) {
+    return []
+  }
+
+  return list.map((item) => ({
+    id: item.id || "",
+    plateNumber: vehicleUtils.normalizePlateNumber(item.plateNumber),
+    brandModel: item.brandModel || "--",
+    status: item.status || "",
+    statusText: STATUS_LABEL_MAP[item.status] || item.status || "未知",
+    statusClass: STATUS_CLASS_MAP[item.status] || "status-idle",
+    locationText: item.location ? String(item.location).trim() : "--",
+    createdAtText: formatDisplayTime(item.createdAt)
+  }))
+}
+
 Page({
   data: {
     loading: false,
     keyword: "",
     currentStatus: "all",
     statusOptions: STATUS_OPTIONS,
+    statusOpOptions: STATUS_OP_OPTIONS,
     total: 0,
     summaryItems: buildStatusSummary({}),
+    statusRatioSegments: buildStatusRatioSegments({}),
+    recentAddedList: [],
     list: [],
+    page: 0,
+    pageSize: DEFAULT_PAGE_SIZE,
+    hasMore: false,
     emptyTitle: "暂无车辆数据",
     emptyDesc: "当前筛选条件下没有匹配的车辆记录"
   },
@@ -144,6 +224,14 @@ Page({
     this.fetchList()
   },
 
+  handleLoadMore() {
+    if (this.data.loading || !this.data.hasMore) {
+      return
+    }
+
+    this.fetchList({ append: true })
+  },
+
   handleGoCreate() {
     wx.navigateTo({
       url: "/pages/vehicle-create/vehicle-create"
@@ -179,6 +267,39 @@ Page({
 
     wx.navigateTo({
       url: `/pages/vehicle-detail-manage/vehicle-detail-manage?id=${id}`
+    })
+  },
+
+  handleUpdateStatus(event) {
+    if (this.data.loading) {
+      return
+    }
+
+    const id = String(event.currentTarget.dataset.id || "").trim()
+    const status = String(event.currentTarget.dataset.status || "").trim()
+    const currentStatus = String(event.currentTarget.dataset.currentStatus || "").trim()
+    const plateNumber = String(event.currentTarget.dataset.plateNumber || "").trim()
+
+    if (!id || !status) {
+      return
+    }
+
+    if (status === currentStatus) {
+      return
+    }
+
+    const statusText = STATUS_LABEL_MAP[status] || status
+
+    wx.showModal({
+      title: "更新状态",
+      content: `确认将车辆 ${plateNumber || id} 状态更新为「${statusText}」？`,
+      success: (modalRes) => {
+        if (!modalRes.confirm) {
+          return
+        }
+
+        this.updateVehicleStatus(id, status)
+      }
     })
   },
 
@@ -254,6 +375,49 @@ Page({
         }
 
         this.deleteVehicle(id)
+      }
+    })
+  },
+
+  updateVehicleStatus(id, status) {
+    if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
+      wx.showToast({
+        title: "云能力未初始化",
+        icon: "none"
+      })
+      return
+    }
+
+    wx.showLoading({
+      title: "更新中"
+    })
+
+    wx.cloud.callFunction({
+      name: "vehicleUpdateStatus",
+      data: { id, status },
+      success: (res) => {
+        wx.hideLoading()
+        const result = res && res.result ? res.result : null
+        if (!result || !result.ok) {
+          wx.showToast({
+            title: (result && result.message) || "更新失败",
+            icon: "none"
+          })
+          return
+        }
+
+        wx.showToast({
+          title: result.message || "状态已更新",
+          icon: "success"
+        })
+        this.fetchList()
+      },
+      fail: (error) => {
+        wx.hideLoading()
+        wx.showToast({
+          title: (error && (error.errMsg || error.message)) || "更新失败",
+          icon: "none"
+        })
       }
     })
   },
@@ -393,7 +557,12 @@ Page({
     })
   },
 
-  fetchList(done) {
+  fetchList(input) {
+    const done = typeof input === "function" ? input : input && input.done
+    const append = Boolean(input && typeof input === "object" && input.append)
+    const nextPage = append ? this.data.page + 1 : 0
+    const pageSize = this.data.pageSize || DEFAULT_PAGE_SIZE
+
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       wx.showToast({
         title: "云能力未初始化",
@@ -408,7 +577,9 @@ Page({
 
     const filters = {
       keyword: String(this.data.keyword || "").trim(),
-      status: this.data.currentStatus
+      status: this.data.currentStatus,
+      page: nextPage,
+      pageSize
     }
 
     this.setData({
@@ -454,11 +625,17 @@ Page({
             }))
           : []
 
+        const nextList = append ? this.data.list.concat(list) : list
+
         this.setData({
           loading: false,
           total: result.total || 0,
-          summaryItems: buildStatusSummary(result.stats || {}),
-          list
+          summaryItems: buildStatusSummary(result.dashboard || {}),
+          statusRatioSegments: buildStatusRatioSegments(result.dashboard || {}),
+          recentAddedList: buildRecentAddedViewModel(result.recentAddedList),
+          page: Number.isInteger(result.page) ? result.page : nextPage,
+          hasMore: Boolean(result.hasMore),
+          list: nextList
         })
 
         if (typeof done === "function") {
@@ -472,7 +649,10 @@ Page({
         })
 
         this.setData({
-          loading: false
+          loading: false,
+          page: 0,
+          hasMore: false,
+          list: []
         })
 
         if (typeof done === "function") {

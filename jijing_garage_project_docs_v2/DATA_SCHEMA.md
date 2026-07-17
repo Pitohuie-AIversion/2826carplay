@@ -33,7 +33,7 @@ const cars = [
     name: "MX-5 ND2",
     nickname: "北极星",
     brand: "Mazda",
-    category: "mini_fun",
+    category: "supercar",
     priceDay: 599,
     priceText: "今日 ￥599 / 24小时",
     status: "available",
@@ -103,20 +103,28 @@ data/categories.js
 ```js
 const categories = [
   {
-    id: "mini_fun",
-    name: "迷你乐趣"
+    id: "luxury_sedan",
+    name: "豪华轿车"
   },
   {
-    id: "luxury",
-    name: "奢享旗舰"
+    id: "city_suv",
+    name: "城市SUV"
   },
   {
-    id: "performance",
-    name: "性能闪电"
+    id: "offroad",
+    name: "硬派越野"
   },
   {
-    id: "classic_fuel",
-    name: "经典燃油"
+    id: "supercar",
+    name: "超级跑车"
+  },
+  {
+    id: "commuter_ev",
+    name: "代步电车"
+  },
+  {
+    id: "pickup",
+    name: "皮卡"
   }
 ]
 
@@ -126,11 +134,12 @@ module.exports = categories
 ## 6. 分类枚举
 
 ```text
-mini_fun        迷你乐趣
-luxury          奢享旗舰
-performance     性能闪电
-classic_fuel    经典燃油
-electric         电动先锋
+luxury_sedan    豪华轿车
+city_suv        城市SUV
+offroad         硬派越野
+supercar        超级跑车
+commuter_ev     代步电车
+pickup          皮卡
 ```
 
 ## 7. 预约数据 bookings

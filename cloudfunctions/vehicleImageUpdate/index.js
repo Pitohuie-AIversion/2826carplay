@@ -105,6 +105,63 @@ async function deleteFilesBestEffort(fileList, context) {
       stack: error && error.stack ? error.stack : "",
       createdAt: new Date().toISOString()
     })
+
+    try {
+      await db.collection("pending_file_deletions").add({
+        data: {
+          fileList: list,
+          context: context || {},
+          source: "vehicleImageUpdate",
+          createdAt: db.serverDate()
+        }
+      })
+    } catch (queueError) {}
+  }
+}
+
+async function writeAuditLogBestEffort(payload) {
+  try {
+    await db.collection("audit_logs").add({
+      data: {
+        ...payload,
+        createdAt: db.serverDate()
+      }
+    })
+  } catch (error) {
+    const message = error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error)
+    if (String(message).includes("Unexpected collection:")) {
+      return
+    }
+    console.error({
+      function: "vehicleImageUpdate",
+      stage: "auditLog",
+      errorMessage: message,
+      stack: error && error.stack ? error.stack : "",
+      createdAt: new Date().toISOString()
+    })
+  }
+}
+
+async function writeErrorLogBestEffort(payload) {
+  try {
+    await db.collection("error_logs").add({
+      data: {
+        ...payload,
+        createdAt: db.serverDate()
+      }
+    })
+  } catch (error) {
+    const message = error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error)
+    if (String(message).includes("Unexpected collection:")) {
+      return
+    }
+    console.error({
+      function: "vehicleImageUpdate",
+      stage: "errorLog",
+      errorMessage: message,
+      stack: error && error.stack ? error.stack : "",
+      createdAt: new Date().toISOString()
+    })
   }
 }
 
@@ -207,6 +264,17 @@ exports.main = async (event) => {
       await deleteFilesBestEffort([input.fileId], { openid, id: input.id, action: input.action })
     }
 
+    await writeAuditLogBestEffort({
+      openid,
+      action: "vehicleImageUpdate",
+      vehicleId: input.id,
+      imageAction: input.action,
+      fileId: input.fileId,
+      fileIds: input.fileIds,
+      imageCount: nextImageList.length,
+      coverImage: nextCoverImage
+    })
+
     return {
       ok: true,
       id: input.id,
@@ -216,6 +284,16 @@ exports.main = async (event) => {
       imageCount: nextImageList.length
     }
   } catch (error) {
+    await writeErrorLogBestEffort({
+      function: "vehicleImageUpdate",
+      openid,
+      id: input.id,
+      action: input.action,
+      input,
+      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
+      stack: error && error.stack ? error.stack : ""
+    })
+
     console.error({
       function: "vehicleImageUpdate",
       openid,

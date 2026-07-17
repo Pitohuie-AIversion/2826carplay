@@ -76,7 +76,7 @@ describe("cloudfunctions/garageVehicleList integration", () => {
       name: "理想 L9",
       nickname: "车牌尾号 2345",
       brand: "理想",
-      category: "luxury",
+      category: "city_suv",
       status: "available",
       statusText: "在库",
       priceText: "价格到店详询",
@@ -86,5 +86,30 @@ describe("cloudfunctions/garageVehicleList integration", () => {
     })
     expect(res.list[0].images).toEqual(["cloud://img1", "cloud://img2"])
     expect(res.list[0].tags).toEqual(["SUV", "上牌 2024", "粤A12345"])
+  })
+
+  test("封面图已存在于图片列表时也会排到首页第一张", async () => {
+    const mocks = createMockDb({
+      vehiclesData: [
+        {
+          _id: "car_3",
+          plateNumber: "粤C88888",
+          vehicleType: "sedan",
+          brandModel: "奔驰 C 级",
+          status: "idle",
+          imageList: ["cloud://img_old", "cloud://img_cover", "cloud://img_other"],
+          coverImage: "cloud://img_cover",
+          updatedAt: "2026-07-12T10:00:00.000Z"
+        }
+      ]
+    })
+
+    const garageVehicleList = await loadGarageVehicleListWith({ mockDb: mocks.db })
+    const res = await garageVehicleList.main({})
+
+    expect(res.ok).toBe(true)
+    expect(res.list).toHaveLength(1)
+    expect(res.list[0].cover).toBe("cloud://img_cover")
+    expect(res.list[0].images).toEqual(["cloud://img_cover", "cloud://img_old", "cloud://img_other"])
   })
 })

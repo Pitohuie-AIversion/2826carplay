@@ -18,7 +18,8 @@ Page({
     submitText: "预约信息已提交，客服将尽快联系您",
     submitButtonText: "提交预约",
     isSubmitting: false,
-    privacyTip: "提交预约即表示您同意我们仅将所填信息用于本次车辆预约沟通。车辆档期、价格、押金及取还车规则以客服最终确认为准。",
+    privacyTip:
+      "提交预约即表示您同意我们仅将所填信息用于本次车辆预约沟通与联系确认。您可在【我的预约】查看与取消；如需删除预约记录或个人信息，请联系管理员处理。车辆档期、价格、押金及取还车规则以客服最终确认为准。",
     form: {
       userName: "",
       phone: "",
@@ -67,13 +68,14 @@ Page({
     }
 
     wx.cloud.callFunction({
-      name: "garageVehicleList",
-      data: {},
+      name: "vehiclePublicDetail",
+      data: {
+        id: carId
+      },
       success: (res) => {
         const result = res && res.result ? res.result : null
-        const list = result && result.ok && Array.isArray(result.list) ? result.list : []
-        const car = list.find((item) => item.id === carId) || mockCars.find((item) => item.id === carId) || null
-        this.applyCar(car)
+        const car = result && result.ok ? result.car : null
+        this.applyCar(car || mockCars.find((item) => item.id === carId) || null)
       },
       fail: () => {
         this.applyCar(mockCars.find((item) => item.id === carId) || null)

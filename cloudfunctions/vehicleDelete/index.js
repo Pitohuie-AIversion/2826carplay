@@ -83,6 +83,63 @@ async function deleteFilesBestEffort(fileList, context) {
       stack: error && error.stack ? error.stack : "",
       createdAt: new Date().toISOString()
     })
+
+    try {
+      await db.collection("pending_file_deletions").add({
+        data: {
+          fileList: list,
+          context: context || {},
+          source: "vehicleDelete",
+          createdAt: db.serverDate()
+        }
+      })
+    } catch (queueError) {}
+  }
+}
+
+async function writeAuditLogBestEffort(payload) {
+  try {
+    await db.collection("audit_logs").add({
+      data: {
+        ...payload,
+        createdAt: db.serverDate()
+      }
+    })
+  } catch (error) {
+    const message = error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error)
+    if (String(message).includes("Unexpected collection:")) {
+      return
+    }
+    console.error({
+      function: "vehicleDelete",
+      stage: "auditLog",
+      errorMessage: message,
+      stack: error && error.stack ? error.stack : "",
+      createdAt: new Date().toISOString()
+    })
+  }
+}
+
+async function writeErrorLogBestEffort(payload) {
+  try {
+    await db.collection("error_logs").add({
+      data: {
+        ...payload,
+        createdAt: db.serverDate()
+      }
+    })
+  } catch (error) {
+    const message = error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error)
+    if (String(message).includes("Unexpected collection:")) {
+      return
+    }
+    console.error({
+      function: "vehicleDelete",
+      stage: "errorLog",
+      errorMessage: message,
+      stack: error && error.stack ? error.stack : "",
+      createdAt: new Date().toISOString()
+    })
   }
 }
 
@@ -115,12 +172,29 @@ exports.main = async (event) => {
     const fileList = normalizeStringArray(current && current.imageList).concat(coverImage ? [coverImage] : [])
     await deleteFilesBestEffort(fileList, { openid, id })
 
+    await writeAuditLogBestEffort({
+      openid,
+      action: "vehicleDelete",
+      vehicleId: id,
+      imageCount: normalizeStringArray(current && current.imageList).length,
+      hasCoverImage: Boolean(coverImage)
+    })
+
     return {
       ok: true,
       id,
       message: "车辆已删除"
     }
   } catch (error) {
+    await writeErrorLogBestEffort({
+      function: "vehicleDelete",
+      openid,
+      id,
+      input: event && typeof event === "object" ? event : {},
+      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
+      stack: error && error.stack ? error.stack : ""
+    })
+
     console.error({
       function: "vehicleDelete",
       openid,

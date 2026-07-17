@@ -73,7 +73,7 @@ function formatCarViewModel(car) {
 
 Page({
   data: {
-    servicePhone: "4008001234",
+    servicePhone: "15715710090",
     carId: "",
     car: null,
     notFoundText: "未找到该车辆，请返回车库重新选择",
@@ -121,13 +121,14 @@ Page({
     }
 
     wx.cloud.callFunction({
-      name: "garageVehicleList",
-      data: {},
+      name: "vehiclePublicDetail",
+      data: {
+        id: carId
+      },
       success: (res) => {
         const result = res && res.result ? res.result : null
-        const list = result && result.ok && Array.isArray(result.list) ? result.list : []
-        const targetCar = list.find((item) => item.id === carId) || mockCars.find((item) => item.id === carId) || null
-        this.applyCar(targetCar)
+        const car = result && result.ok ? result.car : null
+        this.applyCar(car || mockCars.find((item) => item.id === carId) || null)
       },
       fail: () => {
         this.applyCar(mockCars.find((item) => item.id === carId) || null)

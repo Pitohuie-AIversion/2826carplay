@@ -49,6 +49,7 @@ async function loadVehicleListWith({ openid, mockDb }) {
 
 describe("cloudfunctions/vehicleList integration", () => {
   test("admin 查询全部车辆列表成功", async () => {
+    const now = Date.now()
     const mocks = createMockDb({
       rolesData: [{ role: "admin" }],
       vehiclesData: [
@@ -65,6 +66,7 @@ describe("cloudfunctions/vehicleList integration", () => {
           seats: 5,
           priceDay: 1299,
           createdByOpenid: "admin_1",
+          createdAt: new Date(now - 2 * 24 * 60 * 60 * 1000).toISOString(),
           updatedAt: "2026-07-08T10:00:00.000Z"
         },
         {
@@ -80,6 +82,7 @@ describe("cloudfunctions/vehicleList integration", () => {
           seats: 5,
           priceDay: 899,
           createdByOpenid: "admin_2",
+          createdAt: new Date(now - 10 * 24 * 60 * 60 * 1000).toISOString(),
           updatedAt: "2026-07-08T08:00:00.000Z"
         }
       ]
@@ -101,6 +104,22 @@ describe("cloudfunctions/vehicleList integration", () => {
       maintenance: 1,
       retired: 0
     })
+    expect(res.dashboard).toEqual({
+      idle: 0,
+      active: 1,
+      maintenance: 1,
+      recentAdded7d: 1
+    })
+    expect(res.recentAddedList).toEqual([
+      {
+        id: "v1",
+        plateNumber: "京A12345",
+        brandModel: "BMW 740Li",
+        status: "active",
+        location: "杭州",
+        createdAt: expect.any(String)
+      }
+    ])
     expect(res.list[0].id).toBe("v1")
     expect(res.list[0].plateNumber).toBe("京A12345")
     expect(res.list[0].location).toBe("杭州")
@@ -111,6 +130,7 @@ describe("cloudfunctions/vehicleList integration", () => {
   })
 
   test("admin 按状态筛选车辆", async () => {
+    const now = Date.now()
     const mocks = createMockDb({
       rolesData: [{ role: "admin" }],
       vehiclesData: [
@@ -121,7 +141,8 @@ describe("cloudfunctions/vehicleList integration", () => {
           brandModel: "BMW 740Li",
           registerDate: "2024-01-01",
           status: "active",
-          location: "杭州"
+          location: "杭州",
+          createdAt: new Date(now - 1 * 24 * 60 * 60 * 1000).toISOString()
         },
         {
           _id: "v2",
@@ -130,7 +151,8 @@ describe("cloudfunctions/vehicleList integration", () => {
           brandModel: "Audi Q5",
           registerDate: "2023-05-10",
           status: "maintenance",
-          location: "上海"
+          location: "上海",
+          createdAt: new Date(now - 20 * 24 * 60 * 60 * 1000).toISOString()
         }
       ]
     })
@@ -146,6 +168,14 @@ describe("cloudfunctions/vehicleList integration", () => {
     expect(res.total).toBe(1)
     expect(res.list[0].brandModel).toBe("Audi Q5")
     expect(res.stats.maintenance).toBe(1)
+    expect(res.dashboard).toEqual({
+      idle: 0,
+      active: 1,
+      maintenance: 1,
+      recentAdded7d: 1
+    })
+    expect(res.recentAddedList).toHaveLength(1)
+    expect(res.recentAddedList[0].id).toBe("v1")
   })
 
   test("admin 按关键词筛选车辆", async () => {

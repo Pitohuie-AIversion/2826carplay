@@ -201,11 +201,12 @@ reserved     已预约
 车辆分类只允许：
 
 ```text
-mini_fun
-luxury
-performance
-classic_fuel
-electric
+luxury_sedan
+city_suv
+offroad
+supercar
+commuter_ev
+pickup
 ```
 
 禁止：

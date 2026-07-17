@@ -21,8 +21,15 @@
   - [x] 在 `pages/vehicle-edit/vehicle-edit.wxss` 中使用普通类替代 `.field-group:last-child`
   - [x] 保持最后一个字段的底部间距表现与修复前一致
 
+- [x] Task 5: 再次检查并统一预约相关页面的全局文本样式
+  - [x] 盘点 `booking`、`booking-detail`、`booking-manage`、`booking-manage-detail`、`bookings` 中仍偏大的标题、正文、按钮和标签字号
+  - [x] 为车辆名、状态、备注、导出提示和操作按钮补充必要的换行、截断或宽度约束
+  - [x] 保持预约链路页面的视觉层级与既有深色风格一致
+  - [x] 验证样式调整后未引入新的兼容性风险写法
+
 # Task Dependencies
 
 - Task 2 depends on Task 1
 - Task 3 depends on Task 2
 - Task 4 has no additional dependency
+- Task 5 depends on Task 3

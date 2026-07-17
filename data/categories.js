@@ -4,20 +4,28 @@
 // 让首页继续按相同字段完成分类高亮与筛选。
 const categories = [
   {
-    id: "mini_fun",
-    name: "迷你乐趣"
+    id: "luxury_sedan",
+    name: "豪华轿车"
   },
   {
-    id: "luxury",
-    name: "奢享旗舰"
+    id: "city_suv",
+    name: "城市SUV"
   },
   {
-    id: "performance",
-    name: "性能闪电"
+    id: "offroad",
+    name: "硬派越野"
   },
   {
-    id: "classic_fuel",
-    name: "经典燃油"
+    id: "supercar",
+    name: "超级跑车"
+  },
+  {
+    id: "commuter_ev",
+    name: "代步电车"
+  },
+  {
+    id: "pickup",
+    name: "皮卡"
   }
 ]
 

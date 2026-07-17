@@ -8,11 +8,12 @@
 - 盘点 `/spec` 相关界面中的标题、正文、辅助文案、按钮、标签等文本样式，收敛不合理的字号和行高
 - 建立统一的字体层级，避免同类信息在不同页面出现过大或过小的视觉落差
 - 为长文本、车牌、状态标签、按钮文案补充换行或截断策略，避免窄屏下溢出和拥挤
+- 将预约相关页面纳入同一套字体层级与文本容错规则，避免形成新的样式孤岛
 - 保持现有深色视觉风格与布局结构，不引入项目约束中禁止的兼容性风险写法
 
 ## Impact
-- Affected specs: 页面多端适配、文本可读性、管理页信息展示
-- Affected code: `app.wxss`, `components/car-card/car-card.wxss`, `pages/garage/garage.wxss`, `pages/car-detail/car-detail.wxss`, `pages/mine/mine.wxss`, `pages/vehicle-manage/vehicle-manage.wxss`, `pages/vehicle-detail-manage/vehicle-detail-manage.wxss`, `pages/vehicle-create/vehicle-create.wxss`, `pages/vehicle-edit/vehicle-edit.wxss`, `pages/booking/booking.wxss`
+- Affected specs: 页面多端适配、文本可读性、管理页信息展示、预约链路信息展示
+- Affected code: `app.wxss`, `components/car-card/car-card.wxss`, `pages/garage/garage.wxss`, `pages/car-detail/car-detail.wxss`, `pages/mine/mine.wxss`, `pages/vehicle-manage/vehicle-manage.wxss`, `pages/vehicle-detail-manage/vehicle-detail-manage.wxss`, `pages/vehicle-create/vehicle-create.wxss`, `pages/vehicle-edit/vehicle-edit.wxss`, `pages/booking/booking.wxss`, `pages/booking-detail/booking-detail.wxss`, `pages/booking-manage/booking-manage.wxss`, `pages/booking-manage-detail/booking-manage-detail.wxss`, `pages/bookings/bookings.wxss`
 
 ## ADDED Requirements
 ### Requirement: 字体响应式适配

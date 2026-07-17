@@ -185,7 +185,7 @@ data/
   name: "MX-5 ND2",
   nickname: "北极星",
   brand: "Mazda",
-  category: "mini_fun",
+  category: "supercar",
   priceDay: 599,
   priceText: "今日 ￥599 / 24小时",
   status: "available",
@@ -217,11 +217,12 @@ reserved       // 已预约
 分类只允许使用：
 
 ```js
-mini_fun
-luxury
-performance
-classic_fuel
-electric
+luxury_sedan
+city_suv
+offroad
+supercar
+commuter_ev
+pickup
 ```
 
 ## UI 风格约束

@@ -7,7 +7,7 @@
   <view class="car-overlay">
     <view class="car-top">
       <view class="car-nickname">{{car.nickname}}</view>
-      <view class="car-status {{car.statusClass}}">{{car.statusText}}</view>
+      <view class="car-status ui-status {{car.statusClass}}">{{car.statusText}}</view>
     </view>
 
     <view class="car-bottom">

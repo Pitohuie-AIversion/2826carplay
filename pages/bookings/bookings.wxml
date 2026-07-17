@@ -4,23 +4,33 @@
   <view wx:if="{{loading}}" class="loading">加载中...</view>
 
   <view wx:elif="{{list.length}}">
-    <view class="booking-item" wx:for="{{list}}" wx:key="id">
+    <view class="booking-item ui-card" wx:for="{{list}}" wx:key="id">
       <view class="booking-main">
         <view class="booking-name">{{item.vehicleName}}</view>
-        <view class="booking-status">{{item.statusText}}</view>
+        <view class="booking-status ui-status ui-status-lg {{item.statusClass}}">{{item.statusText}}</view>
       </view>
       <view class="booking-sub">
         <view class="booking-date">{{item.startDate}} - {{item.endDate}}</view>
         <view class="booking-city">{{item.city}}</view>
       </view>
       <view wx:if="{{item.note}}" class="booking-note">{{item.note}}</view>
+      <view class="booking-actions">
+        <button class="booking-btn ui-btn ui-btn-primary {{item.canCancel ? '' : 'booking-btn-last'}}" data-id="{{item.id}}" bindtap="handleViewDetail">查看详情</button>
+        <button
+          wx:if="{{item.canCancel}}"
+          class="booking-btn ui-btn ui-btn-danger-ghost booking-btn-last"
+          data-id="{{item.id}}"
+          bindtap="handleCancel"
+        >
+          取消预约
+        </button>
+      </view>
     </view>
   </view>
 
   <view wx:else class="empty">
     <view class="empty-title">暂无预约</view>
     <view class="empty-desc">去车库挑一辆喜欢的车，提交预约咨询吧。</view>
-    <button class="empty-action" bindtap="handleBackGarage">返回车库</button>
+    <button class="empty-action ui-btn ui-btn-primary" bindtap="handleBackGarage">返回车库</button>
   </view>
 </view>
-

@@ -40,6 +40,8 @@ exports.main = async (event) => {
   const wxContext = cloud.getWXContext()
   const openid = wxContext && wxContext.OPENID ? wxContext.OPENID : ""
   const limit = normalizeLimit(event && event.limit)
+  const pageRaw = Number(event && event.page)
+  const page = Number.isFinite(pageRaw) && pageRaw > 0 ? Math.floor(pageRaw) : 0
 
   try {
     if (!openid) {
@@ -50,6 +52,7 @@ exports.main = async (event) => {
       .collection("bookings")
       .where({ openid })
       .orderBy("createdAt", "desc")
+      .skip(page * limit)
       .limit(limit)
       .get()
 
@@ -57,6 +60,8 @@ exports.main = async (event) => {
 
     return {
       ok: true,
+      page,
+      limit,
       list: list.map((item) => ({
         id: item._id,
         vehicleId: item.vehicleId,
@@ -84,4 +89,3 @@ exports.main = async (event) => {
     return createError("INTERNAL_ERROR", "查询预约失败，请稍后重试")
   }
 }
-

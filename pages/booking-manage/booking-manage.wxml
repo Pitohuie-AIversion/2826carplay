@@ -1,0 +1,155 @@
+<view class="manage-page">
+  <view class="header">
+    <view class="title">预约管理</view>
+    <view class="desc">仅管理员可查看全部预约并更新状态</view>
+  </view>
+
+  <view class="filter-card ui-card ui-card-soft">
+    <input
+      class="keyword-input ui-input"
+      placeholder="搜索车辆/姓名/手机/城市"
+      value="{{keyword}}"
+      bindinput="handleKeywordInput"
+      confirm-type="search"
+      bindconfirm="handleKeywordConfirm"
+    />
+
+    <view class="status-row">
+      <view
+        wx:for="{{statusOptions}}"
+        wx:key="value"
+        class="status-chip ui-pill {{currentStatus === item.value ? 'ui-pill-active' : ''}}"
+        data-status="{{item.value}}"
+        bindtap="handleStatusTap"
+      >
+        {{item.label}}
+      </view>
+    </view>
+
+    <view class="actions">
+      <button class="action-btn ui-btn ui-btn-primary" bindtap="handleSearch">查询</button>
+      <button class="action-btn ui-btn ui-btn-ghost action-btn-last" bindtap="handleReset">重置</button>
+    </view>
+
+    <view class="result-count">当前筛选结果 {{total}} 条</view>
+
+    <button class="export-btn ui-btn ui-btn-ghost" bindtap="handleExport">导出CSV</button>
+    <view wx:if="{{exportFilePath}}" class="export-actions">
+      <view class="export-tip">CSV 已生成：{{exportFileName}}</view>
+      <view class="actions">
+        <button wx:if="{{canShareExport}}" class="action-btn ui-btn ui-btn-primary" bindtap="handleShareExportedFile">分享导出文件</button>
+        <button class="action-btn ui-btn {{canShareExport ? 'ui-btn-ghost action-btn-last' : 'ui-btn-primary action-btn-last'}}" bindtap="handleOpenExportedFile">打开文件</button>
+      </view>
+    </view>
+  </view>
+
+  <view class="dashboard-card ui-card ui-card-gradient">
+    <view class="dashboard-head">
+      <view class="dashboard-title">租赁看板</view>
+      <view class="dashboard-desc">基于全部预约统计，不受当前筛选影响</view>
+    </view>
+
+    <view class="summary-grid">
+      <view wx:for="{{summaryItems}}" wx:key="key" class="summary-item">
+        <view class="summary-value">{{item.value}}</view>
+        <view class="summary-label">{{item.label}}</view>
+      </view>
+    </view>
+
+    <view class="ratio-card">
+      <view class="ratio-head">
+        <view class="dashboard-title">跟进进度占比</view>
+        <view class="dashboard-desc">口径：待联系 / 已联系 / 已完成（不含已取消）</view>
+      </view>
+      <view class="ratio-bar">
+        <view
+          wx:for="{{statusRatioSegments}}"
+          wx:key="key"
+          wx:for-item="seg"
+          class="ratio-seg {{seg.className}}"
+          style="width: {{seg.percent}}%;"
+        ></view>
+      </view>
+      <view class="ratio-legend">
+        <view wx:for="{{statusRatioSegments}}" wx:key="key" wx:for-item="seg" class="legend-item">
+          <view class="legend-dot {{seg.className}}"></view>
+          <view class="legend-text">{{seg.label}} {{seg.value}}（{{seg.percentText}}）</view>
+        </view>
+      </view>
+    </view>
+
+    <view class="recent-block">
+      <view class="recent-head">
+        <view class="dashboard-title">近 7 天新增预约</view>
+        <view class="dashboard-desc">展示最近提交的 5 条预约，可直接进入详情</view>
+      </view>
+
+      <view wx:if="{{recentCreatedList.length}}" class="recent-list">
+        <view wx:for="{{recentCreatedList}}" wx:key="id" class="recent-item" data-id="{{item.id}}" bindtap="handleViewDetail">
+          <view class="recent-main">
+            <view class="recent-booking-title">{{item.vehicleName}}</view>
+            <view class="recent-booking-meta">客户：{{item.userName}} · 城市：{{item.city}}</view>
+            <view class="recent-booking-meta">日期：{{item.startDate}} - {{item.endDate}}</view>
+            <view class="recent-booking-meta">提交：{{item.createdAtText || '--'}}</view>
+          </view>
+          <view class="booking-status ui-status ui-status-lg {{item.statusClass}}">{{item.statusText}}</view>
+        </view>
+      </view>
+
+      <view wx:else class="recent-empty">近 7 天暂无新增预约</view>
+    </view>
+  </view>
+
+  <view wx:if="{{loading}}" class="loading">加载中...</view>
+
+  <view wx:elif="{{list.length}}">
+    <view class="booking-item ui-card" wx:for="{{list}}" wx:key="id">
+      <view class="booking-top">
+        <view class="booking-name">{{item.vehicleName || '--'}}</view>
+        <view class="booking-status ui-status ui-status-lg {{item.statusClass}}">{{item.statusText}}</view>
+      </view>
+      <view class="booking-meta">
+        <view class="booking-line">姓名：{{item.userName}}</view>
+        <view class="booking-line">手机：{{item.phone}}</view>
+        <view class="booking-line">日期：{{item.startDate}} - {{item.endDate}}</view>
+        <view class="booking-line">城市：{{item.city}}</view>
+        <view class="booking-line">提交：{{item.createdAtText}}</view>
+      </view>
+      <button class="detail-btn ui-btn ui-btn-ghost" data-id="{{item.id}}" bindtap="handleViewDetail">查看详情</button>
+      <view wx:if="{{item.note}}" class="booking-note">用户备注：{{item.note}}</view>
+
+      <view class="remark-card ui-card ui-card-soft">
+        <view class="remark-head">
+          <view class="remark-title">管理员备注</view>
+          <view wx:if="{{item.adminRemarkUpdatedAtText}}" class="remark-time">{{item.adminRemarkUpdatedAtText}}</view>
+        </view>
+        <textarea
+          class="remark-input"
+          maxlength="200"
+          placeholder="记录联系结果、到店时间、后续跟进计划"
+          value="{{item.adminRemarkDraft}}"
+          data-index="{{index}}"
+          bindinput="handleRemarkInput"
+        />
+        <button class="remark-save-btn ui-btn ui-btn-primary" data-id="{{item.id}}" data-index="{{index}}" bindtap="handleSaveRemark">保存备注</button>
+      </view>
+
+      <view class="op-row">
+        <button class="op-btn" data-id="{{item.id}}" data-status="pending" bindtap="handleUpdateStatus">待联系</button>
+        <button class="op-btn op-btn-alt" data-id="{{item.id}}" data-status="contacted" bindtap="handleUpdateStatus">已联系</button>
+        <button class="op-btn" data-id="{{item.id}}" data-status="completed" bindtap="handleUpdateStatus">已完成</button>
+        <button class="op-btn op-btn-alt op-danger op-btn-last" data-id="{{item.id}}" data-status="cancelled" bindtap="handleUpdateStatus">取消</button>
+      </view>
+    </view>
+
+    <view class="load-more">
+      <button wx:if="{{hasMore && !loading}}" class="load-more-btn ui-btn ui-btn-ghost" bindtap="handleLoadMore">加载更多</button>
+      <view wx:elif="{{!hasMore}}" class="load-more-end">已加载全部</view>
+    </view>
+  </view>
+
+  <view wx:else class="empty">
+    <view class="empty-title">{{emptyTitle}}</view>
+    <view class="empty-desc">{{emptyDesc}}</view>
+  </view>
+</view>

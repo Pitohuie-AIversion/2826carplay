@@ -149,14 +149,16 @@ pages/garage/garage
 当前所有页面均使用本地 mock 数据：
 
 - `data/cars.js`：车辆列表与详情数据，当前包含 5 辆示例车辆
-- `data/categories.js`：分类数据，当前包含 4 个分类
+- `data/categories.js`：分类数据，当前包含 6 个分类
 
 当前分类包括：
 
-- `mini_fun`：迷你乐趣
-- `luxury`：奢享旗舰
-- `performance`：性能闪电
-- `classic_fuel`：经典燃油
+- `luxury_sedan`：豪华轿车
+- `city_suv`：城市SUV
+- `offroad`：硬派越野
+- `supercar`：超级跑车
+- `commuter_ev`：代步电车
+- `pickup`：皮卡
 
 车辆状态字段统一使用：
 

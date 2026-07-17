@@ -44,6 +44,10 @@ async function loadBootstrapAdminWith({ openid, mockDb }) {
 }
 
 describe("cloudfunctions/bootstrapAdmin integration", () => {
+  afterEach(() => {
+    delete process.env.BOOTSTRAP_TOKEN
+  })
+
   test("roles 为空时，当前用户初始化为首个管理员", async () => {
     const mocks = createMockDb({
       rolesData: [],
@@ -116,6 +120,28 @@ describe("cloudfunctions/bootstrapAdmin integration", () => {
       ok: false,
       code: "BOOTSTRAP_LOCKED",
       message: "管理员已初始化，请联系现有管理员分配权限"
+    })
+    expect(mocks.rolesAdd).not.toHaveBeenCalled()
+  })
+
+  test("设置 BOOTSTRAP_TOKEN 后必须提供正确口令", async () => {
+    process.env.BOOTSTRAP_TOKEN = "secret_token"
+    const mocks = createMockDb({
+      rolesData: [],
+      addResult: { _id: "role_1" }
+    })
+
+    const bootstrapAdmin = await loadBootstrapAdminWith({
+      openid: "first_admin_openid",
+      mockDb: mocks.db
+    })
+
+    const res = await bootstrapAdmin.main({ token: "wrong_token" })
+
+    expect(res).toEqual({
+      ok: false,
+      code: "BOOTSTRAP_TOKEN_REQUIRED",
+      message: "管理员初始化已加锁，请联系开发人员获取口令"
     })
     expect(mocks.rolesAdd).not.toHaveBeenCalled()
   })

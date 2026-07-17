@@ -39,3 +39,199 @@ button {
   line-height: 1.7;
   color: #b8b8b8;
 }
+
+.ui-page {
+  min-height: 100vh;
+  background: #101010;
+  color: #ffffff;
+}
+
+.ui-card {
+  border: 1rpx solid rgba(255, 255, 255, 0.1);
+  border-radius: 16rpx;
+  background: #181818;
+  box-sizing: border-box;
+}
+
+.ui-card-soft {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: #161616;
+}
+
+.ui-card-gradient {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: linear-gradient(180deg, #1c1c1c, #151515);
+}
+
+.ui-shadow-sm {
+  box-shadow: 0 12rpx 24rpx rgba(0, 0, 0, 0.18);
+}
+
+.ui-title {
+  color: #ffffff;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.ui-title-lg {
+  font-size: 36rpx;
+}
+
+.ui-title-md {
+  font-size: 30rpx;
+}
+
+.ui-title-sm {
+  font-size: 28rpx;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.ui-desc {
+  color: #b8b8b8;
+  font-size: 24rpx;
+  line-height: 1.7;
+}
+
+.ui-desc-weak {
+  color: #a8a8a8;
+  font-size: 22rpx;
+  line-height: 1.6;
+}
+
+.ui-pill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1rpx solid rgba(255, 255, 255, 0.14);
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.72);
+  box-sizing: border-box;
+}
+
+.ui-pill-active {
+  border-color: rgba(47, 128, 237, 0.65);
+  background: rgba(47, 128, 237, 0.18);
+  color: #ffffff;
+}
+
+.ui-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.1);
+  color: inherit;
+  box-sizing: border-box;
+}
+
+.ui-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44rpx;
+  padding: 10rpx 18rpx;
+  border-radius: 999rpx;
+  color: #ffffff;
+  font-size: 20rpx;
+  font-weight: 600;
+  line-height: 1.2;
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ui-status-lg {
+  min-height: 48rpx;
+  padding: 10rpx 18rpx;
+  font-size: 22rpx;
+}
+
+.status-available,
+.status-active,
+.status-contacted {
+  background: #2f80ed;
+}
+
+.status-idle,
+.status-completed {
+  background: #27ae60;
+}
+
+.status-maintenance {
+  background: #f2994a;
+}
+
+.status-retired,
+.status-rented {
+  background: #6f7580;
+}
+
+.status-reserved {
+  background: #9b51e0;
+}
+
+.status-pending {
+  background: #5c6370;
+}
+
+.status-cancelled {
+  background: #d64b4b;
+}
+
+.ui-btn {
+  height: 80rpx;
+  margin: 0;
+  padding: 0 18rpx;
+  border-radius: 14rpx;
+  font-size: 26rpx;
+  line-height: 80rpx;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-sizing: border-box;
+}
+
+.ui-btn::after {
+  border: 0;
+}
+
+.ui-btn-primary {
+  background: #2f80ed;
+  color: #ffffff;
+}
+
+.ui-btn-ghost {
+  border: 1rpx solid rgba(255, 255, 255, 0.14);
+  background: #141414;
+  color: #ffffff;
+}
+
+.ui-btn-danger {
+  background: #d64b4b;
+  color: #ffffff;
+}
+
+.ui-btn-success {
+  background: #27ae60;
+  color: #ffffff;
+}
+
+.ui-btn-danger-ghost {
+  border: 1rpx solid rgba(214, 75, 75, 0.6);
+  background: rgba(214, 75, 75, 0.12);
+  color: #ffffff;
+}
+
+.ui-input {
+  height: 80rpx;
+  padding: 0 24rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.14);
+  border-radius: 14rpx;
+  background: #121212;
+  color: #ffffff;
+  font-size: 26rpx;
+  box-sizing: border-box;
+}

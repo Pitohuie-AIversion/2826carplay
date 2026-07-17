@@ -149,11 +149,36 @@ Page({
       } catch (error) {}
     }
 
+    this.loadOperationConfig()
     this.loadCars()
   },
 
   onShow() {
+    this.loadOperationConfig()
     this.loadCars()
+  },
+
+  loadOperationConfig() {
+    if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
+      return
+    }
+
+    wx.cloud.callFunction({
+      name: "operationConfigGet",
+      success: (res) => {
+        const result = res && res.result ? res.result : null
+        if (!result || !result.ok || !result.config) {
+          return
+        }
+
+        this.setData({
+          pageTitle: result.config.garagePageTitle || this.data.pageTitle,
+          pageSubtitle: result.config.garagePageSubtitle || this.data.pageSubtitle,
+          servicePhone: result.config.servicePhone || this.data.servicePhone
+        })
+      },
+      fail: () => {}
+    })
   },
 
   loadCars() {

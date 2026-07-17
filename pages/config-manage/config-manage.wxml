@@ -1,0 +1,71 @@
+<view class="config-page">
+  <view class="hero-card ui-card ui-card-gradient">
+    <view class="hero-title">运营配置</view>
+    <view class="hero-desc">统一管理品牌名、客服电话、首页展示文案与预约说明。保存后前台页面会按新配置展示。</view>
+  </view>
+
+  <view class="form-card ui-card">
+    <view class="section-title">基础信息</view>
+
+    <view class="form-item">
+      <view class="form-label">品牌名称</view>
+      <input class="form-input ui-input" value="{{form.brandName}}" data-field="brandName" bindinput="handleInput" />
+    </view>
+
+    <view class="form-item">
+      <view class="form-label">客服电话</view>
+      <input class="form-input ui-input" value="{{form.servicePhone}}" data-field="servicePhone" bindinput="handleInput" />
+    </view>
+
+    <view class="form-item">
+      <view class="form-label">我的页简介</view>
+      <textarea class="form-textarea ui-input" value="{{form.mineUserDesc}}" data-field="mineUserDesc" bindinput="handleInput" maxlength="80" />
+    </view>
+  </view>
+
+  <view class="form-card ui-card">
+    <view class="section-title">首页展示</view>
+
+    <view class="form-item">
+      <view class="form-label">首页标题</view>
+      <input class="form-input ui-input" value="{{form.garagePageTitle}}" data-field="garagePageTitle" bindinput="handleInput" />
+    </view>
+
+    <view class="form-item">
+      <view class="form-label">首页副标题</view>
+      <textarea class="form-textarea ui-input" value="{{form.garagePageSubtitle}}" data-field="garagePageSubtitle" bindinput="handleInput" maxlength="80" />
+    </view>
+
+    <view class="form-item">
+      <view class="form-label">城市列表</view>
+      <textarea class="form-textarea ui-input" value="{{form.cityOptionsText}}" data-field="cityOptionsText" bindinput="handleInput" maxlength="300" />
+      <view class="form-tip">每行一个城市，预约页会展示为可选列表。</view>
+    </view>
+  </view>
+
+  <view class="form-card ui-card">
+    <view class="section-title">内容页面</view>
+    <view class="form-item">
+      <view class="form-label">常见问题</view>
+      <textarea class="form-textarea form-textarea-lg ui-input" value="{{form.faqContent}}" data-field="faqContent" bindinput="handleInput" maxlength="1000" />
+    </view>
+
+    <view class="form-item">
+      <view class="form-label">平台规则</view>
+      <textarea class="form-textarea form-textarea-lg ui-input" value="{{form.rulesContent}}" data-field="rulesContent" bindinput="handleInput" maxlength="1000" />
+    </view>
+  </view>
+
+  <view class="form-card ui-card">
+    <view class="section-title">预约说明</view>
+    <view class="form-item">
+      <view class="form-label">预约说明文案</view>
+      <textarea class="form-textarea form-textarea-lg ui-input" value="{{form.bookingPrivacyTip}}" data-field="bookingPrivacyTip" bindinput="handleInput" maxlength="300" />
+    </view>
+  </view>
+
+  <view class="action-row">
+    <button class="action-btn ui-btn ui-btn-primary" loading="{{saving}}" bindtap="handleSubmit">保存配置</button>
+    <button class="action-btn ui-btn ui-btn-ghost action-btn-offset" bindtap="handleReset">恢复默认</button>
+  </view>
+</view>

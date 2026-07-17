@@ -18,6 +18,9 @@ Page({
     submitText: "预约信息已提交，客服将尽快联系您",
     submitButtonText: "提交预约",
     isSubmitting: false,
+    cityOptions: [],
+    cityIndex: -1,
+    pickerCityIndex: 0,
     privacyTip:
       "提交预约即表示您同意我们仅将所填信息用于本次车辆预约沟通与联系确认。您可在【我的预约】查看与取消；如需删除预约记录或个人信息，请联系管理员处理。车辆档期、价格、押金及取还车规则以客服最终确认为准。",
     form: {
@@ -53,7 +56,32 @@ Page({
       carId
     })
 
+    this.loadOperationConfig()
     this.loadBookingCar(carId)
+  },
+
+  loadOperationConfig() {
+    if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
+      return
+    }
+
+    wx.cloud.callFunction({
+      name: "operationConfigGet",
+      success: (res) => {
+        const result = res && res.result ? res.result : null
+        if (!result || !result.ok || !result.config) {
+          return
+        }
+
+        this.setData({
+          privacyTip: result.config.bookingPrivacyTip || this.data.privacyTip,
+          cityOptions: Array.isArray(result.config.cityOptions) ? result.config.cityOptions : []
+        })
+
+        this.syncCitySelection()
+      },
+      fail: () => {}
+    })
   },
 
   loadBookingCar(carId) {
@@ -89,8 +117,30 @@ Page({
       "form.city": car ? car.location || "" : ""
     })
 
+    this.syncCitySelection()
+
     wx.setNavigationBarTitle({
       title: car ? `${car.name} 预约` : "预约咨询"
+    })
+  },
+
+  syncCitySelection() {
+    const cityOptions = Array.isArray(this.data.cityOptions) ? this.data.cityOptions : []
+    const currentCity = String((this.data.form && this.data.form.city) || "").trim()
+    const cityIndex = cityOptions.indexOf(currentCity)
+
+    if (!currentCity && cityOptions.length) {
+      this.setData({
+        cityIndex: 0,
+        pickerCityIndex: 0,
+        "form.city": cityOptions[0]
+      })
+      return
+    }
+
+    this.setData({
+      cityIndex,
+      pickerCityIndex: cityIndex >= 0 ? cityIndex : 0
     })
   },
 
@@ -135,6 +185,20 @@ Page({
 
     this.setData({
       [`form.${field}`]: value
+    })
+  },
+
+  handleCityChange(event) {
+    const index = Number(event.detail && event.detail.value)
+    const cityOptions = Array.isArray(this.data.cityOptions) ? this.data.cityOptions : []
+    if (!Number.isInteger(index) || index < 0 || index >= cityOptions.length) {
+      return
+    }
+
+    this.setData({
+      cityIndex: index,
+      pickerCityIndex: index,
+      "form.city": cityOptions[index]
     })
   },
 

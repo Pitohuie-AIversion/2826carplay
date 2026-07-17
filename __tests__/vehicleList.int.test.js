@@ -215,6 +215,34 @@ describe("cloudfunctions/vehicleList integration", () => {
     expect(res.list[0].id).toBe("v2")
   })
 
+  test("vehicle_manager 可查询车辆列表", async () => {
+    const mocks = createMockDb({
+      rolesData: [{ role: "vehicle_manager" }],
+      vehiclesData: [
+        {
+          _id: "v1",
+          plateNumber: "京A12345",
+          vehicleType: "sedan",
+          brandModel: "BMW 740Li",
+          registerDate: "2024-01-01",
+          status: "active",
+          location: "杭州"
+        }
+      ]
+    })
+
+    const vehicleList = await loadVehicleListWith({
+      openid: "vehicle_manager_openid",
+      mockDb: mocks.db
+    })
+
+    const res = await vehicleList.main({ status: "all" })
+
+    expect(res.ok).toBe(true)
+    expect(res.total).toBe(1)
+    expect(res.list[0].id).toBe("v1")
+  })
+
   test("admin 可按扩展展示字段关键词筛选车辆", async () => {
     const mocks = createMockDb({
       rolesData: [{ role: "admin" }],

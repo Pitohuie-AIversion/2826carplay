@@ -44,40 +44,58 @@
       <view class="section-title">基础信息</view>
       <view class="info-grid">
         <view class="info-item">
-          <view class="info-label">车辆类型</view>
-          <view class="info-value">{{detail.vehicleTypeText}}</view>
+          <view class="info-item-inner">
+            <view class="info-label">车辆类型</view>
+            <view class="info-value">{{detail.vehicleTypeText}}</view>
+          </view>
         </view>
         <view class="info-item">
-          <view class="info-label">注册日期</view>
-          <view class="info-value">{{detail.registerDate || "--"}}</view>
+          <view class="info-item-inner">
+            <view class="info-label">注册日期</view>
+            <view class="info-value">{{detail.registerDate || "--"}}</view>
+          </view>
         </view>
         <view class="info-item">
-          <view class="info-label">取车城市</view>
-          <view class="info-value">{{detail.locationText}}</view>
+          <view class="info-item-inner">
+            <view class="info-label">取车城市</view>
+            <view class="info-value">{{detail.locationText}}</view>
+          </view>
         </view>
         <view class="info-item">
-          <view class="info-label">日租金</view>
-          <view class="info-value">{{detail.priceDayText}}</view>
+          <view class="info-item-inner">
+            <view class="info-label">日租金</view>
+            <view class="info-value">{{detail.priceDayText}}</view>
+          </view>
         </view>
         <view class="info-item">
-          <view class="info-label">变速箱</view>
-          <view class="info-value">{{detail.transmissionText}}</view>
+          <view class="info-item-inner">
+            <view class="info-label">变速箱</view>
+            <view class="info-value">{{detail.transmissionText}}</view>
+          </view>
         </view>
         <view class="info-item">
-          <view class="info-label">燃油类型</view>
-          <view class="info-value">{{detail.fuelTypeText}}</view>
+          <view class="info-item-inner">
+            <view class="info-label">燃油类型</view>
+            <view class="info-value">{{detail.fuelTypeText}}</view>
+          </view>
         </view>
         <view class="info-item">
-          <view class="info-label">座位数</view>
-          <view class="info-value">{{detail.seatsText}}</view>
+          <view class="info-item-inner">
+            <view class="info-label">座位数</view>
+            <view class="info-value">{{detail.seatsText}}</view>
+          </view>
         </view>
         <view class="info-item">
-          <view class="info-label">VIN</view>
-          <view class="info-value">{{detail.vinText}}</view>
+          <view class="info-item-inner">
+            <view class="info-label">VIN</view>
+            <view class="info-value">{{detail.vinText}}</view>
+          </view>
         </view>
         <view class="info-item">
-          <view class="info-label">发动机号</view>
-          <view class="info-value">{{detail.engineNumberText}}</view>
+          <view class="info-item-inner">
+            <view class="info-label">发动机号</view>
+            <view class="info-value">{{detail.engineNumberText}}</view>
+          </view>
         </view>
       </view>
     </view>
@@ -86,20 +104,28 @@
       <view class="section-title">管理信息</view>
       <view class="info-grid">
         <view class="info-item">
-          <view class="info-label">车辆ID</view>
-          <view class="info-value info-value-ellipsis">{{detail.id}}</view>
+          <view class="info-item-inner">
+            <view class="info-label">车辆ID</view>
+            <view class="info-value info-value-ellipsis">{{detail.id}}</view>
+          </view>
         </view>
         <view class="info-item">
-          <view class="info-label">创建人</view>
-          <view class="info-value info-value-ellipsis">{{detail.createdByOpenidText}}</view>
+          <view class="info-item-inner">
+            <view class="info-label">创建人</view>
+            <view class="info-value info-value-ellipsis">{{detail.createdByOpenidText}}</view>
+          </view>
         </view>
         <view class="info-item">
-          <view class="info-label">创建时间</view>
-          <view class="info-value">{{detail.createdAtText}}</view>
+          <view class="info-item-inner">
+            <view class="info-label">创建时间</view>
+            <view class="info-value">{{detail.createdAtText}}</view>
+          </view>
         </view>
         <view class="info-item">
-          <view class="info-label">更新时间</view>
-          <view class="info-value">{{detail.updatedAtText}}</view>
+          <view class="info-item-inner">
+            <view class="info-label">更新时间</view>
+            <view class="info-value">{{detail.updatedAtText}}</view>
+          </view>
         </view>
       </view>
     </view>

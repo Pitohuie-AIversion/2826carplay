@@ -1,0 +1,66 @@
+<view class="role-page">
+  <view class="hero-card ui-card ui-card-gradient">
+    <view class="hero-title">权限管理</view>
+    <view class="hero-desc">仅管理员可访问。按 OpenID 分配车辆管理与预约管理权限，admin 账号仅展示不可改。</view>
+  </view>
+
+  <view class="form-card ui-card">
+    <view class="section-title">{{editingOpenid ? "编辑权限" : "新增权限"}}</view>
+    <input
+      class="openid-input ui-input"
+      placeholder="请输入目标用户 OpenID"
+      value="{{formOpenid}}"
+      bindinput="handleOpenidInput"
+    />
+
+    <view class="permission-row">
+      <view
+        wx:for="{{permissionOptions}}"
+        wx:key="value"
+        class="permission-chip ui-pill {{item.active ? 'ui-pill-active' : ''}}"
+        data-value="{{item.value}}"
+        bindtap="handleTogglePermission"
+      >
+        {{item.label}}
+      </view>
+    </view>
+
+    <view class="form-tip">不选任何权限时，将保存为普通成员记录。</view>
+
+    <view class="action-row">
+      <button class="save-btn ui-btn ui-btn-primary" loading="{{saving}}" bindtap="handleSubmit">保存权限</button>
+      <button class="reset-btn ui-btn ui-btn-ghost" bindtap="handleResetForm">清空表单</button>
+    </view>
+  </view>
+
+  <view class="list-card ui-card">
+    <view class="section-title">当前角色列表</view>
+    <view class="section-desc">优先显示管理员，其余按 OpenID 排序。</view>
+
+    <view wx:if="{{loading}}" class="loading-text">角色列表加载中...</view>
+
+    <view wx:elif="{{list.length}}" class="role-list">
+      <view wx:for="{{list}}" wx:key="id" class="role-item">
+        <view class="role-main">
+          <view class="role-openid">{{item.openid}}</view>
+          <view class="role-permission">{{item.permissionText}}</view>
+        </view>
+        <button
+          wx:if="{{!item.isAdmin}}"
+          class="edit-btn ui-btn ui-btn-ghost"
+          data-openid="{{item.openid}}"
+          data-permissions="{{item.permissions}}"
+          bindtap="handleEditRole"
+        >
+          编辑
+        </button>
+        <view wx:else class="admin-tag">Admin</view>
+      </view>
+    </view>
+
+    <view wx:else class="empty-wrap">
+      <view class="empty-title">{{emptyTitle}}</view>
+      <view class="empty-desc">{{emptyDesc}}</view>
+    </view>
+  </view>
+</view>

@@ -1,0 +1,122 @@
+.role-page {
+  min-height: 100vh;
+  padding: 24rpx;
+  background: #101010;
+  box-sizing: border-box;
+}
+
+.hero-card,
+.form-card,
+.list-card {
+  margin-bottom: 24rpx;
+  padding: 28rpx;
+  box-sizing: border-box;
+}
+
+.hero-title,
+.section-title,
+.role-openid,
+.empty-title {
+  color: #ffffff;
+}
+
+.hero-title {
+  font-size: 32rpx;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.section-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.hero-desc,
+.section-desc,
+.form-tip,
+.role-permission,
+.loading-text,
+.empty-desc {
+  margin-top: 10rpx;
+  color: #b7b7b7;
+  font-size: 24rpx;
+  line-height: 1.7;
+}
+
+.openid-input {
+  margin-top: 20rpx;
+}
+
+.permission-row {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: 20rpx;
+}
+
+.permission-chip {
+  margin-right: 16rpx;
+  margin-bottom: 16rpx;
+  padding: 14rpx 24rpx;
+  font-size: 24rpx;
+  line-height: 1.2;
+}
+
+.action-row {
+  display: flex;
+  margin-top: 20rpx;
+}
+
+.save-btn,
+.reset-btn {
+  flex: 1;
+}
+
+.reset-btn {
+  margin-left: 16rpx;
+}
+
+.role-list {
+  margin-top: 16rpx;
+}
+
+.role-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid #262626;
+}
+
+.role-main {
+  flex: 1;
+  min-width: 0;
+  padding-right: 16rpx;
+}
+
+.role-openid {
+  font-size: 24rpx;
+  line-height: 1.6;
+  word-break: break-all;
+}
+
+.edit-btn {
+  min-width: 132rpx;
+}
+
+.admin-tag {
+  min-width: 132rpx;
+  padding: 10rpx 16rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  font-size: 22rpx;
+  line-height: 1.3;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.empty-wrap {
+  padding: 40rpx 0 12rpx;
+  text-align: center;
+}

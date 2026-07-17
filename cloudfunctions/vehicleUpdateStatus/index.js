@@ -20,6 +20,21 @@ function createError(code, message, details) {
   return result
 }
 
+function normalizeStringArray(value) {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  const list = []
+  value.forEach((item) => {
+    const text = String(item || "").trim()
+    if (text && !list.includes(text)) {
+      list.push(text)
+    }
+  })
+  return list
+}
+
 function hasAdminRole(record) {
   if (!record || typeof record !== "object") {
     return false
@@ -40,14 +55,27 @@ function hasAdminRole(record) {
   return false
 }
 
-async function isAdminOpenid(openid) {
+function hasCapability(record, capability) {
+  if (hasAdminRole(record)) {
+    return true
+  }
+
+  const merged = normalizeStringArray([record && record.role].concat((record && record.roles) || [], (record && record.permissions) || []))
+  if (capability === "vehicle_manage") {
+    return merged.includes("vehicle_manage") || merged.includes("vehicle_manager")
+  }
+
+  return false
+}
+
+async function hasOpenidCapability(openid, capability) {
   if (!openid) {
     return false
   }
 
   const res = await db.collection("roles").where({ openid }).limit(20).get()
   const list = res && Array.isArray(res.data) ? res.data : []
-  return list.some((item) => hasAdminRole(item))
+  return list.some((item) => hasCapability(item, capability))
 }
 
 async function writeAuditLogBestEffort(payload) {
@@ -110,7 +138,7 @@ exports.main = async (event) => {
   const input = normalizeInput(event)
 
   try {
-    const allowed = await isAdminOpenid(openid)
+    const allowed = await hasOpenidCapability(openid, "vehicle_manage")
     if (!allowed) {
       return createError("FORBIDDEN", "权限不足")
     }

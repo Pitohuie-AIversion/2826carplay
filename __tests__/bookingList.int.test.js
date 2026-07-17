@@ -124,6 +124,27 @@ describe("cloudfunctions/bookingList integration", () => {
     expect(res.list[0].adminRemark).toBe("客户周末到店")
   })
 
+  test("booking_manager 可查询预约列表", async () => {
+    const mocks = createMockDb({
+      rolesData: [{ role: "booking_manager" }],
+      bookingData: [
+        {
+          _id: "b1",
+          vehicleName: "MX-5",
+          status: "pending",
+          createdAt: "2026-07-13T00:00:00.000Z"
+        }
+      ]
+    })
+
+    const mod = await loadBookingListWith({ openid: "booking_manager_openid", mockDb: mocks.db })
+    const res = await mod.main({ status: "all" })
+
+    expect(res.ok).toBe(true)
+    expect(res.total).toBe(1)
+    expect(res.list[0].id).toBe("b1")
+  })
+
   test("非法状态筛选返回 VALIDATION_ERROR", async () => {
     const mocks = createMockDb({
       rolesData: [{ role: "admin" }],

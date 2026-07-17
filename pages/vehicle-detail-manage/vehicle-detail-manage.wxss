@@ -108,12 +108,23 @@
   display: flex;
   flex-wrap: wrap;
   margin-top: 18rpx;
+  margin-left: -8rpx;
+  margin-right: -8rpx;
 }
 
 .info-item {
   width: 50%;
   margin-bottom: 20rpx;
-  padding-right: 16rpx;
+  padding: 0 8rpx;
+  box-sizing: border-box;
+}
+
+.info-item-inner {
+  min-height: 100%;
+  padding: 22rpx 20rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.08);
+  border-radius: 14rpx;
+  background: rgba(255, 255, 255, 0.04);
   box-sizing: border-box;
 }
 
@@ -121,7 +132,8 @@
   margin-top: 8rpx;
   color: #ffffff;
   font-size: 24rpx;
-  line-height: 1.5;
+  font-weight: 600;
+  line-height: 1.45;
   word-break: break-all;
 }
 
@@ -136,7 +148,8 @@
   min-height: 120rpx;
   padding: 24rpx;
   border-radius: 14rpx;
-  background: #121212;
+  border: 1rpx solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
   color: #ffffff;
   font-size: 24rpx;
   line-height: 1.7;
@@ -165,16 +178,17 @@
 .image-list {
   display: flex;
   flex-wrap: wrap;
-  margin-top: 18rpx;
+  margin-top: 20rpx;
 }
 
 .image-card {
   width: calc(50% - 12rpx);
   margin-right: 24rpx;
   margin-bottom: 24rpx;
-  padding: 16rpx;
+  padding: 18rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.08);
   border-radius: 14rpx;
-  background: #121212;
+  background: rgba(255, 255, 255, 0.04);
   box-sizing: border-box;
 }
 
@@ -208,7 +222,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 16rpx;
+  margin-top: 18rpx;
 }
 
 .mini-button {
@@ -225,13 +239,14 @@
 }
 
 .secondary-mini-button {
-  border: 1rpx solid #3a3a3a;
-  background: #1a1a1a;
+  border: 1rpx solid rgba(255, 255, 255, 0.12);
+  background: #141414;
   color: #ffffff;
 }
 
 .danger-mini-button {
-  background: #8b1e1e;
+  border: 1rpx solid rgba(214, 75, 75, 0.6);
+  background: rgba(214, 75, 75, 0.12);
   color: #ffffff;
 }
 
@@ -254,12 +269,14 @@
   min-height: 160rpx;
   margin-top: 18rpx;
   border-radius: 14rpx;
-  background: #121212;
+  border: 1rpx solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
   text-align: center;
 }
 
 .action-row {
   align-items: center;
+  margin-top: 8rpx;
 }
 
 .primary-button,

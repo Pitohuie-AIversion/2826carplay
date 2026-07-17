@@ -3,7 +3,10 @@
     <view class="avatar-placeholder">GL</view>
     <view class="profile-info">
       <view class="profile-name">{{userName}}</view>
-      <view class="profile-brand">{{brandName}}</view>
+      <view class="profile-meta">
+        <text class="profile-brand-chip">{{brandName}}</text>
+        <text class="profile-brand-note">官方服务入口</text>
+      </view>
       <view class="profile-desc">{{userDesc}}</view>
     </view>
   </view>
@@ -22,7 +25,7 @@
         <view class="menu-title">{{item.title}}</view>
         <view class="menu-desc">{{item.desc}}</view>
       </view>
-      <view class="menu-arrow">></view>
+      <view class="menu-arrow">›</view>
     </view>
   </view>
 

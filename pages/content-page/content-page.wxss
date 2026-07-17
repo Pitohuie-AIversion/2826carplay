@@ -1,0 +1,28 @@
+.content-page {
+  min-height: 100vh;
+  padding: 24rpx;
+  background: #101010;
+  box-sizing: border-box;
+}
+
+.hero-card,
+.content-card {
+  margin-bottom: 24rpx;
+  padding: 28rpx;
+  box-sizing: border-box;
+}
+
+.hero-title {
+  color: #ffffff;
+  font-size: 32rpx;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.content-text {
+  color: #d2d2d2;
+  font-size: 24rpx;
+  line-height: 1.9;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

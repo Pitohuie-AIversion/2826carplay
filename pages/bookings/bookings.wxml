@@ -1,5 +1,6 @@
 <view class="bookings-page">
   <view class="page-title">我的预约</view>
+  <view class="page-desc">查看已提交的预约咨询，跟踪联系进度与出行日期。</view>
 
   <view wx:if="{{loading}}" class="loading">加载中...</view>
 
@@ -10,10 +11,13 @@
         <view class="booking-status ui-status ui-status-lg {{item.statusClass}}">{{item.statusText}}</view>
       </view>
       <view class="booking-sub">
-        <view class="booking-date">{{item.startDate}} - {{item.endDate}}</view>
-        <view class="booking-city">{{item.city}}</view>
+        <view class="booking-meta-chip">日期 {{item.startDate}} - {{item.endDate}}</view>
+        <view class="booking-meta-chip booking-meta-chip-weak">城市 {{item.city}}</view>
       </view>
-      <view wx:if="{{item.note}}" class="booking-note">{{item.note}}</view>
+      <view wx:if="{{item.note}}" class="booking-note-box">
+        <view class="booking-note-label">用户备注</view>
+        <view class="booking-note">{{item.note}}</view>
+      </view>
       <view class="booking-actions">
         <button class="booking-btn ui-btn ui-btn-primary {{item.canCancel ? '' : 'booking-btn-last'}}" data-id="{{item.id}}" bindtap="handleViewDetail">查看详情</button>
         <button

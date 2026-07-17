@@ -52,7 +52,13 @@
 
     <view class="form-item">
       <view class="form-label">城市</view>
+      <picker wx:if="{{cityOptions.length}}" mode="selector" range="{{cityOptions}}" value="{{pickerCityIndex}}" bindchange="handleCityChange">
+        <view class="form-picker {{form.city ? 'form-picker-filled' : ''}}">
+          {{form.city || '请选择取车城市'}}
+        </view>
+      </picker>
       <input
+        wx:else
         class="form-input"
         placeholder="请输入取车城市"
         value="{{form.city}}"

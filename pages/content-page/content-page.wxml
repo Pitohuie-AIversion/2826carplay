@@ -1,0 +1,9 @@
+<view class="content-page">
+  <view class="hero-card ui-card ui-card-gradient">
+    <view class="hero-title">{{pageTitle}}</view>
+  </view>
+
+  <view class="content-card ui-card">
+    <view class="content-text">{{content}}</view>
+  </view>
+</view>

@@ -63,6 +63,52 @@ async function hasOpenidCapability(openid, capability) {
   return list.some((item) => hasCapability(item, capability))
 }
 
+async function writeErrorLogBestEffort(payload) {
+  try {
+    await db.collection("error_logs").add({
+      data: {
+        ...payload,
+        createdAt: db.serverDate()
+      }
+    })
+  } catch (error) {
+    const message = error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error)
+    if (String(message).includes("Unexpected collection:")) {
+      return
+    }
+    console.error({
+      function: "vehicleUpdate",
+      stage: "errorLog",
+      errorMessage: message,
+      stack: error && error.stack ? error.stack : "",
+      createdAt: new Date().toISOString()
+    })
+  }
+}
+
+async function writeAuditLogBestEffort(payload) {
+  try {
+    await db.collection("audit_logs").add({
+      data: {
+        ...payload,
+        createdAt: db.serverDate()
+      }
+    })
+  } catch (error) {
+    const message = error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error)
+    if (String(message).includes("Unexpected collection:")) {
+      return
+    }
+    console.error({
+      function: "vehicleUpdate",
+      stage: "auditLog",
+      errorMessage: message,
+      stack: error && error.stack ? error.stack : "",
+      createdAt: new Date().toISOString()
+    })
+  }
+}
+
 function normalizeUpdateInput(event) {
   const payload = event && typeof event === "object" ? event : {}
   return {
@@ -80,6 +126,31 @@ function normalizeUpdateInput(event) {
     vin: payload.vin,
     engineNumber: payload.engineNumber,
     note: payload.note
+  }
+}
+
+function buildVehicleDiff(current, next) {
+  const fields = [
+    "plateNumber",
+    "vehicleType",
+    "brandModel",
+    "registerDate",
+    "status",
+    "location",
+    "transmission",
+    "fuelType",
+    "seats",
+    "priceDay",
+    "vin",
+    "engineNumber",
+    "note"
+  ]
+
+  const changedKeys = fields.filter((key) => JSON.stringify(current && current[key]) !== JSON.stringify(next && next[key]))
+  return {
+    changedKeys,
+    before: changedKeys.reduce((acc, key) => ({ ...acc, [key]: current ? current[key] : undefined }), {}),
+    after: changedKeys.reduce((acc, key) => ({ ...acc, [key]: next ? next[key] : undefined }), {})
   }
 }
 
@@ -129,8 +200,30 @@ exports.main = async (event) => {
       }
     })
 
+    const diff = buildVehicleDiff(current, payload)
+    await writeAuditLogBestEffort({
+      openid,
+      action: "vehicleUpdate",
+      vehicleId: input.id,
+      plateNumber,
+      changedKeys: diff.changedKeys,
+      before: diff.before,
+      after: diff.after
+    })
+
     return { ok: true, id: input.id }
   } catch (error) {
+    await writeErrorLogBestEffort({
+      function: "vehicleUpdate",
+      openid,
+      vehicleId: input.id,
+      plateNumber,
+      stage: "main",
+      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
+      stack: error && error.stack ? error.stack : "",
+      occurredAt: new Date().toISOString()
+    })
+
     console.error({
       function: "vehicleUpdate",
       openid,

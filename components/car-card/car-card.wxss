@@ -77,6 +77,10 @@
   max-width: 176rpx;
 }
 
+.car-status.status-rented {
+  background: #2f80ed;
+}
+
 .car-bottom {
   display: flex;
   align-items: flex-end;

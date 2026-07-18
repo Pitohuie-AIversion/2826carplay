@@ -25,6 +25,11 @@ const MENU_ITEMS = [
     desc: "查看权限分配与配置变更记录"
   },
   {
+    key: "errorLogManage",
+    title: "错误日志",
+    desc: "查看云函数异常记录，便于线上排障"
+  },
+  {
     key: "bootstrapAdmin",
     title: "初始化管理员",
     desc: "仅限首次配置时使用，自动把当前账号设为首个管理员"
@@ -69,9 +74,14 @@ function buildVisibleMenuItems(options) {
   const canManageRoles = Boolean(input.canManageRoles)
   const canManageConfig = Boolean(input.canManageConfig)
   const canViewAuditLogs = Boolean(input.canViewAuditLogs)
+  const canViewErrorLogs = Boolean(input.canViewErrorLogs)
 
   return MENU_ITEMS.filter((item) => {
     if (item.key === "bootstrapAdmin" && envVersion === "release") {
+      return false
+    }
+
+    if (item.key === "favorites" && envVersion === "release") {
       return false
     }
 
@@ -95,6 +105,10 @@ function buildVisibleMenuItems(options) {
       return false
     }
 
+    if (item.key === "errorLogManage" && !canViewErrorLogs) {
+      return false
+    }
+
     return true
   })
 }
@@ -111,6 +125,7 @@ Page({
       canManageRoles: false,
       canManageConfig: false,
       canViewAuditLogs: false,
+      canViewErrorLogs: false,
       canManageVehicles: false,
       canManageBookings: false
     })
@@ -133,6 +148,7 @@ Page({
         canManageRoles: false,
         canManageConfig: false,
         canViewAuditLogs: false,
+        canViewErrorLogs: false,
         canManageVehicles: false,
         canManageBookings: false
       })
@@ -184,6 +200,7 @@ Page({
             canManageRoles: Boolean(result.canManageRoles),
             canManageConfig: Boolean(result.canManageConfig),
             canViewAuditLogs: Boolean(result.canViewAuditLogs),
+            canViewErrorLogs: Boolean(result.canViewErrorLogs),
             canManageVehicles: Boolean(result.canManageVehicles),
             canManageBookings: Boolean(result.canManageBookings)
           })
@@ -238,6 +255,19 @@ Page({
     if (key === "auditLogManage") {
       wx.navigateTo({
         url: "/pages/audit-log-manage/audit-log-manage",
+        fail: () => {
+          wx.showToast({
+            title: "页面跳转失败",
+            icon: "none"
+          })
+        }
+      })
+      return
+    }
+
+    if (key === "errorLogManage") {
+      wx.navigateTo({
+        url: "/pages/error-log-manage/error-log-manage",
         fail: () => {
           wx.showToast({
             title: "页面跳转失败",

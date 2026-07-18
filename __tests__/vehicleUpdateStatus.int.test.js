@@ -4,6 +4,7 @@ function createMockDb({ rolesData, currentData, updateResult }) {
   const rolesGet = jest.fn().mockResolvedValue({ data: rolesData })
   const currentGet = jest.fn().mockResolvedValue({ data: currentData })
   const update = jest.fn().mockResolvedValue(updateResult)
+  const auditAdd = jest.fn().mockResolvedValue({ _id: "audit_1" })
 
   const rolesLimit = jest.fn(() => ({ get: rolesGet }))
   const rolesWhere = jest.fn(() => ({ limit: rolesLimit }))
@@ -24,6 +25,9 @@ function createMockDb({ rolesData, currentData, updateResult }) {
       if (name === "vehicles") {
         return { doc: vehiclesDoc }
       }
+      if (name === "audit_logs") {
+        return { add: auditAdd }
+      }
       throw new Error(`Unexpected collection: ${name}`)
     }),
     serverDate
@@ -34,6 +38,7 @@ function createMockDb({ rolesData, currentData, updateResult }) {
     rolesWhere,
     vehiclesDoc,
     update,
+    auditAdd,
     serverDateValue
   }
 }
@@ -77,6 +82,16 @@ describe("cloudfunctions/vehicleUpdateStatus integration", () => {
       data: {
         status: "active",
         updatedAt: mocks.serverDateValue
+      }
+    })
+    expect(mocks.auditAdd).toHaveBeenCalledWith({
+      data: {
+        openid: "admin_openid",
+        action: "vehicleUpdateStatus",
+        vehicleId: "car_1",
+        fromStatus: "idle",
+        toStatus: "active",
+        createdAt: mocks.serverDateValue
       }
     })
   })
@@ -152,4 +167,3 @@ describe("cloudfunctions/vehicleUpdateStatus integration", () => {
     expect(mocks.update).not.toHaveBeenCalled()
   })
 })
-

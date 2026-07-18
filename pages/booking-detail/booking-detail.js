@@ -72,6 +72,8 @@ Page({
   data: {
     id: "",
     loading: false,
+    loadFailed: false,
+    loadErrorText: "预约详情加载失败，请稍后重试",
     booking: {},
     statusText: "待联系",
     statusClass: "status-pending",
@@ -116,6 +118,7 @@ Page({
   applyBooking(booking) {
     this.setData({
       booking,
+      loadFailed: false,
       statusText: mapStatusText(booking.status),
       statusClass: mapStatusClass(booking.status),
       createdAtText: formatDisplayTime(booking.createdAt),
@@ -129,22 +132,28 @@ Page({
       return
     }
 
-    this.setData({ loading: true })
+    this.setData({
+      loading: true,
+      loadFailed: false
+    })
 
     wx.cloud.callFunction({
-      name: "bookingMyList",
-      data: { limit: 100 },
+      name: "bookingMyDetail",
+      data: { id: this.data.id },
       success: (res) => {
         const result = res && res.result ? res.result : null
-        const rawList = result && result.ok && Array.isArray(result.list) ? result.list : []
-        const current = rawList.find((item) => item.id === this.data.id)
+        const current = result && result.ok ? result.detail : null
 
         if (!current) {
           wx.showToast({
-            title: "预约不存在",
+            title: (result && result.message) || "预约不存在",
             icon: "none"
           })
-          this.setData({ loading: false })
+          this.setData({
+            loading: false,
+            loadFailed: result && result.code !== "NOT_FOUND",
+            loadErrorText: (result && result.message) || "预约详情加载失败，请稍后重试"
+          })
           return
         }
 
@@ -156,7 +165,11 @@ Page({
           title: (error && (error.errMsg || error.message)) || "加载失败",
           icon: "none"
         })
-        this.setData({ loading: false })
+        this.setData({
+          loading: false,
+          loadFailed: true,
+          loadErrorText: (error && (error.errMsg || error.message)) || "预约详情加载失败，请稍后重试"
+        })
       }
     })
   },
@@ -210,5 +223,9 @@ Page({
         this.setData({ loading: false })
       }
     })
+  },
+
+  handleRetryLoad() {
+    this.loadDetail()
   }
 })

@@ -4,6 +4,12 @@
     <view class="hero-desc">统一管理品牌名、客服电话、首页展示文案与预约说明。保存后前台页面会按新配置展示。</view>
   </view>
 
+  <view wx:if="{{loadFailed}}" class="form-card ui-card">
+    <view class="section-title">加载失败</view>
+    <view class="form-tip">{{loadErrorText}}</view>
+    <view class="form-tip">为避免默认值误覆盖线上配置，当前已禁用保存，请先重新下拉刷新或稍后再试。</view>
+  </view>
+
   <view class="form-card ui-card">
     <view class="section-title">基础信息</view>
 
@@ -65,7 +71,7 @@
   </view>
 
   <view class="action-row">
-    <button class="action-btn ui-btn ui-btn-primary" loading="{{saving}}" bindtap="handleSubmit">保存配置</button>
-    <button class="action-btn ui-btn ui-btn-ghost action-btn-offset" bindtap="handleReset">恢复默认</button>
+    <button class="action-btn ui-btn ui-btn-primary" loading="{{saving}}" disabled="{{loadFailed || !hasLoadedConfig}}" bindtap="handleSubmit">保存配置</button>
+    <button class="action-btn ui-btn ui-btn-ghost action-btn-offset" disabled="{{loadFailed || !hasLoadedConfig}}" bindtap="handleReset">恢复默认</button>
   </view>
 </view>

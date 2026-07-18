@@ -100,6 +100,29 @@ async function writeAuditLogBestEffort(payload) {
   }
 }
 
+async function writeErrorLogBestEffort(payload) {
+  try {
+    await db.collection("error_logs").add({
+      data: {
+        ...payload,
+        createdAt: db.serverDate()
+      }
+    })
+  } catch (error) {
+    const message = error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error)
+    if (String(message).includes("Unexpected collection:")) {
+      return
+    }
+    console.error({
+      function: "bookingUpdateAdminRemark",
+      stage: "errorLog",
+      errorMessage: message,
+      stack: error && error.stack ? error.stack : "",
+      createdAt: new Date().toISOString()
+    })
+  }
+}
+
 function normalizeEvent(event) {
   const payload = event && typeof event === "object" ? event : {}
   return {
@@ -164,6 +187,16 @@ exports.main = async (event) => {
       message: "管理员备注已保存"
     }
   } catch (error) {
+    await writeErrorLogBestEffort({
+      function: "bookingUpdateAdminRemark",
+      openid,
+      bookingId: input.id,
+      stage: "main",
+      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
+      stack: error && error.stack ? error.stack : "",
+      occurredAt: new Date().toISOString()
+    })
+
     console.error({
       function: "bookingUpdateAdminRemark",
       openid,

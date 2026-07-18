@@ -1,0 +1,62 @@
+<view class="error-page">
+  <view class="header">
+    <view class="title">错误日志</view>
+    <view class="desc">展示云函数异常记录（仅管理员可见）</view>
+  </view>
+
+  <view class="filter-card ui-card">
+    <input
+      class="keyword-input ui-input"
+      placeholder="搜索 OpenID / 车辆ID / 预约ID / 错误信息"
+      value="{{keyword}}"
+      bindinput="handleKeywordInput"
+      confirm-type="search"
+      bindconfirm="handleSearch"
+    />
+
+    <scroll-view class="func-scroll" scroll-x enable-flex show-scrollbar="{{false}}">
+      <view class="func-list">
+        <view
+          wx:for="{{funcOptions}}"
+          wx:key="value"
+          class="func-chip ui-pill {{currentFunc === item.value ? 'ui-pill-active' : ''}}"
+          data-value="{{item.value}}"
+          bindtap="handleFuncTap"
+        >
+          {{item.label}}
+        </view>
+      </view>
+    </scroll-view>
+
+    <view class="actions">
+      <button class="action-btn ui-btn ui-btn-primary" bindtap="handleSearch">查询</button>
+    </view>
+
+    <view class="result-count">当前筛选结果 {{total}} 条</view>
+  </view>
+
+  <view wx:if="{{loading}}" class="loading">加载中...</view>
+
+  <view wx:elif="{{list.length}}">
+    <view class="log-item ui-card ui-card-soft" wx:for="{{list}}" wx:key="id">
+      <view class="log-head">
+        <view class="log-func">{{item.function || '--'}}</view>
+        <view class="log-time">{{item.createdAtText || '--'}}</view>
+      </view>
+      <view wx:if="{{item.messagePreview}}" class="log-message">{{item.messagePreview}}</view>
+      <view wx:if="{{item.summary}}" class="log-summary">{{item.summary}}</view>
+      <button wx:if="{{item.stack}}" class="copy-btn ui-btn ui-btn-ghost" data-stack="{{item.stack}}" bindtap="handleCopyStack">复制堆栈</button>
+    </view>
+
+    <view class="load-more">
+      <button wx:if="{{hasMore && !loading}}" class="load-more-btn ui-btn ui-btn-ghost" bindtap="handleLoadMore">加载更多</button>
+      <view wx:elif="{{!hasMore}}" class="load-more-end">已加载全部</view>
+    </view>
+  </view>
+
+  <view wx:else class="empty ui-card">
+    <view class="empty-title">{{emptyTitle}}</view>
+    <view class="empty-desc">{{emptyDesc}}</view>
+  </view>
+</view>
+

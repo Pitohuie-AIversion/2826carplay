@@ -56,6 +56,8 @@ describe("cloudfunctions/getMyPermissions integration", () => {
       permissions: ["admin", "vehicle_manage", "booking_manage"],
       canManageRoles: true,
       canManageConfig: true,
+      canViewAuditLogs: true,
+      canViewErrorLogs: true,
       canManageVehicles: true,
       canManageBookings: true
     })
@@ -78,6 +80,8 @@ describe("cloudfunctions/getMyPermissions integration", () => {
     expect(res.permissions).toEqual(["vehicle_manage", "booking_manage"])
     expect(res.canManageRoles).toBe(false)
     expect(res.canManageConfig).toBe(false)
+    expect(res.canViewAuditLogs).toBe(false)
+    expect(res.canViewErrorLogs).toBe(false)
     expect(res.canManageVehicles).toBe(true)
     expect(res.canManageBookings).toBe(true)
   })

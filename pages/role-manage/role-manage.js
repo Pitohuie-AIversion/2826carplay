@@ -1,3 +1,5 @@
+const { requirePagePermission } = require("../../shared/pageAuth")
+
 const PERMISSION_OPTIONS = [
   { value: "vehicle_manage", label: "车辆管理" },
   { value: "booking_manage", label: "预约管理" }
@@ -48,6 +50,7 @@ Page({
   data: {
     loading: false,
     saving: false,
+    pageAuthorized: false,
     list: [],
     permissionOptions: buildPermissionOptions([]),
     formOpenid: "",
@@ -58,7 +61,13 @@ Page({
   },
 
   onLoad() {
-    this.fetchRoleList()
+    requirePagePermission(this, {
+      required: "canManageRoles",
+      noPermissionMessage: "无权访问权限管理",
+      onAuthorized: () => {
+        this.fetchRoleList()
+      }
+    })
   },
 
   onPullDownRefresh() {

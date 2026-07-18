@@ -1,4 +1,3 @@
-const mockCars = require("../../data/cars")
 const mockCategories = require("../../data/categories")
 
 const CATEGORY_LABEL_MAP = {
@@ -119,6 +118,8 @@ Page({
     pageTitle: "极境车库",
     pageSubtitle: "后台车辆资料已接入首页展示，上传封面后会同步展示到车库首页",
     emptyText: "当前分类暂无车辆，更多车型即将入库",
+    loadError: false,
+    loadErrorText: "车辆列表加载失败，请稍后重试",
     categorySummary: {
       name: "",
       total: 0,
@@ -183,7 +184,7 @@ Page({
 
   loadCars() {
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
-      this.applyCars(mockCars)
+      this.setCarsLoadError("云能力未初始化，请稍后重试")
       return
     }
 
@@ -193,14 +194,29 @@ Page({
       success: (res) => {
         const result = res && res.result ? res.result : null
         if (!result || !result.ok || !Array.isArray(result.list)) {
-          this.applyCars(mockCars)
+          this.setCarsLoadError((result && result.message) || "车辆列表加载失败，请稍后重试")
           return
         }
 
         this.applyCars(result.list)
       },
-      fail: () => {
-        this.applyCars(mockCars)
+      fail: (error) => {
+        this.setCarsLoadError((error && (error.errMsg || error.message)) || "车辆列表加载失败，请稍后重试")
+      }
+    })
+  },
+
+  setCarsLoadError(message) {
+    this.setData({
+      loadError: true,
+      loadErrorText: String(message || "车辆列表加载失败，请稍后重试"),
+      categories: [],
+      cars: [],
+      filteredCars: [],
+      categorySummary: {
+        name: "",
+        total: 0,
+        available: 0
       }
     })
   },
@@ -212,6 +228,7 @@ Page({
     const nextCategory = categoryIds.includes(this.data.currentCategory) ? this.data.currentCategory : "all"
 
     this.setData({
+      loadError: false,
       categories,
       cars: sortedCars
     })
@@ -272,6 +289,10 @@ Page({
     wx.navigateTo({
       url: "/pages/mine/mine"
     })
+  },
+
+  handleRetryLoad() {
+    this.loadCars()
   },
 
   onShareAppMessage() {

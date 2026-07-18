@@ -1,4 +1,5 @@
 const vehicleUtils = require("../../shared/vehicle")
+const { requirePagePermission } = require("../../shared/pageAuth")
 
 const VEHICLE_TYPE_LABEL_MAP = {
   sedan: "轿车",
@@ -58,6 +59,7 @@ Page({
   data: {
     today: formatDate(new Date()),
     isSubmitting: false,
+    pageAuthorized: false,
     vehicleTypeLabels: buildLabels(vehicleUtils.VEHICLE_TYPES, VEHICLE_TYPE_LABEL_MAP),
     statusLabels: buildLabels(vehicleUtils.VEHICLE_STATUSES, STATUS_LABEL_MAP),
     transmissionLabels: buildLabels(vehicleUtils.TRANSMISSION_TYPES, TRANSMISSION_LABEL_MAP),
@@ -147,6 +149,12 @@ Page({
         })
       } catch (error) {}
     }
+
+    requirePagePermission(this, {
+      required: "canManageVehicles",
+      noPermissionMessage: "无权访问新增车辆",
+      onAuthorized: () => {}
+    })
   },
 
   handlePlateInput(event) {

@@ -1,3 +1,5 @@
+const { requirePagePermission } = require("../../shared/pageAuth")
+
 const STATUS_LABEL_MAP = {
   active: "在用",
   idle: "闲置",
@@ -138,6 +140,7 @@ Page({
     loading: true,
     uploading: false,
     updatingStatus: false,
+    pageAuthorized: false,
     statusOpOptions: STATUS_OP_OPTIONS,
     detail: null
   },
@@ -173,10 +176,20 @@ Page({
     }
 
     this.setData({ id })
-    this.fetchDetail(id)
+    requirePagePermission(this, {
+      required: "canManageVehicles",
+      noPermissionMessage: "无权访问车辆详情管理",
+      onAuthorized: () => {
+        this.fetchDetail(id)
+      }
+    })
   },
 
   onPullDownRefresh() {
+    if (!this.data.pageAuthorized) {
+      wx.stopPullDownRefresh()
+      return
+    }
     this.fetchDetail(this.data.id, () => {
       wx.stopPullDownRefresh()
     })

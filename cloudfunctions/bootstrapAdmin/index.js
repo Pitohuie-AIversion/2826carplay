@@ -24,6 +24,52 @@ function hasAdminRole(record) {
   return false
 }
 
+async function writeErrorLogBestEffort(payload) {
+  try {
+    await db.collection("error_logs").add({
+      data: {
+        ...payload,
+        createdAt: db.serverDate()
+      }
+    })
+  } catch (error) {
+    const message = error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error)
+    if (String(message).includes("Unexpected collection:")) {
+      return
+    }
+    console.error({
+      function: "bootstrapAdmin",
+      stage: "errorLog",
+      errorMessage: message,
+      stack: error && error.stack ? error.stack : "",
+      createdAt: new Date().toISOString()
+    })
+  }
+}
+
+async function writeAuditLogBestEffort(payload) {
+  try {
+    await db.collection("audit_logs").add({
+      data: {
+        ...payload,
+        createdAt: db.serverDate()
+      }
+    })
+  } catch (error) {
+    const message = error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error)
+    if (String(message).includes("Unexpected collection:")) {
+      return
+    }
+    console.error({
+      function: "bootstrapAdmin",
+      stage: "auditLog",
+      errorMessage: message,
+      stack: error && error.stack ? error.stack : "",
+      createdAt: new Date().toISOString()
+    })
+  }
+}
+
 exports.main = async (event) => {
   const context = cloud.getWXContext()
   const openid = context && context.OPENID ? context.OPENID : ""
@@ -72,6 +118,14 @@ exports.main = async (event) => {
       }
     })
 
+    await writeAuditLogBestEffort({
+      openid,
+      action: "bootstrapAdmin",
+      targetOpenid: openid,
+      bootstrap: true,
+      tokenProtected: Boolean(requiredToken)
+    })
+
     return {
       ok: true,
       openid,
@@ -80,6 +134,17 @@ exports.main = async (event) => {
       message: "已初始化为首个管理员"
     }
   } catch (error) {
+    await writeErrorLogBestEffort({
+      function: "bootstrapAdmin",
+      openid,
+      stage: "main",
+      hasRequiredToken: Boolean(requiredToken),
+      tokenProvided: Boolean(token),
+      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
+      stack: error && error.stack ? error.stack : "",
+      occurredAt: new Date().toISOString()
+    })
+
     console.error({
       function: "bootstrapAdmin",
       openid,

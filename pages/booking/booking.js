@@ -1,5 +1,3 @@
-const mockCars = require("../../data/cars")
-
 function formatDate(date) {
   const year = date.getFullYear()
   const month = `${date.getMonth() + 1}`.padStart(2, "0")
@@ -12,6 +10,8 @@ Page({
   data: {
     carId: "",
     carName: "",
+    loadError: false,
+    loadErrorText: "车辆信息加载失败，请稍后重试",
     today: formatDate(new Date()),
     endMinDate: formatDate(new Date()),
     notFoundText: "未找到该车辆，请返回车库重新选择",
@@ -91,7 +91,7 @@ Page({
     }
 
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
-      this.applyCar(mockCars.find((item) => item.id === carId) || null)
+      this.setLoadError("云能力未初始化，请稍后重试")
       return
     }
 
@@ -103,16 +103,39 @@ Page({
       success: (res) => {
         const result = res && res.result ? res.result : null
         const car = result && result.ok ? result.car : null
-        this.applyCar(car || mockCars.find((item) => item.id === carId) || null)
+        if (car) {
+          this.applyCar(car)
+          return
+        }
+
+        if (result && result.code === "NOT_FOUND") {
+          this.applyCar(null)
+          return
+        }
+
+        this.setLoadError((result && result.message) || "车辆信息加载失败，请稍后重试")
       },
-      fail: () => {
-        this.applyCar(mockCars.find((item) => item.id === carId) || null)
+      fail: (error) => {
+        this.setLoadError((error && (error.errMsg || error.message)) || "车辆信息加载失败，请稍后重试")
       }
+    })
+  },
+
+  setLoadError(message) {
+    this.setData({
+      loadError: true,
+      loadErrorText: String(message || "车辆信息加载失败，请稍后重试"),
+      carName: ""
+    })
+
+    wx.setNavigationBarTitle({
+      title: "预约咨询"
     })
   },
 
   applyCar(car) {
     this.setData({
+      loadError: false,
       carName: car ? car.name || "" : "",
       "form.city": car ? car.location || "" : ""
     })
@@ -354,5 +377,8 @@ Page({
         })
       }
     })
+  },
+  handleRetryLoad() {
+    this.loadBookingCar(this.data.carId)
   }
 })

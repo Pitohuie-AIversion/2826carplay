@@ -6,6 +6,7 @@ function createMockDb({ rolesData, vehiclesData, addResult }) {
   const rolesGet = jest.fn().mockResolvedValue({ data: rolesData })
   const vehiclesGet = jest.fn().mockResolvedValue({ data: vehiclesData })
   const vehiclesAdd = jest.fn().mockResolvedValue(addResult)
+  const auditAdd = jest.fn().mockResolvedValue({ _id: "audit_1" })
 
   const rolesLimit = jest.fn(() => ({ get: rolesGet }))
   const rolesWhere = jest.fn(() => ({ limit: rolesLimit }))
@@ -24,6 +25,9 @@ function createMockDb({ rolesData, vehiclesData, addResult }) {
       if (name === "vehicles") {
         return { where: vehiclesWhere, add: vehiclesAdd }
       }
+      if (name === "audit_logs") {
+        return { add: auditAdd }
+      }
       throw new Error(`Unexpected collection: ${name}`)
     }),
     serverDate
@@ -38,7 +42,8 @@ function createMockDb({ rolesData, vehiclesData, addResult }) {
     vehiclesGet,
     vehiclesWhere,
     vehiclesLimit,
-    vehiclesAdd
+    vehiclesAdd,
+    auditAdd
   }
 }
 
@@ -105,6 +110,19 @@ describe("cloudfunctions/vehicleCreate integration", () => {
         createdAt: mocks.serverDateValue,
         updatedAt: mocks.serverDateValue,
         createdByOpenid: "admin_openid"
+      }
+    })
+    expect(mocks.auditAdd).toHaveBeenCalledWith({
+      data: {
+        openid: "admin_openid",
+        action: "vehicleCreate",
+        vehicleId: "new_id",
+        plateNumber: "京A12345",
+        vehicleType: "sedan",
+        brandModel: "Toyota",
+        status: "active",
+        location: "杭州",
+        createdAt: mocks.serverDateValue
       }
     })
   })

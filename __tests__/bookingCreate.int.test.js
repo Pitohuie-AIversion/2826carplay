@@ -3,6 +3,7 @@ jest.mock("wx-server-sdk")
 function createMockDb({ vehicleData, addResult }) {
   const vehicleGet = jest.fn().mockResolvedValue({ data: vehicleData })
   const add = jest.fn().mockResolvedValue(addResult)
+  const auditAdd = jest.fn().mockResolvedValue({ _id: "audit_1" })
 
   const vehiclesDoc = jest.fn(() => ({
     get: vehicleGet
@@ -23,6 +24,9 @@ function createMockDb({ vehicleData, addResult }) {
       if (name === "bookings") {
         return { add }
       }
+      if (name === "audit_logs") {
+        return { add: auditAdd }
+      }
       throw new Error(`Unexpected collection: ${name}`)
     }),
     serverDate
@@ -33,6 +37,7 @@ function createMockDb({ vehicleData, addResult }) {
     vehiclesDoc,
     vehicleGet,
     add,
+    auditAdd,
     serverDateValue
   }
 }
@@ -94,6 +99,19 @@ describe("cloudfunctions/bookingCreate integration", () => {
         updatedAt: mocks.serverDateValue
       }
     })
+    expect(mocks.auditAdd).toHaveBeenCalledWith({
+      data: {
+        openid: "user_openid",
+        action: "bookingCreate",
+        bookingId: "booking_1",
+        vehicleId: "car_1",
+        vehicleName: "MX-5 ND2",
+        startDate: "2026-07-13",
+        endDate: "2026-07-14",
+        city: "杭州",
+        createdAt: mocks.serverDateValue
+      }
+    })
   })
 
   test("缺少 vehicleId 返回 VALIDATION_ERROR", async () => {
@@ -147,4 +165,3 @@ describe("cloudfunctions/bookingCreate integration", () => {
     expect(mocks.add).not.toHaveBeenCalled()
   })
 })
-

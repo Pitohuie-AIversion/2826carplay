@@ -10,6 +10,7 @@
     "pages/role-manage/role-manage",
     "pages/config-manage/config-manage",
     "pages/audit-log-manage/audit-log-manage",
+    "pages/error-log-manage/error-log-manage",
     "pages/booking-manage/booking-manage",
     "pages/booking-manage-detail/booking-manage-detail",
     "pages/vehicle-create/vehicle-create",

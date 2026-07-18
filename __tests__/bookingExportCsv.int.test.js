@@ -3,6 +3,9 @@ jest.mock("wx-server-sdk")
 function createMockDb({ rolesData, bookingData }) {
   const rolesGet = jest.fn().mockResolvedValue({ data: rolesData })
   const bookingsGet = jest.fn().mockResolvedValue({ data: bookingData })
+  const auditAdd = jest.fn().mockResolvedValue({ _id: "audit_1" })
+  const serverDateValue = { __type: "serverDate" }
+  const serverDate = jest.fn(() => serverDateValue)
 
   const rolesLimit = jest.fn(() => ({ get: rolesGet }))
   const rolesWhere = jest.fn(() => ({ limit: rolesLimit }))
@@ -17,14 +20,19 @@ function createMockDb({ rolesData, bookingData }) {
       if (name === "bookings") {
         return { limit: bookingsLimit }
       }
+      if (name === "audit_logs") {
+        return { add: auditAdd }
+      }
       throw new Error(`Unexpected collection: ${name}`)
-    })
+    }),
+    serverDate
   }
 
   return {
     db,
     rolesWhere,
-    bookingsLimit
+    bookingsLimit,
+    auditAdd
   }
 }
 
@@ -73,6 +81,17 @@ describe("cloudfunctions/bookingExportCsv integration", () => {
     expect(res.csvText).toContain("张三")
     expect(res.csvText).toContain("已联系")
     expect(mocks.rolesWhere).toHaveBeenCalledWith({ openid: "admin_openid" })
+    expect(mocks.auditAdd).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        openid: "admin_openid",
+        action: "bookingExportCsv",
+        status: "all",
+        keyword: "",
+        limit: 500,
+        total: 1,
+        fileName: res.fileName
+      })
+    })
   })
 
   test("非 admin 返回 FORBIDDEN", async () => {
@@ -91,4 +110,3 @@ describe("cloudfunctions/bookingExportCsv integration", () => {
     })
   })
 })
-

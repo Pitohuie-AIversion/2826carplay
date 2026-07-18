@@ -5,6 +5,7 @@ function createMockDb({ rolesData, duplicateData, currentData, updateResult }) {
   const duplicateGet = jest.fn().mockResolvedValue({ data: duplicateData })
   const currentGet = jest.fn().mockResolvedValue({ data: currentData })
   const update = jest.fn().mockResolvedValue(updateResult)
+  const auditAdd = jest.fn().mockResolvedValue({ _id: "audit_1" })
 
   const rolesLimit = jest.fn(() => ({ get: rolesGet }))
   const rolesWhere = jest.fn(() => ({ limit: rolesLimit }))
@@ -27,6 +28,9 @@ function createMockDb({ rolesData, duplicateData, currentData, updateResult }) {
       if (name === "vehicles") {
         return { where: vehiclesWhere, doc: vehiclesDoc }
       }
+      if (name === "audit_logs") {
+        return { add: auditAdd }
+      }
       throw new Error(`Unexpected collection: ${name}`)
     }),
     serverDate
@@ -41,6 +45,7 @@ function createMockDb({ rolesData, duplicateData, currentData, updateResult }) {
     vehiclesDoc,
     currentGet,
     update,
+    auditAdd,
     serverDateValue
   }
 }
@@ -104,6 +109,40 @@ describe("cloudfunctions/vehicleUpdate integration", () => {
         priceDay: 1299,
         note: "行政旗舰",
         updatedAt: mocks.serverDateValue
+      }
+    })
+    expect(mocks.auditAdd).toHaveBeenCalledWith({
+      data: {
+        openid: "admin_openid",
+        action: "vehicleUpdate",
+        vehicleId: "car_1",
+        plateNumber: "京A12345",
+        changedKeys: ["vehicleType", "brandModel", "registerDate", "status", "location", "transmission", "fuelType", "seats", "priceDay", "note"],
+        before: {
+          vehicleType: undefined,
+          brandModel: undefined,
+          registerDate: undefined,
+          status: undefined,
+          location: undefined,
+          transmission: undefined,
+          fuelType: undefined,
+          seats: undefined,
+          priceDay: undefined,
+          note: undefined
+        },
+        after: {
+          vehicleType: "sedan",
+          brandModel: "BMW 740Li",
+          registerDate: "2026-07-08",
+          status: "idle",
+          location: "杭州",
+          transmission: "automatic",
+          fuelType: "gasoline",
+          seats: 5,
+          priceDay: 1299,
+          note: "行政旗舰"
+        },
+        createdAt: mocks.serverDateValue
       }
     })
   })

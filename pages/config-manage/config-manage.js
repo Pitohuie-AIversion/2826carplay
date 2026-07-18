@@ -1,3 +1,5 @@
+const { requirePagePermission } = require("../../shared/pageAuth")
+
 const DEFAULT_CONFIG = {
   brandName: "极境车库",
   servicePhone: "15715710090",
@@ -52,11 +54,21 @@ Page({
   data: {
     loading: false,
     saving: false,
+    pageAuthorized: false,
+    hasLoadedConfig: false,
+    loadFailed: false,
+    loadErrorText: "",
     form: buildForm(DEFAULT_CONFIG)
   },
 
   onLoad() {
-    this.fetchConfig()
+    requirePagePermission(this, {
+      required: "canManageConfig",
+      noPermissionMessage: "无权访问运营配置",
+      onAuthorized: () => {
+        this.fetchConfig()
+      }
+    })
   },
 
   onPullDownRefresh() {
@@ -73,23 +85,43 @@ Page({
       return
     }
 
-    this.setData({ loading: true })
+    this.setData({
+      loading: true,
+      loadFailed: false,
+      loadErrorText: ""
+    })
     wx.cloud.callFunction({
       name: "operationConfigGet",
       success: (res) => {
         const result = res && res.result ? res.result : null
+        if (!result || !result.ok || !result.config) {
+          this.setData({
+            loading: false,
+            loadFailed: true,
+            loadErrorText: (result && result.message) || "配置加载失败，请刷新后重试"
+          })
+          if (typeof done === "function") {
+            done()
+          }
+          return
+        }
+
         this.setData({
           loading: false,
-          form: buildForm(result && result.ok && result.config ? result.config : DEFAULT_CONFIG)
+          hasLoadedConfig: true,
+          loadFailed: false,
+          loadErrorText: "",
+          form: buildForm(result.config)
         })
         if (typeof done === "function") {
           done()
         }
       },
-      fail: () => {
+      fail: (error) => {
         this.setData({
           loading: false,
-          form: buildForm(DEFAULT_CONFIG)
+          loadFailed: true,
+          loadErrorText: (error && (error.errMsg || error.message)) || "配置加载失败，请刷新后重试"
         })
         if (typeof done === "function") {
           done()
@@ -110,6 +142,14 @@ Page({
   },
 
   handleReset() {
+    if (!this.data.hasLoadedConfig || this.data.loadFailed) {
+      wx.showToast({
+        title: "请先成功加载线上配置",
+        icon: "none"
+      })
+      return
+    }
+
     this.setData({
       form: buildForm(DEFAULT_CONFIG)
     })
@@ -117,6 +157,14 @@ Page({
 
   handleSubmit() {
     if (this.data.saving) {
+      return
+    }
+
+    if (!this.data.hasLoadedConfig || this.data.loadFailed) {
+      wx.showToast({
+        title: "配置未加载成功，暂不允许保存",
+        icon: "none"
+      })
       return
     }
 

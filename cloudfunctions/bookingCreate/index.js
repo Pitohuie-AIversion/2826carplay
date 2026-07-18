@@ -104,6 +104,30 @@ async function writeErrorLogBestEffort(payload) {
   }
 }
 
+async function writeAuditLogBestEffort(payload) {
+  try {
+    await db.collection("audit_logs").add({
+      data: {
+        ...payload,
+        createdAt: db.serverDate()
+      }
+    })
+  } catch (error) {
+    const message = error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error)
+    if (String(message).includes("Unexpected collection:")) {
+      return
+    }
+
+    console.error({
+      function: "bookingCreate",
+      stage: "auditLog",
+      errorMessage: message,
+      stack: error && error.stack ? error.stack : "",
+      createdAt: new Date().toISOString()
+    })
+  }
+}
+
 exports.main = async (event) => {
   const wxContext = cloud.getWXContext()
   const openid = wxContext && wxContext.OPENID ? wxContext.OPENID : ""
@@ -149,6 +173,17 @@ exports.main = async (event) => {
     })
 
     const bookingId = addRes && (addRes._id || addRes.id) ? addRes._id || addRes.id : ""
+
+    await writeAuditLogBestEffort({
+      openid,
+      action: "bookingCreate",
+      bookingId,
+      vehicleId: input.vehicleId,
+      vehicleName: bookingData.vehicleName,
+      startDate: input.startDate,
+      endDate: input.endDate,
+      city: input.city
+    })
 
     return {
       ok: true,

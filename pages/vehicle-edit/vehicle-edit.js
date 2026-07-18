@@ -1,4 +1,5 @@
 const vehicleUtils = require("../../shared/vehicle")
+const { requirePagePermission } = require("../../shared/pageAuth")
 
 const VEHICLE_TYPE_LABEL_MAP = {
   sedan: "轿车",
@@ -61,6 +62,7 @@ Page({
     today: formatDate(new Date()),
     loading: true,
     isSubmitting: false,
+    pageAuthorized: false,
     vehicleTypeLabels: buildLabels(vehicleUtils.VEHICLE_TYPES, VEHICLE_TYPE_LABEL_MAP),
     statusLabels: buildLabels(vehicleUtils.VEHICLE_STATUSES, STATUS_LABEL_MAP),
     transmissionLabels: buildLabels(vehicleUtils.TRANSMISSION_TYPES, TRANSMISSION_LABEL_MAP),
@@ -121,7 +123,13 @@ Page({
     }
 
     this.setData({ id })
-    this.fetchDetail(id)
+    requirePagePermission(this, {
+      required: "canManageVehicles",
+      noPermissionMessage: "无权访问编辑车辆",
+      onAuthorized: () => {
+        this.fetchDetail(id)
+      }
+    })
   },
 
   fetchDetail(id) {
@@ -137,14 +145,13 @@ Page({
     }
 
     wx.cloud.callFunction({
-      name: "vehicleList",
+      name: "vehicleDetail",
       data: {
-        status: "all",
-        keyword: ""
+        id
       },
       success: (res) => {
         const result = res && res.result ? res.result : null
-        if (!result || !result.ok) {
+        if (!result || !result.ok || !result.detail) {
           wx.showToast({
             title: (result && result.message) || "加载失败",
             icon: "none"
@@ -155,18 +162,7 @@ Page({
           return
         }
 
-        const list = Array.isArray(result.list) ? result.list : []
-        const current = list.find((item) => item.id === id)
-        if (!current) {
-          wx.showToast({
-            title: "车辆不存在",
-            icon: "none"
-          })
-          this.setData({
-            loading: false
-          })
-          return
-        }
+        const current = result.detail
 
         const vehicleTypeIndex = Math.max(vehicleUtils.VEHICLE_TYPES.indexOf(current.vehicleType), 0)
         const statusIndex = Math.max(vehicleUtils.VEHICLE_STATUSES.indexOf(current.status), 0)

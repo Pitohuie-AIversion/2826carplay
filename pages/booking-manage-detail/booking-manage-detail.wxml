@@ -5,41 +5,43 @@
   </view>
 
   <view class="info-card ui-card">
-    <view class="info-row">
-      <view class="info-label">预约编号</view>
-      <view class="info-value">{{booking.id || "--"}}</view>
-    </view>
-    <view class="info-row">
-      <view class="info-label">车辆 ID</view>
-      <view class="info-value">{{booking.vehicleId || "--"}}</view>
-    </view>
-    <view class="info-row">
-      <view class="info-label">联系人</view>
-      <view class="info-value">{{booking.userName || "--"}}</view>
-    </view>
-    <view class="info-row">
-      <view class="info-label">手机号</view>
-      <view class="info-value">{{booking.phone || "--"}}</view>
-    </view>
-    <view class="info-row">
-      <view class="info-label">预约日期</view>
-      <view class="info-value">{{booking.startDate || "--"}} - {{booking.endDate || "--"}}</view>
-    </view>
-    <view class="info-row">
-      <view class="info-label">取车城市</view>
-      <view class="info-value">{{booking.city || "--"}}</view>
-    </view>
-    <view class="info-row">
-      <view class="info-label">提交时间</view>
-      <view class="info-value">{{createdAtText || "--"}}</view>
-    </view>
-    <view class="info-row">
-      <view class="info-label">最后更新</view>
-      <view class="info-value">{{updatedAtText || "--"}}</view>
-    </view>
-    <view class="info-row info-row-end">
-      <view class="info-label">用户 OpenID</view>
-      <view class="info-value">{{booking.openid || "--"}}</view>
+    <view class="info-grid">
+      <view class="info-item">
+        <view class="info-label">预约编号</view>
+        <view class="info-value">{{booking.id || "--"}}</view>
+      </view>
+      <view class="info-item">
+        <view class="info-label">车辆 ID</view>
+        <view class="info-value">{{booking.vehicleId || "--"}}</view>
+      </view>
+      <view class="info-item">
+        <view class="info-label">联系人</view>
+        <view class="info-value">{{booking.userName || "--"}}</view>
+      </view>
+      <view class="info-item">
+        <view class="info-label">手机号</view>
+        <view class="info-value">{{booking.phone || "--"}}</view>
+      </view>
+      <view class="info-item info-item-full">
+        <view class="info-label">预约日期</view>
+        <view class="info-value">{{booking.startDate || "--"}} - {{booking.endDate || "--"}}</view>
+      </view>
+      <view class="info-item">
+        <view class="info-label">取车城市</view>
+        <view class="info-value">{{booking.city || "--"}}</view>
+      </view>
+      <view class="info-item">
+        <view class="info-label">提交时间</view>
+        <view class="info-value">{{createdAtText || "--"}}</view>
+      </view>
+      <view class="info-item">
+        <view class="info-label">最后更新</view>
+        <view class="info-value">{{updatedAtText || "--"}}</view>
+      </view>
+      <view class="info-item info-item-full">
+        <view class="info-label">用户 OpenID</view>
+        <view class="info-value">{{booking.openid || "--"}}</view>
+      </view>
     </view>
   </view>
 

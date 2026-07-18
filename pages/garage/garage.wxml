@@ -27,7 +27,13 @@
     <view class="summary-phone" bindtap="handlePhoneCall">客服 {{servicePhone}}</view>
   </view>
 
-  <view class="car-list" wx:if="{{filteredCars.length}}">
+  <view class="empty-state" wx:if="{{loadError}}">
+    <view class="empty-title">加载失败</view>
+    <view class="empty-desc">{{loadErrorText}}</view>
+    <button class="ui-btn ui-btn-primary" bindtap="handleRetryLoad">重新加载</button>
+  </view>
+
+  <view class="car-list" wx:elif="{{filteredCars.length}}">
     <car-card
       wx:for="{{filteredCars}}"
       wx:key="id"

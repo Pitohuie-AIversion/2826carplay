@@ -2,7 +2,13 @@
   <view class="page-title">我的预约</view>
   <view class="page-desc">查看已提交的预约咨询，跟踪联系进度与出行日期。</view>
 
-  <view wx:if="{{loading}}" class="loading">加载中...</view>
+  <view wx:if="{{loading && !list.length}}" class="loading">加载中...</view>
+
+  <view wx:elif="{{loadFailed && !list.length}}" class="empty">
+    <view class="empty-title">加载失败</view>
+    <view class="empty-desc">{{loadErrorText}}</view>
+    <button class="empty-action ui-btn ui-btn-primary" bindtap="handleRetryLoad">重新加载</button>
+  </view>
 
   <view wx:elif="{{list.length}}">
     <view class="booking-item ui-card" wx:for="{{list}}" wx:key="id">
@@ -30,6 +36,8 @@
         </button>
       </view>
     </view>
+
+    <button wx:if="{{hasMore}}" class="empty-action ui-btn ui-btn-ghost" loading="{{loading}}" bindtap="handleLoadMore">加载更多</button>
   </view>
 
   <view wx:else class="empty">

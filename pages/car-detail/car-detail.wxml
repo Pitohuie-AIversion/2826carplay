@@ -79,6 +79,7 @@
 
 <view class="empty-page ui-card" wx:else>
   <view class="empty-title">车辆详情</view>
-  <view class="empty-desc">{{notFoundText}}</view>
-  <button class="empty-action ui-btn ui-btn-primary" bindtap="handleBackGarage">返回车库首页</button>
+  <view class="empty-desc">{{loadError ? loadErrorText : notFoundText}}</view>
+  <button wx:if="{{loadError}}" class="empty-action ui-btn ui-btn-primary" bindtap="handleRetryLoad">重新加载</button>
+  <button wx:else class="empty-action ui-btn ui-btn-primary" bindtap="handleBackGarage">返回车库首页</button>
 </view>

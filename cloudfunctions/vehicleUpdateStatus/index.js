@@ -101,6 +101,29 @@ async function writeAuditLogBestEffort(payload) {
   }
 }
 
+async function writeErrorLogBestEffort(payload) {
+  try {
+    await db.collection("error_logs").add({
+      data: {
+        ...payload,
+        createdAt: db.serverDate()
+      }
+    })
+  } catch (error) {
+    const message = error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error)
+    if (String(message).includes("Unexpected collection:")) {
+      return
+    }
+    console.error({
+      function: "vehicleUpdateStatus",
+      stage: "errorLog",
+      errorMessage: message,
+      stack: error && error.stack ? error.stack : "",
+      createdAt: new Date().toISOString()
+    })
+  }
+}
+
 function normalizeInput(event) {
   const payload = event && typeof event === "object" ? event : {}
   return {
@@ -188,6 +211,17 @@ exports.main = async (event) => {
       message: "车辆状态已更新"
     }
   } catch (error) {
+    await writeErrorLogBestEffort({
+      function: "vehicleUpdateStatus",
+      openid,
+      vehicleId: input.id,
+      stage: "main",
+      toStatus: input.status,
+      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
+      stack: error && error.stack ? error.stack : "",
+      occurredAt: new Date().toISOString()
+    })
+
     console.error({
       function: "vehicleUpdateStatus",
       openid,

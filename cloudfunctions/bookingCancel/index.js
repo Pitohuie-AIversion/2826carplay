@@ -26,6 +26,52 @@ function normalizeEvent(event) {
   }
 }
 
+async function writeErrorLogBestEffort(payload) {
+  try {
+    await db.collection("error_logs").add({
+      data: {
+        ...payload,
+        createdAt: db.serverDate()
+      }
+    })
+  } catch (error) {
+    const message = error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error)
+    if (String(message).includes("Unexpected collection:")) {
+      return
+    }
+    console.error({
+      function: "bookingCancel",
+      stage: "errorLog",
+      errorMessage: message,
+      stack: error && error.stack ? error.stack : "",
+      createdAt: new Date().toISOString()
+    })
+  }
+}
+
+async function writeAuditLogBestEffort(payload) {
+  try {
+    await db.collection("audit_logs").add({
+      data: {
+        ...payload,
+        createdAt: db.serverDate()
+      }
+    })
+  } catch (error) {
+    const message = error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error)
+    if (String(message).includes("Unexpected collection:")) {
+      return
+    }
+    console.error({
+      function: "bookingCancel",
+      stage: "auditLog",
+      errorMessage: message,
+      stack: error && error.stack ? error.stack : "",
+      createdAt: new Date().toISOString()
+    })
+  }
+}
+
 exports.main = async (event) => {
   const wxContext = cloud.getWXContext()
   const openid = wxContext && wxContext.OPENID ? wxContext.OPENID : ""
@@ -67,6 +113,15 @@ exports.main = async (event) => {
       }
     })
 
+    await writeAuditLogBestEffort({
+      openid,
+      action: "bookingCancel",
+      bookingId: input.id,
+      vehicleId: current.vehicleId || "",
+      fromStatus: status,
+      toStatus: "cancelled"
+    })
+
     return {
       ok: true,
       id: input.id,
@@ -74,6 +129,16 @@ exports.main = async (event) => {
       message: "预约已取消"
     }
   } catch (error) {
+    await writeErrorLogBestEffort({
+      function: "bookingCancel",
+      openid,
+      bookingId: input.id,
+      stage: "main",
+      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
+      stack: error && error.stack ? error.stack : "",
+      occurredAt: new Date().toISOString()
+    })
+
     console.error({
       function: "bookingCancel",
       openid,

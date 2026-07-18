@@ -3,6 +3,7 @@ jest.mock("wx-server-sdk")
 function createMockDb({ rolesData, addResult }) {
   const rolesGet = jest.fn().mockResolvedValue({ data: rolesData })
   const rolesAdd = jest.fn().mockResolvedValue(addResult)
+  const auditAdd = jest.fn().mockResolvedValue({ _id: "audit_1" })
 
   const rolesLimit = jest.fn(() => ({ get: rolesGet }))
 
@@ -14,6 +15,9 @@ function createMockDb({ rolesData, addResult }) {
       if (name === "roles") {
         return { limit: rolesLimit, add: rolesAdd }
       }
+      if (name === "audit_logs") {
+        return { add: auditAdd }
+      }
       throw new Error(`Unexpected collection: ${name}`)
     }),
     serverDate
@@ -24,6 +28,7 @@ function createMockDb({ rolesData, addResult }) {
     rolesGet,
     rolesAdd,
     rolesLimit,
+    auditAdd,
     serverDateValue
   }
 }
@@ -76,6 +81,16 @@ describe("cloudfunctions/bootstrapAdmin integration", () => {
         bootstrap: true,
         createdAt: mocks.serverDateValue,
         updatedAt: mocks.serverDateValue
+      }
+    })
+    expect(mocks.auditAdd).toHaveBeenCalledWith({
+      data: {
+        openid: "first_admin_openid",
+        action: "bootstrapAdmin",
+        targetOpenid: "first_admin_openid",
+        bootstrap: true,
+        tokenProtected: false,
+        createdAt: mocks.serverDateValue
       }
     })
   })

@@ -3,6 +3,7 @@ jest.mock("wx-server-sdk")
 function createMockDb({ currentData, updateResult }) {
   const currentGet = jest.fn().mockResolvedValue({ data: currentData })
   const update = jest.fn().mockResolvedValue(updateResult)
+  const auditAdd = jest.fn().mockResolvedValue({ _id: "audit_1" })
 
   const bookingsDoc = jest.fn(() => ({
     get: currentGet,
@@ -17,6 +18,9 @@ function createMockDb({ currentData, updateResult }) {
       if (name === "bookings") {
         return { doc: bookingsDoc }
       }
+      if (name === "audit_logs") {
+        return { add: auditAdd }
+      }
       throw new Error(`Unexpected collection: ${name}`)
     }),
     serverDate
@@ -27,6 +31,7 @@ function createMockDb({ currentData, updateResult }) {
     bookingsDoc,
     currentGet,
     update,
+    auditAdd,
     serverDateValue
   }
 }
@@ -71,6 +76,17 @@ describe("cloudfunctions/bookingCancel integration", () => {
       data: {
         status: "cancelled",
         updatedAt: mocks.serverDateValue
+      }
+    })
+    expect(mocks.auditAdd).toHaveBeenCalledWith({
+      data: {
+        openid: "user_openid",
+        action: "bookingCancel",
+        bookingId: "booking_1",
+        vehicleId: "",
+        fromStatus: "pending",
+        toStatus: "cancelled",
+        createdAt: mocks.serverDateValue
       }
     })
   })

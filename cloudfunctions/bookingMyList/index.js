@@ -18,7 +18,7 @@ function createError(code, message, details) {
   return result
 }
 
-function normalizeLimit(value) {
+function normalizePageSize(value) {
   const num = Number(value)
   if (!Number.isFinite(num)) {
     return 20
@@ -39,7 +39,7 @@ function normalizeLimit(value) {
 exports.main = async (event) => {
   const wxContext = cloud.getWXContext()
   const openid = wxContext && wxContext.OPENID ? wxContext.OPENID : ""
-  const limit = normalizeLimit(event && event.limit)
+  const pageSize = normalizePageSize((event && event.pageSize) || (event && event.limit))
   const pageRaw = Number(event && event.page)
   const page = Number.isFinite(pageRaw) && pageRaw > 0 ? Math.floor(pageRaw) : 0
 
@@ -52,16 +52,19 @@ exports.main = async (event) => {
       .collection("bookings")
       .where({ openid })
       .orderBy("createdAt", "desc")
-      .skip(page * limit)
-      .limit(limit)
+      .skip(page * pageSize)
+      .limit(pageSize + 1)
       .get()
 
-    const list = res && Array.isArray(res.data) ? res.data : []
+    const rawList = res && Array.isArray(res.data) ? res.data : []
+    const hasMore = rawList.length > pageSize
+    const list = hasMore ? rawList.slice(0, pageSize) : rawList
 
     return {
       ok: true,
       page,
-      limit,
+      pageSize,
+      hasMore,
       list: list.map((item) => ({
         id: item._id,
         vehicleId: item.vehicleId,

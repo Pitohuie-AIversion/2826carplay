@@ -1,10 +1,20 @@
+const { requirePagePermission } = require("../../shared/pageAuth")
+
 const ACTION_OPTIONS = [
   { value: "all", label: "全部" },
+  { value: "bootstrapAdmin", label: "管理员初始化" },
   { value: "roleUpsert", label: "权限分配" },
   { value: "operationConfigUpdate", label: "运营配置" },
+  { value: "vehicleCreate", label: "新增车辆" },
+  { value: "vehicleUpdate", label: "车辆编辑" },
   { value: "vehicleUpdateStatus", label: "车辆状态" },
+  { value: "vehicleRetire", label: "车辆停用" },
+  { value: "vehicleRestore", label: "车辆恢复" },
   { value: "vehicleDelete", label: "删除车辆" },
   { value: "vehicleImageUpdate", label: "车辆图片" },
+  { value: "bookingCreate", label: "预约创建" },
+  { value: "bookingCancel", label: "预约取消" },
+  { value: "bookingExportCsv", label: "预约导出" },
   { value: "bookingUpdateStatus", label: "预约状态" },
   { value: "bookingUpdateAdminRemark", label: "预约备注" }
 ]
@@ -33,12 +43,36 @@ function buildSummary(item) {
     return `目标：${item.targetOpenid || "--"}\n权限：${Array.isArray(item.toPermissions) ? item.toPermissions.join(", ") : "--"}`
   }
 
+  if (action === "bootstrapAdmin") {
+    return `目标：${item.targetOpenid || "--"}\n口令保护：${item.tokenProtected ? "已开启" : "未开启"}`
+  }
+
   if (action === "operationConfigUpdate") {
     return `变更字段：${Array.isArray(item.changedKeys) ? item.changedKeys.join(", ") : "--"}`
   }
 
+  if (action === "vehicleCreate") {
+    return `车辆：${item.vehicleId || "--"}\n车型：${item.brandModel || "--"}`
+  }
+
+  if (action === "vehicleUpdate") {
+    return `车辆：${item.vehicleId || "--"}\n变更字段：${Array.isArray(item.changedKeys) ? item.changedKeys.join(", ") : "--"}`
+  }
+
   if (action === "vehicleUpdateStatus") {
     return `车辆：${item.vehicleId || "--"}\n状态：${item.fromStatus || "--"} → ${item.toStatus || "--"}`
+  }
+
+  if (action === "vehicleRetire" || action === "vehicleRestore") {
+    return `车辆：${item.vehicleId || "--"}\n状态：${item.fromStatus || "--"} → ${item.toStatus || "--"}`
+  }
+
+  if (action === "bookingCreate") {
+    return `预约：${item.bookingId || "--"}\n车辆：${item.vehicleName || "--"}`
+  }
+
+  if (action === "bookingCancel") {
+    return `预约：${item.bookingId || "--"}\n状态：${item.fromStatus || "--"} → ${item.toStatus || "--"}`
   }
 
   if (action === "bookingUpdateStatus") {
@@ -47,6 +81,10 @@ function buildSummary(item) {
 
   if (action === "bookingUpdateAdminRemark") {
     return `预约：${item.bookingId || "--"}\n备注长度：${item.remarkLength || 0}`
+  }
+
+  if (action === "bookingExportCsv") {
+    return `状态：${item.status || "--"}\n导出条数：${item.total || 0}`
   }
 
   if (action === "vehicleDelete") {
@@ -63,6 +101,7 @@ function buildSummary(item) {
 Page({
   data: {
     loading: false,
+    pageAuthorized: false,
     keyword: "",
     currentAction: "all",
     actionOptions: ACTION_OPTIONS,
@@ -76,7 +115,13 @@ Page({
   },
 
   onLoad() {
-    this.fetchList()
+    requirePagePermission(this, {
+      required: "canViewAuditLogs",
+      noPermissionMessage: "无权访问审计日志",
+      onAuthorized: () => {
+        this.fetchList()
+      }
+    })
   },
 
   onPullDownRefresh() {
@@ -197,4 +242,3 @@ Page({
     })
   }
 })
-

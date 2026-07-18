@@ -92,6 +92,7 @@
 
 <view class="empty-page" wx:else>
   <view class="empty-title">预约咨询</view>
-  <view class="empty-desc">{{notFoundText}}</view>
-  <button class="empty-action" bindtap="handleBackGarage">返回车库首页</button>
+  <view class="empty-desc">{{loadError ? loadErrorText : notFoundText}}</view>
+  <button wx:if="{{loadError}}" class="empty-action" bindtap="handleRetryLoad">重新加载</button>
+  <button wx:else class="empty-action" bindtap="handleBackGarage">返回车库首页</button>
 </view>

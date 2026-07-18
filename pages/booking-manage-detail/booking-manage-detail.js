@@ -1,3 +1,5 @@
+const { requirePagePermission } = require("../../shared/pageAuth")
+
 const STATUS_TEXT_MAP = {
   pending: "待联系",
   contacted: "已联系",
@@ -61,6 +63,7 @@ Page({
   data: {
     id: "",
     loading: false,
+    pageAuthorized: false,
     booking: {},
     statusText: "待联系",
     statusClass: "status-pending",
@@ -89,15 +92,25 @@ Page({
     if (eventChannel && typeof eventChannel.on === "function") {
       eventChannel.on("acceptManageBookingDetail", (payload) => {
         const booking = normalizeBooking(payload && payload.booking)
-        if (booking.id) {
+        if (booking.id && this.data.pageAuthorized) {
           this.applyBooking(booking)
         }
       })
     }
+
+    requirePagePermission(this, {
+      required: "canManageBookings",
+      noPermissionMessage: "无权访问预约详情管理",
+      onAuthorized: () => {
+        if (this.data.id) {
+          this.loadDetail()
+        }
+      }
+    })
   },
 
   onShow() {
-    if (this.data.id) {
+    if (this.data.pageAuthorized && this.data.id) {
       this.loadDetail()
     }
   },
@@ -121,20 +134,16 @@ Page({
     this.setData({ loading: true })
 
     wx.cloud.callFunction({
-      name: "bookingList",
+      name: "bookingDetail",
       data: {
-        status: "all",
-        keyword: "",
-        limit: 300
+        id: this.data.id
       },
       success: (res) => {
         const result = res && res.result ? res.result : null
-        const list = result && result.ok && Array.isArray(result.list) ? result.list : []
-        const current = list.find((item) => item.id === this.data.id)
-
+        const current = result && result.ok ? result.detail : null
         if (!current) {
           wx.showToast({
-            title: "预约不存在",
+            title: (result && result.message) || "预约不存在",
             icon: "none"
           })
           this.setData({ loading: false })

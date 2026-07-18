@@ -78,6 +78,52 @@ async function hasOpenidCapability(openid, capability) {
   return list.some((item) => hasCapability(item, capability))
 }
 
+async function writeErrorLogBestEffort(payload) {
+  try {
+    await db.collection("error_logs").add({
+      data: {
+        ...payload,
+        createdAt: db.serverDate()
+      }
+    })
+  } catch (error) {
+    const message = error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error)
+    if (String(message).includes("Unexpected collection:")) {
+      return
+    }
+    console.error({
+      function: "bookingExportCsv",
+      stage: "errorLog",
+      errorMessage: message,
+      stack: error && error.stack ? error.stack : "",
+      createdAt: new Date().toISOString()
+    })
+  }
+}
+
+async function writeAuditLogBestEffort(payload) {
+  try {
+    await db.collection("audit_logs").add({
+      data: {
+        ...payload,
+        createdAt: db.serverDate()
+      }
+    })
+  } catch (error) {
+    const message = error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error)
+    if (String(message).includes("Unexpected collection:")) {
+      return
+    }
+    console.error({
+      function: "bookingExportCsv",
+      stage: "auditLog",
+      errorMessage: message,
+      stack: error && error.stack ? error.stack : "",
+      createdAt: new Date().toISOString()
+    })
+  }
+}
+
 function normalizeFilters(event) {
   const payload = event && typeof event === "object" ? event : {}
   const status = String(payload.status || "").trim()
@@ -260,6 +306,16 @@ exports.main = async (event) => {
     const fileName = formatFileName(new Date())
     const csvText = buildCsv(list)
 
+    await writeAuditLogBestEffort({
+      openid,
+      action: "bookingExportCsv",
+      status: filters.status || "all",
+      keyword: filters.keyword || "",
+      limit: filters.limit,
+      total: list.length,
+      fileName
+    })
+
     return {
       ok: true,
       filters,
@@ -268,6 +324,16 @@ exports.main = async (event) => {
       csvText
     }
   } catch (error) {
+    await writeErrorLogBestEffort({
+      function: "bookingExportCsv",
+      openid,
+      stage: "main",
+      input: event && typeof event === "object" ? event : {},
+      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
+      stack: error && error.stack ? error.stack : "",
+      occurredAt: new Date().toISOString()
+    })
+
     console.error({
       function: "bookingExportCsv",
       openid,

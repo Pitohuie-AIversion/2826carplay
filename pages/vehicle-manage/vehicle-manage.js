@@ -1,4 +1,5 @@
 const vehicleUtils = require("../../shared/vehicle")
+const { requirePagePermission } = require("../../shared/pageAuth")
 
 const STATUS_OPTIONS = [
   { value: "all", label: "全部" },
@@ -155,6 +156,7 @@ function buildRecentAddedViewModel(list) {
 Page({
   data: {
     loading: false,
+    pageAuthorized: false,
     keyword: "",
     currentStatus: "all",
     statusOptions: STATUS_OPTIONS,
@@ -172,11 +174,17 @@ Page({
   },
 
   onLoad() {
-    this.fetchList()
+    requirePagePermission(this, {
+      required: "canManageVehicles",
+      noPermissionMessage: "无权访问车辆管理",
+      onAuthorized: () => {
+        this.fetchList()
+      }
+    })
   },
 
   onShow() {
-    if (this.data.loading) {
+    if (!this.data.pageAuthorized || this.data.loading) {
       return
     }
 

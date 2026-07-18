@@ -1,3 +1,5 @@
+const { requirePagePermission } = require("../../shared/pageAuth")
+
 const STATUS_OPTIONS = [
   { value: "all", label: "全部" },
   { value: "pending", label: "待联系" },
@@ -173,6 +175,7 @@ function isDevtoolsNotSupportedShareError(error) {
 Page({
   data: {
     loading: false,
+    pageAuthorized: false,
     keyword: "",
     currentStatus: "all",
     statusOptions: STATUS_OPTIONS,
@@ -213,7 +216,13 @@ Page({
       canShareExport: !isDevtoolsEnv() && typeof wx.shareFileMessage === "function"
     })
 
-    this.fetchList()
+    requirePagePermission(this, {
+      required: "canManageBookings",
+      noPermissionMessage: "无权访问预约管理",
+      onAuthorized: () => {
+        this.fetchList()
+      }
+    })
   },
 
   onPullDownRefresh() {

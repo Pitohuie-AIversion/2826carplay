@@ -67,6 +67,29 @@ async function writeAuditLogBestEffort(payload) {
   }
 }
 
+async function writeErrorLogBestEffort(payload) {
+  try {
+    await db.collection("error_logs").add({
+      data: {
+        ...payload,
+        createdAt: db.serverDate()
+      }
+    })
+  } catch (error) {
+    const message = error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error)
+    if (String(message).includes("Unexpected collection:")) {
+      return
+    }
+    console.error({
+      function: "roleUpsert",
+      stage: "errorLog",
+      errorMessage: message,
+      stack: error && error.stack ? error.stack : "",
+      createdAt: new Date().toISOString()
+    })
+  }
+}
+
 async function isAdminOpenid(openid) {
   if (!openid) {
     return false
@@ -207,6 +230,16 @@ exports.main = async (event) => {
       errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
       stack: error && error.stack ? error.stack : "",
       createdAt: new Date().toISOString()
+    })
+
+    await writeErrorLogBestEffort({
+      function: "roleUpsert",
+      openid: operatorOpenid,
+      targetOpenid: input.openid,
+      stage: "main",
+      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
+      stack: error && error.stack ? error.stack : "",
+      occurredAt: new Date().toISOString()
     })
 
     return {

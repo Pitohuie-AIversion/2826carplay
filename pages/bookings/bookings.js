@@ -34,7 +34,12 @@ function canCancelBooking(status) {
 Page({
   data: {
     loading: false,
-    list: []
+    loadFailed: false,
+    loadErrorText: "预约列表加载失败，请稍后重试",
+    list: [],
+    page: 0,
+    pageSize: 20,
+    hasMore: false
   },
 
   onLoad() {
@@ -60,25 +65,52 @@ Page({
     this.loadList()
   },
 
-  loadList() {
+  loadList(input) {
+    const append = Boolean(input && input.append)
+    const nextPage = append ? this.data.page + 1 : 0
+
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       this.setData({
         loading: false,
-        list: []
+        loadFailed: true,
+        loadErrorText: "云能力未初始化，请稍后重试",
+        list: [],
+        page: 0,
+        hasMore: false
       })
       return
     }
 
     this.setData({
-      loading: true
+      loading: true,
+      loadFailed: false
     })
 
     wx.cloud.callFunction({
       name: "bookingMyList",
-      data: { limit: 30 },
+      data: {
+        page: nextPage,
+        pageSize: this.data.pageSize
+      },
       success: (res) => {
         const result = res && res.result ? res.result : null
-        const rawList = result && result.ok && Array.isArray(result.list) ? result.list : []
+        if (!result || !result.ok) {
+          wx.showToast({
+            title: (result && result.message) || "加载失败",
+            icon: "none"
+          })
+          this.setData({
+            loading: false,
+            loadFailed: true,
+            loadErrorText: (result && result.message) || "预约列表加载失败，请稍后重试",
+            list: append ? this.data.list : [],
+            page: 0,
+            hasMore: false
+          })
+          return
+        }
+
+        const rawList = Array.isArray(result.list) ? result.list : []
         const list = rawList.map((item) => ({
           ...item,
           statusText: mapStatusText(item.status),
@@ -87,7 +119,10 @@ Page({
         }))
         this.setData({
           loading: false,
-          list
+          loadFailed: false,
+          page: Number.isInteger(result.page) ? result.page : nextPage,
+          hasMore: Boolean(result.hasMore),
+          list: append ? this.data.list.concat(list) : list
         })
       },
       fail: (error) => {
@@ -97,10 +132,22 @@ Page({
         })
         this.setData({
           loading: false,
-          list: []
+          loadFailed: true,
+          loadErrorText: (error && (error.errMsg || error.message)) || "预约列表加载失败，请稍后重试",
+          list: append ? this.data.list : [],
+          page: 0,
+          hasMore: false
         })
       }
     })
+  },
+
+  handleLoadMore() {
+    if (this.data.loading || !this.data.hasMore) {
+      return
+    }
+
+    this.loadList({ append: true })
   },
 
   handleViewDetail(event) {
@@ -196,5 +243,9 @@ Page({
         })
       }
     })
+  },
+
+  handleRetryLoad() {
+    this.loadList()
   }
 })

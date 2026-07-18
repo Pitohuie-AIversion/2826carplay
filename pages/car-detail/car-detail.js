@@ -1,5 +1,3 @@
-const mockCars = require("../../data/cars")
-
 function getStatusText(status, fallbackText) {
   const statusTextMap = {
     available: "在库",
@@ -76,6 +74,8 @@ Page({
     servicePhone: "15715710090",
     carId: "",
     car: null,
+    loadError: false,
+    loadErrorText: "车辆详情加载失败，请返回车库后重试",
     notFoundText: "未找到该车辆，请返回车库重新选择",
     rentalTips: [
       "车辆价格、可用时间、押金和取还车规则以客服最终确认为准。",
@@ -116,7 +116,7 @@ Page({
     }
 
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
-      this.applyCar(mockCars.find((item) => item.id === carId) || null)
+      this.setLoadError("云能力未初始化，请稍后重试")
       return
     }
 
@@ -128,18 +128,41 @@ Page({
       success: (res) => {
         const result = res && res.result ? res.result : null
         const car = result && result.ok ? result.car : null
-        this.applyCar(car || mockCars.find((item) => item.id === carId) || null)
+        if (car) {
+          this.applyCar(car)
+          return
+        }
+
+        if (result && result.code === "NOT_FOUND") {
+          this.applyCar(null)
+          return
+        }
+
+        this.setLoadError((result && result.message) || "车辆详情加载失败，请返回车库后重试")
       },
-      fail: () => {
-        this.applyCar(mockCars.find((item) => item.id === carId) || null)
+      fail: (error) => {
+        this.setLoadError((error && (error.errMsg || error.message)) || "车辆详情加载失败，请返回车库后重试")
       }
+    })
+  },
+
+  setLoadError(message) {
+    this.setData({
+      car: null,
+      loadError: true,
+      loadErrorText: String(message || "车辆详情加载失败，请返回车库后重试")
+    })
+
+    wx.setNavigationBarTitle({
+      title: "车辆详情"
     })
   },
 
   applyCar(targetCar) {
     if (!targetCar) {
       this.setData({
-        car: null
+        car: null,
+        loadError: false
       })
       wx.setNavigationBarTitle({
         title: "车辆详情"
@@ -148,7 +171,8 @@ Page({
     }
 
     this.setData({
-      car: formatCarViewModel(targetCar)
+      car: formatCarViewModel(targetCar),
+      loadError: false
     })
 
     wx.setNavigationBarTitle({
@@ -201,6 +225,10 @@ Page({
         })
       }
     })
+  },
+
+  handleRetryLoad() {
+    this.loadCarDetail(this.data.carId)
   },
 
   onShareAppMessage() {

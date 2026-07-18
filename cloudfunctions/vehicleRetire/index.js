@@ -76,6 +76,52 @@ async function hasOpenidCapability(openid, capability) {
   return list.some((item) => hasCapability(item, capability))
 }
 
+async function writeErrorLogBestEffort(payload) {
+  try {
+    await db.collection("error_logs").add({
+      data: {
+        ...payload,
+        createdAt: db.serverDate()
+      }
+    })
+  } catch (error) {
+    const message = error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error)
+    if (String(message).includes("Unexpected collection:")) {
+      return
+    }
+    console.error({
+      function: "vehicleRetire",
+      stage: "errorLog",
+      errorMessage: message,
+      stack: error && error.stack ? error.stack : "",
+      createdAt: new Date().toISOString()
+    })
+  }
+}
+
+async function writeAuditLogBestEffort(payload) {
+  try {
+    await db.collection("audit_logs").add({
+      data: {
+        ...payload,
+        createdAt: db.serverDate()
+      }
+    })
+  } catch (error) {
+    const message = error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error)
+    if (String(message).includes("Unexpected collection:")) {
+      return
+    }
+    console.error({
+      function: "vehicleRetire",
+      stage: "auditLog",
+      errorMessage: message,
+      stack: error && error.stack ? error.stack : "",
+      createdAt: new Date().toISOString()
+    })
+  }
+}
+
 exports.main = async (event) => {
   const wxContext = cloud.getWXContext()
   const openid = wxContext && wxContext.OPENID ? wxContext.OPENID : ""
@@ -115,6 +161,15 @@ exports.main = async (event) => {
       }
     })
 
+    await writeAuditLogBestEffort({
+      openid,
+      action: "vehicleRetire",
+      vehicleId: id,
+      plateNumber: String(current.plateNumber || "").trim(),
+      fromStatus: current.status || "",
+      toStatus: "retired"
+    })
+
     return {
       ok: true,
       id,
@@ -122,6 +177,16 @@ exports.main = async (event) => {
       message: "车辆已停用"
     }
   } catch (error) {
+    await writeErrorLogBestEffort({
+      function: "vehicleRetire",
+      openid,
+      vehicleId: id,
+      stage: "main",
+      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
+      stack: error && error.stack ? error.stack : "",
+      occurredAt: new Date().toISOString()
+    })
+
     console.error({
       function: "vehicleRetire",
       openid,

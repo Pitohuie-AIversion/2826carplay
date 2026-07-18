@@ -94,6 +94,7 @@ exports.main = async () => {
       canManageRoles: permissions.includes("admin"),
       canManageConfig: permissions.includes("admin"),
       canViewAuditLogs: permissions.includes("admin"),
+      canViewErrorLogs: permissions.includes("admin"),
       canManageVehicles: permissions.includes("admin") || permissions.includes("vehicle_manage"),
       canManageBookings: permissions.includes("admin") || permissions.includes("booking_manage")
     }

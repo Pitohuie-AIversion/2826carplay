@@ -4,6 +4,15 @@
   "functionRoot": "./cloudfunctions",
   "functions": [
     {
+      "name": "auditLogList",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs16.13",
+      "memorySize": 256,
+      "installDependency": true
+    },
+    {
       "name": "vehicleImageUpdate",
       "type": "Event",
       "handler": "index.main",
@@ -32,6 +41,24 @@
     },
     {
       "name": "bookingCreate",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs16.13",
+      "memorySize": 256,
+      "installDependency": true
+    },
+    {
+      "name": "bookingDetail",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs16.13",
+      "memorySize": 256,
+      "installDependency": true
+    },
+    {
+      "name": "bookingMyDetail",
       "type": "Event",
       "handler": "index.main",
       "timeout": 15,
@@ -86,6 +113,15 @@
     },
     {
       "name": "bookingExportCsv",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs16.13",
+      "memorySize": 256,
+      "installDependency": true
+    },
+    {
+      "name": "errorLogList",
       "type": "Event",
       "handler": "index.main",
       "timeout": 15,
@@ -157,6 +193,15 @@
       "installDependency": true
     },
     {
+      "name": "getMyPermissions",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs16.13",
+      "memorySize": 256,
+      "installDependency": true
+    },
+    {
       "name": "getOpenid",
       "type": "Event",
       "handler": "index.main",
@@ -166,7 +211,52 @@
       "installDependency": true
     },
     {
+      "name": "operationConfigGet",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs16.13",
+      "memorySize": 256,
+      "installDependency": true
+    },
+    {
+      "name": "operationConfigUpdate",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs16.13",
+      "memorySize": 256,
+      "installDependency": true
+    },
+    {
+      "name": "roleList",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs16.13",
+      "memorySize": 256,
+      "installDependency": true
+    },
+    {
+      "name": "roleUpsert",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs16.13",
+      "memorySize": 256,
+      "installDependency": true
+    },
+    {
       "name": "garageVehicleList",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs16.13",
+      "memorySize": 256,
+      "installDependency": true
+    },
+    {
+      "name": "vehiclePublicDetail",
       "type": "Event",
       "handler": "index.main",
       "timeout": 15,

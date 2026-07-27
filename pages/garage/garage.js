@@ -14,29 +14,49 @@ mockCategories.forEach((item) => {
   CATEGORY_LABEL_MAP[item.id] = item.name
 })
 
+function normalizeGarageStatus(status) {
+  const value = String(status || "").trim()
+  if (value === "idle" || value === "available") {
+    return "idle"
+  }
+  if (value === "active" || value === "rented") {
+    return "active"
+  }
+  if (value === "maintenance") {
+    return "maintenance"
+  }
+  if (value === "reserved") {
+    return "reserved"
+  }
+  return "idle"
+}
+
 function getStatusText(status, fallbackText) {
+  const normalizedStatus = normalizeGarageStatus(status)
   const statusTextMap = {
-    available: "在库",
-    rented: "在用",
-    maintenance: "维护中",
+    idle: "闲置",
+    active: "在用",
+    maintenance: "维修中",
     reserved: "已预约"
   }
 
-  return statusTextMap[status] || fallbackText || "在库"
+  return statusTextMap[normalizedStatus] || fallbackText || "闲置"
 }
 
 function attachStatusClass(car) {
+  const normalizedStatus = normalizeGarageStatus(car.status)
   const statusClassMap = {
-    available: "status-available",
-    rented: "status-rented",
+    idle: "status-idle",
+    active: "status-active",
     maintenance: "status-maintenance",
     reserved: "status-reserved"
   }
 
   return {
     ...car,
+    garageStatus: normalizedStatus,
     statusText: getStatusText(car.status, car.statusText),
-    statusClass: statusClassMap[car.status] || "status-available"
+    statusClass: statusClassMap[normalizedStatus] || "status-idle"
   }
 }
 
@@ -104,7 +124,7 @@ function buildCategoriesWithCount(carList) {
 
 function buildCategorySummary(categoryId, categories, filteredCars) {
   const currentCategory = categories.find((category) => category.id === categoryId) || {}
-  const availableCars = filteredCars.filter((car) => car.status === "available").length
+  const availableCars = filteredCars.filter((car) => normalizeGarageStatus(car.status) === "idle").length
 
   return {
     name: currentCategory.name || "",

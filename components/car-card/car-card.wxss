@@ -77,8 +77,22 @@
   max-width: 176rpx;
 }
 
+.car-status.status-active,
 .car-status.status-rented {
   background: #2f80ed;
+}
+
+.car-status.status-idle,
+.car-status.status-available {
+  background: #27ae60;
+}
+
+.car-status.status-maintenance {
+  background: #f2994a;
+}
+
+.car-status.status-reserved {
+  background: #9b51e0;
 }
 
 .car-bottom {

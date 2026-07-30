@@ -4,6 +4,11 @@ function createMockDb({ rolesData }) {
   const rolesLimit = jest.fn((limitValue) => ({
     get: jest.fn().mockResolvedValue({ data: rolesData.slice(0, limitValue) })
   }))
+  const rolesSkip = jest.fn((offset) => ({
+    limit: jest.fn((limitValue) => ({
+      get: jest.fn().mockResolvedValue({ data: rolesData.slice(offset, offset + limitValue) })
+    }))
+  }))
   const rolesWhere = jest.fn((filter) => ({
     limit: jest.fn((limitValue) => ({
       get: jest.fn().mockResolvedValue({
@@ -17,7 +22,8 @@ function createMockDb({ rolesData }) {
       if (name === "roles") {
         return {
           where: rolesWhere,
-          limit: rolesLimit
+          limit: rolesLimit,
+          skip: rolesSkip
         }
       }
       throw new Error(`Unexpected collection: ${name}`)
@@ -27,7 +33,8 @@ function createMockDb({ rolesData }) {
   return {
     db,
     rolesWhere,
-    rolesLimit
+    rolesLimit,
+    rolesSkip
   }
 }
 
@@ -64,6 +71,9 @@ describe("cloudfunctions/roleList integration", () => {
     const res = await mod.main()
 
     expect(res.ok).toBe(true)
+    expect(res.page).toBe(0)
+    expect(res.pageSize).toBe(20)
+    expect(res.hasMore).toBe(false)
     expect(res.list).toEqual([
       expect.objectContaining({
         openid: "admin_openid",
@@ -100,5 +110,39 @@ describe("cloudfunctions/roleList integration", () => {
       code: "FORBIDDEN",
       message: "权限不足"
     })
+  })
+
+  test("角色超过 200 条时仍可分页读取后续记录", async () => {
+    const rolesData = [
+      { _id: "admin", openid: "admin_openid", role: "admin" },
+      ...Array.from({ length: 204 }, (_, index) => ({
+        _id: `r${index}`,
+        openid: `user_${String(index).padStart(3, "0")}`,
+        permissions: ["vehicle_manage"]
+      }))
+    ]
+    const mocks = createMockDb({ rolesData })
+    const mod = await loadRoleListWith({
+      openid: "admin_openid",
+      mockDb: mocks.db
+    })
+
+    const res = await mod.main({ page: 10, pageSize: 20 })
+
+    expect(res.ok).toBe(true)
+    expect(res.page).toBe(10)
+    expect(res.pageSize).toBe(20)
+    expect(res.hasMore).toBe(false)
+    expect(res.list).toHaveLength(5)
+    expect(res.list.map((item) => item.openid)).toEqual([
+      "user_199",
+      "user_200",
+      "user_201",
+      "user_202",
+      "user_203"
+    ])
+    expect(mocks.rolesSkip).toHaveBeenCalledWith(0)
+    expect(mocks.rolesSkip).toHaveBeenCalledWith(100)
+    expect(mocks.rolesSkip).toHaveBeenCalledWith(200)
   })
 })

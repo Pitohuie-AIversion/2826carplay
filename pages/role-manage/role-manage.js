@@ -4,6 +4,7 @@ const PERMISSION_OPTIONS = [
   { value: "vehicle_manage", label: "车辆管理" },
   { value: "booking_manage", label: "预约管理" }
 ]
+const OPENID_PATTERN = /^[A-Za-z0-9_-]{6,128}$/
 
 function normalizeStringArray(value) {
   if (!Array.isArray(value)) {
@@ -48,10 +49,14 @@ function buildPermissionText(permissions, isAdmin) {
 
 Page({
   data: {
+    initialLoading: true,
     loading: false,
     saving: false,
     pageAuthorized: false,
     list: [],
+    page: 0,
+    pageSize: 20,
+    hasMore: false,
     permissionOptions: buildPermissionOptions([]),
     formOpenid: "",
     selectedPermissions: [],
@@ -71,16 +76,28 @@ Page({
   },
 
   onPullDownRefresh() {
-    this.fetchRoleList(() => {
+    this.fetchRoleList({ append: false }, () => {
       wx.stopPullDownRefresh()
     })
   },
 
-  fetchRoleList(done) {
+  fetchRoleList(input, done) {
+    if (typeof input === "function") {
+      done = input
+      input = null
+    }
+
+    const append = Boolean(input && input.append)
+    const nextPage = append ? this.data.page + 1 : 0
+
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       wx.showToast({
         title: "云能力未初始化",
         icon: "none"
+      })
+      this.setData({
+        initialLoading: false,
+        loading: false
       })
       if (typeof done === "function") {
         done()
@@ -92,6 +109,10 @@ Page({
 
     wx.cloud.callFunction({
       name: "roleList",
+      data: {
+        page: nextPage,
+        pageSize: this.data.pageSize
+      },
       success: (res) => {
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
@@ -100,8 +121,11 @@ Page({
             icon: "none"
           })
           this.setData({
+            initialLoading: false,
             loading: false,
-            list: []
+            list: append ? this.data.list : [],
+            page: append ? this.data.page : 0,
+            hasMore: append ? this.data.hasMore : false
           })
           if (typeof done === "function") {
             done()
@@ -117,8 +141,11 @@ Page({
           : []
 
         this.setData({
+          initialLoading: false,
           loading: false,
-          list
+          page: Number.isInteger(result.page) ? result.page : nextPage,
+          hasMore: Boolean(result.hasMore),
+          list: append ? this.data.list.concat(list) : list
         })
         if (typeof done === "function") {
           done()
@@ -130,8 +157,11 @@ Page({
           icon: "none"
         })
         this.setData({
+          initialLoading: false,
           loading: false,
-          list: []
+          list: append ? this.data.list : [],
+          page: append ? this.data.page : 0,
+          hasMore: append ? this.data.hasMore : false
         })
         if (typeof done === "function") {
           done()
@@ -140,7 +170,19 @@ Page({
     })
   },
 
+  handleLoadMore() {
+    if (this.data.loading || !this.data.hasMore) {
+      return
+    }
+
+    this.fetchRoleList({ append: true })
+  },
+
   handleOpenidInput(event) {
+    if (this.data.editingOpenid) {
+      return
+    }
+
     this.setData({
       formOpenid: String((event.detail && event.detail.value) || "").trim()
     })
@@ -164,6 +206,14 @@ Page({
     const openid = String(event.currentTarget.dataset.openid || "").trim()
     const permissions = normalizeStringArray(event.currentTarget.dataset.permissions)
     if (!openid) {
+      return
+    }
+
+    if (!OPENID_PATTERN.test(openid)) {
+      wx.showToast({
+        title: "OpenID 格式不正确",
+        icon: "none"
+      })
       return
     }
 

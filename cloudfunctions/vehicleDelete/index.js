@@ -105,7 +105,6 @@ async function deleteFilesBestEffort(fileList, context) {
       function: "vehicleDelete",
       stage: "deleteFile",
       fileCount: list.length,
-      fileList: list,
       context: context || {},
       errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
       stack: error && error.stack ? error.stack : "",
@@ -194,6 +193,12 @@ exports.main = async (event) => {
       return createError("NOT_FOUND", "车辆不存在")
     }
 
+    const bookingRes = await db.collection("bookings").where({ vehicleId: id }).limit(1).get()
+    const bookingList = bookingRes && Array.isArray(bookingRes.data) ? bookingRes.data : []
+    if (bookingList.length) {
+      return createError("VEHICLE_HAS_BOOKINGS", "车辆存在预约记录，请改为停用车辆")
+    }
+
     await db.collection("vehicles").doc(id).remove()
 
     const coverImage = String((current && current.coverImage) || "").trim()
@@ -218,7 +223,6 @@ exports.main = async (event) => {
       function: "vehicleDelete",
       openid,
       id,
-      input: event && typeof event === "object" ? event : {},
       errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
       stack: error && error.stack ? error.stack : ""
     })

@@ -66,6 +66,30 @@ function normalizeOptionalInt(input) {
   return Number(normalized)
 }
 
+function normalizeOptionalTextField(payload, field) {
+  if (!Object.prototype.hasOwnProperty.call(payload, field)) {
+    return undefined
+  }
+
+  if (payload[field] === undefined) {
+    return undefined
+  }
+
+  return String(payload[field] || "").trim()
+}
+
+function normalizeOptionalIntField(payload, field) {
+  if (!Object.prototype.hasOwnProperty.call(payload, field) || payload[field] === undefined) {
+    return undefined
+  }
+
+  if (payload[field] === null || String(payload[field]).trim() === "") {
+    return null
+  }
+
+  return normalizeOptionalInt(payload[field])
+}
+
 function isValidPlateNumber(plateNumber) {
   const plate = normalizePlateNumber(plateNumber)
 
@@ -127,14 +151,15 @@ function normalizeVehicleInput(input) {
   const vehicleType = payload.vehicleType
   const status = payload.status
 
-  const location = normalizeOptionalText(payload.location)
-  const transmission = normalizeOptionalText(payload.transmission)
-  const fuelType = normalizeOptionalText(payload.fuelType)
-  const vin = normalizeOptionalText(payload.vin)
-  const engineNumber = normalizeOptionalText(payload.engineNumber)
-  const note = normalizeOptionalText(payload.note)
-  const seats = normalizeOptionalInt(payload.seats)
-  const priceDay = normalizeOptionalInt(payload.priceDay)
+  const location = normalizeOptionalTextField(payload, "location")
+  const transmission = normalizeOptionalTextField(payload, "transmission")
+  const fuelType = normalizeOptionalTextField(payload, "fuelType")
+  const vin = normalizeOptionalTextField(payload, "vin")
+  const engineNumber = normalizeOptionalTextField(payload, "engineNumber")
+  const publicDescription = normalizeOptionalTextField(payload, "publicDescription")
+  const note = normalizeOptionalTextField(payload, "note")
+  const seats = normalizeOptionalIntField(payload, "seats")
+  const priceDay = normalizeOptionalIntField(payload, "priceDay")
 
   const normalized = {
     plateNumber,
@@ -149,6 +174,9 @@ function normalizeVehicleInput(input) {
   }
   if (engineNumber !== undefined) {
     normalized.engineNumber = engineNumber
+  }
+  if (publicDescription !== undefined) {
+    normalized.publicDescription = publicDescription
   }
   if (note !== undefined) {
     normalized.note = note
@@ -270,19 +298,27 @@ function validateVehicle(input) {
     }
   }
 
+  if (value.publicDescription !== undefined && value.publicDescription.length > 200) {
+    errors.push({
+      field: "publicDescription",
+      message: "公开说明长度不能超过 200",
+      value: value.publicDescription
+    })
+  }
+
   if (value.location !== undefined) {
     if (value.location.length > 20) {
       errors.push({ field: "location", message: "城市长度不能超过 20", value: value.location })
     }
   }
 
-  if (value.seats !== undefined) {
+  if (value.seats !== undefined && value.seats !== null) {
     if (!Number.isInteger(value.seats) || value.seats < 1 || value.seats > 9) {
       errors.push({ field: "seats", message: "座位数需为 1-9 的整数", value: value.seats })
     }
   }
 
-  if (value.priceDay !== undefined) {
+  if (value.priceDay !== undefined && value.priceDay !== null) {
     if (!Number.isInteger(value.priceDay) || value.priceDay < 0 || value.priceDay > 99999) {
       errors.push({ field: "priceDay", message: "日租金需为 0-99999 的整数", value: value.priceDay })
     }

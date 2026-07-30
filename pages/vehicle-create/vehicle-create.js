@@ -41,7 +41,8 @@ const FIELD_LABEL_MAP = {
   priceDay: "日租金",
   vin: "VIN",
   engineNumber: "发动机号",
-  note: "备注"
+  publicDescription: "公开说明",
+  note: "内部备注"
 }
 
 function formatDate(date) {
@@ -59,6 +60,8 @@ Page({
   data: {
     today: formatDate(new Date()),
     isSubmitting: false,
+    publicDescriptionLength: 0,
+    noteLength: 0,
     pageAuthorized: false,
     vehicleTypeLabels: buildLabels(vehicleUtils.VEHICLE_TYPES, VEHICLE_TYPE_LABEL_MAP),
     statusLabels: buildLabels(vehicleUtils.VEHICLE_STATUSES, STATUS_LABEL_MAP),
@@ -85,6 +88,7 @@ Page({
       priceDay: "",
       vin: "",
       engineNumber: "",
+      publicDescription: "",
       note: ""
     }
   },
@@ -187,7 +191,7 @@ Page({
       value = String(value || "").slice(0, 32)
     }
 
-    if (field === "note") {
+    if (field === "publicDescription" || field === "note") {
       value = String(value || "").slice(0, 200)
     }
 
@@ -199,9 +203,17 @@ Page({
       value = String(value || "").replace(/\D/g, "").slice(0, 5)
     }
 
-    this.setData({
+    const nextData = {
       [`form.${field}`]: value
-    })
+    }
+    if (field === "publicDescription") {
+      nextData.publicDescriptionLength = String(value || "").length
+    }
+    if (field === "note") {
+      nextData.noteLength = String(value || "").length
+    }
+
+    this.setData(nextData)
   },
 
   handleVehicleTypeChange(event) {

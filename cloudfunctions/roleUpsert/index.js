@@ -1,9 +1,11 @@
 const cloud = require("wx-server-sdk")
+const crypto = require("crypto")
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
 const ALLOWED_PERMISSIONS = ["vehicle_manage", "booking_manage"]
+const OPENID_PATTERN = /^[A-Za-z0-9_-]{6,128}$/
 
 function normalizeStringArray(value) {
   if (!Array.isArray(value)) {
@@ -22,6 +24,10 @@ function normalizeStringArray(value) {
 
 function normalizeRoleTokens(value) {
   return normalizeStringArray(value)
+}
+
+function buildRoleDocumentId(openid) {
+  return `role_${crypto.createHash("sha256").update(openid).digest("hex").slice(0, 27)}`
 }
 
 function hasAdminRole(record) {
@@ -134,6 +140,22 @@ exports.main = async (event) => {
       }
     }
 
+    if (!OPENID_PATTERN.test(input.openid)) {
+      return {
+        ok: false,
+        code: "VALIDATION_ERROR",
+        message: "OpenID 格式不正确",
+        details: {
+          errors: [
+            {
+              field: "openid",
+              message: "OpenID 仅支持 6-128 位字母、数字、下划线和连字符"
+            }
+          ]
+        }
+      }
+    }
+
     if (input.openid === operatorOpenid) {
       return {
         ok: false,
@@ -156,7 +178,6 @@ exports.main = async (event) => {
 
     const existedRes = await db.collection("roles").where({ openid: input.openid }).limit(20).get()
     const existedList = existedRes && Array.isArray(existedRes.data) ? existedRes.data : []
-    const existed = existedList.length ? existedList[0] : null
     const adminRecord = existedList.find((item) => hasAdminRole(item))
     if (adminRecord) {
       return {
@@ -176,15 +197,28 @@ exports.main = async (event) => {
     }
 
     if (existedList.length) {
-      await db.collection("roles").doc(existedList[0]._id).update({
-        data: payload
+      const fromPermissions = []
+      existedList.forEach((record) => {
+        normalizeRoleTokens(record && record.permissions ? record.permissions : []).forEach((permission) => {
+          if (!fromPermissions.includes(permission)) {
+            fromPermissions.push(permission)
+          }
+        })
       })
+
+      await Promise.all(
+        existedList.map((record) =>
+          db.collection("roles").doc(record._id).update({
+            data: payload
+          })
+        )
+      )
 
       await writeAuditLogBestEffort({
         openid: operatorOpenid,
         action: "roleUpsert",
         targetOpenid: input.openid,
-        fromPermissions: normalizeRoleTokens(existed && existed.permissions ? existed.permissions : []),
+        fromPermissions,
         toPermissions: normalizeRoleTokens(input.permissions),
         updated: true
       })
@@ -198,7 +232,7 @@ exports.main = async (event) => {
       }
     }
 
-    await db.collection("roles").add({
+    await db.collection("roles").doc(buildRoleDocumentId(input.openid)).set({
       data: {
         ...payload,
         createdAt: now,

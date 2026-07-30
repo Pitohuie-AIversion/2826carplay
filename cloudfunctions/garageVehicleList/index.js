@@ -3,6 +3,8 @@ const cloud = require("wx-server-sdk")
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
+const VEHICLE_BATCH_SIZE = 100
+const MAX_VEHICLE_RECORDS = 2000
 
 const VEHICLE_TYPE_LABEL_MAP = {
   sedan: "轿车",
@@ -107,6 +109,23 @@ function getBrand(brandModel) {
   return value.split(/\s+/)[0] || value
 }
 
+function maskPlateNumber(plateNumber) {
+  const value = String(plateNumber || "").trim()
+  if (!value) {
+    return ""
+  }
+
+  if (value.length <= 3) {
+    return "***"
+  }
+
+  if (value.length === 4) {
+    return `${value.slice(0, 1)}**${value.slice(-1)}`
+  }
+
+  return `${value.slice(0, 2)}${"*".repeat(value.length - 4)}${value.slice(-2)}`
+}
+
 function inferCategory(vehicleType, brandModel, fuelType) {
   const upperBrandModel = String(brandModel || "").trim().toUpperCase()
   const normalizedFuelType = String(fuelType || "").trim().toLowerCase()
@@ -140,7 +159,7 @@ function inferCategory(vehicleType, brandModel, fuelType) {
 
 function buildNickname(plateNumber, vehicleTypeText) {
   if (plateNumber) {
-    const suffix = plateNumber.slice(-4)
+    const suffix = plateNumber.slice(-2)
     if (suffix) {
       return `车牌尾号 ${suffix}`
     }
@@ -169,7 +188,7 @@ function buildTags(vehicle, vehicleTypeText) {
   }
 
   if (vehicle && vehicle.plateNumber) {
-    tags.push(String(vehicle.plateNumber).trim())
+    tags.push(maskPlateNumber(vehicle.plateNumber))
   }
 
   if (vehicle && vehicle.transmission) {
@@ -199,15 +218,16 @@ function mapVehicle(vehicle) {
   const cover = images[0] || ""
   const brandModel = String((vehicle && vehicle.brandModel) || "").trim()
   const plateNumber = String((vehicle && vehicle.plateNumber) || "").trim()
-  const note = String((vehicle && vehicle.note) || "").trim()
-  const coverPlaceholderText = brandModel || plateNumber || vehicleTypeText
+  const maskedPlateNumber = maskPlateNumber(plateNumber)
+  const publicDescription = String((vehicle && vehicle.publicDescription) || "").trim()
+  const coverPlaceholderText = brandModel || maskedPlateNumber || vehicleTypeText
   const seats = Number.isInteger(vehicle && vehicle.seats) ? vehicle.seats : ""
   const priceDay = Number.isInteger(vehicle && vehicle.priceDay) ? vehicle.priceDay : 0
   const fuelType = String((vehicle && vehicle.fuelType) || "").trim() || "unknown"
 
   return {
     id: String((vehicle && vehicle._id) || (vehicle && vehicle.id) || "").trim(),
-    name: brandModel || plateNumber || "未命名车辆",
+    name: brandModel || maskedPlateNumber || "未命名车辆",
     nickname: buildNickname(plateNumber, vehicleTypeText),
     brand: getBrand(brandModel),
     category: inferCategory(vehicleType, brandModel, fuelType),
@@ -225,11 +245,55 @@ function mapVehicle(vehicle) {
     images,
     hasImages: images.length > 0,
     coverPlaceholderText,
-    description: note || `${brandModel || plateNumber || "该车"}支持到店咨询与预约服务。`,
+    description:
+      publicDescription ||
+      `${brandModel || maskedPlateNumber || "该车"}支持到店咨询与预约服务。`,
     sort: new Date(formatTime(vehicle && (vehicle.updatedAt || vehicle.createdAt)) || 0).getTime() || 0,
     registerDate: String((vehicle && vehicle.registerDate) || "").trim(),
     updatedAt: formatTime(vehicle && vehicle.updatedAt),
     createdAt: formatTime(vehicle && vehicle.createdAt)
+  }
+}
+
+async function readVehiclesByMode(ordered) {
+  const list = []
+
+  for (let offset = 0; offset <= MAX_VEHICLE_RECORDS; offset += VEHICLE_BATCH_SIZE) {
+    const remaining = MAX_VEHICLE_RECORDS + 1 - list.length
+    const batchSize = Math.min(VEHICLE_BATCH_SIZE, remaining)
+    let query = db.collection("vehicles")
+    if (ordered) {
+      query = query.orderBy("updatedAt", "desc")
+    }
+    const res = await query.skip(offset).limit(batchSize).get()
+    const batch = res && Array.isArray(res.data) ? res.data : []
+
+    list.push(...batch)
+    if (batch.length < batchSize || list.length > MAX_VEHICLE_RECORDS) {
+      break
+    }
+  }
+
+  return {
+    list: list.slice(0, MAX_VEHICLE_RECORDS),
+    truncated: list.length > MAX_VEHICLE_RECORDS
+  }
+}
+
+async function readVehicles() {
+  try {
+    return await readVehiclesByMode(true)
+  } catch (indexError) {
+    console.warn({
+      function: "garageVehicleList",
+      stage: "indexFallback",
+      errorMessage:
+        indexError && (indexError.message || indexError.errMsg)
+          ? indexError.message || indexError.errMsg
+          : String(indexError),
+      createdAt: new Date().toISOString()
+    })
+    return readVehiclesByMode(false)
   }
 }
 
@@ -239,29 +303,22 @@ exports.main = async (event) => {
     const pageRaw = Number(payload.page)
     const pageSizeRaw = Number(payload.pageSize)
     const page = Number.isFinite(pageRaw) && pageRaw > 0 ? Math.floor(pageRaw) : 0
-    const pageSize = Number.isFinite(pageSizeRaw) && pageSizeRaw > 0 ? Math.min(Math.max(Math.floor(pageSizeRaw), 1), 100) : 0
-
-    const query = db.collection("vehicles")
-    const res = pageSize
-      ? await query.orderBy("updatedAt", "desc").skip(page * pageSize).limit(pageSize).get()
-      : await query.limit(100).get()
-    const rawList = res && Array.isArray(res.data) ? res.data : []
-
-    const list = rawList
+    const pageSize = Number.isFinite(pageSizeRaw) && pageSizeRaw > 0 ? Math.min(Math.max(Math.floor(pageSizeRaw), 1), 100) : 100
+    const vehicleRecords = await readVehicles()
+    const fullList = vehicleRecords.list
       .filter((item) => item && item.status !== "retired")
       .map(mapVehicle)
       .sort((prev, next) => next.sort - prev.sort)
-
-    const pagination = pageSize
-      ? {
-          page,
-          pageSize
-        }
-      : {}
+    const offset = page * pageSize
+    const list = fullList.slice(offset, offset + pageSize)
 
     return {
       ok: true,
-      ...pagination,
+      page,
+      pageSize,
+      total: fullList.length,
+      truncated: vehicleRecords.truncated,
+      hasMore: offset + pageSize < fullList.length,
       list
     }
   } catch (error) {

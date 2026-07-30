@@ -1,3 +1,5 @@
+@import "../../shared/management-shell.wxss";
+
 .role-page {
   min-height: 100vh;
   padding: 24rpx;
@@ -46,6 +48,10 @@
 
 .openid-input {
   margin-top: 20rpx;
+}
+
+.openid-input[disabled] {
+  opacity: 0.58;
 }
 
 .permission-row {
@@ -119,4 +125,135 @@
 .empty-wrap {
   padding: 40rpx 0 12rpx;
   text-align: center;
+}
+
+.load-more-btn {
+  margin-top: 24rpx;
+}
+
+.role-page.management-page .hero-card,
+.role-page.management-page .form-card,
+.role-page.management-page .list-card {
+  margin-bottom: 22rpx;
+  padding: 28rpx;
+  border-color: rgba(255, 255, 255, 0.075);
+  border-radius: 26rpx;
+}
+
+.role-page.management-page .form-card,
+.role-page.management-page .list-card {
+  background: #15181d;
+}
+
+.role-page.management-page .openid-input {
+  height: 82rpx;
+  margin-top: 4rpx;
+}
+
+.role-page.management-page .permission-chip {
+  min-height: 62rpx;
+  padding: 14rpx 22rpx;
+}
+
+.role-page.management-page .form-tip,
+.role-page.management-page .section-desc,
+.role-page.management-page .role-permission,
+.role-page.management-page .loading-text,
+.role-page.management-page .empty-desc {
+  color: #737e8c;
+  font-size: 21rpx;
+}
+
+.role-page.management-page .save-btn,
+.role-page.management-page .reset-btn,
+.role-page.management-page .load-more-btn {
+  height: 82rpx;
+  border-radius: 18rpx;
+  font-size: 23rpx;
+  line-height: 82rpx;
+}
+
+.role-page.management-page .role-item {
+  margin-bottom: 12rpx;
+  padding: 20rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.065);
+  border-radius: 18rpx;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.role-page.management-page .role-openid {
+  color: #e5e9ef;
+  font-family: monospace;
+  font-size: 21rpx;
+}
+
+.role-page.management-page .admin-tag {
+  border: 1rpx solid rgba(84, 143, 255, 0.24);
+  background: rgba(47, 128, 237, 0.1);
+  color: #83b0fb;
+}
+
+.role-skeleton {
+  margin-top: 20rpx;
+}
+
+.role-skeleton-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12rpx;
+  padding: 20rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.06);
+  border-radius: 18rpx;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.role-skeleton-item-muted {
+  opacity: 0.7;
+}
+
+.role-skeleton-copy {
+  flex: 1;
+  min-width: 0;
+  padding-right: 22rpx;
+}
+
+.role-skeleton-openid {
+  width: 78%;
+  height: 23rpx;
+  border-radius: 8rpx;
+}
+
+.role-skeleton-permission {
+  width: 58%;
+  height: 19rpx;
+  margin-top: 16rpx;
+  border-radius: 8rpx;
+}
+
+.role-skeleton-action {
+  flex: 0 0 132rpx;
+  height: 68rpx;
+  border-radius: 18rpx;
+}
+
+.role-empty-emblem {
+  width: 88rpx;
+  height: 88rpx;
+  border: 1rpx solid rgba(105, 154, 235, 0.2);
+  border-radius: 50%;
+  opacity: 0.76;
+}
+
+.role-empty-kicker {
+  margin-top: 17rpx;
+  color: #60738f;
+  font-size: 14rpx;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 2rpx;
+}
+
+.role-page.management-page .empty-title {
+  margin-top: 8rpx;
 }

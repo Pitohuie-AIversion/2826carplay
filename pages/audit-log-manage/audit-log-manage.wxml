@@ -1,13 +1,27 @@
-<view class="audit-page">
-  <view class="header">
-    <view class="title">审计日志</view>
-    <view class="desc">展示权限分配、运营配置变更等关键操作记录（仅管理员可见）</view>
+<view class="audit-page management-page">
+  <view class="page-glow"></view>
+  <view class="header hero-card ui-card ui-card-gradient">
+    <view class="hero-top">
+      <view class="hero-copy">
+        <view class="page-kicker">AUDIT TRAIL</view>
+        <view class="title">审计日志</view>
+        <view class="desc">追踪权限分配与运营配置变更</view>
+      </view>
+      <image class="hero-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+    </view>
   </view>
 
   <view class="filter-card ui-card">
+    <view class="section-heading">
+      <view>
+        <view class="section-eyebrow">LOG FILTER</view>
+        <view class="section-heading-title">筛选操作记录</view>
+      </view>
+      <view class="section-index">01</view>
+    </view>
     <input
       class="keyword-input ui-input"
-      placeholder="搜索 OpenID / 车辆ID / 预约ID / 字段"
+      placeholder="搜索 OpenID / 车辆ID / 预约ID / 申请ID / 字段"
       value="{{keyword}}"
       bindinput="handleKeywordInput"
       confirm-type="search"
@@ -30,17 +44,63 @@
 
     <view class="actions">
       <button class="action-btn ui-btn ui-btn-primary" bindtap="handleSearch">查询</button>
+      <button class="action-btn action-btn-last ui-btn ui-btn-ghost" loading="{{exporting}}" disabled="{{loading || exporting}}" bindtap="handleExport">导出 CSV</button>
     </view>
 
-    <view class="result-count">当前筛选结果 {{total}} 条</view>
+    <view wx:if="{{exportFilePath}}" class="export-actions">
+      <view class="export-tip">CSV 已生成：{{exportFileName}}</view>
+      <view class="export-buttons">
+        <button wx:if="{{canShareExport}}" class="export-button ui-btn ui-btn-primary" bindtap="handleShareExportedFile">分享文件</button>
+        <button class="export-button ui-btn ui-btn-ghost" bindtap="handleOpenExportedFile">打开文件</button>
+        <button class="export-button ui-btn ui-btn-ghost" bindtap="handleDeleteExportedFile">删除文件</button>
+      </view>
+    </view>
+
+    <view class="result-count">当前筛选结果 {{total}}{{truncated ? '+' : ''}} 条</view>
+    <view wx:if="{{truncated}}" class="result-count">当前最多展示已读取的 2000 条记录，请缩小筛选范围。</view>
   </view>
 
-  <view wx:if="{{loading}}" class="loading">加载中...</view>
+  <view wx:if="{{(initialLoading || loading) && !list.length}}" class="log-list-skeleton">
+    <view class="log-skeleton-heading">
+      <view>
+        <view class="log-skeleton-kicker manage-skeleton-pulse"></view>
+        <view class="log-skeleton-title manage-skeleton-pulse"></view>
+      </view>
+      <view class="log-skeleton-count manage-skeleton-pulse"></view>
+    </view>
+    <view class="log-skeleton-card ui-card">
+      <view class="log-skeleton-head">
+        <view class="log-skeleton-name manage-skeleton-pulse"></view>
+        <view class="log-skeleton-time manage-skeleton-pulse"></view>
+      </view>
+      <view class="log-skeleton-identity manage-skeleton-pulse"></view>
+      <view class="log-skeleton-line manage-skeleton-pulse"></view>
+      <view class="log-skeleton-line log-skeleton-line-short manage-skeleton-pulse"></view>
+    </view>
+    <view class="log-skeleton-card ui-card log-skeleton-card-muted">
+      <view class="log-skeleton-head">
+        <view class="log-skeleton-name manage-skeleton-pulse"></view>
+        <view class="log-skeleton-time manage-skeleton-pulse"></view>
+      </view>
+      <view class="log-skeleton-identity manage-skeleton-pulse"></view>
+      <view class="log-skeleton-line manage-skeleton-pulse"></view>
+    </view>
+  </view>
 
-  <view wx:elif="{{list.length}}">
+  <view wx:elif="{{list.length}}" class="audit-list">
+    <view class="list-heading">
+      <view>
+        <view class="list-kicker">ACTIVITY RECORDS</view>
+        <view class="list-title">操作记录</view>
+      </view>
+      <view class="list-count">{{total}}{{truncated ? '+' : ''}} 条</view>
+    </view>
     <view class="log-item ui-card ui-card-soft" wx:for="{{list}}" wx:key="id">
       <view class="log-head">
-        <view class="log-action">{{item.action || '--'}}</view>
+        <view class="log-title-group">
+          <view class="log-kind log-kind-audit">ACTION</view>
+          <view class="log-action">{{item.action || '--'}}</view>
+        </view>
         <view class="log-time">{{item.createdAtText || '--'}}</view>
       </view>
       <view class="log-openid">操作者：{{item.openid || '--'}}</view>
@@ -54,6 +114,8 @@
   </view>
 
   <view wx:else class="empty ui-card">
+    <image class="manage-empty-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+    <view class="manage-empty-kicker">NO AUDIT ACTIVITY</view>
     <view class="empty-title">{{emptyTitle}}</view>
     <view class="empty-desc">{{emptyDesc}}</view>
   </view>

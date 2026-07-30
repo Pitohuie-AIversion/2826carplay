@@ -3,6 +3,7 @@ const cloud = require("wx-server-sdk")
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
+const BOOTSTRAP_ROLE_ID = "bootstrap_admin"
 
 function hasAdminRole(record) {
   if (!record || typeof record !== "object") {
@@ -77,6 +78,14 @@ exports.main = async (event) => {
   const requiredToken = String(process.env.BOOTSTRAP_TOKEN || "").trim()
 
   try {
+    if (!openid) {
+      return {
+        ok: false,
+        code: "UNAUTHORIZED",
+        message: "未获取到用户身份"
+      }
+    }
+
     const existed = await db.collection("roles").limit(100).get()
     const roleList = existed && Array.isArray(existed.data) ? existed.data : []
     const currentRole = roleList.find((item) => item && item.openid === openid)
@@ -99,16 +108,24 @@ exports.main = async (event) => {
       }
     }
 
-    if (requiredToken && token !== requiredToken) {
+    if (!requiredToken) {
+      return {
+        ok: false,
+        code: "BOOTSTRAP_DISABLED",
+        message: "管理员初始化未启用，请先配置初始化口令"
+      }
+    }
+
+    if (token !== requiredToken) {
       return {
         ok: false,
         code: "BOOTSTRAP_TOKEN_REQUIRED",
-        message: "管理员初始化已加锁，请联系开发人员获取口令"
+        message: "管理员初始化口令不正确"
       }
     }
 
     const now = db.serverDate()
-    await db.collection("roles").add({
+    await db.collection("roles").doc(BOOTSTRAP_ROLE_ID).set({
       data: {
         openid,
         role: "admin",
@@ -123,7 +140,7 @@ exports.main = async (event) => {
       action: "bootstrapAdmin",
       targetOpenid: openid,
       bootstrap: true,
-      tokenProtected: Boolean(requiredToken)
+      tokenProtected: true
     })
 
     return {

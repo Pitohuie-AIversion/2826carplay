@@ -1,0 +1,180 @@
+<view class="workbench-page management-page">
+  <view class="page-glow"></view>
+
+  <view class="hero-card ui-card ui-card-gradient">
+    <view class="hero-top">
+      <view>
+        <view class="page-kicker">FOLLOW-UP WORKBENCH</view>
+        <view class="hero-title">待协调工作台</view>
+        <view class="hero-desc">集中处理优先、候补与超时预约</view>
+      </view>
+      <image class="hero-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+    </view>
+    <view class="hero-foot">
+      <view class="live-dot"></view>
+      <view class="hero-foot-text">超过 24 小时仍待协调会标记为超时</view>
+      <view class="refresh-text">{{refreshing ? '刷新中…' : '下拉刷新'}}</view>
+    </view>
+  </view>
+
+  <view wx:if="{{loading}}" class="state-card ui-card">
+    <view class="state-loader"></view>
+    <view>
+      <view class="state-title">正在整理待协调队列</view>
+      <view class="state-desc">优先级、等待时间与协调进度正在汇总</view>
+    </view>
+  </view>
+
+  <view wx:elif="{{loadError && !allBookings.length}}" class="state-card ui-card">
+    <view>
+      <view class="state-title">暂时无法加载工作台</view>
+      <view class="state-desc">{{loadError}}</view>
+      <button class="retry-button ui-btn ui-btn-ghost" bindtap="handleRetry">重新加载</button>
+    </view>
+  </view>
+
+  <block wx:else>
+    <view wx:if="{{loadError}}" class="inline-error">{{loadError}}</view>
+
+    <view class="summary-grid">
+      <view class="summary-card summary-card-main ui-card" data-mode="todo" bindtap="handleSummaryTap">
+        <view class="summary-value">{{summary.todo}}</view>
+        <view class="summary-label">全部待办</view>
+      </view>
+      <view class="summary-card ui-card" data-mode="priority" bindtap="handleSummaryTap">
+        <view class="summary-value summary-warning">{{summary.priority}}</view>
+        <view class="summary-label">优先预约</view>
+      </view>
+      <view class="summary-card ui-card" data-mode="overdue" bindtap="handleSummaryTap">
+        <view class="summary-value summary-danger">{{summary.overdue}}</view>
+        <view class="summary-label">超时未处理</view>
+      </view>
+      <view class="summary-card ui-card" data-mode="standby" bindtap="handleSummaryTap">
+        <view class="summary-value summary-muted">{{summary.standby}}</view>
+        <view class="summary-label">候补预约</view>
+      </view>
+    </view>
+
+    <view class="stage-card ui-card">
+      <view class="stage-heading">
+        <view>
+          <view class="section-eyebrow">COORDINATION FLOW</view>
+          <view class="stage-title">协调进度</view>
+        </view>
+        <view class="stage-hint">点击前两阶段查看队列</view>
+      </view>
+      <view class="stage-row">
+        <view
+          class="stage-item {{selectedMode === 'pending' ? 'stage-item-active stage-item-pending' : ''}}"
+          data-mode="pending"
+          bindtap="handleSummaryTap"
+        >
+          <view class="stage-value">{{summary.pending}}</view>
+          <view class="stage-label">待启动</view>
+        </view>
+        <view class="stage-connector">
+          <view class="stage-line"></view>
+          <view class="stage-arrow"></view>
+        </view>
+        <view
+          class="stage-item {{selectedMode === 'coordinating' ? 'stage-item-active stage-item-progress' : ''}}"
+          data-mode="coordinating"
+          bindtap="handleSummaryTap"
+        >
+          <view class="stage-value stage-value-progress">{{summary.coordinating}}</view>
+          <view class="stage-label">协调中</view>
+        </view>
+        <view class="stage-connector">
+          <view class="stage-line"></view>
+          <view class="stage-arrow"></view>
+        </view>
+        <view class="stage-item stage-item-finished">
+          <view class="stage-value stage-value-finished">✓</view>
+          <view class="stage-label">完成后移出</view>
+        </view>
+      </view>
+    </view>
+
+    <view class="queue-card ui-card">
+      <view class="search-box">
+        <view class="search-symbol"></view>
+        <input
+          class="search-input"
+          value="{{keyword}}"
+          maxlength="40"
+          confirm-type="search"
+          placeholder="搜索车辆、客户、手机号、城市或预约编号"
+          placeholder-class="search-placeholder"
+          bindinput="handleKeywordInput"
+        />
+        <view wx:if="{{keyword}}" class="search-clear" bindtap="handleClearKeyword">清除</view>
+      </view>
+      <view wx:if="{{keyword}}" class="search-caption">
+        <text>本地筛选 {{queue.length}} / {{queueTotal}} 条</text>
+        <text class="search-privacy">关键词不会上传</text>
+      </view>
+
+      <view class="section-heading">
+        <view>
+          <view class="section-eyebrow">ACTION QUEUE</view>
+          <view class="section-title">处理队列</view>
+        </view>
+        <view class="section-count">{{queue.length}} 条</view>
+      </view>
+
+      <scroll-view class="filter-scroll" scroll-x enhanced show-scrollbar="{{false}}">
+        <view class="filter-row">
+          <view
+            wx:for="{{filterOptions}}"
+            wx:key="key"
+            class="filter-chip {{selectedMode === item.key ? 'filter-chip-active' : ''}}"
+            data-mode="{{item.key}}"
+            bindtap="handleFilterTap"
+          >{{item.label}} {{item.count}}</view>
+        </view>
+      </scroll-view>
+
+      <view wx:if="{{queue.length}}" class="queue-list">
+        <view class="queue-item" wx:for="{{queue}}" wx:key="id">
+          <view class="queue-top">
+            <view class="queue-vehicle">{{item.vehicleName}}</view>
+            <view class="status-pill {{item.statusClass}}">{{item.statusLabel}}</view>
+          </view>
+          <view class="queue-contact">{{item.userName}} · {{item.city}}</view>
+          <view class="queue-date">{{item.startDate}} → {{item.endDate}}</view>
+          <view class="badge-row">
+            <text
+              wx:for="{{item.badges}}"
+              wx:for-item="badge"
+              wx:key="key"
+              class="queue-badge badge-{{badge.tone}}"
+            >{{badge.text}}</text>
+            <text class="waiting-text">{{item.waitingText}}</text>
+          </view>
+          <button
+            wx:if="{{item.coordinationStatus === 'pending' || item.coordinationStatus === 'coordinating'}}"
+            class="coordination-action {{item.coordinationStatus === 'coordinating' ? 'coordination-action-resolve' : ''}}"
+            data-id="{{item.id}}"
+            data-schedule-priority="{{item.schedulePriority}}"
+            data-coordination-status="{{item.coordinationStatus}}"
+            disabled="{{updatingId !== ''}}"
+            bindtap="handleQuickCoordination"
+          >{{updatingId === item.id ? '处理中…' : (item.coordinationStatus === 'coordinating' ? '标记已协调' : '开始协调')}}</button>
+          <view class="queue-actions">
+            <button class="queue-action queue-action-primary" data-phone="{{item.phone}}" bindtap="handleCallPhone">拨打电话</button>
+            <button class="queue-action" data-id="{{item.id}}" bindtap="handleViewDetail">进入处理</button>
+          </view>
+        </view>
+      </view>
+
+      <view wx:else class="queue-empty">
+        <view class="queue-empty-mark">{{keyword ? '0' : '✓'}}</view>
+        <view class="queue-empty-title">{{keyword ? '未找到匹配预约' : '当前筛选下没有待办'}}</view>
+        <view class="queue-empty-desc">{{keyword ? '可更换关键词，或清除搜索查看当前分类的全部记录。' : '可切换其他分类，或前往预约管理查看全部记录。'}}</view>
+      </view>
+    </view>
+
+    <button class="manage-button ui-btn ui-btn-ghost" bindtap="handleOpenBookingManage">前往预约管理</button>
+    <view wx:if="{{truncated}}" class="scope-tip">预约超过 2000 条，工作台只汇总当前已读取范围，请缩小筛选或分批处理。</view>
+  </block>
+</view>

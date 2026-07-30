@@ -116,6 +116,7 @@ describe("shared/vehicle.js validateVehicle", () => {
       fuelType: "gasoline",
       seats: "5",
       priceDay: "699",
+      publicDescription: "  公开亮点 ",
       note: "  ok "
     })
     expect(res.ok).toBe(true)
@@ -128,6 +129,7 @@ describe("shared/vehicle.js validateVehicle", () => {
     expect(res.value.fuelType).toBe("gasoline")
     expect(res.value.seats).toBe(5)
     expect(res.value.priceDay).toBe(699)
+    expect(res.value.publicDescription).toBe("公开亮点")
     expect(res.value.note).toBe("ok")
   })
 
@@ -141,7 +143,8 @@ describe("shared/vehicle.js validateVehicle", () => {
       transmission: "cvt",
       fuelType: "diesel",
       seats: "10",
-      priceDay: "abc"
+      priceDay: "abc",
+      publicDescription: "x".repeat(201)
     })
 
     expect(res.ok).toBe(false)
@@ -149,5 +152,38 @@ describe("shared/vehicle.js validateVehicle", () => {
     expect(res.details.errors.some((e) => e.field === "fuelType")).toBe(true)
     expect(res.details.errors.some((e) => e.field === "seats")).toBe(true)
     expect(res.details.errors.some((e) => e.field === "priceDay")).toBe(true)
+    expect(res.details.errors.some((e) => e.field === "publicDescription")).toBe(true)
+  })
+
+  test("validateVehicle preserves explicit empty optional fields for clearing", () => {
+    const res = validateVehicle({
+      plateNumber: "京A12345",
+      vehicleType: "sedan",
+      brandModel: "Toyota",
+      registerDate: "2026-07-08",
+      status: "active",
+      location: "",
+      transmission: "",
+      fuelType: "",
+      seats: "",
+      priceDay: "",
+      publicDescription: "",
+      vin: "",
+      engineNumber: "",
+      note: ""
+    })
+
+    expect(res.ok).toBe(true)
+    expect(res.value).toMatchObject({
+      location: "",
+      transmission: "",
+      fuelType: "",
+      seats: null,
+      priceDay: null,
+      publicDescription: "",
+      vin: "",
+      engineNumber: "",
+      note: ""
+    })
   })
 })

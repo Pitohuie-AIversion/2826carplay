@@ -1,3 +1,5 @@
+@import "../../shared/management-shell.wxss";
+
 .audit-page {
   padding: 24rpx 24rpx 60rpx;
   box-sizing: border-box;
@@ -56,11 +58,45 @@
 }
 
 .actions {
+  display: flex;
+  gap: 14rpx;
   margin-top: 14rpx;
 }
 
 .action-btn {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
+}
+
+.export-actions {
+  margin-top: 18rpx;
+  padding: 18rpx;
+  border: 1rpx solid rgba(82, 143, 255, 0.14);
+  border-radius: 16rpx;
+  background: rgba(82, 143, 255, 0.05);
+}
+
+.export-tip {
+  overflow: hidden;
+  color: #8290a3;
+  font-size: 19rpx;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.export-buttons {
+  display: flex;
+  gap: 12rpx;
+  margin-top: 14rpx;
+}
+
+.export-button {
+  flex: 1;
+  min-width: 0;
+  height: 68rpx;
+  border-radius: 15rpx;
+  font-size: 19rpx;
+  line-height: 68rpx;
 }
 
 .result-count {
@@ -154,4 +190,82 @@
   line-height: 1.6;
   word-break: break-word;
   color: rgba(255, 255, 255, 0.72);
+}
+
+.audit-page.management-page .header,
+.audit-page.management-page .filter-card,
+.audit-page.management-page .log-item,
+.audit-page.management-page .empty {
+  margin-bottom: 20rpx;
+  border-color: rgba(255, 255, 255, 0.075);
+  border-radius: 26rpx;
+}
+
+.audit-page.management-page .filter-card {
+  padding: 28rpx;
+  background: #15181d;
+}
+
+.audit-page.management-page .keyword-input {
+  height: 82rpx;
+}
+
+.audit-page.management-page .action-chip {
+  min-height: 60rpx;
+  padding: 13rpx 21rpx;
+}
+
+.audit-page.management-page .action-btn {
+  height: 82rpx;
+  border-radius: 18rpx;
+  line-height: 82rpx;
+}
+
+.audit-page.management-page .log-item {
+  position: relative;
+  padding: 26rpx;
+  overflow: hidden;
+  background: linear-gradient(145deg, #181d24, #14171c 74%);
+}
+
+.audit-page.management-page .log-item::before {
+  position: absolute;
+  top: 26rpx;
+  left: 0;
+  width: 5rpx;
+  height: 50rpx;
+  border-radius: 0 999rpx 999rpx 0;
+  background: #528fff;
+  content: "";
+}
+
+.audit-page.management-page .log-action {
+  color: #eaf0f8;
+  font-size: 25rpx;
+}
+
+.audit-page.management-page .log-time {
+  color: #687381;
+  font-size: 19rpx;
+}
+
+.audit-page.management-page .log-openid {
+  padding: 14rpx 16rpx;
+  border-radius: 14rpx;
+  background: rgba(255, 255, 255, 0.025);
+  color: #8290a3;
+  font-family: monospace;
+  font-size: 19rpx;
+}
+
+.audit-page.management-page .log-summary {
+  color: #9aa4b1;
+  font-size: 21rpx;
+}
+
+.audit-page.management-page .log-action {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

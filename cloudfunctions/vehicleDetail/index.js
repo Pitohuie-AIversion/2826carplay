@@ -135,6 +135,7 @@ exports.main = async (event) => {
         priceDay: item.priceDay === undefined ? null : item.priceDay,
         vin: item.vin || "",
         engineNumber: item.engineNumber || "",
+        publicDescription: item.publicDescription || "",
         note: item.note || "",
         imageList: Array.isArray(item.imageList) ? item.imageList.filter(Boolean) : [],
         coverImage: item.coverImage || "",

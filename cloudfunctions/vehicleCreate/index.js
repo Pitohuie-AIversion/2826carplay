@@ -63,6 +63,18 @@ async function hasOpenidCapability(openid, capability) {
   return list.some((item) => hasCapability(item, capability))
 }
 
+function isDuplicateKeyError(error) {
+  const code = Number(error && (error.code || error.errCode))
+  const message =
+    error && (error.message || error.errMsg)
+      ? error.message || error.errMsg
+      : String(error || "")
+  return (
+    code === 11000 ||
+    /E11000|duplicate\s+key|duplicate.*index|重复键|唯一索引/i.test(String(message))
+  )
+}
+
 async function writeErrorLogBestEffort(payload) {
   try {
     await db.collection("error_logs").add({
@@ -162,11 +174,18 @@ exports.main = async (event) => {
 
     return { ok: true, id: vehicleId }
   } catch (error) {
+    if (isDuplicateKeyError(error)) {
+      return vehicleUtils.createError("DUPLICATE_PLATE", "车牌号已存在", { plateNumber })
+    }
+
     await writeErrorLogBestEffort({
       function: "vehicleCreate",
       openid,
       plateNumber,
-      input: event && typeof event === "object" ? event : {},
+      fieldsProvided:
+        event && typeof event === "object"
+          ? Object.keys(event).filter((key) => key !== "vin" && key !== "engineNumber" && key !== "note")
+          : [],
       errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
       stack: error && error.stack ? error.stack : ""
     })

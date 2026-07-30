@@ -1,17 +1,71 @@
-<view class="config-page">
+<view class="config-page management-page">
+  <view class="page-glow"></view>
   <view class="hero-card ui-card ui-card-gradient">
-    <view class="hero-title">运营配置</view>
-    <view class="hero-desc">统一管理品牌名、客服电话、首页展示文案与预约说明。保存后前台页面会按新配置展示。</view>
+    <view class="hero-top">
+      <view class="hero-copy">
+        <view class="page-kicker">OPERATIONS SETTINGS</view>
+        <view class="hero-title">运营配置</view>
+        <view class="hero-desc">管理品牌、首页内容与预约服务文案</view>
+      </view>
+      <image class="hero-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+    </view>
   </view>
 
-  <view wx:if="{{loadFailed}}" class="form-card ui-card">
-    <view class="section-title">加载失败</view>
-    <view class="form-tip">{{loadErrorText}}</view>
-    <view class="form-tip">为避免默认值误覆盖线上配置，当前已禁用保存，请先重新下拉刷新或稍后再试。</view>
+  <view wx:if="{{loading && !hasLoadedConfig}}" class="config-skeleton">
+    <view class="config-skeleton-card ui-card">
+      <view class="config-skeleton-heading">
+        <view>
+          <view class="config-skeleton-kicker manage-skeleton-pulse"></view>
+          <view class="config-skeleton-title manage-skeleton-pulse"></view>
+        </view>
+        <view class="config-skeleton-index manage-skeleton-pulse"></view>
+      </view>
+      <view class="config-skeleton-field">
+        <view class="config-skeleton-label manage-skeleton-pulse"></view>
+        <view class="config-skeleton-input manage-skeleton-pulse"></view>
+      </view>
+      <view class="config-skeleton-field">
+        <view class="config-skeleton-label config-skeleton-label-short manage-skeleton-pulse"></view>
+        <view class="config-skeleton-input manage-skeleton-pulse"></view>
+      </view>
+      <view class="config-skeleton-field">
+        <view class="config-skeleton-label manage-skeleton-pulse"></view>
+        <view class="config-skeleton-textarea manage-skeleton-pulse"></view>
+      </view>
+    </view>
+    <view class="config-skeleton-card config-skeleton-card-muted ui-card">
+      <view class="config-skeleton-heading">
+        <view>
+          <view class="config-skeleton-kicker manage-skeleton-pulse"></view>
+          <view class="config-skeleton-title manage-skeleton-pulse"></view>
+        </view>
+        <view class="config-skeleton-index manage-skeleton-pulse"></view>
+      </view>
+      <view class="config-skeleton-field">
+        <view class="config-skeleton-label manage-skeleton-pulse"></view>
+        <view class="config-skeleton-input manage-skeleton-pulse"></view>
+      </view>
+    </view>
   </view>
 
+  <view wx:elif="{{loadFailed}}" class="config-state ui-card">
+    <image class="config-state-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+    <view class="config-state-kicker">CONFIGURATION UNAVAILABLE</view>
+    <view class="config-state-title">配置加载失败</view>
+    <view class="config-state-desc">{{loadErrorText}}</view>
+    <view class="config-state-note">线上配置未成功读取前不会展示默认表单，避免误覆盖现有内容。</view>
+    <button class="config-state-button ui-btn ui-btn-primary" bindtap="handleRetryLoad">重新加载配置</button>
+  </view>
+
+  <block wx:else>
   <view class="form-card ui-card">
-    <view class="section-title">基础信息</view>
+    <view class="section-heading">
+      <view>
+        <view class="section-eyebrow">BRAND PROFILE</view>
+        <view class="section-heading-title">基础信息</view>
+      </view>
+      <view class="section-index">01</view>
+    </view>
 
     <view class="form-item">
       <view class="form-label">品牌名称</view>
@@ -20,7 +74,8 @@
 
     <view class="form-item">
       <view class="form-label">客服电话</view>
-      <input class="form-input ui-input" value="{{form.servicePhone}}" data-field="servicePhone" bindinput="handleInput" />
+      <input class="form-input ui-input" maxlength="20" value="{{form.servicePhone}}" data-field="servicePhone" bindinput="handleInput" />
+      <view class="form-tip">支持手机号、带区号座机或以 + 开头的国际号码。</view>
     </view>
 
     <view class="form-item">
@@ -30,7 +85,13 @@
   </view>
 
   <view class="form-card ui-card">
-    <view class="section-title">首页展示</view>
+    <view class="section-heading">
+      <view>
+        <view class="section-eyebrow">HOMEPAGE</view>
+        <view class="section-heading-title">首页展示</view>
+      </view>
+      <view class="section-index">02</view>
+    </view>
 
     <view class="form-item">
       <view class="form-label">首页标题</view>
@@ -50,7 +111,13 @@
   </view>
 
   <view class="form-card ui-card">
-    <view class="section-title">内容页面</view>
+    <view class="section-heading">
+      <view>
+        <view class="section-eyebrow">CONTENT</view>
+        <view class="section-heading-title">内容页面</view>
+      </view>
+      <view class="section-index">03</view>
+    </view>
     <view class="form-item">
       <view class="form-label">常见问题</view>
       <textarea class="form-textarea form-textarea-lg ui-input" value="{{form.faqContent}}" data-field="faqContent" bindinput="handleInput" maxlength="1000" />
@@ -63,10 +130,28 @@
   </view>
 
   <view class="form-card ui-card">
-    <view class="section-title">预约说明</view>
+    <view class="section-heading">
+      <view>
+        <view class="section-eyebrow">RESERVATION</view>
+        <view class="section-heading-title">预约说明</view>
+      </view>
+      <view class="section-index">04</view>
+    </view>
     <view class="form-item">
       <view class="form-label">预约说明文案</view>
       <textarea class="form-textarea form-textarea-lg ui-input" value="{{form.bookingPrivacyTip}}" data-field="bookingPrivacyTip" bindinput="handleInput" maxlength="300" />
+    </view>
+    <view class="form-item">
+      <view class="form-label">预约状态订阅模板 ID</view>
+      <input
+        class="form-input ui-input"
+        value="{{form.bookingStatusTemplateId}}"
+        data-field="bookingStatusTemplateId"
+        bindinput="handleInput"
+        maxlength="128"
+        placeholder="留空时关闭状态订阅通知"
+      />
+      <view class="form-tip">模板需包含：车辆名称 thing1、预约状态 phrase2、服务说明 thing3、更新时间 time4。</view>
     </view>
   </view>
 
@@ -74,4 +159,5 @@
     <button class="action-btn ui-btn ui-btn-primary" loading="{{saving}}" disabled="{{loadFailed || !hasLoadedConfig}}" bindtap="handleSubmit">保存配置</button>
     <button class="action-btn ui-btn ui-btn-ghost action-btn-offset" disabled="{{loadFailed || !hasLoadedConfig}}" bindtap="handleReset">恢复默认</button>
   </view>
+  </block>
 </view>

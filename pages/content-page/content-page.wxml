@@ -1,9 +1,68 @@
 <view class="content-page">
+  <view class="page-glow"></view>
+
   <view class="hero-card ui-card ui-card-gradient">
-    <view class="hero-title">{{pageTitle}}</view>
+    <view class="hero-top">
+      <view>
+        <view class="hero-kicker">{{type === 'privacy' ? 'PRIVACY & DATA' : type === 'rules' ? 'SERVICE RULES' : 'HELP CENTER'}}</view>
+        <view class="hero-title">{{pageTitle}}</view>
+      </view>
+      <image class="hero-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+    </view>
+    <view class="hero-desc">{{heroDesc}}</view>
   </view>
 
   <view class="content-card ui-card">
-    <view class="content-text">{{content}}</view>
+    <view class="document-head">
+      <view class="document-mark"></view>
+      <view>
+        <view class="document-label">OFFICIAL DOCUMENT</view>
+        <view class="document-title">{{documentTitle}}</view>
+      </view>
+      <view class="document-count">{{sections.length ? sections.length + ' SECTIONS' : 'OFFICIAL'}}</view>
+    </view>
+    <view class="document-divider"></view>
+    <view wx:if="{{intro}}" class="document-intro">{{intro}}</view>
+    <view wx:if="{{sections.length}}" class="document-sections">
+      <view class="document-section" wx:for="{{sections}}" wx:key="key">
+        <view class="section-number">{{item.number}}</view>
+        <view class="section-copy">
+          <view class="section-title">{{item.title}}</view>
+          <view wx:if="{{item.body}}" class="section-body">{{item.body}}</view>
+        </view>
+      </view>
+    </view>
+    <view wx:else class="content-text">{{content}}</view>
+  </view>
+
+  <view wx:if="{{type === 'privacy'}}" class="rights-card ui-card">
+    <view class="rights-icon">申</view>
+    <view class="rights-copy">
+      <view class="rights-kicker">PRIVACY RIGHTS</view>
+      <view class="rights-title">行使您的个人信息权利</view>
+      <view class="rights-desc">在线提交查询、更正或删除申请，并随时查看处理进度与反馈。</view>
+    </view>
+    <button class="rights-button ui-btn ui-btn-primary" bindtap="handlePrivacyRequest">提交个人信息申请</button>
+  </view>
+
+  <view class="support-card ui-card">
+    <view class="support-heading">
+      <view>
+        <view class="support-kicker">NEED ASSISTANCE</view>
+        <view class="support-title">仍有疑问？</view>
+        <view class="support-desc">专属顾问将为您解答服务与信息相关问题</view>
+      </view>
+      <view class="support-mark">?</view>
+    </view>
+    <view class="support-actions">
+      <button class="support-button ui-btn ui-btn-primary" open-type="contact">在线客服</button>
+      <button class="support-button support-button-last ui-btn ui-btn-ghost" bindtap="handlePhoneCall">电话咨询</button>
+    </view>
+  </view>
+
+  <view class="document-footer">
+    <view class="footer-line"></view>
+    <view class="footer-text">EXTREME GARAGE · OFFICIAL</view>
+    <view class="footer-line"></view>
   </view>
 </view>

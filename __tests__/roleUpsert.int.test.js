@@ -1,9 +1,12 @@
 jest.mock("wx-server-sdk")
 
 function createMockDb({ rolesData }) {
-  const rolesAdd = jest.fn().mockResolvedValue({ _id: "new_role_id" })
   const rolesUpdate = jest.fn().mockResolvedValue({ stats: { updated: 1 } })
-  const rolesDoc = jest.fn(() => ({ update: rolesUpdate }))
+  const rolesSet = jest.fn().mockResolvedValue({ _id: "new_role_id" })
+  const rolesDoc = jest.fn(() => ({
+    update: rolesUpdate,
+    set: rolesSet
+  }))
   const rolesWhere = jest.fn((filter) => ({
     limit: jest.fn((limitValue) => ({
       get: jest.fn().mockResolvedValue({
@@ -19,7 +22,6 @@ function createMockDb({ rolesData }) {
       if (name === "roles") {
         return {
           where: rolesWhere,
-          add: rolesAdd,
           doc: rolesDoc
         }
       }
@@ -30,8 +32,8 @@ function createMockDb({ rolesData }) {
 
   return {
     db,
-    rolesAdd,
     rolesDoc,
+    rolesSet,
     rolesUpdate,
     rolesWhere,
     serverDateValue
@@ -76,7 +78,8 @@ describe("cloudfunctions/roleUpsert integration", () => {
       updated: false,
       message: "权限已创建"
     })
-    expect(mocks.rolesAdd).toHaveBeenCalledWith({
+    expect(mocks.rolesDoc).toHaveBeenCalledWith("role_ec29837e250492cf7ed652e81e9")
+    expect(mocks.rolesSet).toHaveBeenCalledWith({
       data: {
         openid: "ops_openid",
         role: "operator",
@@ -148,6 +151,66 @@ describe("cloudfunctions/roleUpsert integration", () => {
       ok: false,
       code: "FORBIDDEN",
       message: "不能修改管理员权限"
+    })
+  })
+
+  test("非法 OpenID 在写入数据库前被拒绝", async () => {
+    const mocks = createMockDb({
+      rolesData: [{ openid: "admin_openid", role: "admin" }]
+    })
+    const mod = await loadRoleUpsertWith({
+      openid: "admin_openid",
+      mockDb: mocks.db
+    })
+
+    const res = await mod.main({
+      openid: "错误 OpenID",
+      permissions: ["vehicle_manage"]
+    })
+
+    expect(res.code).toBe("VALIDATION_ERROR")
+    expect(res.message).toBe("OpenID 格式不正确")
+    expect(mocks.rolesSet).not.toHaveBeenCalled()
+    expect(mocks.rolesUpdate).not.toHaveBeenCalled()
+  })
+
+  test("重复角色记录会全部同步，避免旧权限继续生效", async () => {
+    const mocks = createMockDb({
+      rolesData: [
+        { openid: "admin_openid", role: "admin" },
+        { _id: "role_ops_1", openid: "ops_openid", role: "operator", permissions: ["vehicle_manage"] },
+        { _id: "role_ops_2", openid: "ops_openid", role: "operator", permissions: ["booking_manage"] }
+      ]
+    })
+
+    const mod = await loadRoleUpsertWith({
+      openid: "admin_openid",
+      mockDb: mocks.db
+    })
+
+    const res = await mod.main({
+      openid: "ops_openid",
+      permissions: []
+    })
+
+    expect(res.ok).toBe(true)
+    expect(res.updated).toBe(true)
+    expect(mocks.rolesDoc).toHaveBeenCalledWith("role_ops_1")
+    expect(mocks.rolesDoc).toHaveBeenCalledWith("role_ops_2")
+    expect(mocks.rolesUpdate).toHaveBeenCalledTimes(2)
+    expect(mocks.rolesUpdate).toHaveBeenNthCalledWith(1, {
+      data: expect.objectContaining({
+        openid: "ops_openid",
+        role: "member",
+        permissions: []
+      })
+    })
+    expect(mocks.rolesUpdate).toHaveBeenNthCalledWith(2, {
+      data: expect.objectContaining({
+        openid: "ops_openid",
+        role: "member",
+        permissions: []
+      })
     })
   })
 })

@@ -1,3 +1,5 @@
+@import "../../shared/management-shell.wxss";
+
 .manage-page {
   padding: 24rpx 24rpx 60rpx;
   box-sizing: border-box;
@@ -55,6 +57,53 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.workflow-filter {
+  margin-top: 12rpx;
+  padding-top: 16rpx;
+  border-top: 1rpx solid rgba(255, 255, 255, 0.055);
+}
+
+.workflow-filter-last {
+  margin-top: 4rpx;
+}
+
+.workflow-filter-label {
+  margin-bottom: 11rpx;
+  color: #778496;
+  font-size: 17rpx;
+}
+
+.workflow-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.workflow-chip {
+  margin: 0 11rpx 10rpx 0;
+  padding: 9rpx 14rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.07);
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.025);
+  color: #778394;
+  font-size: 17rpx;
+}
+
+.workflow-chip-active {
+  color: #dce6f4;
+}
+
+.workflow-chip-priority {
+  border-color: rgba(225, 151, 74, 0.24);
+  background: rgba(211, 132, 51, 0.09);
+  color: #dfa15f;
+}
+
+.workflow-chip-coordination {
+  border-color: rgba(86, 143, 232, 0.24);
+  background: rgba(71, 127, 214, 0.09);
+  color: #82acf0;
 }
 
 .actions {
@@ -281,6 +330,39 @@
   white-space: nowrap;
 }
 
+.booking-plan {
+  margin-top: 13rpx;
+}
+
+.booking-plan-pill {
+  display: inline-block;
+  margin-right: 10rpx;
+  padding: 7rpx 13rpx;
+  border-radius: 999rpx;
+  background: rgba(118, 132, 151, 0.1);
+  color: #929dab;
+  font-size: 15rpx;
+}
+
+.priority-priority {
+  background: rgba(223, 143, 57, 0.12);
+  color: #e5a05a;
+}
+
+.priority-standby {
+  color: #a1a9b4;
+}
+
+.coordination-coordinating {
+  background: rgba(76, 135, 224, 0.12);
+  color: #7faaf0;
+}
+
+.coordination-resolved {
+  background: rgba(61, 181, 127, 0.1);
+  color: #62d29c;
+}
+
 .booking-meta {
   margin-top: 16rpx;
   font-size: 22rpx;
@@ -289,9 +371,22 @@
   word-break: break-word;
 }
 
-.detail-btn {
+.quick-action-row {
+  display: flex;
   margin-top: 16rpx;
-  box-sizing: border-box;
+}
+
+.quick-action-btn {
+  flex: 1;
+  height: 76rpx;
+  margin-right: 12rpx;
+  border-radius: 16rpx;
+  font-size: 22rpx;
+  line-height: 76rpx;
+}
+
+.quick-action-btn-last {
+  margin-right: 0;
 }
 
 .booking-note {
@@ -427,4 +522,106 @@
   font-size: 22rpx;
   line-height: 1.5;
   color: rgba(255, 255, 255, 0.6);
+}
+
+.manage-page.management-page .header,
+.manage-page.management-page .filter-card,
+.manage-page.management-page .dashboard-card,
+.manage-page.management-page .booking-item,
+.manage-page.management-page .empty {
+  margin-bottom: 22rpx;
+  border-color: rgba(255, 255, 255, 0.075);
+  border-radius: 26rpx;
+}
+
+.manage-page.management-page .filter-card {
+  padding: 28rpx;
+  background: #15181d;
+}
+
+.manage-page.management-page .dashboard-card {
+  padding: 28rpx;
+  border-color: rgba(84, 136, 220, 0.14);
+  background: linear-gradient(145deg, #19202a, #14171c 75%);
+}
+
+.manage-page.management-page .dashboard-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.manage-page.management-page .keyword-input {
+  height: 82rpx;
+}
+
+.manage-page.management-page .status-chip {
+  min-height: 60rpx;
+  padding: 13rpx 20rpx;
+}
+
+.manage-page.management-page .summary-item,
+.manage-page.management-page .ratio-card,
+.manage-page.management-page .recent-block {
+  border: 1rpx solid rgba(255, 255, 255, 0.06);
+  border-radius: 19rpx;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.manage-page.management-page .summary-value {
+  color: #f5f7fa;
+}
+
+.manage-page.management-page .booking-item {
+  position: relative;
+  padding: 28rpx;
+  overflow: hidden;
+  background: linear-gradient(145deg, #181d24, #14171c 72%);
+  box-shadow: 0 20rpx 46rpx rgba(0, 0, 0, 0.2);
+}
+
+.manage-page.management-page .booking-item::before {
+  position: absolute;
+  top: 30rpx;
+  left: 0;
+  width: 5rpx;
+  height: 54rpx;
+  border-radius: 0 999rpx 999rpx 0;
+  background: #528fff;
+  content: "";
+}
+
+.manage-page.management-page .booking-name {
+  color: #f5f7fa;
+  font-size: 29rpx;
+}
+
+.manage-page.management-page .booking-meta {
+  padding: 18rpx 20rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.06);
+  border-radius: 18rpx;
+  background: rgba(255, 255, 255, 0.025);
+  color: #929ca9;
+}
+
+.manage-page.management-page .quick-action-btn {
+  height: 76rpx;
+  border-radius: 17rpx;
+  line-height: 76rpx;
+}
+
+.manage-page.management-page .remark-card {
+  border-color: rgba(255, 255, 255, 0.065);
+  border-radius: 19rpx;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.manage-page.management-page .remark-input {
+  border: 1rpx solid rgba(255, 255, 255, 0.075);
+  background: #101318;
+}
+
+.manage-page.management-page .op-btn {
+  border-radius: 16rpx;
+  background: #111419;
 }

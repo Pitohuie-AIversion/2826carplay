@@ -1,3 +1,5 @@
+@import "../../shared/management-shell.wxss";
+
 .error-page {
   padding: 24rpx 24rpx 60rpx;
   box-sizing: border-box;
@@ -56,11 +58,45 @@
 }
 
 .actions {
+  display: flex;
+  gap: 14rpx;
   margin-top: 14rpx;
 }
 
 .action-btn {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
+}
+
+.export-actions {
+  margin-top: 18rpx;
+  padding: 18rpx;
+  border: 1rpx solid rgba(198, 79, 93, 0.16);
+  border-radius: 16rpx;
+  background: rgba(198, 79, 93, 0.05);
+}
+
+.export-tip {
+  overflow: hidden;
+  color: #91878b;
+  font-size: 19rpx;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.export-buttons {
+  display: flex;
+  gap: 12rpx;
+  margin-top: 14rpx;
+}
+
+.export-button {
+  flex: 1;
+  min-width: 0;
+  height: 68rpx;
+  border-radius: 15rpx;
+  font-size: 19rpx;
+  line-height: 68rpx;
 }
 
 .result-count {
@@ -161,3 +197,101 @@
   color: rgba(255, 255, 255, 0.72);
 }
 
+.error-page.management-page .error-glow {
+  background: rgba(174, 55, 70, 0.09);
+}
+
+.error-page.management-page .header,
+.error-page.management-page .filter-card,
+.error-page.management-page .log-item,
+.error-page.management-page .empty {
+  margin-bottom: 20rpx;
+  border-color: rgba(255, 255, 255, 0.075);
+  border-radius: 26rpx;
+}
+
+.error-page.management-page .header {
+  border-color: rgba(196, 75, 90, 0.14);
+}
+
+.error-page.management-page .filter-card {
+  padding: 28rpx;
+  background: #15181d;
+}
+
+.error-page.management-page .keyword-input {
+  height: 82rpx;
+}
+
+.error-page.management-page .func-chip {
+  min-height: 60rpx;
+  padding: 13rpx 21rpx;
+}
+
+.error-page.management-page .action-btn {
+  height: 82rpx;
+  border-radius: 18rpx;
+  line-height: 82rpx;
+}
+
+.error-page.management-page .log-item {
+  position: relative;
+  padding: 26rpx;
+  overflow: hidden;
+  border-color: rgba(199, 73, 88, 0.11);
+  background: linear-gradient(145deg, #1c1b20, #14171c 74%);
+}
+
+.error-page.management-page .log-item::before {
+  position: absolute;
+  top: 26rpx;
+  left: 0;
+  width: 5rpx;
+  height: 50rpx;
+  border-radius: 0 999rpx 999rpx 0;
+  background: #c64f5d;
+  content: "";
+}
+
+.error-page.management-page .log-func {
+  color: #f0e9eb;
+  font-size: 25rpx;
+}
+
+.error-page.management-page .log-time {
+  color: #72686c;
+  font-size: 19rpx;
+}
+
+.error-page.management-page .log-message {
+  padding: 16rpx 18rpx;
+  border-left: 3rpx solid rgba(198, 79, 93, 0.58);
+  border-radius: 0 14rpx 14rpx 0;
+  background: rgba(198, 79, 93, 0.055);
+  color: #c9b7bb;
+  font-size: 21rpx;
+}
+
+.error-page.management-page .log-summary {
+  color: #91878b;
+  font-size: 20rpx;
+}
+
+.error-page.management-page .copy-btn {
+  height: 76rpx;
+  border-color: rgba(198, 79, 93, 0.18);
+  border-radius: 17rpx;
+  line-height: 76rpx;
+}
+
+.error-page.management-page .log-func {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.error-page.management-page .log-skeleton-card {
+  border-color: rgba(199, 73, 88, 0.1);
+  background: linear-gradient(145deg, #1c1b20, #14171c 74%);
+}

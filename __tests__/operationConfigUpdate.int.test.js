@@ -75,12 +75,14 @@ describe("cloudfunctions/operationConfigUpdate integration", () => {
     const res = await mod.main({
       config: {
         brandName: "超跑车库",
-        servicePhone: "18800000000"
+        servicePhone: "18800000000",
+        cityOptions: ["杭州", "杭州", "上海"]
       }
     })
 
     expect(res.ok).toBe(true)
     expect(res.config.brandName).toBe("超跑车库")
+    expect(res.config.cityOptions).toEqual(["杭州", "上海"])
     expect(mocks.configAdd).toHaveBeenCalled()
   })
 
@@ -134,5 +136,49 @@ describe("cloudfunctions/operationConfigUpdate integration", () => {
       code: "FORBIDDEN",
       message: "权限不足"
     })
+  })
+
+  test("非法客服电话在写入前被拒绝", async () => {
+    const mocks = createMockDb({
+      rolesData: [{ openid: "admin_openid", role: "admin" }],
+      configData: []
+    })
+    const mod = await loadOperationConfigUpdateWith({
+      openid: "admin_openid",
+      mockDb: mocks.db
+    })
+
+    const res = await mod.main({
+      config: {
+        servicePhone: "请联系客服"
+      }
+    })
+
+    expect(res.code).toBe("VALIDATION_ERROR")
+    expect(res.message).toBe("客服电话格式不正确")
+    expect(mocks.configAdd).not.toHaveBeenCalled()
+    expect(mocks.configUpdate).not.toHaveBeenCalled()
+  })
+
+  test("非法订阅模板 ID 在写入前被拒绝", async () => {
+    const mocks = createMockDb({
+      rolesData: [{ openid: "admin_openid", role: "admin" }],
+      configData: []
+    })
+    const mod = await loadOperationConfigUpdateWith({
+      openid: "admin_openid",
+      mockDb: mocks.db
+    })
+
+    const res = await mod.main({
+      config: {
+        servicePhone: "18800000000",
+        bookingStatusTemplateId: "bad id"
+      }
+    })
+
+    expect(res.code).toBe("VALIDATION_ERROR")
+    expect(res.message).toBe("订阅消息模板 ID 格式不正确")
+    expect(mocks.configAdd).not.toHaveBeenCalled()
   })
 })

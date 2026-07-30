@@ -1,4 +1,12 @@
 const { requirePagePermission } = require("../../shared/pageAuth")
+const {
+  canShareCsvFile,
+  getErrorMessage,
+  openCsvFile,
+  removeCsvFile,
+  saveCsvFile,
+  shareCsvFile
+} = require("../../shared/csvFile")
 
 const ACTION_OPTIONS = [
   { value: "all", label: "全部" },
@@ -16,8 +24,28 @@ const ACTION_OPTIONS = [
   { value: "bookingCancel", label: "预约取消" },
   { value: "bookingExportCsv", label: "预约导出" },
   { value: "bookingUpdateStatus", label: "预约状态" },
-  { value: "bookingUpdateAdminRemark", label: "预约备注" }
+  { value: "bookingUpdateAdminRemark", label: "预约备注" },
+  { value: "bookingUpdateCoordination", label: "档期协调" },
+  { value: "bookingUpdateMyContact", label: "用户修改联系信息" },
+  { value: "privacyRequestCreate", label: "隐私申请" },
+  { value: "privacyRequestCancel", label: "隐私撤回" },
+  { value: "privacyRequestUpdateStatus", label: "隐私处理" },
+  { value: "privacyRequestDataInventory", label: "隐私数据核验" },
+  { value: "logExportCsv", label: "日志导出" },
+  { value: "analyticsCleanup", label: "匿名数据清理" }
 ]
+
+const PRIORITY_LABEL_MAP = {
+  priority: "优先",
+  normal: "常规",
+  standby: "候补"
+}
+
+const COORDINATION_LABEL_MAP = {
+  pending: "待协调",
+  coordinating: "协调中",
+  resolved: "已协调"
+}
 
 function formatDisplayTime(value) {
   if (!value) {
@@ -83,8 +111,16 @@ function buildSummary(item) {
     return `预约：${item.bookingId || "--"}\n备注长度：${item.remarkLength || 0}`
   }
 
+  if (action === "bookingUpdateCoordination") {
+    return `预约：${item.bookingId || "--"}\n优先级：${PRIORITY_LABEL_MAP[item.fromPriority] || "--"} → ${PRIORITY_LABEL_MAP[item.toPriority] || "--"}\n协调状态：${COORDINATION_LABEL_MAP[item.fromCoordinationStatus] || "--"} → ${COORDINATION_LABEL_MAP[item.toCoordinationStatus] || "--"}`
+  }
+
+  if (action === "bookingUpdateMyContact") {
+    return `预约：${item.bookingId || "--"}\n变更字段：${Array.isArray(item.changedKeys) ? item.changedKeys.join(", ") : "--"}`
+  }
+
   if (action === "bookingExportCsv") {
-    return `状态：${item.status || "--"}\n导出条数：${item.total || 0}`
+    return `预约状态：${item.status || "全部"}\n优先级：${PRIORITY_LABEL_MAP[item.schedulePriority] || "全部"}\n协调进度：${COORDINATION_LABEL_MAP[item.coordinationStatus] || "全部"}\n导出条数：${item.total || 0}`
   }
 
   if (action === "vehicleDelete") {
@@ -95,12 +131,38 @@ function buildSummary(item) {
     return `车辆：${item.vehicleId || "--"}\n操作：${item.imageAction || "--"}`
   }
 
+  if (action === "privacyRequestCreate") {
+    return `申请：${item.requestId || "--"}\n类型：${item.requestType || "--"}`
+  }
+
+  if (action === "privacyRequestCancel") {
+    return `申请：${item.requestId || "--"}\n类型：${item.requestType || "--"}\n状态：${item.fromStatus || "--"} → ${item.toStatus || "--"}`
+  }
+
+  if (action === "privacyRequestUpdateStatus") {
+    return `申请：${item.requestId || "--"}\n类型：${item.requestType || "--"}\n状态：${item.fromStatus || "--"} → ${item.toStatus || "--"}`
+  }
+
+  if (action === "privacyRequestDataInventory") {
+    return `申请：${item.requestId || "--"}\n类型：${item.requestType || "--"}\n预约：${item.bookingCount || 0}\n收藏：${item.favoriteCount || 0}\n隐私申请：${item.privacyRequestCount || 0}\n结果：${item.partial ? "部分可用" : "完整"}`
+  }
+
+  if (action === "analyticsCleanup") {
+    return `保留周期：${item.retentionDays || 90} 天\n处理：${item.processed || 0}\n删除：${item.deleted || 0}\n失败：${item.failed || 0}`
+  }
+
+  if (action === "logExportCsv") {
+    return `日志类型：${item.logType === "error" ? "错误日志" : "审计日志"}\n筛选：${item.filter || "全部"}\n导出：${item.total || 0} / ${item.matchedTotal || 0}\n结果：${item.truncated ? "已截断" : "完整"}`
+  }
+
   return ""
 }
 
 Page({
   data: {
+    initialLoading: true,
     loading: false,
+    exporting: false,
     pageAuthorized: false,
     keyword: "",
     currentAction: "all",
@@ -109,12 +171,19 @@ Page({
     pageSize: 20,
     hasMore: false,
     total: 0,
+    truncated: false,
     list: [],
+    exportFilePath: "",
+    exportFileName: "",
+    canShareExport: true,
     emptyTitle: "暂无审计日志",
     emptyDesc: "可在此查看权限分配与运营配置变更等关键操作记录"
   },
 
   onLoad() {
+    this.setData({
+      canShareExport: canShareCsvFile()
+    })
     requirePagePermission(this, {
       required: "canViewAuditLogs",
       noPermissionMessage: "无权访问审计日志",
@@ -159,6 +228,143 @@ Page({
     this.fetchList({ append: true })
   },
 
+  handleExport() {
+    if (this.data.loading || this.data.exporting) {
+      return
+    }
+    if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
+      wx.showToast({
+        title: "云能力未初始化",
+        icon: "none"
+      })
+      return
+    }
+
+    const filter = this.data.currentAction === "all" ? "" : this.data.currentAction
+    this.setData({
+      exporting: true
+    })
+    wx.cloud.callFunction({
+      name: "logExportCsv",
+      data: {
+        logType: "audit",
+        filter,
+        keyword: this.data.keyword,
+        limit: 500
+      },
+      success: (res) => {
+        const result = res && res.result ? res.result : null
+        if (!result || !result.ok || !result.csvText) {
+          wx.showToast({
+            title: (result && result.message) || "导出失败",
+            icon: "none"
+          })
+          this.setData({ exporting: false })
+          return
+        }
+
+        saveCsvFile({
+          fileName: result.fileName,
+          fallbackFileName: "audit-logs.csv",
+          csvText: result.csvText
+        })
+          .then(({ filePath, fileName }) => {
+            const previousFilePath = this.data.exportFilePath
+            this.setData({
+              exporting: false,
+              exportFilePath: filePath,
+              exportFileName: fileName
+            })
+            if (previousFilePath && previousFilePath !== filePath) {
+              removeCsvFile(previousFilePath).catch(() => {})
+            }
+            if (result.truncated) {
+              wx.showModal({
+                title: "CSV 已生成",
+                content: result.sourceTruncated
+                  ? `已导出最近扫描结果中的 ${result.total || 0} 条，日志超过 2000 条扫描上限，请缩小筛选范围后分批归档。`
+                  : `符合条件 ${result.matchedTotal || 0} 条，本次已导出 ${result.total || 0} 条，请分批归档。`,
+                showCancel: false
+              })
+            } else {
+              wx.showToast({
+                title: "CSV 已生成",
+                icon: "none"
+              })
+            }
+          })
+          .catch((error) => {
+            wx.showToast({
+              title: getErrorMessage(error) || "保存失败",
+              icon: "none"
+            })
+            this.setData({ exporting: false })
+          })
+      },
+      fail: (error) => {
+        wx.showToast({
+          title: getErrorMessage(error) || "导出失败",
+          icon: "none"
+        })
+        this.setData({ exporting: false })
+      }
+    })
+  },
+
+  handleShareExportedFile() {
+    if (!this.data.exportFilePath || !this.data.exportFileName) {
+      return
+    }
+    shareCsvFile(this.data.exportFilePath, this.data.exportFileName).catch(() => {
+      this.handleOpenExportedFile()
+    })
+  },
+
+  handleOpenExportedFile() {
+    if (!this.data.exportFilePath) {
+      return
+    }
+    openCsvFile(this.data.exportFilePath).catch(() => {
+      wx.showToast({
+        title: "文件已生成",
+        icon: "none"
+      })
+    })
+  },
+
+  handleDeleteExportedFile() {
+    const filePath = String(this.data.exportFilePath || "")
+    if (!filePath) {
+      return
+    }
+    wx.showModal({
+      title: "删除本地 CSV",
+      content: "将从当前设备删除这份导出文件，删除后无法恢复。云端审计日志不会受到影响。",
+      success: (res) => {
+        if (!res.confirm) {
+          return
+        }
+        removeCsvFile(filePath)
+          .then(() => {
+            this.setData({
+              exportFilePath: "",
+              exportFileName: ""
+            })
+            wx.showToast({
+              title: "本地文件已删除",
+              icon: "none"
+            })
+          })
+          .catch((error) => {
+            wx.showToast({
+              title: getErrorMessage(error) || "删除失败",
+              icon: "none"
+            })
+          })
+      }
+    })
+  },
+
   fetchList(input) {
     const done = typeof input === "function" ? input : input && input.done
     const append = Boolean(input && typeof input === "object" && input.append)
@@ -167,6 +373,7 @@ Page({
 
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       this.setData({
+        initialLoading: false,
         loading: false,
         list: []
       })
@@ -196,10 +403,12 @@ Page({
             icon: "none"
           })
           this.setData({
+            initialLoading: false,
             loading: false,
             list: append ? this.data.list : [],
             hasMore: false,
             total: 0,
+            truncated: false,
             page: 0
           })
           if (typeof done === "function") {
@@ -217,10 +426,12 @@ Page({
           : []
 
         this.setData({
+          initialLoading: false,
           loading: false,
           page: Number.isInteger(result.page) ? result.page : nextPage,
           hasMore: Boolean(result.hasMore),
           total: result.total || 0,
+          truncated: Boolean(result.truncated),
           list: append ? this.data.list.concat(list) : list
         })
         if (typeof done === "function") {
@@ -233,6 +444,7 @@ Page({
           icon: "none"
         })
         this.setData({
+          initialLoading: false,
           loading: false
         })
         if (typeof done === "function") {

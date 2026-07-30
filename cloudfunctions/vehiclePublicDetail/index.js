@@ -107,6 +107,23 @@ function getBrand(brandModel) {
   return value.split(/\s+/)[0] || value
 }
 
+function maskPlateNumber(plateNumber) {
+  const value = String(plateNumber || "").trim()
+  if (!value) {
+    return ""
+  }
+
+  if (value.length <= 3) {
+    return "***"
+  }
+
+  if (value.length === 4) {
+    return `${value.slice(0, 1)}**${value.slice(-1)}`
+  }
+
+  return `${value.slice(0, 2)}${"*".repeat(value.length - 4)}${value.slice(-2)}`
+}
+
 function inferCategory(vehicleType, brandModel, fuelType) {
   const upperBrandModel = String(brandModel || "").trim().toUpperCase()
   const normalizedFuelType = String(fuelType || "").trim().toLowerCase()
@@ -140,7 +157,7 @@ function inferCategory(vehicleType, brandModel, fuelType) {
 
 function buildNickname(plateNumber, vehicleTypeText) {
   if (plateNumber) {
-    const suffix = plateNumber.slice(-4)
+    const suffix = plateNumber.slice(-2)
     if (suffix) {
       return `车牌尾号 ${suffix}`
     }
@@ -169,7 +186,7 @@ function buildTags(vehicle, vehicleTypeText) {
   }
 
   if (vehicle && vehicle.plateNumber) {
-    tags.push(String(vehicle.plateNumber).trim())
+    tags.push(maskPlateNumber(vehicle.plateNumber))
   }
 
   if (vehicle && vehicle.transmission) {
@@ -199,15 +216,16 @@ function mapVehicle(vehicle) {
   const cover = images[0] || ""
   const brandModel = String((vehicle && vehicle.brandModel) || "").trim()
   const plateNumber = String((vehicle && vehicle.plateNumber) || "").trim()
-  const note = String((vehicle && vehicle.note) || "").trim()
-  const coverPlaceholderText = brandModel || plateNumber || vehicleTypeText
+  const maskedPlateNumber = maskPlateNumber(plateNumber)
+  const publicDescription = String((vehicle && vehicle.publicDescription) || "").trim()
+  const coverPlaceholderText = brandModel || maskedPlateNumber || vehicleTypeText
   const seats = Number.isInteger(vehicle && vehicle.seats) ? vehicle.seats : ""
   const priceDay = Number.isInteger(vehicle && vehicle.priceDay) ? vehicle.priceDay : 0
   const fuelType = String((vehicle && vehicle.fuelType) || "").trim() || "unknown"
 
   return {
     id: String((vehicle && vehicle._id) || (vehicle && vehicle.id) || "").trim(),
-    name: brandModel || plateNumber || "未命名车辆",
+    name: brandModel || maskedPlateNumber || "未命名车辆",
     nickname: buildNickname(plateNumber, vehicleTypeText),
     brand: getBrand(brandModel),
     category: inferCategory(vehicleType, brandModel, fuelType),
@@ -225,7 +243,9 @@ function mapVehicle(vehicle) {
     images,
     hasImages: images.length > 0,
     coverPlaceholderText,
-    description: note || `${brandModel || plateNumber || "该车"}支持到店咨询与预约服务。`,
+    description:
+      publicDescription ||
+      `${brandModel || maskedPlateNumber || "该车"}支持到店咨询与预约服务。`,
     sort: new Date(formatTime(vehicle && (vehicle.updatedAt || vehicle.createdAt)) || 0).getTime() || 0,
     registerDate: String((vehicle && vehicle.registerDate) || "").trim(),
     updatedAt: formatTime(vehicle && vehicle.updatedAt),

@@ -6,9 +6,9 @@ function createMockDb({ currentData, updateResult }) {
   const auditAdd = jest.fn().mockResolvedValue({ _id: "audit_1" })
 
   const bookingsDoc = jest.fn(() => ({
-    get: currentGet,
-    update
+    get: currentGet
   }))
+  const bookingsWhere = jest.fn(() => ({ update }))
 
   const serverDateValue = { __type: "serverDate" }
   const serverDate = jest.fn(() => serverDateValue)
@@ -16,7 +16,10 @@ function createMockDb({ currentData, updateResult }) {
   const db = {
     collection: jest.fn((name) => {
       if (name === "bookings") {
-        return { doc: bookingsDoc }
+        return {
+          doc: bookingsDoc,
+          where: bookingsWhere
+        }
       }
       if (name === "audit_logs") {
         return { add: auditAdd }
@@ -29,6 +32,7 @@ function createMockDb({ currentData, updateResult }) {
   return {
     db,
     bookingsDoc,
+    bookingsWhere,
     currentGet,
     update,
     auditAdd,
@@ -72,6 +76,11 @@ describe("cloudfunctions/bookingCancel integration", () => {
       message: "预约已取消"
     })
     expect(mocks.bookingsDoc).toHaveBeenCalledWith("booking_1")
+    expect(mocks.bookingsWhere).toHaveBeenCalledWith({
+      _id: "booking_1",
+      openid: "user_openid",
+      status: "pending"
+    })
     expect(mocks.update).toHaveBeenCalledWith({
       data: {
         status: "cancelled",
@@ -128,5 +137,30 @@ describe("cloudfunctions/bookingCancel integration", () => {
       message: "只能取消自己的预约"
     })
     expect(mocks.update).not.toHaveBeenCalled()
+  })
+
+  test("后台并发更新状态后取消请求不会覆盖新状态", async () => {
+    const mocks = createMockDb({
+      currentData: {
+        _id: "booking_1",
+        openid: "user_openid",
+        status: "contacted"
+      },
+      updateResult: { stats: { updated: 0 } }
+    })
+
+    const bookingCancel = await loadBookingCancelWith({ openid: "user_openid", mockDb: mocks.db })
+    const res = await bookingCancel.main({ id: "booking_1" })
+
+    expect(res).toEqual({
+      ok: false,
+      code: "STATUS_CONFLICT",
+      message: "预约状态已发生变化，请刷新后重试"
+    })
+    expect(mocks.bookingsWhere).toHaveBeenCalledWith({
+      _id: "booking_1",
+      openid: "user_openid",
+      status: "contacted"
+    })
   })
 })

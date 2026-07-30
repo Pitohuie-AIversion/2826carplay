@@ -66,6 +66,7 @@ describe("cloudfunctions/operationConfigGet integration", () => {
       cityOptions: ["杭州", "上海"],
       faqContent: expect.any(String),
       rulesContent: expect.any(String),
+      bookingStatusTemplateId: "",
       bookingPrivacyTip: "仅用于本次预约沟通。"
     })
   })

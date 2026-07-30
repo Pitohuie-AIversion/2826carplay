@@ -1,11 +1,35 @@
-<view class="vehicle-detail-page">
+<view class="vehicle-detail-page management-page">
+  <view class="page-glow"></view>
   <view class="hero-card ui-card ui-card-gradient">
-    <view class="hero-title">车辆详情管理</view>
-    <view class="hero-desc">查看车辆完整信息，并从详情页继续编辑。</view>
+    <view class="hero-top">
+      <view class="hero-copy">
+        <view class="page-kicker">FLEET PROFILE</view>
+        <view class="hero-title">车辆详情管理</view>
+        <view class="hero-desc">查看车辆档案、状态与图片素材</view>
+      </view>
+      <image class="hero-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+    </view>
   </view>
 
   <view class="loading-card ui-card" wx:if="{{loading}}">
-    <view class="loading-text">车辆详情加载中...</view>
+    <view class="vehicle-detail-skeleton-head">
+      <view>
+        <view class="vehicle-detail-skeleton-plate manage-skeleton-pulse"></view>
+        <view class="vehicle-detail-skeleton-model manage-skeleton-pulse"></view>
+      </view>
+      <view class="vehicle-detail-skeleton-status manage-skeleton-pulse"></view>
+    </view>
+    <view class="vehicle-detail-skeleton-divider"></view>
+    <view class="vehicle-detail-skeleton-grid">
+      <view class="vehicle-detail-skeleton-item manage-skeleton-pulse"></view>
+      <view class="vehicle-detail-skeleton-item manage-skeleton-pulse"></view>
+      <view class="vehicle-detail-skeleton-item manage-skeleton-pulse"></view>
+      <view class="vehicle-detail-skeleton-item manage-skeleton-pulse"></view>
+    </view>
+    <view class="vehicle-detail-skeleton-actions">
+      <view class="vehicle-detail-skeleton-button manage-skeleton-pulse"></view>
+      <view class="vehicle-detail-skeleton-button manage-skeleton-pulse"></view>
+    </view>
   </view>
 
   <view wx:elif="{{detail}}" class="detail-wrap">
@@ -131,7 +155,12 @@
     </view>
 
     <view class="section-card ui-card">
-      <view class="section-title">备注信息</view>
+      <view class="section-title">公开说明</view>
+      <view class="note-box">{{detail.publicDescriptionText}}</view>
+    </view>
+
+    <view class="section-card ui-card">
+      <view class="section-title">内部备注</view>
       <view class="note-box">{{detail.noteText}}</view>
     </view>
 
@@ -148,7 +177,7 @@
 
       <view wx:if="{{detail.imageItems.length}}" class="image-list">
         <view wx:for="{{detail.imageItems}}" wx:key="fileId" class="image-card">
-          <image class="vehicle-image" src="{{item.fileId}}" mode="aspectFill" bindtap="handlePreviewImage" data-file-id="{{item.fileId}}" />
+          <image class="vehicle-image" src="{{item.fileId}}" mode="aspectFill" lazy-load="{{true}}" fade-in="{{true}}" bindtap="handlePreviewImage" data-file-id="{{item.fileId}}" />
           <view class="image-badge" wx:if="{{item.isCover}}">封面</view>
           <view class="image-action-row">
             <button
@@ -178,7 +207,11 @@
     </view>
   </view>
 
-  <view class="loading-card ui-card" wx:else>
-    <view class="loading-text">暂无车辆详情</view>
+  <view class="loading-card vehicle-detail-empty-card ui-card" wx:else>
+    <image class="vehicle-detail-empty-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+    <view class="vehicle-detail-empty-kicker">FLEET PROFILE</view>
+    <view class="vehicle-detail-empty-title">暂无车辆详情</view>
+    <view class="vehicle-detail-empty-desc">车辆可能已删除，或当前账号无法读取该车辆档案</view>
+    <button class="vehicle-detail-empty-button ui-btn ui-btn-primary" bindtap="handleBackList">返回车辆列表</button>
   </view>
 </view>

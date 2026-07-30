@@ -1,0 +1,380 @@
+@import "../../shared/management-shell.wxss";
+
+.calendar-page {
+  min-height: 100vh;
+  padding: 24rpx 24rpx 70rpx;
+  background: linear-gradient(180deg, #151d29 0%, #0b0d10 540rpx);
+  box-sizing: border-box;
+  color: #eef2f7;
+}
+
+.hero-card,
+.calendar-card,
+.day-card,
+.state-card {
+  margin-bottom: 22rpx;
+  padding: 28rpx;
+}
+
+.hero-top,
+.month-switcher,
+.section-heading,
+.booking-item,
+.booking-side {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.page-kicker,
+.month-kicker,
+.section-eyebrow {
+  color: #6e83a1;
+  font-size: 15rpx;
+  font-weight: 650;
+  letter-spacing: 2.5rpx;
+}
+
+.hero-title {
+  margin-top: 7rpx;
+  font-size: 38rpx;
+  font-weight: 700;
+}
+
+.hero-desc {
+  margin-top: 10rpx;
+  color: #8996a6;
+  font-size: 21rpx;
+}
+
+.hero-emblem {
+  width: 80rpx;
+  height: 80rpx;
+  border: 1rpx solid rgba(105, 155, 236, 0.25);
+  border-radius: 50%;
+}
+
+.summary-grid {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 22rpx;
+}
+
+.conflict-overview,
+.day-conflict-tip {
+  display: flex;
+  align-items: center;
+  margin: -5rpx 0 22rpx;
+  padding: 18rpx 21rpx;
+  border: 1rpx solid rgba(235, 157, 75, 0.22);
+  border-radius: 18rpx;
+  background: rgba(213, 127, 38, 0.08);
+  color: #dca05f;
+  font-size: 17rpx;
+  line-height: 1.55;
+}
+
+.conflict-overview-mark {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 34rpx;
+  height: 34rpx;
+  margin-right: 13rpx;
+  border: 1rpx solid rgba(237, 166, 91, 0.36);
+  border-radius: 50%;
+  font-weight: 700;
+}
+
+.summary-card {
+  width: calc(33.333% - 9rpx);
+  padding: 22rpx 10rpx;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.summary-value {
+  color: #e9edf4;
+  font-size: 34rpx;
+  font-weight: 700;
+}
+
+.summary-warning { color: #efb168; }
+.summary-primary { color: #82b0fa; }
+
+.summary-label {
+  margin-top: 8rpx;
+  color: #788493;
+  font-size: 17rpx;
+}
+
+.month-switcher {
+  text-align: center;
+}
+
+.month-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 58rpx;
+  height: 58rpx;
+  border: 1rpx solid rgba(100, 153, 239, 0.18);
+  border-radius: 50%;
+  color: #86b1f4;
+  font-size: 38rpx;
+}
+
+.month-title {
+  margin-top: 5rpx;
+  font-size: 27rpx;
+  font-weight: 650;
+}
+
+.weekday-row,
+.date-grid {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.weekday-row {
+  margin-top: 25rpx;
+  padding-bottom: 12rpx;
+  border-bottom: 1rpx solid rgba(255, 255, 255, 0.06);
+}
+
+.weekday-item,
+.date-cell {
+  width: 14.2857%;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.weekday-item {
+  color: #667489;
+  font-size: 16rpx;
+}
+
+.date-cell {
+  position: relative;
+  height: 74rpx;
+  margin-top: 10rpx;
+  padding-top: 12rpx;
+  border: 1rpx solid transparent;
+  border-radius: 16rpx;
+}
+
+.date-cell-selected {
+  border-color: rgba(102, 161, 255, 0.34);
+  background: rgba(84, 143, 255, 0.11);
+}
+
+.date-cell-conflict {
+  border-color: rgba(235, 155, 74, 0.38);
+  background: rgba(209, 123, 36, 0.09);
+}
+
+.date-cell-today .date-number {
+  color: #8bb8ff;
+  font-weight: 700;
+}
+
+.date-number {
+  color: #a9b2bf;
+  font-size: 19rpx;
+}
+
+.date-count {
+  position: absolute;
+  right: 5rpx;
+  top: 5rpx;
+  min-width: 25rpx;
+  height: 25rpx;
+  padding: 0 5rpx;
+  border-radius: 999rpx;
+  background: rgba(83, 140, 233, 0.2);
+  color: #8cb7fb;
+  font-size: 13rpx;
+  line-height: 25rpx;
+  box-sizing: border-box;
+}
+
+.pending-dot {
+  width: 7rpx;
+  height: 7rpx;
+  margin: 7rpx auto 0;
+  border-radius: 50%;
+  background: #ecaa5d;
+}
+
+.calendar-legend {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 18rpx;
+  color: #6f7c8c;
+  font-size: 15rpx;
+}
+
+.calendar-legend view {
+  margin-left: 22rpx;
+}
+
+.legend-dot {
+  display: inline-block;
+  width: 9rpx;
+  height: 9rpx;
+  margin-right: 8rpx;
+  border-radius: 50%;
+}
+
+.legend-booking { background: #6ca1f5; }
+.legend-pending { background: #ecaa5d; }
+.legend-conflict { background: #dc6f55; }
+
+.section-title {
+  margin-top: 5rpx;
+  font-size: 25rpx;
+  font-weight: 650;
+}
+
+.section-index {
+  color: #58687f;
+  font-size: 16rpx;
+}
+
+.booking-list {
+  margin-top: 18rpx;
+}
+
+.day-conflict-tip {
+  margin: 18rpx 0 0;
+}
+
+.booking-item {
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid rgba(255, 255, 255, 0.06);
+}
+
+.booking-item-conflict {
+  margin: 0 -14rpx;
+  padding: 20rpx 14rpx;
+  border: 1rpx solid rgba(220, 111, 85, 0.2);
+  border-radius: 16rpx;
+  background: rgba(220, 111, 85, 0.055);
+}
+
+.booking-vehicle-row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.booking-conflict-chip {
+  flex: 0 0 auto;
+  margin-left: 12rpx;
+  padding: 4rpx 9rpx;
+  border: 1rpx solid rgba(220, 111, 85, 0.28);
+  border-radius: 999rpx;
+  background: rgba(220, 111, 85, 0.1);
+  color: #e08b77;
+  font-size: 14rpx;
+}
+
+.booking-item:last-child {
+  border-bottom: 0;
+}
+
+.booking-item.booking-item-conflict:last-child {
+  border-bottom: 1rpx solid rgba(220, 111, 85, 0.2);
+}
+
+.booking-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.booking-vehicle {
+  overflow: hidden;
+  font-size: 21rpx;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.booking-meta,
+.booking-range {
+  margin-top: 6rpx;
+  color: #778392;
+  font-size: 16rpx;
+}
+
+.booking-side {
+  margin-left: 16rpx;
+}
+
+.status-pill {
+  padding: 8rpx 13rpx;
+  border-radius: 999rpx;
+  background: rgba(83, 143, 239, 0.1);
+  color: #82aef3;
+  font-size: 15rpx;
+}
+
+.status-pending {
+  background: rgba(237, 170, 87, 0.1);
+  color: #edaf67;
+}
+
+.status-completed {
+  background: rgba(82, 210, 151, 0.1);
+  color: #5bd7a0;
+}
+
+.booking-arrow {
+  margin-left: 12rpx;
+  color: #5f718a;
+  font-size: 30rpx;
+}
+
+.state-card,
+.inline-empty,
+.scope-tip,
+.mode-tip {
+  color: #7d8998;
+  font-size: 18rpx;
+  line-height: 1.65;
+  text-align: center;
+}
+
+.state-title {
+  color: #e9edf3;
+  font-size: 23rpx;
+  font-weight: 600;
+}
+
+.state-desc {
+  margin-top: 8rpx;
+}
+
+.retry-button {
+  width: 220rpx;
+  height: 70rpx;
+  margin-top: 22rpx;
+  border-radius: 17rpx;
+  font-size: 20rpx;
+  line-height: 70rpx;
+}
+
+.inline-empty {
+  padding: 38rpx 0 12rpx;
+}
+
+.scope-tip,
+.mode-tip {
+  margin-top: 15rpx;
+  padding: 17rpx 22rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.06);
+  border-radius: 17rpx;
+  background: rgba(255, 255, 255, 0.025);
+  font-size: 16rpx;
+}

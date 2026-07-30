@@ -5,6 +5,8 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
 const DEFAULT_PAGE_SIZE = 20
 const MAX_PAGE_SIZE = 50
+const LOG_BATCH_SIZE = 100
+const MAX_LOG_RECORDS = 2000
 
 function normalizeText(value, maxLen) {
   const text = String(value || "").trim()
@@ -94,7 +96,10 @@ function toSearchText(item) {
     item.targetOpenid,
     item.vehicleId,
     item.bookingId,
+    item.requestId,
+    item.requestType,
     item.imageAction,
+    item.cutoffDate,
     item.changedKeys ? item.changedKeys.join(",") : "",
     item.fromStatus,
     item.toStatus
@@ -104,6 +109,48 @@ function toSearchText(item) {
     .toUpperCase()
 
   return source
+}
+
+async function readAuditLogsByMode(ordered) {
+  const list = []
+
+  for (let offset = 0; offset <= MAX_LOG_RECORDS; offset += LOG_BATCH_SIZE) {
+    const remaining = MAX_LOG_RECORDS + 1 - list.length
+    const batchSize = Math.min(LOG_BATCH_SIZE, remaining)
+    let query = db.collection("audit_logs")
+    if (ordered) {
+      query = query.orderBy("createdAt", "desc")
+    }
+    const res = await query.skip(offset).limit(batchSize).get()
+    const batch = res && Array.isArray(res.data) ? res.data : []
+
+    list.push(...batch)
+    if (batch.length < batchSize || list.length > MAX_LOG_RECORDS) {
+      break
+    }
+  }
+
+  return {
+    list: list.slice(0, MAX_LOG_RECORDS),
+    truncated: list.length > MAX_LOG_RECORDS
+  }
+}
+
+async function readAuditLogs() {
+  try {
+    return await readAuditLogsByMode(true)
+  } catch (indexError) {
+    console.warn({
+      function: "auditLogList",
+      stage: "indexFallback",
+      errorMessage:
+        indexError && (indexError.message || indexError.errMsg)
+          ? indexError.message || indexError.errMsg
+          : String(indexError),
+      createdAt: new Date().toISOString()
+    })
+    return readAuditLogsByMode(false)
+  }
 }
 
 exports.main = async (event) => {
@@ -121,8 +168,8 @@ exports.main = async (event) => {
       }
     }
 
-    const res = await db.collection("audit_logs").limit(500).get()
-    const rawList = res && Array.isArray(res.data) ? res.data : []
+    const logRecords = await readAuditLogs()
+    const rawList = logRecords.list
 
     const list = rawList
       .map((item) => ({
@@ -132,7 +179,24 @@ exports.main = async (event) => {
         targetOpenid: String(item.targetOpenid || "").trim(),
         vehicleId: String(item.vehicleId || "").trim(),
         bookingId: String(item.bookingId || "").trim(),
+        requestId: String(item.requestId || "").trim(),
+        requestType: String(item.requestType || "").trim(),
         imageAction: String(item.imageAction || "").trim(),
+        cutoffDate: String(item.cutoffDate || "").trim(),
+        retentionDays: Number(item.retentionDays) || 0,
+        processed: Number(item.processed) || 0,
+        deleted: Number(item.deleted) || 0,
+        failed: Number(item.failed) || 0,
+        bookingCount: Number(item.bookingCount) || 0,
+        favoriteCount: Number(item.favoriteCount) || 0,
+        privacyRequestCount: Number(item.privacyRequestCount) || 0,
+        partial: item.partial === true,
+        logType: String(item.logType || "").trim(),
+        filter: String(item.filter || "").trim(),
+        total: Number(item.total) || 0,
+        matchedTotal: Number(item.matchedTotal) || 0,
+        sourceTruncated: item.sourceTruncated === true,
+        truncated: item.truncated === true,
         fromStatus: String(item.fromStatus || "").trim(),
         toStatus: String(item.toStatus || "").trim(),
         changedKeys: Array.isArray(item.changedKeys) ? item.changedKeys : [],
@@ -159,6 +223,7 @@ exports.main = async (event) => {
       page: input.page,
       pageSize: input.pageSize,
       total: list.length,
+      truncated: logRecords.truncated,
       hasMore: Boolean(offset + input.pageSize < list.length),
       list: paged
     }
@@ -178,4 +243,3 @@ exports.main = async (event) => {
     }
   }
 }
-

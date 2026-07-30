@@ -4,7 +4,20 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
 
+const CONFIG_KEY = "operation_settings"
 const BOOKING_STATUSES = ["pending", "contacted", "completed", "cancelled"]
+const STATUS_LABELS = {
+  pending: "待联系",
+  contacted: "已联系",
+  completed: "已完成",
+  cancelled: "已取消"
+}
+const STATUS_TRANSITIONS = {
+  pending: ["contacted", "cancelled"],
+  contacted: ["completed", "cancelled"],
+  completed: [],
+  cancelled: []
+}
 
 function createError(code, message, details) {
   const result = {
@@ -124,6 +137,188 @@ async function writeErrorLogBestEffort(payload) {
   }
 }
 
+function normalizeNotificationText(value, maxLength, fallback) {
+  const text = String(value || "").trim() || String(fallback || "")
+  return text.length > maxLength ? text.slice(0, maxLength) : text
+}
+
+function normalizeNotificationError(error) {
+  const errorCode = String(
+    (error && (error.errCode || error.code)) || ""
+  )
+    .trim()
+    .slice(0, 80)
+  const errorMessage = String(
+    (error && (error.errMsg || error.message)) || error || "订阅消息发送失败"
+  )
+    .trim()
+    .slice(0, 300)
+
+  return {
+    errorCode,
+    errorMessage
+  }
+}
+
+function isNotSubscribedError(error) {
+  const normalized = normalizeNotificationError(error)
+  const message = normalized.errorMessage.toLowerCase()
+  return (
+    normalized.errorCode === "43101" ||
+    message.includes("user refuse") ||
+    message.includes("not subscribe") ||
+    message.includes("未订阅") ||
+    message.includes("拒绝")
+  )
+}
+
+function formatNotificationTime(input) {
+  const date = input instanceof Date ? input : new Date(input || Date.now())
+  const safeDate = Number.isNaN(date.getTime()) ? new Date() : date
+  const chinaDate = new Date(safeDate.getTime() + 8 * 60 * 60 * 1000)
+  const hour = `${chinaDate.getUTCHours()}`.padStart(2, "0")
+  const minute = `${chinaDate.getUTCMinutes()}`.padStart(2, "0")
+  return `${hour}:${minute}`
+}
+
+async function readBookingStatusTemplateId() {
+  const envTemplateId = String(process.env.BOOKING_STATUS_TEMPLATE_ID || "").trim()
+  if (envTemplateId) {
+    return {
+      templateId: envTemplateId,
+      error: null
+    }
+  }
+
+  try {
+    const res = await db.collection("app_configs").where({ key: CONFIG_KEY }).limit(1).get()
+    const list = res && Array.isArray(res.data) ? res.data : []
+    const value = list.length && list[0] && list[0].value ? list[0].value : {}
+    return {
+      templateId: String(value.bookingStatusTemplateId || "").trim(),
+      error: null
+    }
+  } catch (error) {
+    return {
+      templateId: "",
+      error
+    }
+  }
+}
+
+async function recordNotificationFailure(booking, status, reason, error) {
+  const normalized = normalizeNotificationError(error)
+  const bookingId = String((booking && (booking._id || booking.id)) || "").trim()
+
+  await writeErrorLogBestEffort({
+    function: "bookingUpdateStatus",
+    stage: "subscribeMessage",
+    bookingId,
+    targetStatus: String(status || "").trim(),
+    errorCode: normalized.errorCode,
+    errorMessage: normalized.errorMessage
+  })
+
+  console.warn({
+    function: "bookingUpdateStatus",
+    stage: "subscribeMessage",
+    bookingId,
+    targetStatus: status,
+    errorCode: normalized.errorCode,
+    errorMessage: normalized.errorMessage,
+    createdAt: new Date().toISOString()
+  })
+
+  return {
+    status: "failed",
+    reason
+  }
+}
+
+async function sendStatusNotificationBestEffort(booking, status) {
+  const targetOpenid = String((booking && booking.openid) || "").trim()
+  if (!targetOpenid) {
+    return {
+      status: "skipped",
+      reason: "missing_target"
+    }
+  }
+
+  const configResult = await readBookingStatusTemplateId()
+  if (configResult.error) {
+    return recordNotificationFailure(
+      booking,
+      status,
+      "config_read_failed",
+      configResult.error
+    )
+  }
+
+  const templateId = configResult.templateId
+  if (!templateId) {
+    return {
+      status: "skipped",
+      reason: "not_configured"
+    }
+  }
+
+  const subscribeMessage = cloud.openapi && cloud.openapi.subscribeMessage
+  if (!subscribeMessage || typeof subscribeMessage.send !== "function") {
+    return recordNotificationFailure(
+      booking,
+      status,
+      "api_unavailable",
+      {
+        code: "API_UNAVAILABLE",
+        message: "订阅消息接口不可用"
+      }
+    )
+  }
+
+  const envState = String(process.env.BOOKING_NOTIFY_STATE || "").trim()
+  const miniprogramState = ["developer", "trial", "formal"].includes(envState)
+    ? envState
+    : "formal"
+
+  try {
+    await subscribeMessage.send({
+      touser: targetOpenid,
+      templateId,
+      page: `pages/booking-detail/booking-detail?id=${encodeURIComponent(String(booking._id || booking.id || ""))}`,
+      miniprogramState,
+      lang: "zh_CN",
+      data: {
+        thing1: {
+          value: normalizeNotificationText(booking.vehicleName, 20, "车辆预约")
+        },
+        phrase2: {
+          value: normalizeNotificationText(STATUS_LABELS[status], 5, "已更新")
+        },
+        thing3: {
+          value: "状态已更新，请进入小程序查看"
+        },
+        time4: {
+          value: formatNotificationTime(new Date())
+        }
+      }
+    })
+
+    return {
+      status: "sent",
+      reason: ""
+    }
+  } catch (error) {
+    if (isNotSubscribedError(error)) {
+      return {
+        status: "not_subscribed",
+        reason: "user_not_subscribed"
+      }
+    }
+
+    return recordNotificationFailure(booking, status, "send_failed", error)
+  }
+}
+
 function normalizeEvent(event) {
   const payload = event && typeof event === "object" ? event : {}
   return {
@@ -163,25 +358,56 @@ exports.main = async (event) => {
       return createError("NOT_FOUND", "预约不存在")
     }
 
-    await db.collection("bookings").doc(input.id).update({
+    const currentStatus = String(current.status || "pending").trim() || "pending"
+    if (input.status === currentStatus) {
+      return {
+        ok: true,
+        id: input.id,
+        status: input.status,
+        updated: false,
+        message: "预约状态未变化"
+      }
+    }
+
+    const allowedStatuses = STATUS_TRANSITIONS[currentStatus] || []
+    if (!allowedStatuses.includes(input.status)) {
+      return createError("STATUS_TRANSITION_NOT_ALLOWED", "当前预约状态不允许执行此操作", {
+        currentStatus,
+        allowedStatuses
+      })
+    }
+
+    const updateRes = await db.collection("bookings").where({
+      _id: input.id,
+      status: currentStatus
+    }).update({
       data: {
         status: input.status,
         updatedAt: db.serverDate()
       }
     })
+    const updatedCount = Number(updateRes && updateRes.stats && updateRes.stats.updated) || 0
+    if (updatedCount < 1) {
+      return createError("STATUS_CONFLICT", "预约状态已发生变化，请刷新后重试")
+    }
 
     await writeAuditLogBestEffort({
       openid,
       action: "bookingUpdateStatus",
       bookingId: input.id,
-      fromStatus: String(current.status || "pending").trim() || "pending",
+      fromStatus: currentStatus,
       toStatus: input.status
     })
+
+    const notificationResult = await sendStatusNotificationBestEffort(current, input.status)
 
     return {
       ok: true,
       id: input.id,
       status: input.status,
+      updated: true,
+      notificationStatus: notificationResult.status,
+      notificationReason: notificationResult.reason,
       message: "预约状态已更新"
     }
   } catch (error) {
@@ -190,7 +416,6 @@ exports.main = async (event) => {
       openid,
       id: input.id,
       status: input.status,
-      input,
       errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
       stack: error && error.stack ? error.stack : ""
     })

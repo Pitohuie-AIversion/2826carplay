@@ -1,10 +1,24 @@
-<view class="error-page">
-  <view class="header">
-    <view class="title">错误日志</view>
-    <view class="desc">展示云函数异常记录（仅管理员可见）</view>
+<view class="error-page management-page">
+  <view class="page-glow error-glow"></view>
+  <view class="header hero-card ui-card ui-card-gradient">
+    <view class="hero-top">
+      <view class="hero-copy">
+        <view class="page-kicker">SYSTEM DIAGNOSTICS</view>
+        <view class="title">错误日志</view>
+        <view class="desc">检查云函数异常与线上运行风险</view>
+      </view>
+      <image class="hero-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+    </view>
   </view>
 
   <view class="filter-card ui-card">
+    <view class="section-heading">
+      <view>
+        <view class="section-eyebrow">ERROR FILTER</view>
+        <view class="section-heading-title">筛选异常记录</view>
+      </view>
+      <view class="section-index">01</view>
+    </view>
     <input
       class="keyword-input ui-input"
       placeholder="搜索 OpenID / 车辆ID / 预约ID / 错误信息"
@@ -30,17 +44,63 @@
 
     <view class="actions">
       <button class="action-btn ui-btn ui-btn-primary" bindtap="handleSearch">查询</button>
+      <button class="action-btn action-btn-last ui-btn ui-btn-ghost" loading="{{exporting}}" disabled="{{loading || exporting}}" bindtap="handleExport">导出 CSV</button>
     </view>
 
-    <view class="result-count">当前筛选结果 {{total}} 条</view>
+    <view wx:if="{{exportFilePath}}" class="export-actions">
+      <view class="export-tip">CSV 已生成：{{exportFileName}}</view>
+      <view class="export-buttons">
+        <button wx:if="{{canShareExport}}" class="export-button ui-btn ui-btn-primary" bindtap="handleShareExportedFile">分享文件</button>
+        <button class="export-button ui-btn ui-btn-ghost" bindtap="handleOpenExportedFile">打开文件</button>
+        <button class="export-button ui-btn ui-btn-ghost" bindtap="handleDeleteExportedFile">删除文件</button>
+      </view>
+    </view>
+
+    <view class="result-count">当前筛选结果 {{total}}{{truncated ? '+' : ''}} 条</view>
+    <view wx:if="{{truncated}}" class="result-count">当前最多展示已读取的 2000 条记录，请缩小筛选范围。</view>
   </view>
 
-  <view wx:if="{{loading}}" class="loading">加载中...</view>
+  <view wx:if="{{(initialLoading || loading) && !list.length}}" class="log-list-skeleton log-list-skeleton-error">
+    <view class="log-skeleton-heading">
+      <view>
+        <view class="log-skeleton-kicker manage-skeleton-pulse"></view>
+        <view class="log-skeleton-title manage-skeleton-pulse"></view>
+      </view>
+      <view class="log-skeleton-count manage-skeleton-pulse"></view>
+    </view>
+    <view class="log-skeleton-card ui-card">
+      <view class="log-skeleton-head">
+        <view class="log-skeleton-name manage-skeleton-pulse"></view>
+        <view class="log-skeleton-time manage-skeleton-pulse"></view>
+      </view>
+      <view class="log-skeleton-message manage-skeleton-pulse"></view>
+      <view class="log-skeleton-line manage-skeleton-pulse"></view>
+      <view class="log-skeleton-action manage-skeleton-pulse"></view>
+    </view>
+    <view class="log-skeleton-card ui-card log-skeleton-card-muted">
+      <view class="log-skeleton-head">
+        <view class="log-skeleton-name manage-skeleton-pulse"></view>
+        <view class="log-skeleton-time manage-skeleton-pulse"></view>
+      </view>
+      <view class="log-skeleton-message manage-skeleton-pulse"></view>
+      <view class="log-skeleton-line log-skeleton-line-short manage-skeleton-pulse"></view>
+    </view>
+  </view>
 
-  <view wx:elif="{{list.length}}">
+  <view wx:elif="{{list.length}}" class="error-list">
+    <view class="list-heading">
+      <view>
+        <view class="list-kicker">DIAGNOSTIC RECORDS</view>
+        <view class="list-title">异常记录</view>
+      </view>
+      <view class="list-count">{{total}}{{truncated ? '+' : ''}} 条</view>
+    </view>
     <view class="log-item ui-card ui-card-soft" wx:for="{{list}}" wx:key="id">
       <view class="log-head">
-        <view class="log-func">{{item.function || '--'}}</view>
+        <view class="log-title-group">
+          <view class="log-kind log-kind-error"><view class="log-kind-dot"></view>ERROR</view>
+          <view class="log-func">{{item.function || '--'}}</view>
+        </view>
         <view class="log-time">{{item.createdAtText || '--'}}</view>
       </view>
       <view wx:if="{{item.messagePreview}}" class="log-message">{{item.messagePreview}}</view>
@@ -55,8 +115,9 @@
   </view>
 
   <view wx:else class="empty ui-card">
+    <image class="manage-empty-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+    <view class="manage-empty-kicker">SYSTEM HEALTHY</view>
     <view class="empty-title">{{emptyTitle}}</view>
     <view class="empty-desc">{{emptyDesc}}</view>
   </view>
 </view>
-

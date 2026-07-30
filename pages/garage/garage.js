@@ -1,3 +1,4 @@
+const { trackEvent } = require("../../shared/analytics")
 const mockCategories = require("../../data/categories")
 
 const CATEGORY_LABEL_MAP = {
@@ -149,10 +150,18 @@ Page({
     currentCategory: "all",
     categories: [],
     cars: [],
-    filteredCars: []
+    filteredCars: [],
+    initialLoading: true,
+    loadingCars: false,
+    page: 0,
+    pageSize: 20,
+    total: 0,
+    truncated: false,
+    hasMore: false
   },
 
   onLoad() {
+    trackEvent("garage_view")
     const app = getApp()
     const env =
       app &&
@@ -170,8 +179,6 @@ Page({
       } catch (error) {}
     }
 
-    this.loadOperationConfig()
-    this.loadCars()
   },
 
   onShow() {
@@ -202,15 +209,28 @@ Page({
     })
   },
 
-  loadCars() {
+  loadCars(input) {
+    const append = Boolean(input && input.append)
+    const nextPage = append ? this.data.page + 1 : 0
+    if (this.data.loadingCars) {
+      return
+    }
+
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       this.setCarsLoadError("云能力未初始化，请稍后重试")
       return
     }
 
+    this.setData({
+      loadingCars: true
+    })
+
     wx.cloud.callFunction({
       name: "garageVehicleList",
-      data: {},
+      data: {
+        page: nextPage,
+        pageSize: this.data.pageSize
+      },
       success: (res) => {
         const result = res && res.result ? res.result : null
         if (!result || !result.ok || !Array.isArray(result.list)) {
@@ -218,9 +238,25 @@ Page({
           return
         }
 
-        this.applyCars(result.list)
+        const nextCars = append ? this.data.cars.concat(result.list) : result.list
+        this.applyCars(nextCars, {
+          page: Number.isInteger(result.page) ? result.page : nextPage,
+          total: Number(result.total) || nextCars.length,
+          truncated: Boolean(result.truncated),
+          hasMore: Boolean(result.hasMore)
+        })
       },
       fail: (error) => {
+        if (append) {
+          this.setData({
+            loadingCars: false
+          })
+          wx.showToast({
+            title: (error && (error.errMsg || error.message)) || "加载更多失败",
+            icon: "none"
+          })
+          return
+        }
         this.setCarsLoadError((error && (error.errMsg || error.message)) || "车辆列表加载失败，请稍后重试")
       }
     })
@@ -229,10 +265,16 @@ Page({
   setCarsLoadError(message) {
     this.setData({
       loadError: true,
+      initialLoading: false,
+      loadingCars: false,
       loadErrorText: String(message || "车辆列表加载失败，请稍后重试"),
       categories: [],
       cars: [],
       filteredCars: [],
+      page: 0,
+      total: 0,
+      truncated: false,
+      hasMore: false,
       categorySummary: {
         name: "",
         total: 0,
@@ -241,16 +283,32 @@ Page({
     })
   },
 
-  applyCars(carList) {
-    const sortedCars = sortCars(Array.isArray(carList) ? carList : [])
+  applyCars(carList, pagination) {
+    const uniqueCars = []
+    const ids = new Set()
+    ;(Array.isArray(carList) ? carList : []).forEach((car) => {
+      const id = String((car && car.id) || "").trim()
+      if (!id || ids.has(id)) {
+        return
+      }
+      ids.add(id)
+      uniqueCars.push(car)
+    })
+    const sortedCars = sortCars(uniqueCars)
     const categories = buildCategoriesWithCount(sortedCars)
     const categoryIds = categories.map((item) => item.id)
     const nextCategory = categoryIds.includes(this.data.currentCategory) ? this.data.currentCategory : "all"
 
     this.setData({
       loadError: false,
+      initialLoading: false,
+      loadingCars: false,
       categories,
-      cars: sortedCars
+      cars: sortedCars,
+      page: pagination && Number.isInteger(pagination.page) ? pagination.page : 0,
+      total: pagination ? pagination.total : sortedCars.length,
+      truncated: Boolean(pagination && pagination.truncated),
+      hasMore: Boolean(pagination && pagination.hasMore)
     })
 
     this.filterCars(nextCategory)
@@ -278,6 +336,14 @@ Page({
     }
 
     this.filterCars(categoryId)
+  },
+
+  handleLoadMore() {
+    if (this.data.loadingCars || !this.data.hasMore) {
+      return
+    }
+
+    this.loadCars({ append: true })
   },
 
   handleCarTap(event) {

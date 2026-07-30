@@ -50,7 +50,8 @@ describe("cloudfunctions/vehiclePublicDetail integration", () => {
         fuelType: "gasoline",
         seats: 5,
         priceDay: 1299,
-        note: "车辆备注",
+        publicDescription: "公开车辆亮点",
+        note: "内部维修记录不得公开",
         imageList: ["cloud://img1", "cloud://img2"],
         coverImage: "cloud://img2",
         createdAt: "2026-07-08T08:00:00.000Z",
@@ -64,8 +65,12 @@ describe("cloudfunctions/vehiclePublicDetail integration", () => {
     expect(res.ok).toBe(true)
     expect(res.car.id).toBe("car_1")
     expect(res.car.name).toBe("BMW 740Li")
+    expect(res.car.nickname).toBe("车牌尾号 45")
+    expect(res.car.tags).toEqual(["轿车", "上牌 2026", "浙A***45"])
     expect(res.car.cover).toBe("cloud://img2")
     expect(res.car.images).toEqual(["cloud://img2", "cloud://img1"])
+    expect(res.car.description).toBe("公开车辆亮点")
+    expect(JSON.stringify(res.car)).not.toContain("内部维修记录不得公开")
     expect(mocks.vehiclesDoc).toHaveBeenCalledWith("car_1")
   })
 
@@ -77,6 +82,24 @@ describe("cloudfunctions/vehiclePublicDetail integration", () => {
     expect(res.ok).toBe(false)
     expect(res.code).toBe("VALIDATION_ERROR")
     expect(mocks.vehiclesDoc).not.toHaveBeenCalled()
+  })
+
+  test("旧车辆的内部备注不会作为公开说明返回", async () => {
+    const mocks = createMockDb({
+      currentData: {
+        _id: "car_legacy",
+        plateNumber: "浙A12345",
+        brandModel: "Legacy Car",
+        status: "idle",
+        note: "内部维修记录不得公开"
+      }
+    })
+    const vehiclePublicDetail = await loadVehiclePublicDetailWith({ mockDb: mocks.db })
+    const res = await vehiclePublicDetail.main({ id: "car_legacy" })
+
+    expect(res.ok).toBe(true)
+    expect(res.car.description).toBe("Legacy Car支持到店咨询与预约服务。")
+    expect(JSON.stringify(res.car)).not.toContain("内部维修记录不得公开")
   })
 
   test("车辆不存在返回 NOT_FOUND", async () => {
@@ -109,4 +132,3 @@ describe("cloudfunctions/vehiclePublicDetail integration", () => {
     })
   })
 })
-

@@ -2,10 +2,12 @@ jest.mock("wx-server-sdk")
 
 const cloud = require("wx-server-sdk")
 
-function createMockDb({ rolesData, vehiclesData, addResult }) {
+function createMockDb({ rolesData, vehiclesData, addResult, addError = null }) {
   const rolesGet = jest.fn().mockResolvedValue({ data: rolesData })
   const vehiclesGet = jest.fn().mockResolvedValue({ data: vehiclesData })
-  const vehiclesAdd = jest.fn().mockResolvedValue(addResult)
+  const vehiclesAdd = addError
+    ? jest.fn().mockRejectedValue(addError)
+    : jest.fn().mockResolvedValue(addResult)
   const auditAdd = jest.fn().mockResolvedValue({ _id: "audit_1" })
 
   const rolesLimit = jest.fn(() => ({ get: rolesGet }))
@@ -83,7 +85,8 @@ describe("cloudfunctions/vehicleCreate integration", () => {
       fuelType: "gasoline",
       seats: 5,
       priceDay: 699,
-      note: "门店主推"
+      publicDescription: "适合商务接待",
+      note: "内部整备提醒"
     })
 
     expect(res).toEqual({ ok: true, id: "new_id" })
@@ -104,7 +107,8 @@ describe("cloudfunctions/vehicleCreate integration", () => {
         fuelType: "gasoline",
         seats: 5,
         priceDay: 699,
-        note: "门店主推",
+        publicDescription: "适合商务接待",
+        note: "内部整备提醒",
         imageList: [],
         coverImage: "",
         createdAt: mocks.serverDateValue,
@@ -196,5 +200,30 @@ describe("cloudfunctions/vehicleCreate integration", () => {
     expect(res).toEqual({ ok: false, code: "FORBIDDEN", message: "权限不足" })
     expect(mocks.vehiclesWhere).not.toHaveBeenCalled()
     expect(mocks.vehiclesAdd).not.toHaveBeenCalled()
+  })
+
+  test("唯一索引并发冲突返回 DUPLICATE_PLATE", async () => {
+    const mocks = createMockDb({
+      rolesData: [{ role: "admin" }],
+      vehiclesData: [],
+      addResult: null,
+      addError: Object.assign(new Error("E11000 duplicate key error"), { code: 11000 })
+    })
+
+    const vehicleCreate = await loadVehicleCreateWith({ openid: "admin_openid", mockDb: mocks.db })
+    const res = await vehicleCreate.main({
+      plateNumber: "京A12345",
+      vehicleType: "sedan",
+      brandModel: "Toyota",
+      registerDate: "2026-07-08",
+      status: "active"
+    })
+
+    expect(res).toEqual({
+      ok: false,
+      code: "DUPLICATE_PLATE",
+      message: "车牌号已存在",
+      details: { plateNumber: "京A12345" }
+    })
   })
 })

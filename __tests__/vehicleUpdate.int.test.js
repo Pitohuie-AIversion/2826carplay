@@ -1,10 +1,12 @@
 jest.mock("wx-server-sdk")
 
-function createMockDb({ rolesData, duplicateData, currentData, updateResult }) {
+function createMockDb({ rolesData, duplicateData, currentData, updateResult, updateError = null }) {
   const rolesGet = jest.fn().mockResolvedValue({ data: rolesData })
   const duplicateGet = jest.fn().mockResolvedValue({ data: duplicateData })
   const currentGet = jest.fn().mockResolvedValue({ data: currentData })
-  const update = jest.fn().mockResolvedValue(updateResult)
+  const update = updateError
+    ? jest.fn().mockRejectedValue(updateError)
+    : jest.fn().mockResolvedValue(updateResult)
   const auditAdd = jest.fn().mockResolvedValue({ _id: "audit_1" })
 
   const rolesLimit = jest.fn(() => ({ get: rolesGet }))
@@ -88,7 +90,10 @@ describe("cloudfunctions/vehicleUpdate integration", () => {
       fuelType: "gasoline",
       seats: 5,
       priceDay: 1299,
-      note: "行政旗舰"
+      vin: "VIN-SECRET",
+      engineNumber: "ENG-SECRET",
+      publicDescription: "行政旗舰座驾",
+      note: "内部整备提醒"
     })
 
     expect(res).toEqual({ ok: true, id: "car_1" })
@@ -107,7 +112,10 @@ describe("cloudfunctions/vehicleUpdate integration", () => {
         fuelType: "gasoline",
         seats: 5,
         priceDay: 1299,
-        note: "行政旗舰",
+        vin: "VIN-SECRET",
+        engineNumber: "ENG-SECRET",
+        publicDescription: "行政旗舰座驾",
+        note: "内部整备提醒",
         updatedAt: mocks.serverDateValue
       }
     })
@@ -117,7 +125,7 @@ describe("cloudfunctions/vehicleUpdate integration", () => {
         action: "vehicleUpdate",
         vehicleId: "car_1",
         plateNumber: "京A12345",
-        changedKeys: ["vehicleType", "brandModel", "registerDate", "status", "location", "transmission", "fuelType", "seats", "priceDay", "note"],
+        changedKeys: ["vehicleType", "brandModel", "registerDate", "status", "location", "transmission", "fuelType", "seats", "priceDay", "publicDescription", "vin", "engineNumber", "note"],
         before: {
           vehicleType: undefined,
           brandModel: undefined,
@@ -128,7 +136,7 @@ describe("cloudfunctions/vehicleUpdate integration", () => {
           fuelType: undefined,
           seats: undefined,
           priceDay: undefined,
-          note: undefined
+          publicDescription: undefined
         },
         after: {
           vehicleType: "sedan",
@@ -140,7 +148,7 @@ describe("cloudfunctions/vehicleUpdate integration", () => {
           fuelType: "gasoline",
           seats: 5,
           priceDay: 1299,
-          note: "行政旗舰"
+          publicDescription: "行政旗舰座驾"
         },
         createdAt: mocks.serverDateValue
       }
@@ -170,6 +178,108 @@ describe("cloudfunctions/vehicleUpdate integration", () => {
     expect(res.code).toBe("VALIDATION_ERROR")
     expect(mocks.vehiclesWhere).not.toHaveBeenCalled()
     expect(mocks.update).not.toHaveBeenCalled()
+  })
+
+  test("admin 可以真正清空车辆选填字段", async () => {
+    const currentData = {
+      _id: "car_1",
+      plateNumber: "京A12345",
+      vehicleType: "sedan",
+      brandModel: "BMW 740Li",
+      registerDate: "2026-07-08",
+      status: "idle",
+      location: "杭州",
+      transmission: "automatic",
+      fuelType: "gasoline",
+      seats: 5,
+      priceDay: 1299,
+      publicDescription: "公开说明",
+      vin: "VIN-SECRET",
+      engineNumber: "ENG-SECRET",
+      note: "内部备注"
+    }
+    const mocks = createMockDb({
+      rolesData: [{ role: "admin" }],
+      duplicateData: [currentData],
+      currentData,
+      updateResult: { stats: { updated: 1 } }
+    })
+    const vehicleUpdate = await loadVehicleUpdateWith({ openid: "admin_openid", mockDb: mocks.db })
+
+    const res = await vehicleUpdate.main({
+      id: "car_1",
+      plateNumber: "京A12345",
+      vehicleType: "sedan",
+      brandModel: "BMW 740Li",
+      registerDate: "2026-07-08",
+      status: "idle",
+      location: "",
+      transmission: "",
+      fuelType: "",
+      seats: "",
+      priceDay: "",
+      publicDescription: "",
+      vin: "",
+      engineNumber: "",
+      note: ""
+    })
+
+    expect(res).toEqual({ ok: true, id: "car_1" })
+    expect(mocks.update).toHaveBeenCalledWith({
+      data: {
+        plateNumber: "京A12345",
+        vehicleType: "sedan",
+        brandModel: "BMW 740Li",
+        registerDate: "2026-07-08",
+        status: "idle",
+        location: "",
+        transmission: "",
+        fuelType: "",
+        seats: null,
+        priceDay: null,
+        publicDescription: "",
+        vin: "",
+        engineNumber: "",
+        note: "",
+        updatedAt: mocks.serverDateValue
+      }
+    })
+    expect(mocks.auditAdd).toHaveBeenCalledWith({
+      data: {
+        openid: "admin_openid",
+        action: "vehicleUpdate",
+        vehicleId: "car_1",
+        plateNumber: "京A12345",
+        changedKeys: [
+          "location",
+          "transmission",
+          "fuelType",
+          "seats",
+          "priceDay",
+          "publicDescription",
+          "vin",
+          "engineNumber",
+          "note"
+        ],
+        before: {
+          location: "杭州",
+          transmission: "automatic",
+          fuelType: "gasoline",
+          seats: 5,
+          priceDay: 1299,
+          publicDescription: "公开说明"
+        },
+        after: {
+          location: "",
+          transmission: "",
+          fuelType: "",
+          seats: null,
+          priceDay: null,
+          publicDescription: ""
+        },
+        createdAt: mocks.serverDateValue
+      }
+    })
   })
 
   test("admin 修改为重复车牌返回 DUPLICATE_PLATE", async () => {
@@ -252,5 +362,32 @@ describe("cloudfunctions/vehicleUpdate integration", () => {
     expect(res).toEqual({ ok: false, code: "FORBIDDEN", message: "权限不足" })
     expect(mocks.vehiclesDoc).not.toHaveBeenCalled()
     expect(mocks.update).not.toHaveBeenCalled()
+  })
+
+  test("唯一索引并发冲突返回 DUPLICATE_PLATE", async () => {
+    const mocks = createMockDb({
+      rolesData: [{ role: "admin" }],
+      duplicateData: [],
+      currentData: { _id: "car_1", plateNumber: "沪B67890" },
+      updateResult: null,
+      updateError: Object.assign(new Error("E11000 duplicate key error"), { code: 11000 })
+    })
+
+    const vehicleUpdate = await loadVehicleUpdateWith({ openid: "admin_openid", mockDb: mocks.db })
+    const res = await vehicleUpdate.main({
+      id: "car_1",
+      plateNumber: "京A12345",
+      vehicleType: "sedan",
+      brandModel: "BMW 740Li",
+      registerDate: "2026-07-08",
+      status: "idle"
+    })
+
+    expect(res).toEqual({
+      ok: false,
+      code: "DUPLICATE_PLATE",
+      message: "车牌号已存在",
+      details: { plateNumber: "京A12345" }
+    })
   })
 })

@@ -42,7 +42,8 @@ const FIELD_LABEL_MAP = {
   priceDay: "日租金",
   vin: "VIN",
   engineNumber: "发动机号",
-  note: "备注"
+  publicDescription: "公开说明",
+  note: "内部备注"
 }
 
 function formatDate(date) {
@@ -61,7 +62,11 @@ Page({
     id: "",
     today: formatDate(new Date()),
     loading: true,
+    loadFailed: false,
+    loadErrorText: "车辆档案加载失败，请稍后重试",
     isSubmitting: false,
+    publicDescriptionLength: 0,
+    noteLength: 0,
     pageAuthorized: false,
     vehicleTypeLabels: buildLabels(vehicleUtils.VEHICLE_TYPES, VEHICLE_TYPE_LABEL_MAP),
     statusLabels: buildLabels(vehicleUtils.VEHICLE_STATUSES, STATUS_LABEL_MAP),
@@ -88,6 +93,7 @@ Page({
       priceDay: "",
       vin: "",
       engineNumber: "",
+      publicDescription: "",
       note: ""
     }
   },
@@ -117,7 +123,9 @@ Page({
         icon: "none"
       })
       this.setData({
-        loading: false
+        loading: false,
+        loadFailed: true,
+        loadErrorText: "缺少车辆ID，无法加载车辆档案"
       })
       return
     }
@@ -139,7 +147,9 @@ Page({
         icon: "none"
       })
       this.setData({
-        loading: false
+        loading: false,
+        loadFailed: true,
+        loadErrorText: "云能力未初始化，请稍后重试"
       })
       return
     }
@@ -157,7 +167,9 @@ Page({
             icon: "none"
           })
           this.setData({
-            loading: false
+            loading: false,
+            loadFailed: true,
+            loadErrorText: (result && result.message) || "车辆档案加载失败，请稍后重试"
           })
           return
         }
@@ -175,6 +187,9 @@ Page({
 
         this.setData({
           loading: false,
+          loadFailed: false,
+          publicDescriptionLength: String(current.publicDescription || "").length,
+          noteLength: String(current.note || "").length,
           vehicleTypeIndex,
           statusIndex,
           transmissionIndex: transmission ? transmissionIndex : 0,
@@ -196,6 +211,7 @@ Page({
             priceDay: current.priceDay === undefined || current.priceDay === null ? "" : String(current.priceDay),
             vin: current.vin || "",
             engineNumber: current.engineNumber || "",
+            publicDescription: current.publicDescription || "",
             note: current.note || ""
           }
         })
@@ -206,7 +222,9 @@ Page({
           icon: "none"
         })
         this.setData({
-          loading: false
+          loading: false,
+          loadFailed: true,
+          loadErrorText: (error && (error.errMsg || error.message)) || "车辆档案加载失败，请稍后重试"
         })
       }
     })
@@ -242,7 +260,7 @@ Page({
       value = String(value || "").slice(0, 32)
     }
 
-    if (field === "note") {
+    if (field === "publicDescription" || field === "note") {
       value = String(value || "").slice(0, 200)
     }
 
@@ -254,9 +272,17 @@ Page({
       value = String(value || "").replace(/\D/g, "").slice(0, 5)
     }
 
-    this.setData({
+    const nextData = {
       [`form.${field}`]: value
-    })
+    }
+    if (field === "publicDescription") {
+      nextData.publicDescriptionLength = String(value || "").length
+    }
+    if (field === "note") {
+      nextData.noteLength = String(value || "").length
+    }
+
+    this.setData(nextData)
   },
 
   handleVehicleTypeChange(event) {
@@ -320,6 +346,37 @@ Page({
 
     wx.navigateTo({
       url: `/pages/vehicle-detail-manage/vehicle-detail-manage?id=${this.data.id}`
+    })
+  },
+
+  handleRetryLoad() {
+    if (!this.data.id) {
+      return
+    }
+
+    this.setData({
+      loading: true,
+      loadFailed: false
+    })
+    this.fetchDetail(this.data.id)
+  },
+
+  handleBackList() {
+    const pages = getCurrentPages()
+    if (pages.length > 1) {
+      wx.navigateBack({
+        delta: 1,
+        fail: () => {
+          wx.redirectTo({
+            url: "/pages/vehicle-manage/vehicle-manage"
+          })
+        }
+      })
+      return
+    }
+
+    wx.redirectTo({
+      url: "/pages/vehicle-manage/vehicle-manage"
     })
   },
 

@@ -33,6 +33,7 @@ function canCancelBooking(status) {
 
 Page({
   data: {
+    initialLoading: true,
     loading: false,
     loadFailed: false,
     loadErrorText: "预约列表加载失败，请稍后重试",
@@ -71,6 +72,7 @@ Page({
 
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       this.setData({
+        initialLoading: false,
         loading: false,
         loadFailed: true,
         loadErrorText: "云能力未初始化，请稍后重试",
@@ -100,6 +102,7 @@ Page({
             icon: "none"
           })
           this.setData({
+            initialLoading: false,
             loading: false,
             loadFailed: true,
             loadErrorText: (result && result.message) || "预约列表加载失败，请稍后重试",
@@ -118,6 +121,7 @@ Page({
           canCancel: canCancelBooking(item.status)
         }))
         this.setData({
+          initialLoading: false,
           loading: false,
           loadFailed: false,
           page: Number.isInteger(result.page) ? result.page : nextPage,
@@ -131,6 +135,7 @@ Page({
           icon: "none"
         })
         this.setData({
+          initialLoading: false,
           loading: false,
           loadFailed: true,
           loadErrorText: (error && (error.errMsg || error.message)) || "预约列表加载失败，请稍后重试",

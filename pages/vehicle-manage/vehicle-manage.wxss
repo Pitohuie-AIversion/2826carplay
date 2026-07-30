@@ -1,3 +1,5 @@
+@import "../../shared/management-shell.wxss";
+
 .vehicle-manage-page {
   min-height: 100vh;
   padding: 24rpx;
@@ -482,4 +484,112 @@
   font-size: 22rpx;
   line-height: 1.5;
   color: #8e8e8e;
+}
+
+.vehicle-manage-page.management-page .hero-card,
+.vehicle-manage-page.management-page .section-card,
+.vehicle-manage-page.management-page .dashboard-card,
+.vehicle-manage-page.management-page .vehicle-card,
+.vehicle-manage-page.management-page .empty-card {
+  margin-bottom: 22rpx;
+  border-color: rgba(255, 255, 255, 0.075);
+  border-radius: 26rpx;
+}
+
+.vehicle-manage-page.management-page .hero-button {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 84rpx;
+  margin-top: 24rpx;
+  border-radius: 19rpx;
+  line-height: 84rpx;
+}
+
+.vehicle-manage-page.management-page .section-card {
+  background: #15181d;
+}
+
+.vehicle-manage-page.management-page .dashboard-card {
+  border-color: rgba(84, 136, 220, 0.14);
+  background: linear-gradient(145deg, #19202a, #14171c 75%);
+}
+
+.vehicle-manage-page.management-page .search-input {
+  height: 82rpx;
+}
+
+.vehicle-manage-page.management-page .search-button {
+  height: 82rpx;
+  border-radius: 18rpx;
+  line-height: 82rpx;
+}
+
+.vehicle-manage-page.management-page .status-item {
+  min-height: 62rpx;
+  padding: 14rpx 22rpx;
+}
+
+.vehicle-manage-page.management-page .summary-item {
+  border-color: rgba(255, 255, 255, 0.065);
+  border-radius: 19rpx;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.vehicle-manage-page.management-page .summary-value {
+  color: #f5f7fa;
+}
+
+.vehicle-manage-page.management-page .ratio-card,
+.vehicle-manage-page.management-page .recent-block {
+  border-top-color: rgba(255, 255, 255, 0.07);
+}
+
+.vehicle-manage-page.management-page .vehicle-card {
+  overflow: hidden;
+  background: linear-gradient(145deg, #181d24, #14171c 72%);
+  box-shadow: 0 20rpx 46rpx rgba(0, 0, 0, 0.2);
+}
+
+.vehicle-manage-page.management-page .vehicle-cover {
+  border: 1rpx solid rgba(255, 255, 255, 0.08);
+  border-radius: 18rpx;
+}
+
+.vehicle-manage-page.management-page .plate-number {
+  color: #f7f9fc;
+  font-size: 31rpx;
+}
+
+.vehicle-manage-page.management-page .brand-model {
+  color: #9da6b3;
+}
+
+.vehicle-manage-page.management-page .meta-label {
+  color: #697482;
+  font-size: 20rpx;
+}
+
+.vehicle-manage-page.management-page .meta-value {
+  color: #e6eaf0;
+  font-size: 22rpx;
+}
+
+.vehicle-manage-page.management-page .status-op-card {
+  border-color: rgba(255, 255, 255, 0.065);
+  border-radius: 18rpx;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.vehicle-manage-page.management-page .status-op-btn {
+  border-radius: 16rpx;
+  background: #111419;
+}
+
+.vehicle-manage-page.management-page .detail-button,
+.vehicle-manage-page.management-page .edit-button,
+.vehicle-manage-page.management-page .retire-button,
+.vehicle-manage-page.management-page .restore-button,
+.vehicle-manage-page.management-page .delete-button {
+  border-radius: 16rpx;
 }

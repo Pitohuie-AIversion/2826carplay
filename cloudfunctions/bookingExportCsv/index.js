@@ -5,6 +5,8 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
 
 const BOOKING_STATUSES = ["pending", "contacted", "completed", "cancelled"]
+const BOOKING_BATCH_SIZE = 100
+const MAX_EXPORT_SOURCE_RECORDS = 2000
 
 function createError(code, message, details) {
   const result = {
@@ -127,12 +129,16 @@ async function writeAuditLogBestEffort(payload) {
 function normalizeFilters(event) {
   const payload = event && typeof event === "object" ? event : {}
   const status = String(payload.status || "").trim()
+  const schedulePriority = String(payload.schedulePriority || "").trim()
+  const coordinationStatus = String(payload.coordinationStatus || "").trim()
   const keyword = String(payload.keyword || "").trim().toUpperCase()
   const limitRaw = Number(payload.limit)
   const limit = Number.isFinite(limitRaw) ? Math.floor(limitRaw) : 500
 
   return {
     status,
+    schedulePriority,
+    coordinationStatus,
     keyword,
     limit: Math.min(Math.max(limit, 1), 500)
   }
@@ -150,6 +156,25 @@ function validateFilters(event) {
           allowed: ["all"].concat(BOOKING_STATUSES)
         }
       ]
+    })
+  }
+
+  if (
+    filters.schedulePriority &&
+    filters.schedulePriority !== "all" &&
+    !["priority", "normal", "standby"].includes(filters.schedulePriority)
+  ) {
+    return createError("VALIDATION_ERROR", "筛选条件不合法", {
+      errors: [{ field: "schedulePriority", message: "预约优先级不合法" }]
+    })
+  }
+  if (
+    filters.coordinationStatus &&
+    filters.coordinationStatus !== "all" &&
+    !["pending", "coordinating", "resolved"].includes(filters.coordinationStatus)
+  ) {
+    return createError("VALIDATION_ERROR", "筛选条件不合法", {
+      errors: [{ field: "coordinationStatus", message: "协调状态不合法" }]
     })
   }
 
@@ -198,6 +223,64 @@ function matchesKeyword(item, keyword) {
   return source.includes(keyword)
 }
 
+function toTimestamp(input) {
+  if (!input) {
+    return 0
+  }
+
+  if (input instanceof Date) {
+    return input.getTime() || 0
+  }
+
+  if (typeof input === "object" && typeof input.toDate === "function") {
+    return input.toDate().getTime() || 0
+  }
+
+  return new Date(input).getTime() || 0
+}
+
+async function readBookingsByMode(ordered) {
+  const list = []
+
+  for (let offset = 0; offset <= MAX_EXPORT_SOURCE_RECORDS; offset += BOOKING_BATCH_SIZE) {
+    const remaining = MAX_EXPORT_SOURCE_RECORDS + 1 - list.length
+    const batchSize = Math.min(BOOKING_BATCH_SIZE, remaining)
+    let query = db.collection("bookings")
+    if (ordered) {
+      query = query.orderBy("createdAt", "desc")
+    }
+    const res = await query.skip(offset).limit(batchSize).get()
+    const batch = res && Array.isArray(res.data) ? res.data : []
+
+    list.push(...batch)
+    if (batch.length < batchSize || list.length > MAX_EXPORT_SOURCE_RECORDS) {
+      break
+    }
+  }
+
+  return {
+    list: list.slice(0, MAX_EXPORT_SOURCE_RECORDS),
+    truncated: list.length > MAX_EXPORT_SOURCE_RECORDS
+  }
+}
+
+async function readBookings() {
+  try {
+    return await readBookingsByMode(true)
+  } catch (indexError) {
+    console.warn({
+      function: "bookingExportCsv",
+      stage: "indexFallback",
+      errorMessage:
+        indexError && (indexError.message || indexError.errMsg)
+          ? indexError.message || indexError.errMsg
+          : String(indexError),
+      createdAt: new Date().toISOString()
+    })
+    return readBookingsByMode(false)
+  }
+}
+
 function pad2(value) {
   return `${value}`.padStart(2, "0")
 }
@@ -215,7 +298,10 @@ function formatFileName(date) {
 function escapeCsvCell(value) {
   const text = String(value === undefined || value === null ? "" : value)
   const normalized = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n")
-  const escaped = normalized.replace(/"/g, '""')
+  const formulaPrefixPattern =
+    /^[\t\n\u0000]|^[\s\u0000]*[=+\-@\uFF1D\uFF0B\uFF0D\uFF20]/
+  const safeText = formulaPrefixPattern.test(normalized) ? `'${normalized}` : normalized
+  const escaped = safeText.replace(/"/g, '""')
   const needWrap = /[",\n]/.test(escaped)
   return needWrap ? `"${escaped}"` : escaped
 }
@@ -224,6 +310,8 @@ function buildCsv(items) {
   const header = [
     "提交时间",
     "状态",
+    "预约优先级",
+    "协调状态",
     "车辆名称",
     "联系人",
     "手机号",
@@ -242,6 +330,8 @@ function buildCsv(items) {
       [
         item.createdAt,
         item.status,
+        item.schedulePriorityText,
+        item.coordinationStatusText,
         item.vehicleName,
         item.userName,
         item.phone,
@@ -264,6 +354,14 @@ function buildCsv(items) {
 exports.main = async (event) => {
   const wxContext = cloud.getWXContext()
   const openid = wxContext && wxContext.OPENID ? wxContext.OPENID : ""
+  const normalizedLogFilters = normalizeFilters(event)
+  const logContext = {
+    status: normalizedLogFilters.status || "all",
+    schedulePriority: normalizedLogFilters.schedulePriority || "all",
+    coordinationStatus: normalizedLogFilters.coordinationStatus || "all",
+    limit: normalizedLogFilters.limit,
+    keywordProvided: Boolean(normalizedLogFilters.keyword)
+  }
 
   try {
     const allowed = await hasOpenidCapability(openid, "booking_manage")
@@ -277,10 +375,10 @@ exports.main = async (event) => {
     }
 
     const filters = check.value
-    const res = await db.collection("bookings").limit(filters.limit).get()
-    const rawList = res && Array.isArray(res.data) ? res.data : []
+    const bookingRecords = await readBookings()
+    const rawList = bookingRecords.list
 
-    const list = rawList
+    const matchedList = rawList
       .map((item) => ({
         id: item._id || item.id || "",
         vehicleId: item.vehicleId || "",
@@ -292,6 +390,27 @@ exports.main = async (event) => {
         city: item.city || "",
         note: item.note || "",
         adminRemark: item.adminRemark || "",
+        schedulePriority: ["priority", "normal", "standby"].includes(item.schedulePriority)
+          ? item.schedulePriority
+          : "normal",
+        schedulePriorityText:
+          item.schedulePriority === "priority"
+            ? "优先"
+            : item.schedulePriority === "standby"
+              ? "候补"
+              : "常规",
+        coordinationStatus:
+          item.status === "completed" || item.status === "cancelled"
+            ? "resolved"
+            : ["pending", "coordinating", "resolved"].includes(item.coordinationStatus)
+              ? item.coordinationStatus
+              : "pending",
+        coordinationStatusText:
+          item.status === "completed" || item.status === "cancelled" || item.coordinationStatus === "resolved"
+            ? "已协调"
+            : item.coordinationStatus === "coordinating"
+              ? "协调中"
+              : "待协调",
         status: item.status || "pending",
         createdAt: formatTime(item.createdAt),
         updatedAt: formatTime(item.updatedAt)
@@ -300,8 +419,26 @@ exports.main = async (event) => {
         if (filters.status && filters.status !== "all" && item.status !== filters.status) {
           return false
         }
+        if (
+          filters.schedulePriority &&
+          filters.schedulePriority !== "all" &&
+          item.schedulePriority !== filters.schedulePriority
+        ) {
+          return false
+        }
+        if (
+          filters.coordinationStatus &&
+          filters.coordinationStatus !== "all" &&
+          item.coordinationStatus !== filters.coordinationStatus
+        ) {
+          return false
+        }
         return matchesKeyword(item, filters.keyword)
       })
+      .sort((left, right) => toTimestamp(right.createdAt) - toTimestamp(left.createdAt))
+    const list = matchedList.slice(0, filters.limit)
+    const exportTruncated = matchedList.length > filters.limit
+    const truncated = bookingRecords.truncated || exportTruncated
 
     const fileName = formatFileName(new Date())
     const csvText = buildCsv(list)
@@ -310,9 +447,14 @@ exports.main = async (event) => {
       openid,
       action: "bookingExportCsv",
       status: filters.status || "all",
-      keyword: filters.keyword || "",
+      schedulePriority: filters.schedulePriority || "all",
+      coordinationStatus: filters.coordinationStatus || "all",
+      keywordProvided: Boolean(filters.keyword),
       limit: filters.limit,
       total: list.length,
+      matchedTotal: matchedList.length,
+      sourceTruncated: bookingRecords.truncated,
+      exportTruncated,
       fileName
     })
 
@@ -321,6 +463,10 @@ exports.main = async (event) => {
       filters,
       fileName,
       total: list.length,
+      matchedTotal: matchedList.length,
+      sourceTruncated: bookingRecords.truncated,
+      exportTruncated,
+      truncated,
       csvText
     }
   } catch (error) {
@@ -328,7 +474,7 @@ exports.main = async (event) => {
       function: "bookingExportCsv",
       openid,
       stage: "main",
-      input: event && typeof event === "object" ? event : {},
+      ...logContext,
       errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
       stack: error && error.stack ? error.stack : "",
       occurredAt: new Date().toISOString()

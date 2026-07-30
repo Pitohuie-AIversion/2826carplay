@@ -1,4 +1,5 @@
 const { requirePagePermission } = require("../../shared/pageAuth")
+const { removeCsvFile } = require("../../shared/csvFile")
 
 const STATUS_OPTIONS = [
   { value: "all", label: "全部" },
@@ -22,7 +23,58 @@ const STATUS_CLASS_MAP = {
   cancelled: "status-cancelled"
 }
 
+const PRIORITY_TEXT_MAP = {
+  priority: "优先",
+  normal: "常规",
+  standby: "候补"
+}
+
+const COORDINATION_TEXT_MAP = {
+  pending: "待协调",
+  coordinating: "协调中",
+  resolved: "已协调"
+}
+
+const PRIORITY_OPTIONS = [
+  { value: "all", label: "全部级别" },
+  { value: "priority", label: "优先" },
+  { value: "normal", label: "常规" },
+  { value: "standby", label: "候补" }
+]
+
+const COORDINATION_OPTIONS = [
+  { value: "all", label: "全部进度" },
+  { value: "pending", label: "待协调" },
+  { value: "coordinating", label: "协调中" },
+  { value: "resolved", label: "已协调" }
+]
+
 const DEFAULT_PAGE_SIZE = 20
+
+function showStatusUpdateFeedback(result, done) {
+  const notificationStatus = String((result && result.notificationStatus) || "")
+  if (notificationStatus === "failed") {
+    wx.showModal({
+      title: "状态已更新",
+      content: "预约状态已更新，但提醒发送失败。可在错误日志中查看原因。",
+      showCancel: false,
+      complete: done
+    })
+    return
+  }
+
+  const title =
+    notificationStatus === "sent"
+      ? "提醒已发送"
+      : notificationStatus === "not_subscribed"
+        ? "用户未订阅提醒"
+        : "状态已更新"
+  wx.showToast({
+    title,
+    icon: "none"
+  })
+  done()
+}
 
 function buildStatusSummary(stats) {
   return [
@@ -127,6 +179,15 @@ function normalizeRemark(value) {
   return String(value || "").slice(0, 200)
 }
 
+function normalizePhone(value) {
+  const phone = String(value || "").trim()
+  const digitCount = phone.replace(/\D/g, "").length
+  if (!/^\+?[0-9-]{6,20}$/.test(phone) || digitCount < 6 || digitCount > 15) {
+    return ""
+  }
+  return phone
+}
+
 function ensureCsvFileName(name) {
   const raw = String(name || "").trim()
   if (!raw) {
@@ -179,7 +240,12 @@ Page({
     keyword: "",
     currentStatus: "all",
     statusOptions: STATUS_OPTIONS,
+    currentPriority: "all",
+    priorityOptions: PRIORITY_OPTIONS,
+    currentCoordination: "all",
+    coordinationOptions: COORDINATION_OPTIONS,
     total: 0,
+    truncated: false,
     summaryItems: buildStatusSummary({}),
     statusRatioSegments: buildStatusRatioSegments({}),
     recentCreatedList: [],
@@ -257,10 +323,30 @@ Page({
     this.fetchList()
   },
 
+  handlePriorityTap(event) {
+    const value = String(event.currentTarget.dataset.value || "")
+    if (!value || value === this.data.currentPriority) {
+      return
+    }
+    this.setData({ currentPriority: value })
+    this.fetchList()
+  },
+
+  handleCoordinationTap(event) {
+    const value = String(event.currentTarget.dataset.value || "")
+    if (!value || value === this.data.currentCoordination) {
+      return
+    }
+    this.setData({ currentCoordination: value })
+    this.fetchList()
+  },
+
   handleReset() {
     this.setData({
       keyword: "",
-      currentStatus: "all"
+      currentStatus: "all",
+      currentPriority: "all",
+      currentCoordination: "all"
     })
 
     this.fetchList()
@@ -288,15 +374,15 @@ Page({
     }
 
     this.setData({
-      loading: true,
-      exportFilePath: "",
-      exportFileName: ""
+      loading: true
     })
 
     wx.cloud.callFunction({
       name: "bookingExportCsv",
       data: {
         status: this.data.currentStatus,
+        schedulePriority: this.data.currentPriority,
+        coordinationStatus: this.data.currentCoordination,
         keyword: this.data.keyword,
         limit: 500
       },
@@ -313,7 +399,11 @@ Page({
 
         this.saveExportedCsv({
           fileName: ensureCsvFileName(result.fileName),
-          csvText: result.csvText
+          csvText: result.csvText,
+          total: Number(result.total) || 0,
+          matchedTotal: Number(result.matchedTotal) || 0,
+          sourceTruncated: Boolean(result.sourceTruncated),
+          truncated: Boolean(result.truncated)
         })
       },
       fail: (error) => {
@@ -326,7 +416,7 @@ Page({
     })
   },
 
-  saveExportedCsv({ fileName, csvText }) {
+  saveExportedCsv({ fileName, csvText, total, matchedTotal, sourceTruncated, truncated }) {
     const fs = wx.getFileSystemManager && wx.getFileSystemManager()
     if (!fs) {
       wx.showToast({
@@ -345,15 +435,29 @@ Page({
       data: csvText,
       encoding: "utf8",
       success: () => {
+        const previousFilePath = this.data.exportFilePath
         this.setData({
           loading: false,
           exportFilePath: filePath,
           exportFileName: fileName
         })
-        wx.showToast({
-          title: "CSV已生成，请点击下方按钮分享",
-          icon: "none"
-        })
+        if (previousFilePath && previousFilePath !== filePath) {
+          removeCsvFile(previousFilePath).catch(() => {})
+        }
+        if (truncated) {
+          wx.showModal({
+            title: "CSV已生成",
+            content: sourceTruncated
+              ? `已导出最近扫描结果中的 ${total} 条，数据超过 2000 条扫描上限，请缩小筛选范围后分批导出。`
+              : `符合条件 ${matchedTotal} 条，本次已导出 ${total} 条，请缩小筛选范围后分批导出。`,
+            showCancel: false
+          })
+        } else {
+          wx.showToast({
+            title: "CSV已生成，请点击下方按钮分享",
+            icon: "none"
+          })
+        }
       },
       fail: (error) => {
         wx.showToast({
@@ -387,6 +491,39 @@ Page({
     }
 
     this.openCsvFile(this.data.exportFilePath)
+  },
+
+  handleDeleteExportedFile() {
+    const filePath = String(this.data.exportFilePath || "")
+    if (!filePath) {
+      return
+    }
+    wx.showModal({
+      title: "删除本地 CSV",
+      content: "将从当前设备删除这份导出文件，删除后无法恢复。云端预约数据不会受到影响。",
+      success: (res) => {
+        if (!res.confirm) {
+          return
+        }
+        removeCsvFile(filePath)
+          .then(() => {
+            this.setData({
+              exportFilePath: "",
+              exportFileName: ""
+            })
+            wx.showToast({
+              title: "本地文件已删除",
+              icon: "none"
+            })
+          })
+          .catch((error) => {
+            wx.showToast({
+              title: getErrorMessage(error) || "删除失败",
+              icon: "none"
+            })
+          })
+      }
+    })
   },
 
   shareCsvFile(filePath, fileName) {
@@ -503,6 +640,37 @@ Page({
     })
   },
 
+  handleCallPhone(event) {
+    const phone = normalizePhone(event.currentTarget.dataset.phone)
+    if (!phone) {
+      wx.showToast({
+        title: "手机号不可用",
+        icon: "none"
+      })
+      return
+    }
+
+    wx.makePhoneCall({
+      phoneNumber: phone,
+      success: () => {
+        wx.showToast({
+          title: "已打开拨号",
+          icon: "none"
+        })
+      },
+      fail: (error) => {
+        const message = error && (error.errMsg || error.message)
+        if (message && String(message).includes("cancel")) {
+          return
+        }
+        wx.showToast({
+          title: "拨号失败，请进入详情复制号码",
+          icon: "none"
+        })
+      }
+    })
+  },
+
   handleUpdateStatus(event) {
     if (this.data.loading) {
       return
@@ -573,12 +741,9 @@ Page({
           return
         }
 
-        wx.showToast({
-          title: "状态已更新",
-          icon: "none"
+        showStatusUpdateFeedback(result, () => {
+          this.fetchList()
         })
-
-        this.fetchList()
       },
       fail: (error) => {
         wx.showToast({
@@ -659,8 +824,10 @@ Page({
       name: "bookingList",
       data: {
         status: this.data.currentStatus,
+        schedulePriority: this.data.currentPriority,
+        coordinationStatus: this.data.currentCoordination,
         keyword: this.data.keyword,
-        limit: 500,
+        limit: 2000,
         page: nextPage,
         pageSize
       },
@@ -669,6 +836,15 @@ Page({
         const list = result && result.ok && Array.isArray(result.list) ? result.list : []
         const formatted = list.map((item) => {
           const status = item.status || "pending"
+          const schedulePriority = PRIORITY_TEXT_MAP[item.schedulePriority]
+            ? item.schedulePriority
+            : "normal"
+          const coordinationStatus =
+            status === "completed" || status === "cancelled"
+              ? "resolved"
+              : COORDINATION_TEXT_MAP[item.coordinationStatus]
+                ? item.coordinationStatus
+                : "pending"
           return {
             ...item,
             statusText: STATUS_TEXT_MAP[status] || "待联系",
@@ -676,7 +852,13 @@ Page({
             createdAtText: formatDisplayTime(item.createdAt),
             adminRemark: item.adminRemark || "",
             adminRemarkDraft: item.adminRemark || "",
-            adminRemarkUpdatedAtText: formatDisplayTime(item.adminRemarkUpdatedAt)
+            adminRemarkUpdatedAtText: formatDisplayTime(item.adminRemarkUpdatedAt),
+            schedulePriority,
+            schedulePriorityText: PRIORITY_TEXT_MAP[schedulePriority],
+            priorityClass: `priority-${schedulePriority}`,
+            coordinationStatus,
+            coordinationStatusText: COORDINATION_TEXT_MAP[coordinationStatus],
+            coordinationClass: `coordination-${coordinationStatus}`
           }
         })
 
@@ -687,6 +869,7 @@ Page({
           page: result && result.ok && Number.isInteger(result.page) ? result.page : nextPage,
           hasMore: Boolean(result && result.ok && result.hasMore),
           total: result && result.ok ? result.total || 0 : 0,
+          truncated: Boolean(result && result.ok && result.truncated),
           summaryItems: buildStatusSummary((result && result.dashboard) || {}),
           statusRatioSegments: buildStatusRatioSegments((result && result.dashboard) || {}),
           recentCreatedList: buildRecentCreatedViewModel((result && result.recentCreatedList) || []),
@@ -706,6 +889,7 @@ Page({
           page: 0,
           hasMore: false,
           total: 0,
+          truncated: false,
           summaryItems: buildStatusSummary({}),
           statusRatioSegments: buildStatusRatioSegments({}),
           recentCreatedList: [],

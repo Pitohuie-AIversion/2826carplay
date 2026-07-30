@@ -106,12 +106,20 @@ exports.main = async (event) => {
       })
     }
 
-    await db.collection("bookings").doc(input.id).update({
+    const updateRes = await db.collection("bookings").where({
+      _id: input.id,
+      openid,
+      status
+    }).update({
       data: {
         status: "cancelled",
         updatedAt: db.serverDate()
       }
     })
+    const updatedCount = Number(updateRes && updateRes.stats && updateRes.stats.updated) || 0
+    if (updatedCount < 1) {
+      return createError("STATUS_CONFLICT", "预约状态已发生变化，请刷新后重试")
+    }
 
     await writeAuditLogBestEffort({
       openid,

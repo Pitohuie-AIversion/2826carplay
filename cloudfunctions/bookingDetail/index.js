@@ -3,6 +3,9 @@ const cloud = require("wx-server-sdk")
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
+const CONFLICT_BATCH_SIZE = 100
+const MAX_CONFLICT_SCAN_RECORDS = 1000
+const MAX_CONFLICT_RESULTS = 20
 
 function createError(code, message, details) {
   const result = {
@@ -96,6 +99,145 @@ function formatTime(input) {
   return ""
 }
 
+function getBookingId(item) {
+  return String((item && (item._id || item.id)) || "").trim()
+}
+
+function hasValidDateRange(item) {
+  const startDate = String((item && item.startDate) || "").trim()
+  const endDate = String((item && (item.endDate || item.startDate)) || "").trim()
+  return (
+    /^\d{4}-\d{2}-\d{2}$/.test(startDate) &&
+    /^\d{4}-\d{2}-\d{2}$/.test(endDate) &&
+    startDate <= endDate
+  )
+}
+
+function overlapsTarget(item, target) {
+  if (!hasValidDateRange(item) || !hasValidDateRange(target)) {
+    return false
+  }
+
+  const itemStart = String(item.startDate || "")
+  const itemEnd = String(item.endDate || item.startDate || "")
+  const targetStart = String(target.startDate || "")
+  const targetEnd = String(target.endDate || target.startDate || "")
+  return itemStart <= targetEnd && itemEnd >= targetStart
+}
+
+async function readVehicleBookings(vehicleId) {
+  const list = []
+
+  for (
+    let offset = 0;
+    offset <= MAX_CONFLICT_SCAN_RECORDS;
+    offset += CONFLICT_BATCH_SIZE
+  ) {
+    const remaining = MAX_CONFLICT_SCAN_RECORDS + 1 - list.length
+    const batchSize = Math.min(CONFLICT_BATCH_SIZE, remaining)
+    const res = await db
+      .collection("bookings")
+      .where({ vehicleId })
+      .skip(offset)
+      .limit(batchSize)
+      .get()
+    const batch = res && Array.isArray(res.data) ? res.data : []
+    list.push(...batch)
+    if (batch.length < batchSize || list.length > MAX_CONFLICT_SCAN_RECORDS) {
+      break
+    }
+  }
+
+  return {
+    list: list.slice(0, MAX_CONFLICT_SCAN_RECORDS),
+    truncated: list.length > MAX_CONFLICT_SCAN_RECORDS
+  }
+}
+
+function mapConflictBooking(item) {
+  const bookingStatus = String((item && item.status) || "pending").trim() || "pending"
+  const schedulePriority = ["priority", "normal", "standby"].includes(item && item.schedulePriority)
+    ? item.schedulePriority
+    : "normal"
+  const coordinationStatus = bookingStatus === "completed" || bookingStatus === "cancelled"
+    ? "resolved"
+    : ["pending", "coordinating", "resolved"].includes(item && item.coordinationStatus)
+      ? item.coordinationStatus
+      : "pending"
+  return {
+    id: getBookingId(item),
+    userName: String((item && item.userName) || "").trim(),
+    phone: String((item && item.phone) || "").trim(),
+    startDate: String((item && item.startDate) || "").trim(),
+    endDate: String((item && (item.endDate || item.startDate)) || "").trim(),
+    city: String((item && item.city) || "").trim(),
+    status: bookingStatus,
+    schedulePriority,
+    coordinationStatus
+  }
+}
+
+async function findBookingConflicts(target, targetId) {
+  const vehicleId = String((target && target.vehicleId) || "").trim()
+  if (
+    !vehicleId ||
+    String((target && target.status) || "pending") === "cancelled" ||
+    !hasValidDateRange(target)
+  ) {
+    return {
+      list: [],
+      total: 0,
+      truncated: false,
+      unavailable: false,
+      skipped: true
+    }
+  }
+
+  try {
+    const records = await readVehicleBookings(vehicleId)
+    const conflicts = records.list
+      .filter((item) => {
+        const itemId = getBookingId(item)
+        return (
+          itemId &&
+          itemId !== targetId &&
+          String((item && item.vehicleId) || "").trim() === vehicleId &&
+          String((item && item.status) || "pending").trim() !== "cancelled" &&
+          overlapsTarget(item, target)
+        )
+      })
+      .map(mapConflictBooking)
+      .sort((prev, next) => {
+        const dateOrder = prev.startDate.localeCompare(next.startDate)
+        return dateOrder || prev.id.localeCompare(next.id)
+      })
+
+    return {
+      list: conflicts.slice(0, MAX_CONFLICT_RESULTS),
+      total: conflicts.length,
+      truncated: records.truncated || conflicts.length > MAX_CONFLICT_RESULTS,
+      unavailable: false,
+      skipped: false
+    }
+  } catch (error) {
+    console.warn({
+      function: "bookingDetail",
+      stage: "conflictQuery",
+      bookingId: targetId,
+      vehicleId,
+      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
+      createdAt: new Date().toISOString()
+    })
+    return {
+      list: [],
+      total: 0,
+      truncated: false,
+      unavailable: true,
+      skipped: false
+    }
+  }
+}
+
 async function writeErrorLogBestEffort(payload) {
   try {
     await db.collection("error_logs").add({
@@ -142,6 +284,8 @@ exports.main = async (event) => {
       return createError("NOT_FOUND", "预约不存在")
     }
 
+    const conflictResult = await findBookingConflicts(item, id)
+
     return {
       ok: true,
       detail: {
@@ -157,10 +301,25 @@ exports.main = async (event) => {
         note: item.note || "",
         adminRemark: item.adminRemark || "",
         adminRemarkUpdatedAt: formatTime(item.adminRemarkUpdatedAt),
+        schedulePriority: ["priority", "normal", "standby"].includes(item.schedulePriority)
+          ? item.schedulePriority
+          : "normal",
+        coordinationStatus:
+          item.status === "completed" || item.status === "cancelled"
+            ? "resolved"
+            : ["pending", "coordinating", "resolved"].includes(item.coordinationStatus)
+              ? item.coordinationStatus
+              : "pending",
+        coordinationUpdatedAt: formatTime(item.coordinationUpdatedAt),
         status: item.status || "pending",
         createdAt: formatTime(item.createdAt),
         updatedAt: formatTime(item.updatedAt)
-      }
+      },
+      conflicts: conflictResult.list,
+      conflictTotal: conflictResult.total,
+      conflictsTruncated: conflictResult.truncated,
+      conflictsUnavailable: conflictResult.unavailable,
+      conflictCheckSkipped: conflictResult.skipped
     }
   } catch (error) {
     console.error({

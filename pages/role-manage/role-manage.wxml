@@ -1,15 +1,29 @@
-<view class="role-page">
+<view class="role-page management-page">
+  <view class="page-glow"></view>
   <view class="hero-card ui-card ui-card-gradient">
-    <view class="hero-title">权限管理</view>
-    <view class="hero-desc">仅管理员可访问。按 OpenID 分配车辆管理与预约管理权限，admin 账号仅展示不可改。</view>
+    <view class="hero-top">
+      <view class="hero-copy">
+        <view class="page-kicker">ACCESS CONTROL</view>
+        <view class="hero-title">权限管理</view>
+        <view class="hero-desc">分配车辆、预约与运营管理权限</view>
+      </view>
+      <image class="hero-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+    </view>
   </view>
 
   <view class="form-card ui-card">
-    <view class="section-title">{{editingOpenid ? "编辑权限" : "新增权限"}}</view>
+    <view class="section-heading">
+      <view>
+        <view class="section-eyebrow">MEMBER ACCESS</view>
+        <view class="section-heading-title">{{editingOpenid ? "编辑权限" : "新增权限"}}</view>
+      </view>
+      <view class="section-index">01</view>
+    </view>
     <input
       class="openid-input ui-input"
       placeholder="请输入目标用户 OpenID"
       value="{{formOpenid}}"
+      disabled="{{!!editingOpenid}}"
       bindinput="handleOpenidInput"
     />
 
@@ -25,7 +39,7 @@
       </view>
     </view>
 
-    <view class="form-tip">不选任何权限时，将保存为普通成员记录。</view>
+    <view class="form-tip">{{editingOpenid ? "编辑时不可更换 OpenID；如需新增成员，请先清空表单。" : "不选任何权限时，将保存为普通成员记录。"}}</view>
 
     <view class="action-row">
       <button class="save-btn ui-btn ui-btn-primary" loading="{{saving}}" bindtap="handleSubmit">保存权限</button>
@@ -34,10 +48,31 @@
   </view>
 
   <view class="list-card ui-card">
-    <view class="section-title">当前角色列表</view>
+    <view class="section-heading">
+      <view>
+        <view class="section-eyebrow">TEAM MEMBERS</view>
+        <view class="section-heading-title">当前角色列表</view>
+      </view>
+      <view class="section-index">02</view>
+    </view>
     <view class="section-desc">优先显示管理员，其余按 OpenID 排序。</view>
 
-    <view wx:if="{{loading}}" class="loading-text">角色列表加载中...</view>
+    <view wx:if="{{(initialLoading || loading) && !list.length}}" class="role-skeleton">
+      <view class="role-skeleton-item">
+        <view class="role-skeleton-copy">
+          <view class="role-skeleton-openid manage-skeleton-pulse"></view>
+          <view class="role-skeleton-permission manage-skeleton-pulse"></view>
+        </view>
+        <view class="role-skeleton-action manage-skeleton-pulse"></view>
+      </view>
+      <view class="role-skeleton-item role-skeleton-item-muted">
+        <view class="role-skeleton-copy">
+          <view class="role-skeleton-openid manage-skeleton-pulse"></view>
+          <view class="role-skeleton-permission manage-skeleton-pulse"></view>
+        </view>
+        <view class="role-skeleton-action manage-skeleton-pulse"></view>
+      </view>
+    </view>
 
     <view wx:elif="{{list.length}}" class="role-list">
       <view wx:for="{{list}}" wx:key="id" class="role-item">
@@ -56,9 +91,20 @@
         </button>
         <view wx:else class="admin-tag">Admin</view>
       </view>
+      <button
+        wx:if="{{hasMore}}"
+        class="load-more-btn ui-btn ui-btn-ghost"
+        loading="{{loading}}"
+        disabled="{{loading}}"
+        bindtap="handleLoadMore"
+      >
+        加载更多
+      </button>
     </view>
 
     <view wx:else class="empty-wrap">
+      <image class="role-empty-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+      <view class="role-empty-kicker">NO ACCESS RECORDS</view>
       <view class="empty-title">{{emptyTitle}}</view>
       <view class="empty-desc">{{emptyDesc}}</view>
     </view>

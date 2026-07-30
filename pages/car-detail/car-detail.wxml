@@ -1,25 +1,94 @@
-<view class="detail-page" wx:if="{{car}}">
-  <swiper wx:if="{{car.hasImages}}" class="hero-swiper" indicator-dots="{{true}}" autoplay="{{false}}" circular="{{true}}">
-    <swiper-item wx:for="{{car.images}}" wx:key="*this">
-      <image class="hero-image" src="{{item}}" mode="aspectFill" />
-    </swiper-item>
-  </swiper>
-  <view wx:else class="hero-swiper hero-placeholder">
-    <view class="hero-placeholder-brand">{{car.brand}}</view>
-    <view class="hero-placeholder-name">{{car.name}}</view>
-    <view class="hero-placeholder-text">该车辆暂未上传展示图片</view>
+<view class="detail-loading-page" wx:if="{{loading}}">
+  <view class="detail-loading-hero skeleton-pulse"></view>
+  <view class="detail-loading-card ui-card">
+    <view class="detail-loading-kicker skeleton-pulse"></view>
+    <view class="detail-loading-title skeleton-pulse"></view>
+    <view class="detail-loading-subtitle skeleton-pulse"></view>
+    <view class="detail-loading-divider"></view>
+    <view class="detail-loading-row">
+      <view class="detail-loading-price skeleton-pulse"></view>
+      <view class="detail-loading-status skeleton-pulse"></view>
+    </view>
+  </view>
+  <view class="detail-loading-card detail-loading-info ui-card">
+    <view class="detail-loading-section-title skeleton-pulse"></view>
+    <view class="detail-loading-line skeleton-pulse"></view>
+    <view class="detail-loading-line detail-loading-line-short skeleton-pulse"></view>
+  </view>
+</view>
+
+<view class="detail-page" wx:elif="{{car}}">
+  <view class="hero-shell">
+    <swiper wx:if="{{car.hasImages}}" class="hero-swiper" indicator-dots="{{false}}" autoplay="{{false}}" circular="{{true}}" bindchange="handleHeroSwiperChange">
+      <swiper-item wx:for="{{car.imageItems}}" wx:key="key">
+        <view class="hero-image-frame">
+          <view wx:if="{{!item.loaded && !item.failed}}" class="hero-image-loading">
+            <view class="hero-image-loading-ring"></view>
+            <view class="hero-image-loading-text">LOADING VEHICLE</view>
+          </view>
+          <view wx:if="{{item.failed}}" class="hero-image-fallback">
+            <view class="hero-placeholder-brand">{{car.brand}}</view>
+            <view class="hero-placeholder-name">{{car.name}}</view>
+            <view class="hero-placeholder-text">该图片暂时无法显示</view>
+          </view>
+          <image
+            wx:if="{{!item.failed}}"
+            class="hero-image {{item.loaded ? 'hero-image-loaded' : ''}}"
+            src="{{item.src}}"
+            mode="aspectFill"
+            lazy-load="{{true}}"
+            fade-in="{{false}}"
+            data-index="{{index}}"
+            bindload="handleHeroImageLoad"
+            binderror="handleHeroImageError"
+          />
+        </view>
+      </swiper-item>
+    </swiper>
+    <view wx:else class="hero-swiper hero-placeholder">
+      <view class="hero-placeholder-brand">{{car.brand}}</view>
+      <view class="hero-placeholder-name">{{car.name}}</view>
+      <view class="hero-placeholder-text">该车辆暂未上传展示图片</view>
+    </view>
+    <view class="hero-shade"></view>
+    <view class="hero-signature">
+      <view class="signature-line"></view>
+      <text>EXTREME GARAGE</text>
+    </view>
+    <view wx:if="{{car.hasImages}}" class="hero-counter">
+      <text class="hero-counter-current">{{currentImageIndex + 1}}</text>
+      <text class="hero-counter-divider">/</text>
+      <text>{{car.imageItems.length}}</text>
+    </view>
   </view>
 
   <view class="summary-card ui-card">
     <view class="summary-top">
-      <view>
+      <view class="summary-identity">
+        <view class="summary-kicker">{{car.brand}} · PRIVATE COLLECTION</view>
         <view class="car-name">{{car.name}}</view>
         <view class="car-nickname">{{car.nickname}}</view>
       </view>
-      <view class="car-status ui-status {{car.statusClass}}">{{car.statusText}}</view>
+      <view class="summary-actions">
+        <view class="car-status ui-status {{car.statusClass}}">{{car.statusText}}</view>
+        <button
+          class="favorite-button {{favorited ? 'favorite-button-active' : ''}}"
+          loading="{{favoriteLoading}}"
+          disabled="{{favoriteLoading}}"
+          bindtap="handleFavoriteTap"
+        >
+          {{favorited ? '已收藏' : '收藏'}}
+        </button>
+      </view>
     </view>
 
-    <view class="car-price">{{car.priceText}}</view>
+    <view class="price-row">
+      <view>
+        <view class="price-label">参考价格</view>
+        <view class="car-price">{{car.priceText}}</view>
+      </view>
+      <view class="price-note">以顾问最终确认为准</view>
+    </view>
 
     <view class="tag-list">
       <text wx:for="{{car.tags}}" wx:key="*this" class="tag-item">{{item}}</text>
@@ -27,17 +96,26 @@
   </view>
 
   <view class="notice-card ui-card" wx:if="{{car.statusNoticeText}}">
-    <view class="notice-title">当前状态说明</view>
+    <view class="section-heading">
+      <view class="section-mark"></view>
+      <view class="notice-title">当前状态说明</view>
+    </view>
     <view class="notice-text">{{car.statusNoticeText}}</view>
   </view>
 
   <view class="info-card ui-card">
-    <view class="section-title">车辆简介</view>
+    <view class="section-heading">
+      <view class="section-mark"></view>
+      <view class="section-title">车辆简介</view>
+    </view>
     <view class="section-text">{{car.description}}</view>
   </view>
 
   <view class="info-card ui-card">
-    <view class="section-title">基础信息</view>
+    <view class="section-heading">
+      <view class="section-mark"></view>
+      <view class="section-title">基础信息</view>
+    </view>
     <view class="info-grid">
       <view class="info-item">
         <view class="info-label">品牌</view>
@@ -67,8 +145,11 @@
   </view>
 
   <view class="info-card ui-card">
-    <view class="section-title">租赁说明</view>
-    <view wx:for="{{rentalTips}}" wx:key="*this" class="section-text">{{item}}</view>
+    <view class="section-heading">
+      <view class="section-mark"></view>
+      <view class="section-title">租赁说明</view>
+    </view>
+    <view wx:for="{{rentalTips}}" wx:key="*this" class="section-text rental-tip">{{item}}</view>
   </view>
 
   <view class="detail-bottom-bar">

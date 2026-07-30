@@ -3,6 +3,8 @@ const cloud = require("wx-server-sdk")
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
+const ROLE_BATCH_SIZE = 100
+const MAX_ROLE_RECORDS = 2000
 
 function normalizeStringArray(value) {
   if (!Array.isArray(value)) {
@@ -65,9 +67,42 @@ async function isAdminOpenid(openid) {
   return list.some((item) => hasAdminRole(item))
 }
 
-exports.main = async () => {
+function normalizePageSize(value) {
+  const num = Number(value)
+  if (!Number.isFinite(num)) {
+    return 20
+  }
+
+  return Math.min(50, Math.max(1, Math.floor(num)))
+}
+
+async function listRoleRecords() {
+  const list = []
+
+  for (let offset = 0; offset <= MAX_ROLE_RECORDS; offset += ROLE_BATCH_SIZE) {
+    const remaining = MAX_ROLE_RECORDS + 1 - list.length
+    const batchSize = Math.min(ROLE_BATCH_SIZE, remaining)
+    const res = await db.collection("roles").skip(offset).limit(batchSize).get()
+    const batch = res && Array.isArray(res.data) ? res.data : []
+
+    list.push(...batch)
+    if (batch.length < batchSize || list.length > MAX_ROLE_RECORDS) {
+      break
+    }
+  }
+
+  return {
+    list: list.slice(0, MAX_ROLE_RECORDS),
+    truncated: list.length > MAX_ROLE_RECORDS
+  }
+}
+
+exports.main = async (event) => {
   const wxContext = cloud.getWXContext()
   const openid = wxContext && wxContext.OPENID ? wxContext.OPENID : ""
+  const pageSize = normalizePageSize((event && event.pageSize) || (event && event.limit))
+  const pageRaw = Number(event && event.page)
+  const page = Number.isFinite(pageRaw) && pageRaw > 0 ? Math.floor(pageRaw) : 0
 
   try {
     const allowed = await isAdminOpenid(openid)
@@ -79,9 +114,8 @@ exports.main = async () => {
       }
     }
 
-    const res = await db.collection("roles").limit(200).get()
-    const rawList = res && Array.isArray(res.data) ? res.data : []
-    const list = rawList
+    const roleRecords = await listRoleRecords()
+    const sortedList = roleRecords.list
       .map((item) => ({
         id: item._id || "",
         openid: String(item.openid || "").trim(),
@@ -97,9 +131,15 @@ exports.main = async () => {
         }
         return prev.isAdmin ? -1 : 1
       })
+    const start = page * pageSize
+    const end = start + pageSize
+    const list = sortedList.slice(start, end)
 
     return {
       ok: true,
+      page,
+      pageSize,
+      hasMore: end < sortedList.length || (roleRecords.truncated && end <= MAX_ROLE_RECORDS),
       list
     }
   } catch (error) {

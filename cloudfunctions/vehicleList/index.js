@@ -4,6 +4,8 @@ const vehicleUtils = require("./vehicle")
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
+const VEHICLE_BATCH_SIZE = 100
+const MAX_VEHICLE_RECORDS = 2000
 
 function normalizeStringArray(value) {
   if (!Array.isArray(value)) {
@@ -201,6 +203,48 @@ function buildRecentAddedList(list) {
     }))
 }
 
+async function readVehiclesByMode(ordered) {
+  const list = []
+
+  for (let offset = 0; offset <= MAX_VEHICLE_RECORDS; offset += VEHICLE_BATCH_SIZE) {
+    const remaining = MAX_VEHICLE_RECORDS + 1 - list.length
+    const batchSize = Math.min(VEHICLE_BATCH_SIZE, remaining)
+    let query = db.collection("vehicles")
+    if (ordered) {
+      query = query.orderBy("updatedAt", "desc")
+    }
+    const res = await query.skip(offset).limit(batchSize).get()
+    const batch = res && Array.isArray(res.data) ? res.data : []
+
+    list.push(...batch)
+    if (batch.length < batchSize || list.length > MAX_VEHICLE_RECORDS) {
+      break
+    }
+  }
+
+  return {
+    list: list.slice(0, MAX_VEHICLE_RECORDS),
+    truncated: list.length > MAX_VEHICLE_RECORDS
+  }
+}
+
+async function readVehicles() {
+  try {
+    return await readVehiclesByMode(true)
+  } catch (indexError) {
+    console.warn({
+      function: "vehicleList",
+      stage: "indexFallback",
+      errorMessage:
+        indexError && (indexError.message || indexError.errMsg)
+          ? indexError.message || indexError.errMsg
+          : String(indexError),
+      createdAt: new Date().toISOString()
+    })
+    return readVehiclesByMode(false)
+  }
+}
+
 exports.main = async (event) => {
   const wxContext = cloud.getWXContext()
   const openid = wxContext && wxContext.OPENID ? wxContext.OPENID : ""
@@ -221,8 +265,8 @@ exports.main = async (event) => {
     }
 
     const filters = filterCheck.value
-    const res = await db.collection("vehicles").limit(100).get()
-    const rawList = res && Array.isArray(res.data) ? res.data : []
+    const vehicleRecords = await readVehicles()
+    const rawList = vehicleRecords.list
 
     const formattedList = rawList.map((item) => ({
       id: item._id || item.id || "",
@@ -238,6 +282,7 @@ exports.main = async (event) => {
       priceDay: item.priceDay === undefined ? null : item.priceDay,
       vin: item.vin || "",
       engineNumber: item.engineNumber || "",
+      publicDescription: item.publicDescription || "",
       note: item.note || "",
       imageList: Array.isArray(item.imageList) ? item.imageList.filter(Boolean) : [],
       coverImage: item.coverImage || "",
@@ -271,6 +316,7 @@ exports.main = async (event) => {
       ok: true,
       filters,
       total: filteredList.length,
+      truncated: vehicleRecords.truncated,
       stats: buildStats(filteredList),
       dashboard: buildDashboardStats(formattedList),
       recentAddedList: buildRecentAddedList(formattedList),

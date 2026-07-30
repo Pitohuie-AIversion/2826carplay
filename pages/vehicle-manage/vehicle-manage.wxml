@@ -1,11 +1,25 @@
-<view class="vehicle-manage-page">
+<view class="vehicle-manage-page management-page">
+  <view class="page-glow"></view>
   <view class="hero-card ui-card ui-card-gradient">
-    <view class="hero-title">车辆管理</view>
-    <view class="hero-desc">查看已录入车辆，支持按状态和关键词筛选。</view>
+    <view class="hero-top">
+      <view class="hero-copy">
+        <view class="page-kicker">FLEET OPERATIONS</view>
+        <view class="hero-title">车辆管理</view>
+        <view class="hero-desc">查看车辆档案、库存状态与展示素材</view>
+      </view>
+      <image class="hero-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+    </view>
     <button class="hero-button ui-btn ui-btn-primary" bindtap="handleGoCreate">新增车辆</button>
   </view>
 
   <view class="section-card ui-card">
+    <view class="section-heading">
+      <view>
+        <view class="section-eyebrow">FLEET FILTER</view>
+        <view class="section-heading-title">筛选车辆</view>
+      </view>
+      <view class="section-index">01</view>
+    </view>
     <view class="search-row">
       <input
         class="search-input ui-input"
@@ -33,15 +47,20 @@
     </scroll-view>
 
     <view class="action-row">
-      <view class="result-count">共 {{total}} 条记录</view>
+      <view class="result-count">共 {{total}}{{truncated ? '+' : ''}} 条记录</view>
       <button class="reset-button ui-btn ui-btn-ghost" bindtap="handleReset">重置筛选</button>
     </view>
   </view>
 
+  <view wx:if="{{truncated}}" class="result-count">当前最多展示已读取的 2000 辆，请缩小筛选范围。</view>
+
   <view class="dashboard-card ui-card ui-card-gradient">
     <view class="dashboard-head">
-      <view class="dashboard-title">运营看板</view>
-      <view class="dashboard-desc">基于全部车辆统计，不受当前筛选影响</view>
+      <view>
+        <view class="section-eyebrow">LIVE OVERVIEW</view>
+        <view class="dashboard-title">运营看板</view>
+      </view>
+      <view class="dashboard-desc">全量车辆统计</view>
     </view>
     <view class="summary-grid">
       <view wx:for="{{summaryItems}}" wx:key="key" class="summary-item">
@@ -94,14 +113,39 @@
   </view>
 
   <view class="loading-wrap" wx:if="{{loading}}">
-    <view class="loading-text">车辆数据加载中...</view>
+    <view class="manage-loading-head">
+      <view>
+        <view class="manage-loading-kicker manage-skeleton-pulse"></view>
+        <view class="manage-loading-title manage-skeleton-pulse"></view>
+      </view>
+      <view class="manage-loading-count manage-skeleton-pulse"></view>
+    </view>
+    <view class="manage-loading-card ui-card">
+      <view class="manage-loading-cover manage-skeleton-pulse"></view>
+      <view class="manage-loading-copy">
+        <view class="manage-loading-line manage-loading-line-title manage-skeleton-pulse"></view>
+        <view class="manage-loading-line manage-skeleton-pulse"></view>
+        <view class="manage-loading-line manage-loading-line-short manage-skeleton-pulse"></view>
+        <view class="manage-loading-grid">
+          <view class="manage-loading-grid-item manage-skeleton-pulse"></view>
+          <view class="manage-loading-grid-item manage-skeleton-pulse"></view>
+        </view>
+      </view>
+    </view>
   </view>
 
   <view class="vehicle-list" wx:elif="{{list.length}}">
+    <view class="list-heading">
+      <view>
+        <view class="list-kicker">FLEET RECORDS</view>
+        <view class="list-title">车辆档案</view>
+      </view>
+      <view class="list-count">{{total}}{{truncated ? '+' : ''}} 辆</view>
+    </view>
     <view wx:for="{{list}}" wx:key="id" class="vehicle-card ui-card">
       <view class="vehicle-card-top">
         <view class="vehicle-cover-wrap" data-id="{{item.id}}" bindtap="handleViewDetail">
-          <image wx:if="{{item.coverImage}}" class="vehicle-cover" src="{{item.coverImage}}" mode="aspectFill" />
+          <image wx:if="{{item.coverImage}}" class="vehicle-cover" src="{{item.coverImage}}" mode="aspectFill" lazy-load="{{true}}" fade-in="{{true}}" />
           <view wx:else class="vehicle-cover vehicle-cover-placeholder">
             <view class="vehicle-cover-placeholder-text">暂无图片</view>
           </view>
@@ -211,6 +255,8 @@
   </view>
 
   <view class="empty-card ui-card" wx:else>
+    <image class="manage-empty-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+    <view class="manage-empty-kicker">NO MATCHING VEHICLES</view>
     <view class="empty-title">{{emptyTitle}}</view>
     <view class="empty-desc">{{emptyDesc}}</view>
   </view>

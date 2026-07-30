@@ -1,0 +1,83 @@
+<view class="health-page management-page">
+  <view class="page-glow"></view>
+
+  <view class="hero-card ui-card ui-card-gradient">
+    <view class="hero-top">
+      <view class="hero-copy">
+        <view class="page-kicker">LAUNCH READINESS</view>
+        <view class="hero-title">上线检查</view>
+        <view class="hero-desc">只读检查当前云环境的数据与关键配置</view>
+      </view>
+      <image class="hero-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+    </view>
+    <view class="hero-foot">
+      <view class="live-dot"></view>
+      <view class="hero-foot-text">最近检查：{{checkedAtText}}</view>
+      <view class="refresh-link" bindtap="handleRefresh">{{refreshing ? '检查中…' : '重新检查'}}</view>
+    </view>
+  </view>
+
+  <view wx:if="{{loading}}" class="state-card ui-card">
+    <view class="state-loader"></view>
+    <view>
+      <view class="state-title">正在检查当前云环境</view>
+      <view class="state-desc">不会新增、修改或删除任何业务数据</view>
+    </view>
+  </view>
+
+  <view wx:elif="{{loadError}}" class="error-card ui-card">
+    <view class="error-copy">
+      <view class="error-title">检查未完成</view>
+      <view class="error-desc">{{loadError}}</view>
+    </view>
+    <button class="retry-button ui-btn ui-btn-ghost" bindtap="handleRefresh">重试</button>
+  </view>
+
+  <block wx:else>
+    <view class="summary-card ui-card {{summary.ready ? 'summary-ready' : 'summary-blocked'}}">
+      <view class="summary-mark">{{summary.ready ? '✓' : '!'}}</view>
+      <view class="summary-copy">
+        <view class="summary-title">{{summary.ready ? '技术检查未发现阻塞项' : '仍有阻塞项需要修复'}}</view>
+        <view class="summary-desc">
+          正常 {{summary.passed}} 项 · 待确认 {{summary.warnings}} 项 · 需修复 {{summary.failed}} 项
+        </view>
+      </view>
+    </view>
+
+    <view class="section-card ui-card">
+      <view class="section-heading">
+        <view>
+          <view class="section-eyebrow">AUTOMATED CHECKS</view>
+          <view class="section-title">自动检查结果</view>
+        </view>
+        <view class="section-index">{{summary.total}}</view>
+      </view>
+
+      <view class="check-list">
+        <view class="check-item" wx:for="{{checks}}" wx:key="key">
+          <view class="check-indicator {{item.statusClass}}"></view>
+          <view class="check-copy">
+            <view class="check-label">{{item.label}}</view>
+            <view class="check-message">{{item.message}}</view>
+          </view>
+          <view class="check-status {{item.statusClass}}">{{item.statusLabel}}</view>
+        </view>
+      </view>
+    </view>
+
+    <view class="section-card ui-card">
+      <view class="section-heading">
+        <view>
+          <view class="section-eyebrow">MANUAL REVIEW</view>
+          <view class="section-title">仍需人工确认</view>
+        </view>
+        <view class="section-index">{{manualChecks.length}}</view>
+      </view>
+      <view class="manual-note">云函数无法自动读取索引、安全规则和微信公众平台审核状态，请按下列项目逐项确认。</view>
+      <view class="manual-item" wx:for="{{manualChecks}}" wx:key="*this">
+        <view class="manual-index">{{index + 1}}</view>
+        <view class="manual-text">{{item}}</view>
+      </view>
+    </view>
+  </block>
+</view>

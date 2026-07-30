@@ -4,6 +4,7 @@ const vehicleUtils = require("./vehicle")
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
+const AUDIT_VALUE_EXCLUDED_FIELDS = ["vin", "engineNumber", "note"]
 
 function normalizeStringArray(value) {
   if (!Array.isArray(value)) {
@@ -63,6 +64,18 @@ async function hasOpenidCapability(openid, capability) {
   return list.some((item) => hasCapability(item, capability))
 }
 
+function isDuplicateKeyError(error) {
+  const code = Number(error && (error.code || error.errCode))
+  const message =
+    error && (error.message || error.errMsg)
+      ? error.message || error.errMsg
+      : String(error || "")
+  return (
+    code === 11000 ||
+    /E11000|duplicate\s+key|duplicate.*index|重复键|唯一索引/i.test(String(message))
+  )
+}
+
 async function writeErrorLogBestEffort(payload) {
   try {
     await db.collection("error_logs").add({
@@ -111,22 +124,33 @@ async function writeAuditLogBestEffort(payload) {
 
 function normalizeUpdateInput(event) {
   const payload = event && typeof event === "object" ? event : {}
-  return {
+  const input = {
     id: String(payload.id || "").trim(),
     plateNumber: payload.plateNumber,
     vehicleType: payload.vehicleType,
     brandModel: payload.brandModel,
     registerDate: payload.registerDate,
-    status: payload.status,
-    location: payload.location,
-    transmission: payload.transmission,
-    fuelType: payload.fuelType,
-    seats: payload.seats,
-    priceDay: payload.priceDay,
-    vin: payload.vin,
-    engineNumber: payload.engineNumber,
-    note: payload.note
+    status: payload.status
   }
+
+  const optionalFields = [
+    "location",
+    "transmission",
+    "fuelType",
+    "seats",
+    "priceDay",
+    "publicDescription",
+    "vin",
+    "engineNumber",
+    "note"
+  ]
+  optionalFields.forEach((field) => {
+    if (Object.prototype.hasOwnProperty.call(payload, field)) {
+      input[field] = payload[field]
+    }
+  })
+
+  return input
 }
 
 function buildVehicleDiff(current, next) {
@@ -141,16 +165,22 @@ function buildVehicleDiff(current, next) {
     "fuelType",
     "seats",
     "priceDay",
+    "publicDescription",
     "vin",
     "engineNumber",
     "note"
   ]
 
-  const changedKeys = fields.filter((key) => JSON.stringify(current && current[key]) !== JSON.stringify(next && next[key]))
+  const changedKeys = fields.filter(
+    (key) =>
+      Object.prototype.hasOwnProperty.call(next || {}, key) &&
+      JSON.stringify(current && current[key]) !== JSON.stringify(next && next[key])
+  )
+  const valueLogKeys = changedKeys.filter((key) => !AUDIT_VALUE_EXCLUDED_FIELDS.includes(key))
   return {
     changedKeys,
-    before: changedKeys.reduce((acc, key) => ({ ...acc, [key]: current ? current[key] : undefined }), {}),
-    after: changedKeys.reduce((acc, key) => ({ ...acc, [key]: next ? next[key] : undefined }), {})
+    before: valueLogKeys.reduce((acc, key) => ({ ...acc, [key]: current ? current[key] : undefined }), {}),
+    after: valueLogKeys.reduce((acc, key) => ({ ...acc, [key]: next ? next[key] : undefined }), {})
   }
 }
 
@@ -213,6 +243,10 @@ exports.main = async (event) => {
 
     return { ok: true, id: input.id }
   } catch (error) {
+    if (isDuplicateKeyError(error)) {
+      return vehicleUtils.createError("DUPLICATE_PLATE", "车牌号已存在", { plateNumber })
+    }
+
     await writeErrorLogBestEffort({
       function: "vehicleUpdate",
       openid,

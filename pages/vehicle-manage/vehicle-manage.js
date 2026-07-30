@@ -162,6 +162,7 @@ Page({
     statusOptions: STATUS_OPTIONS,
     statusOpOptions: STATUS_OP_OPTIONS,
     total: 0,
+    truncated: false,
     summaryItems: buildStatusSummary({}),
     statusRatioSegments: buildStatusRatioSegments({}),
     recentAddedList: [],
@@ -375,7 +376,7 @@ Page({
 
     wx.showModal({
       title: "删除车辆",
-      content: `确认删除车辆 ${plateNumber || id}？删除后不可恢复。`,
+      content: `确认删除车辆 ${plateNumber || id}？仅无预约历史的车辆可删除；有预约历史请改为停用。删除后不可恢复。`,
       confirmColor: "#eb5757",
       success: (modalRes) => {
         if (!modalRes.confirm) {
@@ -638,6 +639,7 @@ Page({
         this.setData({
           loading: false,
           total: result.total || 0,
+          truncated: Boolean(result.truncated),
           summaryItems: buildStatusSummary(result.dashboard || {}),
           statusRatioSegments: buildStatusRatioSegments(result.dashboard || {}),
           recentAddedList: buildRecentAddedViewModel(result.recentAddedList),

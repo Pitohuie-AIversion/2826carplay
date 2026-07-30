@@ -1,10 +1,24 @@
-<view class="manage-page">
-  <view class="header">
-    <view class="title">预约管理</view>
-    <view class="desc">仅管理员可查看全部预约并更新状态</view>
+<view class="manage-page management-page">
+  <view class="page-glow"></view>
+  <view class="header hero-card ui-card ui-card-gradient">
+    <view class="hero-top">
+      <view class="hero-copy">
+        <view class="page-kicker">RESERVATION DESK</view>
+        <view class="title">预约管理</view>
+        <view class="desc">统一查看预约、顾问跟进与行程状态</view>
+      </view>
+      <image class="hero-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+    </view>
   </view>
 
   <view class="filter-card ui-card ui-card-soft">
+    <view class="section-heading">
+      <view>
+        <view class="section-eyebrow">RESERVATION FILTER</view>
+        <view class="section-heading-title">筛选预约</view>
+      </view>
+      <view class="section-index">01</view>
+    </view>
     <input
       class="keyword-input ui-input"
       placeholder="搜索车辆/姓名/手机/城市"
@@ -26,27 +40,58 @@
       </view>
     </view>
 
+    <view class="workflow-filter">
+      <view class="workflow-filter-label">预约级别</view>
+      <view class="workflow-filter-row">
+        <view
+          wx:for="{{priorityOptions}}"
+          wx:key="value"
+          class="workflow-chip {{currentPriority === item.value ? 'workflow-chip-active workflow-chip-priority' : ''}}"
+          data-value="{{item.value}}"
+          bindtap="handlePriorityTap"
+        >{{item.label}}</view>
+      </view>
+    </view>
+
+    <view class="workflow-filter workflow-filter-last">
+      <view class="workflow-filter-label">协调进度</view>
+      <view class="workflow-filter-row">
+        <view
+          wx:for="{{coordinationOptions}}"
+          wx:key="value"
+          class="workflow-chip {{currentCoordination === item.value ? 'workflow-chip-active workflow-chip-coordination' : ''}}"
+          data-value="{{item.value}}"
+          bindtap="handleCoordinationTap"
+        >{{item.label}}</view>
+      </view>
+    </view>
+
     <view class="actions">
       <button class="action-btn ui-btn ui-btn-primary" bindtap="handleSearch">查询</button>
       <button class="action-btn ui-btn ui-btn-ghost action-btn-last" bindtap="handleReset">重置</button>
     </view>
 
-    <view class="result-count">当前筛选结果 {{total}} 条</view>
+    <view class="result-count">当前筛选结果 {{total}}{{truncated ? '+' : ''}} 条</view>
+    <view wx:if="{{truncated}}" class="result-count">当前最多展示已读取的 2000 条预约，请缩小筛选范围。</view>
 
     <button class="export-btn ui-btn ui-btn-ghost" bindtap="handleExport">导出CSV</button>
     <view wx:if="{{exportFilePath}}" class="export-actions">
       <view class="export-tip">CSV 已生成：{{exportFileName}}</view>
       <view class="actions">
         <button wx:if="{{canShareExport}}" class="action-btn ui-btn ui-btn-primary" bindtap="handleShareExportedFile">分享导出文件</button>
-        <button class="action-btn ui-btn {{canShareExport ? 'ui-btn-ghost action-btn-last' : 'ui-btn-primary action-btn-last'}}" bindtap="handleOpenExportedFile">打开文件</button>
+        <button class="action-btn ui-btn {{canShareExport ? 'ui-btn-ghost' : 'ui-btn-primary'}}" bindtap="handleOpenExportedFile">打开文件</button>
+        <button class="action-btn ui-btn ui-btn-ghost action-btn-last" bindtap="handleDeleteExportedFile">删除本地文件</button>
       </view>
     </view>
   </view>
 
   <view class="dashboard-card ui-card ui-card-gradient">
     <view class="dashboard-head">
-      <view class="dashboard-title">租赁看板</view>
-      <view class="dashboard-desc">基于全部预约统计，不受当前筛选影响</view>
+      <view>
+        <view class="section-eyebrow">LIVE OVERVIEW</view>
+        <view class="dashboard-title">租赁看板</view>
+      </view>
+      <view class="dashboard-desc">全量预约统计</view>
     </view>
 
     <view class="summary-grid">
@@ -100,13 +145,41 @@
     </view>
   </view>
 
-  <view wx:if="{{loading}}" class="loading">加载中...</view>
+  <view wx:if="{{loading}}" class="loading manage-list-skeleton">
+    <view class="manage-loading-head">
+      <view>
+        <view class="manage-loading-kicker manage-skeleton-pulse"></view>
+        <view class="manage-loading-title manage-skeleton-pulse"></view>
+      </view>
+      <view class="manage-loading-count manage-skeleton-pulse"></view>
+    </view>
+    <view class="manage-loading-card manage-loading-card-booking ui-card">
+      <view class="manage-loading-row">
+        <view class="manage-loading-name manage-skeleton-pulse"></view>
+        <view class="manage-loading-status manage-skeleton-pulse"></view>
+      </view>
+      <view class="manage-loading-line manage-skeleton-pulse"></view>
+      <view class="manage-loading-line manage-loading-line-mid manage-skeleton-pulse"></view>
+      <view class="manage-loading-action manage-skeleton-pulse"></view>
+    </view>
+  </view>
 
-  <view wx:elif="{{list.length}}">
+  <view wx:elif="{{list.length}}" class="booking-list">
+    <view class="list-heading">
+      <view>
+        <view class="list-kicker">RESERVATION RECORDS</view>
+        <view class="list-title">预约档案</view>
+      </view>
+      <view class="list-count">{{total}}{{truncated ? '+' : ''}} 条</view>
+    </view>
     <view class="booking-item ui-card" wx:for="{{list}}" wx:key="id">
       <view class="booking-top">
         <view class="booking-name">{{item.vehicleName || '--'}}</view>
         <view class="booking-status ui-status ui-status-lg {{item.statusClass}}">{{item.statusText}}</view>
+      </view>
+      <view class="booking-plan">
+        <text class="booking-plan-pill {{item.priorityClass}}">{{item.schedulePriorityText}}</text>
+        <text class="booking-plan-pill {{item.coordinationClass}}">{{item.coordinationStatusText}}</text>
       </view>
       <view class="booking-meta">
         <view class="booking-line">姓名：{{item.userName}}</view>
@@ -115,7 +188,10 @@
         <view class="booking-line">城市：{{item.city}}</view>
         <view class="booking-line">提交：{{item.createdAtText}}</view>
       </view>
-      <button class="detail-btn ui-btn ui-btn-ghost" data-id="{{item.id}}" bindtap="handleViewDetail">查看详情</button>
+      <view class="quick-action-row">
+        <button class="quick-action-btn ui-btn ui-btn-primary" data-phone="{{item.phone}}" bindtap="handleCallPhone">拨打电话</button>
+        <button class="quick-action-btn quick-action-btn-last ui-btn ui-btn-ghost" data-id="{{item.id}}" bindtap="handleViewDetail">查看详情</button>
+      </view>
       <view wx:if="{{item.note}}" class="booking-note">用户备注：{{item.note}}</view>
 
       <view class="remark-card ui-card ui-card-soft">
@@ -134,11 +210,10 @@
         <button class="remark-save-btn ui-btn ui-btn-primary" data-id="{{item.id}}" data-index="{{index}}" bindtap="handleSaveRemark">保存备注</button>
       </view>
 
-      <view class="op-row">
-        <button class="op-btn" data-id="{{item.id}}" data-status="pending" bindtap="handleUpdateStatus">待联系</button>
-        <button class="op-btn op-btn-alt" data-id="{{item.id}}" data-status="contacted" bindtap="handleUpdateStatus">已联系</button>
-        <button class="op-btn" data-id="{{item.id}}" data-status="completed" bindtap="handleUpdateStatus">已完成</button>
-        <button class="op-btn op-btn-alt op-danger op-btn-last" data-id="{{item.id}}" data-status="cancelled" bindtap="handleUpdateStatus">取消</button>
+      <view class="op-row" wx:if="{{item.status === 'pending' || item.status === 'contacted'}}">
+        <button wx:if="{{item.status === 'pending'}}" class="op-btn op-btn-alt" data-id="{{item.id}}" data-status="contacted" bindtap="handleUpdateStatus">标记已联系</button>
+        <button wx:if="{{item.status === 'contacted'}}" class="op-btn" data-id="{{item.id}}" data-status="completed" bindtap="handleUpdateStatus">标记已完成</button>
+        <button class="op-btn op-btn-alt op-danger op-btn-last" data-id="{{item.id}}" data-status="cancelled" bindtap="handleUpdateStatus">取消预约</button>
       </view>
     </view>
 
@@ -149,6 +224,8 @@
   </view>
 
   <view wx:else class="empty">
+    <image class="manage-empty-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+    <view class="manage-empty-kicker">NO MATCHING RESERVATIONS</view>
     <view class="empty-title">{{emptyTitle}}</view>
     <view class="empty-desc">{{emptyDesc}}</view>
   </view>

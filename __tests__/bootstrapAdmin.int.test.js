@@ -2,7 +2,8 @@ jest.mock("wx-server-sdk")
 
 function createMockDb({ rolesData, addResult }) {
   const rolesGet = jest.fn().mockResolvedValue({ data: rolesData })
-  const rolesAdd = jest.fn().mockResolvedValue(addResult)
+  const rolesSet = jest.fn().mockResolvedValue(addResult)
+  const rolesDoc = jest.fn(() => ({ set: rolesSet }))
   const auditAdd = jest.fn().mockResolvedValue({ _id: "audit_1" })
 
   const rolesLimit = jest.fn(() => ({ get: rolesGet }))
@@ -13,7 +14,7 @@ function createMockDb({ rolesData, addResult }) {
   const db = {
     collection: jest.fn((name) => {
       if (name === "roles") {
-        return { limit: rolesLimit, add: rolesAdd }
+        return { limit: rolesLimit, doc: rolesDoc }
       }
       if (name === "audit_logs") {
         return { add: auditAdd }
@@ -26,7 +27,8 @@ function createMockDb({ rolesData, addResult }) {
   return {
     db,
     rolesGet,
-    rolesAdd,
+    rolesDoc,
+    rolesSet,
     rolesLimit,
     auditAdd,
     serverDateValue
@@ -53,7 +55,8 @@ describe("cloudfunctions/bootstrapAdmin integration", () => {
     delete process.env.BOOTSTRAP_TOKEN
   })
 
-  test("roles 为空时，当前用户初始化为首个管理员", async () => {
+  test("roles 为空且口令正确时，当前用户初始化为首个管理员", async () => {
+    process.env.BOOTSTRAP_TOKEN = "secret_token"
     const mocks = createMockDb({
       rolesData: [],
       addResult: { _id: "role_1" }
@@ -64,7 +67,7 @@ describe("cloudfunctions/bootstrapAdmin integration", () => {
       mockDb: mocks.db
     })
 
-    const res = await bootstrapAdmin.main()
+    const res = await bootstrapAdmin.main({ token: "secret_token" })
 
     expect(res).toEqual({
       ok: true,
@@ -74,7 +77,8 @@ describe("cloudfunctions/bootstrapAdmin integration", () => {
       message: "已初始化为首个管理员"
     })
     expect(mocks.rolesLimit).toHaveBeenCalledWith(100)
-    expect(mocks.rolesAdd).toHaveBeenCalledWith({
+    expect(mocks.rolesDoc).toHaveBeenCalledWith("bootstrap_admin")
+    expect(mocks.rolesSet).toHaveBeenCalledWith({
       data: {
         openid: "first_admin_openid",
         role: "admin",
@@ -89,7 +93,7 @@ describe("cloudfunctions/bootstrapAdmin integration", () => {
         action: "bootstrapAdmin",
         targetOpenid: "first_admin_openid",
         bootstrap: true,
-        tokenProtected: false,
+        tokenProtected: true,
         createdAt: mocks.serverDateValue
       }
     })
@@ -115,7 +119,7 @@ describe("cloudfunctions/bootstrapAdmin integration", () => {
       alreadyAdmin: true,
       message: "当前账号已是管理员"
     })
-    expect(mocks.rolesAdd).not.toHaveBeenCalled()
+    expect(mocks.rolesSet).not.toHaveBeenCalled()
   })
 
   test("roles 已存在其他记录时返回 BOOTSTRAP_LOCKED", async () => {
@@ -136,7 +140,28 @@ describe("cloudfunctions/bootstrapAdmin integration", () => {
       code: "BOOTSTRAP_LOCKED",
       message: "管理员已初始化，请联系现有管理员分配权限"
     })
-    expect(mocks.rolesAdd).not.toHaveBeenCalled()
+    expect(mocks.rolesSet).not.toHaveBeenCalled()
+  })
+
+  test("未设置 BOOTSTRAP_TOKEN 时默认关闭初始化", async () => {
+    const mocks = createMockDb({
+      rolesData: [],
+      addResult: { _id: "role_1" }
+    })
+
+    const bootstrapAdmin = await loadBootstrapAdminWith({
+      openid: "first_admin_openid",
+      mockDb: mocks.db
+    })
+
+    const res = await bootstrapAdmin.main()
+
+    expect(res).toEqual({
+      ok: false,
+      code: "BOOTSTRAP_DISABLED",
+      message: "管理员初始化未启用，请先配置初始化口令"
+    })
+    expect(mocks.rolesSet).not.toHaveBeenCalled()
   })
 
   test("设置 BOOTSTRAP_TOKEN 后必须提供正确口令", async () => {
@@ -156,8 +181,31 @@ describe("cloudfunctions/bootstrapAdmin integration", () => {
     expect(res).toEqual({
       ok: false,
       code: "BOOTSTRAP_TOKEN_REQUIRED",
-      message: "管理员初始化已加锁，请联系开发人员获取口令"
+      message: "管理员初始化口令不正确"
     })
-    expect(mocks.rolesAdd).not.toHaveBeenCalled()
+    expect(mocks.rolesSet).not.toHaveBeenCalled()
+  })
+
+  test("缺少用户身份时拒绝初始化", async () => {
+    process.env.BOOTSTRAP_TOKEN = "secret_token"
+    const mocks = createMockDb({
+      rolesData: [],
+      addResult: { _id: "role_1" }
+    })
+
+    const bootstrapAdmin = await loadBootstrapAdminWith({
+      openid: "",
+      mockDb: mocks.db
+    })
+
+    const res = await bootstrapAdmin.main({ token: "secret_token" })
+
+    expect(res).toEqual({
+      ok: false,
+      code: "UNAUTHORIZED",
+      message: "未获取到用户身份"
+    })
+    expect(mocks.rolesGet).not.toHaveBeenCalled()
+    expect(mocks.rolesSet).not.toHaveBeenCalled()
   })
 })

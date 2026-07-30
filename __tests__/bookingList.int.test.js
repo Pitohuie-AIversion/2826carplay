@@ -1,13 +1,27 @@
 jest.mock("wx-server-sdk")
 
-function createMockDb({ rolesData, bookingData }) {
+function createMockDb({ rolesData, bookingData, orderedError = null }) {
   const rolesGet = jest.fn().mockResolvedValue({ data: rolesData })
-  const bookingsGet = jest.fn().mockResolvedValue({ data: bookingData })
 
   const rolesLimit = jest.fn(() => ({ get: rolesGet }))
   const rolesWhere = jest.fn(() => ({ limit: rolesLimit }))
 
-  const bookingsLimit = jest.fn(() => ({ get: bookingsGet }))
+  const bookingsLimit = jest.fn((limitValue) => ({
+    get: jest.fn().mockResolvedValue({ data: bookingData.slice(0, limitValue) })
+  }))
+  const bookingsSkip = jest.fn((offset) => ({
+    limit: jest.fn((limitValue) => ({
+      get: jest.fn().mockResolvedValue({ data: bookingData.slice(offset, offset + limitValue) })
+    }))
+  }))
+  const bookingsOrderedSkip = jest.fn((offset) => ({
+    limit: jest.fn((limitValue) => ({
+      get: orderedError
+        ? jest.fn().mockRejectedValue(orderedError)
+        : jest.fn().mockResolvedValue({ data: bookingData.slice(offset, offset + limitValue) })
+    }))
+  }))
+  const bookingsOrderBy = jest.fn(() => ({ skip: bookingsOrderedSkip }))
 
   const db = {
     collection: jest.fn((name) => {
@@ -15,7 +29,11 @@ function createMockDb({ rolesData, bookingData }) {
         return { where: rolesWhere }
       }
       if (name === "bookings") {
-        return { limit: bookingsLimit }
+        return {
+          limit: bookingsLimit,
+          skip: bookingsSkip,
+          orderBy: bookingsOrderBy
+        }
       }
       throw new Error(`Unexpected collection: ${name}`)
     })
@@ -26,7 +44,9 @@ function createMockDb({ rolesData, bookingData }) {
     rolesWhere,
     rolesLimit,
     bookingsLimit,
-    bookingsGet
+    bookingsSkip,
+    bookingsOrderBy,
+    bookingsOrderedSkip
   }
 }
 
@@ -156,7 +176,7 @@ describe("cloudfunctions/bookingList integration", () => {
 
     expect(res.ok).toBe(false)
     expect(res.code).toBe("VALIDATION_ERROR")
-    expect(mocks.bookingsLimit).not.toHaveBeenCalled()
+    expect(mocks.bookingsOrderBy).not.toHaveBeenCalled()
   })
 
   test("非管理员查询返回 FORBIDDEN", async () => {
@@ -173,6 +193,127 @@ describe("cloudfunctions/bookingList integration", () => {
       code: "FORBIDDEN",
       message: "权限不足"
     })
-    expect(mocks.bookingsLimit).not.toHaveBeenCalled()
+    expect(mocks.bookingsOrderBy).not.toHaveBeenCalled()
+  })
+
+  test("超过 500 条后仍可读取后续预约分页", async () => {
+    const bookingData = Array.from({ length: 550 }, (_, index) => ({
+      _id: `b${index}`,
+      vehicleName: `Vehicle ${index}`,
+      userName: `User ${index}`,
+      status: "pending",
+      createdAt: new Date(Date.UTC(2026, 0, 1, 0, 0, index)).toISOString()
+    }))
+    const mocks = createMockDb({
+      rolesData: [{ role: "admin" }],
+      bookingData
+    })
+    const mod = await loadBookingListWith({ openid: "admin_openid", mockDb: mocks.db })
+
+    const res = await mod.main({
+      status: "all",
+      limit: 2000,
+      page: 27,
+      pageSize: 20
+    })
+
+    expect(res.ok).toBe(true)
+    expect(res.total).toBe(550)
+    expect(res.list).toHaveLength(10)
+    expect(res.hasMore).toBe(false)
+    expect(res.truncated).toBe(false)
+    expect(mocks.bookingsOrderedSkip).toHaveBeenCalledWith(500)
+  })
+
+  test("缺少 createdAt 索引时自动降级读取", async () => {
+    const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {})
+    const mocks = createMockDb({
+      rolesData: [{ role: "admin" }],
+      bookingData: [
+        {
+          _id: "b1",
+          vehicleName: "MX-5",
+          status: "pending",
+          createdAt: "2026-07-13T00:00:00.000Z"
+        }
+      ],
+      orderedError: new Error("missing createdAt index")
+    })
+    const mod = await loadBookingListWith({ openid: "admin_openid", mockDb: mocks.db })
+
+    const res = await mod.main({ status: "all", limit: 2000 })
+
+    expect(res.ok).toBe(true)
+    expect(res.total).toBe(1)
+    expect(mocks.bookingsOrderedSkip).toHaveBeenCalledWith(0)
+    expect(mocks.bookingsSkip).toHaveBeenCalledWith(0)
+    expect(warnSpy).toHaveBeenCalled()
+    warnSpy.mockRestore()
+  })
+
+  test("可组合筛选候补与协调中预约，历史记录使用安全默认值", async () => {
+    const mocks = createMockDb({
+      rolesData: [{ role: "booking_manager" }],
+      bookingData: [
+        {
+          _id: "b_standby",
+          vehicleName: "MX-5",
+          status: "contacted",
+          schedulePriority: "standby",
+          coordinationStatus: "coordinating",
+          createdAt: "2026-07-15T00:00:00.000Z"
+        },
+        {
+          _id: "b_legacy",
+          vehicleName: "S2000",
+          status: "pending",
+          createdAt: "2026-07-14T00:00:00.000Z"
+        },
+        {
+          _id: "b_completed",
+          vehicleName: "M4",
+          status: "completed",
+          createdAt: "2026-07-13T00:00:00.000Z"
+        }
+      ]
+    })
+    const mod = await loadBookingListWith({
+      openid: "booking_manager_openid",
+      mockDb: mocks.db
+    })
+
+    const standby = await mod.main({
+      status: "all",
+      schedulePriority: "standby",
+      coordinationStatus: "coordinating"
+    })
+    expect(standby.list.map((item) => item.id)).toEqual(["b_standby"])
+
+    const legacy = await mod.main({
+      status: "pending",
+      schedulePriority: "normal",
+      coordinationStatus: "pending"
+    })
+    expect(legacy.list.map((item) => item.id)).toEqual(["b_legacy"])
+
+    const completed = await mod.main({
+      status: "completed",
+      coordinationStatus: "resolved"
+    })
+    expect(completed.list.map((item) => item.id)).toEqual(["b_completed"])
+  })
+
+  test("非法优先级或协调状态返回 VALIDATION_ERROR", async () => {
+    const mocks = createMockDb({
+      rolesData: [{ role: "admin" }],
+      bookingData: []
+    })
+    const mod = await loadBookingListWith({
+      openid: "admin_openid",
+      mockDb: mocks.db
+    })
+
+    expect((await mod.main({ schedulePriority: "top" })).code).toBe("VALIDATION_ERROR")
+    expect((await mod.main({ coordinationStatus: "unknown" })).code).toBe("VALIDATION_ERROR")
   })
 })

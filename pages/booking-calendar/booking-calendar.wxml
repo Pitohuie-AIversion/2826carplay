@@ -1,0 +1,115 @@
+<view class="calendar-page management-page">
+  <view class="page-glow"></view>
+
+  <view class="hero-card ui-card ui-card-gradient">
+    <view class="hero-top">
+      <view>
+        <view class="page-kicker">RESERVATION CALENDAR</view>
+        <view class="hero-title">预约日历</view>
+        <view class="hero-desc">按月查看车辆预约与顾问待跟进安排</view>
+      </view>
+      <image class="hero-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+    </view>
+  </view>
+
+  <view wx:if="{{loading}}" class="state-card ui-card">正在整理预约档期…</view>
+
+  <view wx:elif="{{loadError}}" class="state-card ui-card">
+    <view class="state-title">暂时无法加载日历</view>
+    <view class="state-desc">{{loadError}}</view>
+    <button class="retry-button ui-btn ui-btn-ghost" bindtap="handleRetry">重新加载</button>
+  </view>
+
+  <block wx:else>
+    <view class="summary-grid">
+      <view class="summary-card ui-card">
+        <view class="summary-value">{{summary.bookingCount}}</view>
+        <view class="summary-label">本月预约</view>
+      </view>
+      <view class="summary-card ui-card">
+        <view class="summary-value summary-warning">{{summary.pendingCount}}</view>
+        <view class="summary-label">待联系</view>
+      </view>
+      <view class="summary-card ui-card">
+        <view class="summary-value summary-primary">{{summary.vehicleCount}}</view>
+        <view class="summary-label">涉及车辆</view>
+      </view>
+    </view>
+    <view wx:if="{{summary.conflictDayCount}}" class="conflict-overview">
+      <view class="conflict-overview-mark">!</view>
+      <view>本月有 {{summary.conflictDayCount}} 天出现同车预约重叠，请优先人工核对。</view>
+    </view>
+
+    <view class="calendar-card ui-card">
+      <view class="month-switcher">
+        <view class="month-button" bindtap="handlePreviousMonth">‹</view>
+        <view>
+          <view class="month-kicker">MONTHLY SCHEDULE</view>
+          <view class="month-title">{{monthTitle}}</view>
+        </view>
+        <view class="month-button" bindtap="handleNextMonth">›</view>
+      </view>
+
+      <view class="weekday-row">
+        <view class="weekday-item" wx:for="{{weekdayLabels}}" wx:key="*this">{{item}}</view>
+      </view>
+      <view class="date-grid">
+        <view
+          wx:for="{{calendarCells}}"
+          wx:key="key"
+          class="date-cell {{item.empty ? 'date-cell-empty' : ''}} {{item.isSelected ? 'date-cell-selected' : ''}} {{item.isToday ? 'date-cell-today' : ''}} {{item.hasConflict ? 'date-cell-conflict' : ''}}"
+          data-date="{{item.date}}"
+          bindtap="handleDateTap"
+        >
+          <view wx:if="{{!item.empty}}" class="date-number">{{item.day}}</view>
+          <view wx:if="{{item.hasBookings}}" class="date-count">{{item.bookingCount}}</view>
+          <view wx:if="{{item.pendingCount}}" class="pending-dot"></view>
+        </view>
+      </view>
+      <view class="calendar-legend">
+        <view><text class="legend-dot legend-booking"></text>有预约</view>
+        <view><text class="legend-dot legend-pending"></text>含待联系</view>
+        <view><text class="legend-dot legend-conflict"></text>同车重叠</view>
+      </view>
+    </view>
+
+    <view class="day-card ui-card">
+      <view class="section-heading">
+        <view>
+          <view class="section-eyebrow">DAILY SCHEDULE</view>
+          <view class="section-title">{{selectedDate}} · {{selectedBookings.length}} 条</view>
+        </view>
+        <view class="section-index">02</view>
+      </view>
+      <view wx:if="{{selectedConflictCount}}" class="day-conflict-tip">
+        当天有 {{selectedConflictCount}} 辆车存在预约重叠，点击记录核对详情。
+      </view>
+      <view wx:if="{{selectedBookings.length}}" class="booking-list">
+        <view
+          class="booking-item {{item.hasConflict ? 'booking-item-conflict' : ''}}"
+          wx:for="{{selectedBookings}}"
+          wx:key="id"
+          data-id="{{item.id}}"
+          bindtap="handleBookingTap"
+        >
+          <view class="booking-main">
+            <view class="booking-vehicle-row">
+              <view class="booking-vehicle">{{item.vehicleName || '车辆预约'}}</view>
+              <view wx:if="{{item.hasConflict}}" class="booking-conflict-chip">同车冲突</view>
+            </view>
+            <view class="booking-meta">点击查看预约详情</view>
+            <view class="booking-range">{{item.startDate}} → {{item.endDate}}</view>
+          </view>
+          <view class="booking-side">
+            <view class="status-pill {{item.statusClass}}">{{item.statusLabel}}</view>
+            <view class="booking-arrow">›</view>
+          </view>
+        </view>
+      </view>
+      <view wx:else class="inline-empty">当天没有未取消的预约安排</view>
+    </view>
+
+    <view wx:if="{{truncated}}" class="scope-tip">预约超过 2000 条，当前日历只展示最近载入的记录。</view>
+    <view class="mode-tip">日历用于人工排期参考，不会自动锁定车辆或替代顾问确认。</view>
+  </block>
+</view>

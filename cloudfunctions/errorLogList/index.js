@@ -5,6 +5,8 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
 const DEFAULT_PAGE_SIZE = 20
 const MAX_PAGE_SIZE = 50
+const LOG_BATCH_SIZE = 100
+const MAX_LOG_RECORDS = 2000
 
 function normalizeText(value, maxLen) {
   const text = String(value || "").trim()
@@ -95,12 +97,56 @@ function toSearchText(item) {
     item.vehicleId,
     item.bookingId,
     item.stage,
+    item.targetStatus,
+    item.errorCode,
     item.errorMessage,
     item.occurredAt
   ]
     .filter(Boolean)
     .join(" ")
     .toUpperCase()
+}
+
+async function readErrorLogsByMode(ordered) {
+  const list = []
+
+  for (let offset = 0; offset <= MAX_LOG_RECORDS; offset += LOG_BATCH_SIZE) {
+    const remaining = MAX_LOG_RECORDS + 1 - list.length
+    const batchSize = Math.min(LOG_BATCH_SIZE, remaining)
+    let query = db.collection("error_logs")
+    if (ordered) {
+      query = query.orderBy("createdAt", "desc")
+    }
+    const res = await query.skip(offset).limit(batchSize).get()
+    const batch = res && Array.isArray(res.data) ? res.data : []
+
+    list.push(...batch)
+    if (batch.length < batchSize || list.length > MAX_LOG_RECORDS) {
+      break
+    }
+  }
+
+  return {
+    list: list.slice(0, MAX_LOG_RECORDS),
+    truncated: list.length > MAX_LOG_RECORDS
+  }
+}
+
+async function readErrorLogs() {
+  try {
+    return await readErrorLogsByMode(true)
+  } catch (indexError) {
+    console.warn({
+      function: "errorLogList",
+      stage: "indexFallback",
+      errorMessage:
+        indexError && (indexError.message || indexError.errMsg)
+          ? indexError.message || indexError.errMsg
+          : String(indexError),
+      createdAt: new Date().toISOString()
+    })
+    return readErrorLogsByMode(false)
+  }
 }
 
 exports.main = async (event) => {
@@ -118,8 +164,8 @@ exports.main = async (event) => {
       }
     }
 
-    const res = await db.collection("error_logs").limit(500).get()
-    const rawList = res && Array.isArray(res.data) ? res.data : []
+    const logRecords = await readErrorLogs()
+    const rawList = logRecords.list
 
     const list = rawList
       .map((item) => ({
@@ -130,6 +176,8 @@ exports.main = async (event) => {
         targetOpenid: String(item.targetOpenid || "").trim(),
         vehicleId: String(item.vehicleId || "").trim(),
         bookingId: String(item.bookingId || "").trim(),
+        targetStatus: String(item.targetStatus || "").trim(),
+        errorCode: String(item.errorCode || "").trim(),
         errorMessage: String(item.errorMessage || "").trim(),
         stack: String(item.stack || "").trim(),
         occurredAt: formatTime(item.occurredAt),
@@ -158,6 +206,7 @@ exports.main = async (event) => {
       page: input.page,
       pageSize: input.pageSize,
       total: list.length,
+      truncated: logRecords.truncated,
       hasMore: Boolean(offset + input.pageSize < list.length),
       list: paged
     }
@@ -177,4 +226,3 @@ exports.main = async (event) => {
     }
   }
 }
-

@@ -1,10 +1,22 @@
 <view class="garage-page">
+  <view class="ambient ambient-blue"></view>
+  <view class="ambient ambient-silver"></view>
+
   <view class="garage-header">
-    <view class="page-title">{{pageTitle}}</view>
+    <view class="header-kicker">
+      <view class="kicker-line"></view>
+      <text>PRIVATE MOTOR CLUB</text>
+    </view>
+    <view class="header-main">
+      <view class="page-title">{{pageTitle}}</view>
+      <view class="brand-mark">
+        <image class="brand-mark-image" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+      </view>
+    </view>
     <view class="page-desc">{{pageSubtitle}}</view>
   </view>
 
-  <scroll-view class="category-scroll" scroll-x enable-flex show-scrollbar="{{false}}">
+  <scroll-view wx:if="{{(!initialLoading && !loadingCars) || cars.length}}" class="category-scroll" scroll-x enable-flex show-scrollbar="{{false}}">
     <view class="category-list">
       <view
         wx:for="{{categories}}"
@@ -19,27 +31,100 @@
     </view>
   </scroll-view>
 
-  <view class="summary-panel ui-card ui-card-soft">
+  <view wx:if="{{(!initialLoading && !loadingCars) || cars.length}}" class="summary-panel ui-card ui-card-soft">
     <view class="summary-copy">
+      <view class="summary-label">CURRENT COLLECTION</view>
       <view class="summary-title">{{categorySummary.name || '当前分类'}}</view>
-      <view class="summary-desc">共 {{categorySummary.total}} 台车，可立即预约 {{categorySummary.available}} 台</view>
+      <view class="summary-stats">
+        <view class="summary-stat">
+          <text class="summary-number">{{categorySummary.total}}</text>
+          <text class="summary-unit">台精选车源</text>
+        </view>
+        <view class="summary-divider"></view>
+        <view class="summary-stat">
+          <text class="summary-number summary-number-active">{{categorySummary.available}}</text>
+          <text class="summary-unit">台可预约</text>
+        </view>
+      </view>
     </view>
-    <view class="summary-phone" bindtap="handlePhoneCall">客服 {{servicePhone}}</view>
+    <view class="summary-service" bindtap="handlePhoneCall">
+      <view class="service-icon">⌁</view>
+      <view class="service-copy">
+        <view class="service-label">专属顾问</view>
+        <view class="service-phone">{{servicePhone}}</view>
+      </view>
+    </view>
   </view>
 
-  <view class="empty-state" wx:if="{{loadError}}">
+  <view class="garage-skeleton" wx:if="{{(initialLoading || loadingCars) && !cars.length}}">
+    <view class="garage-skeleton-pills">
+      <view class="garage-skeleton-pill skeleton-pulse"></view>
+      <view class="garage-skeleton-pill garage-skeleton-pill-wide skeleton-pulse"></view>
+      <view class="garage-skeleton-pill skeleton-pulse"></view>
+    </view>
+    <view class="garage-skeleton-summary ui-card">
+      <view class="garage-skeleton-copy">
+        <view class="garage-skeleton-kicker skeleton-pulse"></view>
+        <view class="garage-skeleton-title skeleton-pulse"></view>
+        <view class="garage-skeleton-numbers skeleton-pulse"></view>
+      </view>
+      <view class="garage-skeleton-service skeleton-pulse"></view>
+    </view>
+    <view class="garage-skeleton-heading">
+      <view>
+        <view class="garage-skeleton-kicker skeleton-pulse"></view>
+        <view class="garage-skeleton-list-title skeleton-pulse"></view>
+      </view>
+      <view class="garage-skeleton-count skeleton-pulse"></view>
+    </view>
+    <view class="garage-skeleton-card ui-card">
+      <view class="garage-skeleton-cover skeleton-pulse"></view>
+      <view class="garage-skeleton-card-body">
+        <view class="garage-skeleton-card-title skeleton-pulse"></view>
+        <view class="garage-skeleton-card-line skeleton-pulse"></view>
+        <view class="garage-skeleton-card-meta skeleton-pulse"></view>
+      </view>
+    </view>
+    <view class="garage-skeleton-card ui-card">
+      <view class="garage-skeleton-cover skeleton-pulse"></view>
+      <view class="garage-skeleton-card-body">
+        <view class="garage-skeleton-card-title skeleton-pulse"></view>
+        <view class="garage-skeleton-card-line skeleton-pulse"></view>
+        <view class="garage-skeleton-card-meta skeleton-pulse"></view>
+      </view>
+    </view>
+  </view>
+
+  <view class="empty-state" wx:elif="{{loadError}}">
     <view class="empty-title">加载失败</view>
     <view class="empty-desc">{{loadErrorText}}</view>
     <button class="ui-btn ui-btn-primary" bindtap="handleRetryLoad">重新加载</button>
   </view>
 
   <view class="car-list" wx:elif="{{filteredCars.length}}">
+    <view class="list-heading">
+      <view>
+        <view class="list-kicker">CURATED FLEET</view>
+        <view class="list-title">为你甄选</view>
+      </view>
+      <view class="list-count">{{filteredCars.length}} VEHICLES</view>
+    </view>
     <car-card
       wx:for="{{filteredCars}}"
       wx:key="id"
       car="{{item}}"
       bind:cardtap="handleCarTap"
     />
+    <button
+      wx:if="{{hasMore}}"
+      class="garage-load-more ui-btn ui-btn-ghost"
+      loading="{{loadingCars}}"
+      disabled="{{loadingCars}}"
+      bindtap="handleLoadMore"
+    >
+      加载更多车辆
+    </button>
+    <view wx:if="{{truncated}}" class="garage-capacity-tip">当前最多展示 2000 辆，请联系管理员缩小车辆范围。</view>
   </view>
 
   <view class="empty-state" wx:else>
@@ -48,9 +133,21 @@
   </view>
 
   <view class="bottom-bar">
-    <button class="bottom-action ui-btn ui-btn-ghost action-contact" open-type="contact">客服</button>
-    <button class="bottom-action ui-btn ui-btn-ghost bottom-action-offset" bindtap="handlePhoneCall">电话</button>
-    <button class="bottom-action ui-btn ui-btn-ghost bottom-action-offset" open-type="share">分享</button>
-    <button class="bottom-action ui-btn ui-btn-ghost bottom-action-offset" bindtap="handleMineTap">我的</button>
+    <button class="bottom-action action-contact" open-type="contact">
+      <text class="bottom-icon bottom-icon-active">◈</text>
+      <text class="bottom-label bottom-label-active">客服</text>
+    </button>
+    <button class="bottom-action" bindtap="handlePhoneCall">
+      <text class="bottom-icon">⌕</text>
+      <text class="bottom-label">电话</text>
+    </button>
+    <button class="bottom-action" open-type="share">
+      <text class="bottom-icon">↗</text>
+      <text class="bottom-label">分享</text>
+    </button>
+    <button class="bottom-action" bindtap="handleMineTap">
+      <text class="bottom-icon">◎</text>
+      <text class="bottom-label">我的</text>
+    </button>
   </view>
 </view>

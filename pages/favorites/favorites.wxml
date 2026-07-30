@@ -1,0 +1,60 @@
+<view class="favorites-page">
+  <view class="page-glow"></view>
+
+  <view class="hero-card ui-card ui-card-gradient">
+    <view class="hero-top">
+      <view>
+        <view class="page-kicker">PRIVATE COLLECTION</view>
+        <view class="hero-title">我的收藏</view>
+        <view class="hero-desc">保存心仪车型，随时回到极境车库继续了解</view>
+      </view>
+      <image class="hero-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+    </view>
+  </view>
+
+  <view wx:if="{{initialLoading && !list.length}}" class="loading-list">
+    <view class="loading-card skeleton-pulse" wx:for="{{[1, 2]}}" wx:key="*this"></view>
+  </view>
+
+  <view wx:elif="{{loadError && !list.length}}" class="empty-card ui-card">
+    <image class="empty-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+    <view class="empty-kicker">COLLECTION UNAVAILABLE</view>
+    <view class="empty-title">暂时无法加载收藏</view>
+    <view class="empty-desc">{{loadError}}</view>
+    <button class="empty-button ui-btn ui-btn-primary" bindtap="handleRetry">重新加载</button>
+  </view>
+
+  <view wx:elif="{{list.length}}" class="favorite-list">
+    <view class="favorite-item" wx:for="{{list}}" wx:key="id">
+      <car-card car="{{item}}" bind:cardtap="handleCarTap" />
+      <view class="favorite-action-row">
+        <button
+          class="remove-button"
+          data-id="{{item.id}}"
+          loading="{{removingId === item.id}}"
+          disabled="{{removingId}}"
+          catchtap="handleRemove"
+        >
+          取消收藏
+        </button>
+      </view>
+    </view>
+    <button
+      wx:if="{{hasMore}}"
+      class="load-more-button ui-btn ui-btn-ghost"
+      loading="{{loading}}"
+      disabled="{{loading}}"
+      bindtap="handleLoadMore"
+    >
+      加载更多
+    </button>
+    <view wx:else class="list-end">已加载全部收藏</view>
+  </view>
+
+  <view wx:else class="empty-card ui-card">
+    <image class="empty-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+    <view class="empty-kicker">YOUR GARAGE AWAITS</view>
+    <view class="empty-title">还没有收藏车辆</view>
+    <view class="empty-desc">进入车辆详情，点击“收藏”即可把喜欢的车型保存到这里。</view>
+  </view>
+</view>

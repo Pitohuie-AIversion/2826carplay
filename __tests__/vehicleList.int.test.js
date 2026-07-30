@@ -1,12 +1,26 @@
 jest.mock("wx-server-sdk")
 
-function createMockDb({ rolesData, vehiclesData }) {
+function createMockDb({ rolesData, vehiclesData, orderedError = null }) {
   const rolesGet = jest.fn().mockResolvedValue({ data: rolesData })
-  const vehiclesGet = jest.fn().mockResolvedValue({ data: vehiclesData })
 
   const rolesLimit = jest.fn(() => ({ get: rolesGet }))
   const rolesWhere = jest.fn(() => ({ limit: rolesLimit }))
-  const vehiclesLimit = jest.fn(() => ({ get: vehiclesGet }))
+  const vehiclesLimit = jest.fn((limitValue) => ({
+    get: jest.fn().mockResolvedValue({ data: vehiclesData.slice(0, limitValue) })
+  }))
+  const vehiclesSkip = jest.fn((offset) => ({
+    limit: jest.fn((limitValue) => ({
+      get: jest.fn().mockResolvedValue({ data: vehiclesData.slice(offset, offset + limitValue) })
+    }))
+  }))
+  const vehiclesOrderedSkip = jest.fn((offset) => ({
+    limit: jest.fn((limitValue) => ({
+      get: orderedError
+        ? jest.fn().mockRejectedValue(orderedError)
+        : jest.fn().mockResolvedValue({ data: vehiclesData.slice(offset, offset + limitValue) })
+    }))
+  }))
+  const vehiclesOrderBy = jest.fn(() => ({ skip: vehiclesOrderedSkip }))
 
   const db = {
     collection: jest.fn((name) => {
@@ -15,7 +29,11 @@ function createMockDb({ rolesData, vehiclesData }) {
       }
 
       if (name === "vehicles") {
-        return { limit: vehiclesLimit }
+        return {
+          limit: vehiclesLimit,
+          skip: vehiclesSkip,
+          orderBy: vehiclesOrderBy
+        }
       }
 
       throw new Error(`Unexpected collection: ${name}`)
@@ -28,7 +46,9 @@ function createMockDb({ rolesData, vehiclesData }) {
     rolesLimit,
     rolesGet,
     vehiclesLimit,
-    vehiclesGet
+    vehiclesSkip,
+    vehiclesOrderBy,
+    vehiclesOrderedSkip
   }
 }
 
@@ -126,7 +146,8 @@ describe("cloudfunctions/vehicleList integration", () => {
     expect(res.list[0].priceDay).toBe(1299)
     expect(mocks.rolesWhere).toHaveBeenCalledWith({ openid: "admin_openid" })
     expect(mocks.rolesLimit).toHaveBeenCalledWith(20)
-    expect(mocks.vehiclesLimit).toHaveBeenCalledWith(100)
+    expect(mocks.vehiclesOrderBy).toHaveBeenCalledWith("updatedAt", "desc")
+    expect(mocks.vehiclesOrderedSkip).toHaveBeenCalledWith(0)
   })
 
   test("admin 按状态筛选车辆", async () => {
@@ -297,7 +318,7 @@ describe("cloudfunctions/vehicleList integration", () => {
 
     expect(res.ok).toBe(false)
     expect(res.code).toBe("VALIDATION_ERROR")
-    expect(mocks.vehiclesLimit).not.toHaveBeenCalled()
+    expect(mocks.vehiclesOrderBy).not.toHaveBeenCalled()
   })
 
   test("非管理员查询返回 FORBIDDEN", async () => {
@@ -318,6 +339,64 @@ describe("cloudfunctions/vehicleList integration", () => {
       code: "FORBIDDEN",
       message: "权限不足"
     })
-    expect(mocks.vehiclesLimit).not.toHaveBeenCalled()
+    expect(mocks.vehiclesOrderBy).not.toHaveBeenCalled()
+  })
+
+  test("超过 100 辆后仍可读取后续分页", async () => {
+    const vehiclesData = Array.from({ length: 150 }, (_, index) => ({
+      _id: `v${index}`,
+      plateNumber: `浙A${String(index).padStart(5, "0")}`,
+      vehicleType: "sedan",
+      brandModel: `Vehicle ${index}`,
+      status: "idle",
+      updatedAt: new Date(Date.UTC(2026, 0, 1, 0, 0, index)).toISOString()
+    }))
+    const mocks = createMockDb({
+      rolesData: [{ role: "admin" }],
+      vehiclesData
+    })
+    const vehicleList = await loadVehicleListWith({
+      openid: "admin_openid",
+      mockDb: mocks.db
+    })
+
+    const res = await vehicleList.main({ status: "all", page: 7, pageSize: 20 })
+
+    expect(res.ok).toBe(true)
+    expect(res.total).toBe(150)
+    expect(res.list).toHaveLength(10)
+    expect(res.hasMore).toBe(false)
+    expect(res.truncated).toBe(false)
+    expect(mocks.vehiclesOrderedSkip).toHaveBeenCalledWith(100)
+  })
+
+  test("缺少 updatedAt 索引时自动降级读取", async () => {
+    const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {})
+    const mocks = createMockDb({
+      rolesData: [{ role: "admin" }],
+      vehiclesData: [
+        {
+          _id: "v1",
+          plateNumber: "浙A12345",
+          vehicleType: "sedan",
+          brandModel: "MX-5",
+          status: "idle"
+        }
+      ],
+      orderedError: new Error("missing updatedAt index")
+    })
+    const vehicleList = await loadVehicleListWith({
+      openid: "admin_openid",
+      mockDb: mocks.db
+    })
+
+    const res = await vehicleList.main({ status: "all" })
+
+    expect(res.ok).toBe(true)
+    expect(res.total).toBe(1)
+    expect(mocks.vehiclesOrderedSkip).toHaveBeenCalledWith(0)
+    expect(mocks.vehiclesSkip).toHaveBeenCalledWith(0)
+    expect(warnSpy).toHaveBeenCalled()
+    warnSpy.mockRestore()
   })
 })

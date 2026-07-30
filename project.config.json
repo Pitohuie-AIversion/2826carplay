@@ -1,9 +1,14 @@
 {
   "appid": "wx5c1892bfed56e0d1",
   "compileType": "miniprogram",
-  "libVersion": "trial",
+  "libVersion": "3.15.0",
   "packOptions": {
-    "ignore": [],
+    "ignore": [
+      {
+        "type": "folder",
+        "value": "log"
+      }
+    ],
     "include": []
   },
   "setting": {

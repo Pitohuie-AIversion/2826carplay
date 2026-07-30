@@ -1,44 +1,73 @@
 <view class="mine-page">
+  <view class="mine-glow"></view>
+  <view class="mine-intro">
+    <view class="intro-kicker">MEMBER CENTER</view>
+    <view class="intro-title">我的极境</view>
+    <view class="intro-desc">管理预约与专属服务</view>
+  </view>
+
   <view class="profile-card ui-card ui-card-gradient">
-    <view class="avatar-placeholder">GL</view>
+    <view class="avatar-ring">
+      <image class="avatar-image" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+    </view>
     <view class="profile-info">
       <view class="profile-name">{{userName}}</view>
       <view class="profile-meta">
-        <text class="profile-brand-chip">{{brandName}}</text>
-        <text class="profile-brand-note">官方服务入口</text>
+        <text class="profile-brand-chip {{roleClass}}">{{roleKicker}}</text>
+        <text class="profile-brand-note">{{brandName}}</text>
       </view>
       <view class="profile-desc">{{userDesc}}</view>
-    </view>
-  </view>
-
-  <view class="section-card ui-card">
-    <view class="section-title">我的服务</view>
-    <view
-      wx:for="{{menuItems}}"
-      wx:key="key"
-      class="menu-item {{index === menuItems.length - 1 ? 'menu-item-last' : ''}}"
-      data-key="{{item.key}}"
-      data-title="{{item.title}}"
-      bindtap="handleMenuTap"
-    >
-      <view>
-        <view class="menu-title">{{item.title}}</view>
-        <view class="menu-desc">{{item.desc}}</view>
+      <view class="profile-access {{roleClass}}">
+        <view class="profile-access-dot"></view>
+        <text>{{roleLabel}}</text>
       </view>
-      <view class="menu-arrow">›</view>
     </view>
+    <image class="profile-watermark" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
   </view>
 
   <view class="section-card ui-card">
+    <view class="section-heading">
+      <view>
+        <view class="section-kicker">SERVICES</view>
+        <view class="section-title">功能中心</view>
+      </view>
+      <view class="section-count">{{permissionsLoading ? 'SYNC' : menuItems.length + ' ENTRIES'}}</view>
+    </view>
+    <block wx:for="{{menuItems}}" wx:key="key">
+      <view wx:if="{{item.showSectionHeader}}" class="menu-group-heading {{index === 0 ? 'menu-group-heading-first' : ''}}">
+        <view class="menu-group-line"></view>
+        <view>
+          <view class="menu-group-kicker">{{item.sectionKicker}}</view>
+          <view class="menu-group-title">{{item.section}}</view>
+        </view>
+      </view>
+      <view
+        class="menu-item {{index === menuItems.length - 1 ? 'menu-item-last' : ''}}"
+        data-key="{{item.key}}"
+        data-title="{{item.title}}"
+        bindtap="handleMenuTap"
+        hover-class="menu-item-pressed"
+      >
+        <view class="menu-glyph {{item.key === 'errorLogManage' ? 'menu-glyph-danger' : ''}}">{{item.glyph}}</view>
+        <view class="menu-copy">
+          <view class="menu-title">{{item.title}}</view>
+          <view class="menu-desc">{{item.desc}}</view>
+        </view>
+        <view wx:if="{{item.badgeText}}" class="menu-badge">{{item.badgeText}}</view>
+        <view class="menu-arrow">↗</view>
+      </view>
+    </block>
+  </view>
+
+  <view class="section-card ui-card">
+    <view class="section-kicker">CONCIERGE</view>
     <view class="section-title">联系客服</view>
     <view class="section-desc">如需确认车辆档期、价格或取还车规则，可直接联系在线客服。</view>
-    <button class="action-button ui-btn ui-btn-ghost" open-type="contact">联系在线客服</button>
-    <button class="action-button ui-btn ui-btn-ghost action-button-offset" bindtap="handlePhoneCall">拨打客服电话</button>
+    <view class="contact-actions">
+      <button class="action-button ui-btn ui-btn-ghost" open-type="contact" hover-class="mine-button-pressed">在线客服</button>
+      <button class="action-button ui-btn ui-btn-ghost action-button-offset" bindtap="handlePhoneCall" hover-class="mine-button-pressed">电话咨询</button>
+    </view>
   </view>
 
-  <view class="section-card ui-card">
-    <view class="section-title">返回首页</view>
-    <view class="section-desc">回到车库首页继续浏览车辆与预约咨询。</view>
-    <button class="action-button ui-btn ui-btn-primary" bindtap="handleBackHome">返回车库首页</button>
-  </view>
+  <button class="home-button ui-btn ui-btn-primary" bindtap="handleBackHome" hover-class="mine-button-pressed">返回车库首页</button>
 </view>

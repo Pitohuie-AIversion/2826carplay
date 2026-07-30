@@ -1,40 +1,65 @@
-<view class="vehicle-create-page">
-  <view class="card header-card">
-    <view class="page-title">新增车辆</view>
-    <view class="page-desc">请按实际车辆信息填写，提交后可直接进入图片管理继续上传车辆图片。</view>
+<view class="vehicle-create-page vehicle-form-page">
+  <view class="page-glow"></view>
+
+  <view class="hero-card">
+    <view class="hero-top">
+      <view>
+        <view class="page-kicker">FLEET ONBOARDING</view>
+        <view class="page-title">新增车辆</view>
+      </view>
+      <image class="hero-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+    </view>
+    <view class="page-desc">录入车辆档案，创建成功后可继续上传车辆图片</view>
   </view>
 
-  <view class="card tip-card">
-    <view class="tip-title">图片上传说明</view>
-    <view class="tip-desc">车辆创建成功后，可立即进入详情页上传图片、设置封面并管理已上传素材。</view>
+  <view class="tip-card">
+    <view class="tip-mark">i</view>
+    <view>
+      <view class="tip-title">图片上传说明</view>
+      <view class="tip-desc">提交车辆后可立即进入图片管理，设置首页封面与车辆相册。</view>
+    </view>
   </view>
 
-  <view class="card form-card">
-    <view class="form-item">
-      <view class="form-label">车牌号</view>
-      <input
-        class="form-input"
-        placeholder="例如 京A12345 / 粤BDF1234"
-        value="{{form.plateNumber}}"
-        maxlength="8"
-        bindinput="handlePlateInput"
-      />
+  <view class="form-card">
+    <view class="section-heading">
+      <view>
+        <view class="section-kicker">IDENTITY</view>
+        <view class="section-title">车辆身份</view>
+      </view>
+      <view class="section-index">01</view>
+    </view>
+    <view class="form-divider"></view>
+
+    <view class="form-row">
+      <view class="form-item form-item-half">
+        <view class="form-label field-label-row"><text>车牌号</text><text class="field-required">必填</text></view>
+        <input
+          class="form-input"
+          placeholder="京A12345"
+          placeholder-class="input-placeholder"
+          value="{{form.plateNumber}}"
+          maxlength="8"
+          bindinput="handlePlateInput"
+        />
+      </view>
+
+      <view class="form-item form-item-half">
+        <view class="form-label field-label-row"><text>车辆类型</text><text class="field-required">必填</text></view>
+        <picker mode="selector" range="{{vehicleTypeLabels}}" value="{{vehicleTypeIndex}}" bindchange="handleVehicleTypeChange">
+          <view class="form-picker {{form.vehicleType ? 'form-picker-filled' : ''}}">
+            <text>{{vehicleTypeLabel || '选择类型'}}</text>
+            <text class="picker-arrow">⌄</text>
+          </view>
+        </picker>
+      </view>
     </view>
 
     <view class="form-item">
-      <view class="form-label">车辆类型</view>
-      <picker mode="selector" range="{{vehicleTypeLabels}}" value="{{vehicleTypeIndex}}" bindchange="handleVehicleTypeChange">
-        <view class="form-picker {{form.vehicleType ? 'form-picker-filled' : ''}}">
-          {{vehicleTypeLabel || '请选择车辆类型'}}
-        </view>
-      </picker>
-    </view>
-
-    <view class="form-item">
-      <view class="form-label">品牌型号</view>
+      <view class="form-label field-label-row"><text>品牌型号</text><text class="field-required">必填</text></view>
       <input
         class="form-input"
         placeholder="例如 BMW 740Li"
+        placeholder-class="input-placeholder"
         value="{{form.brandModel}}"
         maxlength="50"
         data-field="brandModel"
@@ -42,72 +67,119 @@
       />
     </view>
 
-    <view class="form-item">
-      <view class="form-label">注册日期</view>
-      <picker mode="date" value="{{form.registerDate}}" end="{{today}}" bindchange="handleDateChange">
-        <view class="form-picker {{form.registerDate ? 'form-picker-filled' : ''}}">
-          {{form.registerDate || '请选择注册日期'}}
-        </view>
-      </picker>
+    <view class="form-row">
+      <view class="form-item form-item-half">
+        <view class="form-label field-label-row"><text>注册日期</text><text class="field-required">必填</text></view>
+        <picker mode="date" value="{{form.registerDate}}" end="{{today}}" bindchange="handleDateChange">
+          <view class="form-picker {{form.registerDate ? 'form-picker-filled' : ''}}">
+            <text>{{form.registerDate || '选择日期'}}</text>
+            <text class="picker-arrow">⌄</text>
+          </view>
+        </picker>
+      </view>
+
+      <view class="form-item form-item-half">
+        <view class="form-label field-label-row"><text>使用状态</text><text class="field-required">必填</text></view>
+        <picker mode="selector" range="{{statusLabels}}" value="{{statusIndex}}" bindchange="handleStatusChange">
+          <view class="form-picker {{form.status ? 'form-picker-filled' : ''}}">
+            <text>{{statusLabel || '选择状态'}}</text>
+            <text class="picker-arrow">⌄</text>
+          </view>
+        </picker>
+      </view>
+    </view>
+  </view>
+
+  <view class="form-card">
+    <view class="section-heading">
+      <view>
+        <view class="section-kicker">RENTAL PROFILE</view>
+        <view class="section-title">展示与租赁</view>
+      </view>
+      <view class="section-index">02</view>
+    </view>
+    <view class="form-divider"></view>
+    <view class="section-helper">选填信息 · 完善后将用于车库前台展示</view>
+
+    <view class="form-row">
+      <view class="form-item form-item-half">
+        <view class="form-label">取车城市</view>
+        <input class="form-input" placeholder="例如 杭州" placeholder-class="input-placeholder" value="{{form.location}}" maxlength="20" data-field="location" bindinput="handleTextInput" />
+      </view>
+      <view class="form-item form-item-half">
+        <view class="form-label">日租金</view>
+        <input class="form-input" type="number" placeholder="例如 699" placeholder-class="input-placeholder" value="{{form.priceDay}}" maxlength="5" data-field="priceDay" bindinput="handleTextInput" />
+      </view>
     </view>
 
-    <view class="form-item">
-      <view class="form-label">使用状态</view>
-      <picker mode="selector" range="{{statusLabels}}" value="{{statusIndex}}" bindchange="handleStatusChange">
-        <view class="form-picker {{form.status ? 'form-picker-filled' : ''}}">
-          {{statusLabel || '请选择使用状态'}}
-        </view>
-      </picker>
-    </view>
-
-    <view class="form-item">
-      <view class="form-label">取车城市</view>
-      <input class="form-input" placeholder="例如 杭州" value="{{form.location}}" maxlength="20" data-field="location" bindinput="handleTextInput" />
-    </view>
-
-    <view class="form-item">
-      <view class="form-label">日租金</view>
-      <input class="form-input" type="number" placeholder="例如 699" value="{{form.priceDay}}" maxlength="5" data-field="priceDay" bindinput="handleTextInput" />
-    </view>
-
-    <view class="form-item">
-      <view class="form-label">变速箱</view>
-      <picker mode="selector" range="{{transmissionLabels}}" value="{{transmissionIndex}}" bindchange="handleTransmissionChange">
-        <view class="form-picker {{form.transmission ? 'form-picker-filled' : ''}}">
-          {{transmissionLabel || '请选择变速箱'}}
-        </view>
-      </picker>
-    </view>
-
-    <view class="form-item">
-      <view class="form-label">燃油类型</view>
-      <picker mode="selector" range="{{fuelTypeLabels}}" value="{{fuelTypeIndex}}" bindchange="handleFuelTypeChange">
-        <view class="form-picker {{form.fuelType ? 'form-picker-filled' : ''}}">
-          {{fuelTypeLabel || '请选择燃油类型'}}
-        </view>
-      </picker>
+    <view class="form-row">
+      <view class="form-item form-item-half">
+        <view class="form-label">变速箱</view>
+        <picker mode="selector" range="{{transmissionLabels}}" value="{{transmissionIndex}}" bindchange="handleTransmissionChange">
+          <view class="form-picker {{form.transmission ? 'form-picker-filled' : ''}}">
+            <text>{{transmissionLabel || '选择类型'}}</text>
+            <text class="picker-arrow">⌄</text>
+          </view>
+        </picker>
+      </view>
+      <view class="form-item form-item-half">
+        <view class="form-label">燃油类型</view>
+        <picker mode="selector" range="{{fuelTypeLabels}}" value="{{fuelTypeIndex}}" bindchange="handleFuelTypeChange">
+          <view class="form-picker {{form.fuelType ? 'form-picker-filled' : ''}}">
+            <text>{{fuelTypeLabel || '选择类型'}}</text>
+            <text class="picker-arrow">⌄</text>
+          </view>
+        </picker>
+      </view>
     </view>
 
     <view class="form-item">
       <view class="form-label">座位数</view>
-      <input class="form-input" type="number" placeholder="例如 5" value="{{form.seats}}" maxlength="1" data-field="seats" bindinput="handleTextInput" />
+      <input class="form-input" type="number" placeholder="例如 5" placeholder-class="input-placeholder" value="{{form.seats}}" maxlength="1" data-field="seats" bindinput="handleTextInput" />
     </view>
 
     <view class="form-item">
+      <view class="form-label field-label-row"><text>公开说明</text><text class="field-counter">{{publicDescriptionLength}} / 200</text></view>
+      <textarea
+        class="form-textarea"
+        placeholder="填写车辆亮点、租赁提示等公开内容"
+        placeholder-class="input-placeholder"
+        value="{{form.publicDescription}}"
+        maxlength="200"
+        data-field="publicDescription"
+        bindinput="handleTextInput"
+      />
+      <view class="section-helper">此内容会显示在首页和车辆详情，请勿填写内部档案信息。</view>
+    </view>
+  </view>
+
+  <view class="form-card">
+    <view class="section-heading">
+      <view>
+        <view class="section-kicker">ARCHIVE</view>
+        <view class="section-title">档案与备注</view>
+      </view>
+      <view class="section-index">03</view>
+    </view>
+    <view class="form-divider"></view>
+    <view class="section-helper">选填信息 · 仅用于内部档案，不会在前台展示</view>
+
+    <view class="form-item">
       <view class="form-label">VIN</view>
-      <input class="form-input" placeholder="可选，最多 32 位" value="{{form.vin}}" maxlength="32" data-field="vin" bindinput="handleTextInput" />
+      <input class="form-input" placeholder="选填，最多 32 位" placeholder-class="input-placeholder" value="{{form.vin}}" maxlength="32" data-field="vin" bindinput="handleTextInput" />
     </view>
 
     <view class="form-item">
       <view class="form-label">发动机号</view>
-      <input class="form-input" placeholder="可选，最多 32 位" value="{{form.engineNumber}}" maxlength="32" data-field="engineNumber" bindinput="handleTextInput" />
+      <input class="form-input" placeholder="选填，最多 32 位" placeholder-class="input-placeholder" value="{{form.engineNumber}}" maxlength="32" data-field="engineNumber" bindinput="handleTextInput" />
     </view>
 
     <view class="form-item">
-      <view class="form-label">备注说明</view>
+      <view class="form-label field-label-row"><text>内部备注</text><text class="field-counter">{{noteLength}} / 200</text></view>
       <textarea
         class="form-textarea"
-        placeholder="可填写车辆亮点、租赁提示等说明"
+        placeholder="填写维修提醒、档案说明等内部内容"
+        placeholder-class="input-placeholder"
         value="{{form.note}}"
         maxlength="200"
         data-field="note"
@@ -121,7 +193,8 @@
     bindtap="handleSubmit"
     disabled="{{isSubmitting}}"
     loading="{{isSubmitting}}"
+    hover-class="vehicle-form-button-pressed"
   >
-    {{isSubmitting ? '提交中' : '提交'}}
+    {{isSubmitting ? '正在创建车辆' : '创建车辆并继续'}}
   </button>
 </view>

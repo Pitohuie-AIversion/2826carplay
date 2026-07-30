@@ -1,0 +1,145 @@
+<view class="inventory-page management-page">
+  <view class="page-glow"></view>
+
+  <view class="hero-card ui-card ui-card-gradient">
+    <view class="hero-top">
+      <view class="hero-copy">
+        <view class="page-kicker">PRIVACY DATA INVENTORY</view>
+        <view class="hero-title">相关数据清单</view>
+        <view class="hero-desc">只读核验本次申请关联的用户数据</view>
+      </view>
+      <image class="hero-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+    </view>
+    <view class="hero-foot">
+      <view class="live-dot"></view>
+      <view class="hero-foot-text">每次核验均写入审计日志</view>
+      <view class="refresh-link" bindtap="handleRefresh">{{refreshing ? '核验中…' : '重新核验'}}</view>
+    </view>
+  </view>
+
+  <view wx:if="{{loading}}" class="state-card ui-card">
+    <view class="state-loader"></view>
+    <view>
+      <view class="state-title">正在核验相关数据</view>
+      <view class="state-desc">不会修改或删除用户数据</view>
+    </view>
+  </view>
+
+  <view wx:elif="{{loadError}}" class="error-card ui-card">
+    <view class="error-copy">
+      <view class="error-title">数据核验未完成</view>
+      <view class="error-desc">{{loadError}}</view>
+    </view>
+    <button class="retry-button ui-btn ui-btn-ghost" bindtap="handleRefresh">重试</button>
+  </view>
+
+  <block wx:else>
+    <view wx:if="{{partial}}" class="warning-card ui-card">
+      <view class="warning-title">清单未完全展示</view>
+      <view class="warning-desc">{{issueText}}。请缩小人工核验范围或修复对应集合，暂勿直接完成申请。</view>
+    </view>
+
+    <view class="request-card ui-card">
+      <view class="section-heading">
+        <view>
+          <view class="section-eyebrow">REQUEST CONTEXT</view>
+          <view class="section-title">{{request.typeLabel}}</view>
+        </view>
+        <view class="status-pill">{{request.statusLabel}}</view>
+      </view>
+      <view class="identity-row">
+        <view class="identity-text">{{request.openid || '--'}}</view>
+        <button class="copy-button ui-btn ui-btn-ghost" bindtap="handleCopyOpenid">复制</button>
+      </view>
+      <view class="request-meta">申请时间：{{request.createdAtText}}</view>
+      <view class="request-description">{{request.description || '未填写申请说明'}}</view>
+    </view>
+
+    <view class="metric-grid">
+      <view class="metric-card ui-card">
+        <view class="metric-value">{{bookings.count}}{{bookings.truncated ? '+' : ''}}</view>
+        <view class="metric-label">预约记录</view>
+      </view>
+      <view class="metric-card ui-card">
+        <view class="metric-value">{{favorites.count}}{{favorites.truncated ? '+' : ''}}</view>
+        <view class="metric-label">收藏记录</view>
+      </view>
+      <view class="metric-card ui-card">
+        <view class="metric-value">{{privacyRequests.count}}{{privacyRequests.truncated ? '+' : ''}}</view>
+        <view class="metric-label">隐私申请</view>
+      </view>
+    </view>
+
+    <view class="section-card ui-card">
+      <view class="section-heading">
+        <view>
+          <view class="section-eyebrow">RESERVATIONS</view>
+          <view class="section-title">预约数据</view>
+        </view>
+        <view class="section-index">{{bookings.count}}{{bookings.truncated ? '+' : ''}}</view>
+      </view>
+      <view wx:if="{{bookings.list.length}}" class="record-list">
+        <view
+          class="record-item record-link"
+          wx:for="{{bookings.list}}"
+          wx:key="id"
+          data-id="{{item.id}}"
+          bindtap="handleBookingTap"
+        >
+          <view class="record-head">
+            <view class="record-title">{{item.vehicleName || item.vehicleId || '未命名车辆'}}</view>
+            <view class="record-status">{{item.statusLabel}}</view>
+          </view>
+          <view class="record-meta">{{item.dateText}} · {{item.createdAtText}}</view>
+          <view class="record-detail">姓名：{{item.userName || '--'}}　电话：{{item.phone || '--'}}</view>
+          <view class="record-detail">城市：{{item.city || '--'}}</view>
+          <view wx:if="{{item.note}}" class="record-note">{{item.note}}</view>
+        </view>
+      </view>
+      <view wx:else class="empty-text">未发现预约记录</view>
+    </view>
+
+    <view class="section-card ui-card">
+      <view class="section-heading">
+        <view>
+          <view class="section-eyebrow">FAVORITES</view>
+          <view class="section-title">收藏数据</view>
+        </view>
+        <view class="section-index">{{favorites.count}}{{favorites.truncated ? '+' : ''}}</view>
+      </view>
+      <view wx:if="{{favorites.list.length}}" class="record-list">
+        <view class="record-item" wx:for="{{favorites.list}}" wx:key="id">
+          <view class="record-title">车辆 ID：{{item.vehicleId || '--'}}</view>
+          <view class="record-meta">收藏时间：{{item.createdAtText}}</view>
+        </view>
+      </view>
+      <view wx:else class="empty-text">未发现收藏记录</view>
+    </view>
+
+    <view class="section-card ui-card">
+      <view class="section-heading">
+        <view>
+          <view class="section-eyebrow">PRIVACY REQUESTS</view>
+          <view class="section-title">隐私申请记录</view>
+        </view>
+        <view class="section-index">{{privacyRequests.count}}{{privacyRequests.truncated ? '+' : ''}}</view>
+      </view>
+      <view wx:if="{{privacyRequests.list.length}}" class="record-list">
+        <view class="record-item" wx:for="{{privacyRequests.list}}" wx:key="id">
+          <view class="record-head">
+            <view class="record-title">{{item.typeLabel}}</view>
+            <view class="record-status">{{item.statusLabel}}</view>
+          </view>
+          <view class="record-meta">{{item.createdAtText}} · {{item.id}}</view>
+          <view wx:if="{{item.description}}" class="record-note">{{item.description}}</view>
+          <view wx:if="{{item.resolutionNote}}" class="record-resolution">处理反馈：{{item.resolutionNote}}</view>
+        </view>
+      </view>
+      <view wx:else class="empty-text">未发现其他隐私申请</view>
+    </view>
+
+    <view class="privacy-note ui-card">
+      匿名分析事件不保存 OpenID、姓名、手机号、城市或备注，无法也无需关联到具体用户。该清单仅用于人工核验，不会自动更正或删除记录。
+    </view>
+  </block>
+</view>

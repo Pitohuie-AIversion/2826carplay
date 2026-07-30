@@ -1,12 +1,35 @@
 jest.mock("wx-server-sdk")
 
-function createMockDb({ rolesData, bookingData }) {
+function createMockDb({ rolesData, bookingData, conflictBookings = [], conflictQueryError = null }) {
   const rolesGet = jest.fn().mockResolvedValue({ data: rolesData })
   const bookingGet = jest.fn().mockResolvedValue({ data: bookingData })
 
   const rolesLimit = jest.fn(() => ({ get: rolesGet }))
   const rolesWhere = jest.fn(() => ({ limit: rolesLimit }))
   const bookingsDoc = jest.fn(() => ({ get: bookingGet }))
+  const bookingsWhere = jest.fn(() => {
+    let offset = 0
+    let limit = 100
+    const chain = {
+      skip: jest.fn((value) => {
+        offset = value
+        return chain
+      }),
+      limit: jest.fn((value) => {
+        limit = value
+        return chain
+      }),
+      get: jest.fn(() => {
+        if (conflictQueryError) {
+          return Promise.reject(conflictQueryError)
+        }
+        return Promise.resolve({
+          data: conflictBookings.slice(offset, offset + limit)
+        })
+      })
+    }
+    return chain
+  })
 
   const db = {
     collection: jest.fn((name) => {
@@ -14,7 +37,10 @@ function createMockDb({ rolesData, bookingData }) {
         return { where: rolesWhere }
       }
       if (name === "bookings") {
-        return { doc: bookingsDoc }
+        return {
+          doc: bookingsDoc,
+          where: bookingsWhere
+        }
       }
       throw new Error(`Unexpected collection: ${name}`)
     })
@@ -23,7 +49,8 @@ function createMockDb({ rolesData, bookingData }) {
   return {
     db,
     rolesWhere,
-    bookingsDoc
+    bookingsDoc,
+    bookingsWhere
   }
 }
 
@@ -82,13 +109,22 @@ describe("cloudfunctions/bookingDetail integration", () => {
         note: "下午取车",
         adminRemark: "已联系",
         adminRemarkUpdatedAt: "",
+        schedulePriority: "normal",
+        coordinationStatus: "pending",
+        coordinationUpdatedAt: "",
         status: "contacted",
         createdAt: "2026-07-18T10:00:00.000Z",
         updatedAt: "2026-07-18T11:00:00.000Z"
-      }
+      },
+      conflicts: [],
+      conflictTotal: 0,
+      conflictsTruncated: false,
+      conflictsUnavailable: false,
+      conflictCheckSkipped: false
     })
     expect(mocks.rolesWhere).toHaveBeenCalledWith({ openid: "admin_openid" })
     expect(mocks.bookingsDoc).toHaveBeenCalledWith("booking_1")
+    expect(mocks.bookingsWhere).toHaveBeenCalledWith({ vehicleId: "vehicle_1" })
   })
 
   test("缺少 id 返回 VALIDATION_ERROR", async () => {
@@ -126,5 +162,108 @@ describe("cloudfunctions/bookingDetail integration", () => {
       message: "权限不足"
     })
     expect(mocks.bookingsDoc).not.toHaveBeenCalled()
+  })
+
+  test("只返回同车且日期重叠的未取消预约", async () => {
+    const mocks = createMockDb({
+      rolesData: [{ role: "booking_manager" }],
+      bookingData: {
+        _id: "booking_target",
+        vehicleId: "vehicle_1",
+        vehicleName: "BMW M4",
+        startDate: "2026-08-10",
+        endDate: "2026-08-12",
+        status: "pending"
+      },
+      conflictBookings: [
+        {
+          _id: "booking_target",
+          vehicleId: "vehicle_1",
+          startDate: "2026-08-10",
+          endDate: "2026-08-12",
+          status: "pending"
+        },
+        {
+          _id: "booking_overlap",
+          vehicleId: "vehicle_1",
+          userName: "李四",
+          phone: "13900000000",
+          city: "杭州",
+          startDate: "2026-08-12",
+          endDate: "2026-08-14",
+          status: "contacted"
+        },
+        {
+          _id: "booking_cancelled",
+          vehicleId: "vehicle_1",
+          startDate: "2026-08-11",
+          endDate: "2026-08-13",
+          status: "cancelled"
+        },
+        {
+          _id: "booking_other_vehicle",
+          vehicleId: "vehicle_2",
+          startDate: "2026-08-11",
+          endDate: "2026-08-13",
+          status: "pending"
+        },
+        {
+          _id: "booking_later",
+          vehicleId: "vehicle_1",
+          startDate: "2026-08-20",
+          endDate: "2026-08-21",
+          status: "pending"
+        }
+      ]
+    })
+
+    const mod = await loadBookingDetailWith({
+      openid: "manager_openid",
+      mockDb: mocks.db
+    })
+    const res = await mod.main({ id: "booking_target" })
+
+    expect(res.conflictTotal).toBe(1)
+    expect(res.conflicts).toEqual([
+      {
+        id: "booking_overlap",
+        userName: "李四",
+        phone: "13900000000",
+        city: "杭州",
+        startDate: "2026-08-12",
+        endDate: "2026-08-14",
+        status: "contacted",
+        schedulePriority: "normal",
+        coordinationStatus: "pending"
+      }
+    ])
+  })
+
+  test("冲突查询失败不影响主预约详情", async () => {
+    const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {})
+    const mocks = createMockDb({
+      rolesData: [{ role: "admin" }],
+      bookingData: {
+        _id: "booking_1",
+        vehicleId: "vehicle_1",
+        startDate: "2026-08-10",
+        endDate: "2026-08-12",
+        status: "pending"
+      },
+      conflictQueryError: new Error("temporary database error")
+    })
+
+    const mod = await loadBookingDetailWith({
+      openid: "admin_openid",
+      mockDb: mocks.db
+    })
+    const res = await mod.main({ id: "booking_1" })
+
+    expect(res.ok).toBe(true)
+    expect(res.detail.id).toBe("booking_1")
+    expect(res.conflicts).toEqual([])
+    expect(res.conflictsUnavailable).toBe(true)
+    expect(warnSpy).toHaveBeenCalled()
+    warnSpy.mockRestore()
   })
 })

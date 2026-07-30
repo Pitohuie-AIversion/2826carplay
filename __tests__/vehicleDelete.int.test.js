@@ -1,9 +1,10 @@
 jest.mock("wx-server-sdk")
 
-function createMockDb({ rolesData, currentData, removeResult }) {
+function createMockDb({ rolesData, currentData, removeResult, bookingsData = [] }) {
   const rolesGet = jest.fn().mockResolvedValue({ data: rolesData })
   const currentGet = jest.fn().mockResolvedValue({ data: currentData })
   const remove = jest.fn().mockResolvedValue(removeResult)
+  const bookingsGet = jest.fn().mockResolvedValue({ data: bookingsData })
 
   const rolesLimit = jest.fn(() => ({ get: rolesGet }))
   const rolesWhere = jest.fn(() => ({ limit: rolesLimit }))
@@ -12,6 +13,8 @@ function createMockDb({ rolesData, currentData, removeResult }) {
     get: currentGet,
     remove
   }))
+  const bookingsLimit = jest.fn(() => ({ get: bookingsGet }))
+  const bookingsWhere = jest.fn(() => ({ limit: bookingsLimit }))
 
   const db = {
     collection: jest.fn((name) => {
@@ -20,6 +23,9 @@ function createMockDb({ rolesData, currentData, removeResult }) {
       }
       if (name === "vehicles") {
         return { doc: vehiclesDoc }
+      }
+      if (name === "bookings") {
+        return { where: bookingsWhere }
       }
       throw new Error(`Unexpected collection: ${name}`)
     })
@@ -31,7 +37,10 @@ function createMockDb({ rolesData, currentData, removeResult }) {
     rolesLimit,
     vehiclesDoc,
     currentGet,
-    remove
+    remove,
+    bookingsWhere,
+    bookingsLimit,
+    bookingsGet
   }
 }
 
@@ -76,6 +85,8 @@ describe("cloudfunctions/vehicleDelete integration", () => {
     })
     expect(mocks.rolesWhere).toHaveBeenCalledWith({ openid: "admin_openid" })
     expect(mocks.vehiclesDoc).toHaveBeenCalledWith("car_1")
+    expect(mocks.bookingsWhere).toHaveBeenCalledWith({ vehicleId: "car_1" })
+    expect(mocks.bookingsLimit).toHaveBeenCalledWith(1)
     expect(mocks.remove).toHaveBeenCalledTimes(1)
     expect(cloud.deleteFile).toHaveBeenCalledWith({
       fileList: ["cloud://img1", "cloud://img2"]
@@ -136,5 +147,28 @@ describe("cloudfunctions/vehicleDelete integration", () => {
     })
     expect(mocks.vehiclesDoc).not.toHaveBeenCalled()
     expect(mocks.remove).not.toHaveBeenCalled()
+  })
+
+  test("存在预约历史时禁止物理删除车辆", async () => {
+    const mocks = createMockDb({
+      rolesData: [{ role: "admin" }],
+      currentData: { _id: "car_1", plateNumber: "京A12345" },
+      bookingsData: [{ _id: "booking_1", vehicleId: "car_1", status: "cancelled" }],
+      removeResult: { stats: { removed: 1 } }
+    })
+
+    const vehicleDelete = await loadVehicleDeleteWith({ openid: "admin_openid", mockDb: mocks.db })
+
+    const res = await vehicleDelete.main({ id: "car_1" })
+    const cloud = require("wx-server-sdk")
+
+    expect(res).toEqual({
+      ok: false,
+      code: "VEHICLE_HAS_BOOKINGS",
+      message: "车辆存在预约记录，请改为停用车辆"
+    })
+    expect(mocks.bookingsWhere).toHaveBeenCalledWith({ vehicleId: "car_1" })
+    expect(mocks.remove).not.toHaveBeenCalled()
+    expect(cloud.deleteFile).not.toHaveBeenCalled()
   })
 })

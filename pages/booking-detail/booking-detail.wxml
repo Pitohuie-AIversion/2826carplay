@@ -1,15 +1,73 @@
 <view class="detail-page" wx:if="{{booking.id}}">
-  <view class="header-card ui-card">
+  <view class="page-glow"></view>
+
+  <view class="receipt-card ui-card">
+    <view class="receipt-top">
+      <view class="receipt-brand">
+        <image class="brand-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+        <view>
+          <view class="brand-kicker">EXTREME GARAGE</view>
+          <view class="brand-title">预约确认单</view>
+        </view>
+      </view>
+      <view class="booking-status ui-status ui-status-lg {{statusClass}}">{{statusText}}</view>
+    </view>
+
+    <view class="receipt-divider">
+      <view class="receipt-notch receipt-notch-left"></view>
+      <view class="dashed-line"></view>
+      <view class="receipt-notch receipt-notch-right"></view>
+    </view>
+
+    <view class="vehicle-label">RESERVED VEHICLE</view>
     <view class="booking-name">{{booking.vehicleName || "--"}}</view>
-    <view class="booking-status ui-status ui-status-lg {{statusClass}}">{{statusText}}</view>
+
+    <view class="journey-panel">
+      <view class="journey-date">
+        <view class="journey-label">取车日期</view>
+        <view class="journey-value">{{booking.startDate || "--"}}</view>
+      </view>
+      <view class="journey-route">
+        <view class="route-dot"></view>
+        <view class="route-line"></view>
+        <view class="route-arrow">›</view>
+      </view>
+      <view class="journey-date journey-date-end">
+        <view class="journey-label">还车日期</view>
+        <view class="journey-value">{{booking.endDate || "--"}}</view>
+      </view>
+    </view>
+
+    <view class="receipt-footer">
+      <view>
+        <view class="footer-label">取车城市</view>
+        <view class="footer-value">{{booking.city || "--"}}</view>
+      </view>
+      <view class="receipt-code">
+        <view class="code-label">BOOKING ID</view>
+        <view class="code-value">{{booking.id || "--"}}</view>
+      </view>
+    </view>
   </view>
 
   <view class="info-card ui-card">
-    <view class="info-grid">
-      <view class="info-item">
-        <view class="info-label">预约编号</view>
-        <view class="info-value">{{booking.id || "--"}}</view>
+    <view class="section-heading">
+      <view>
+        <view class="section-kicker">CONTACT</view>
+        <view class="section-title">联系人信息</view>
       </view>
+      <view class="section-side">
+        <button
+          wx:if="{{canEdit && !editing}}"
+          class="edit-contact-btn ui-btn ui-btn-ghost"
+          bindtap="handleStartEdit"
+        >
+          修改
+        </button>
+        <view class="section-index">01</view>
+      </view>
+    </view>
+    <view wx:if="{{!editing}}" class="info-grid">
       <view class="info-item">
         <view class="info-label">联系人</view>
         <view class="info-value">{{booking.userName || "--"}}</view>
@@ -18,48 +76,163 @@
         <view class="info-label">手机号</view>
         <view class="info-value">{{booking.phone || "--"}}</view>
       </view>
-      <view class="info-item">
-        <view class="info-label">取车城市</view>
-        <view class="info-value">{{booking.city || "--"}}</view>
+    </view>
+    <view wx:else class="edit-form">
+      <view class="edit-field">
+        <view class="edit-label">联系人</view>
+        <input
+          class="edit-input"
+          maxlength="20"
+          value="{{editForm.userName}}"
+          placeholder="请输入联系人姓名"
+          data-field="userName"
+          bindinput="handleEditInput"
+        />
       </view>
-      <view class="info-item info-item-full">
-        <view class="info-label">预约日期</view>
-        <view class="info-value">{{booking.startDate || "--"}} - {{booking.endDate || "--"}}</view>
+      <view class="edit-field">
+        <view class="edit-label">手机号</view>
+        <input
+          class="edit-input"
+          type="digit"
+          maxlength="11"
+          value="{{editForm.phone}}"
+          placeholder="请输入 11 位手机号"
+          data-field="phone"
+          bindinput="handleEditInput"
+        />
       </view>
-      <view class="info-item">
-        <view class="info-label">提交时间</view>
-        <view class="info-value">{{createdAtText || "--"}}</view>
+      <view class="edit-field">
+        <view class="edit-label">取车城市</view>
+        <input
+          class="edit-input"
+          maxlength="20"
+          value="{{editForm.city}}"
+          placeholder="请输入取车城市"
+          data-field="city"
+          bindinput="handleEditInput"
+        />
       </view>
-      <view wx:if="{{updatedAtText}}" class="info-item">
-        <view class="info-label">最后更新</view>
-        <view class="info-value">{{updatedAtText}}</view>
+      <view class="edit-field">
+        <view class="edit-label">需求备注</view>
+        <textarea
+          class="edit-textarea"
+          maxlength="200"
+          value="{{editForm.note}}"
+          placeholder="可留空，最多 200 字"
+          data-field="note"
+          bindinput="handleEditInput"
+        />
+        <view class="edit-count">{{editForm.note.length || 0}} / 200</view>
       </view>
+      <view class="edit-actions">
+        <button class="edit-save-btn ui-btn ui-btn-primary" loading="{{saving}}" disabled="{{saving}}" bindtap="handleSaveEdit">保存修改</button>
+        <button class="edit-cancel-btn ui-btn ui-btn-ghost" disabled="{{saving}}" bindtap="handleCancelEdit">取消</button>
+      </view>
+      <view class="edit-tip">只修改本次预约的联系信息，不会更改行程日期或车辆。</view>
     </view>
   </view>
 
-  <view wx:if="{{booking.note}}" class="note-card ui-card">
-    <view class="note-title">备注</view>
+  <view class="info-card ui-card">
+    <view class="section-heading">
+      <view>
+        <view class="section-kicker">TIMELINE</view>
+        <view class="section-title">预约进度</view>
+      </view>
+      <view class="section-index">02</view>
+    </view>
+    <view class="progress-track">
+      <view class="progress-step {{item.stateClass}} {{item.isLast ? 'progress-step-last' : ''}}" wx:for="{{progressSteps}}" wx:key="key">
+        <view class="progress-visual">
+          <view class="progress-node">{{item.marker}}</view>
+          <view wx:if="{{!item.isLast}}" class="progress-connector"></view>
+        </view>
+        <view class="progress-label">{{item.label}}</view>
+      </view>
+    </view>
+    <view class="timeline-meta">
+      <view class="timeline-meta-item">
+        <view class="timeline-meta-label">提交时间</view>
+        <view class="timeline-meta-value">{{createdAtText || "--"}}</view>
+      </view>
+      <view class="timeline-meta-divider"></view>
+      <view class="timeline-meta-item timeline-meta-item-end">
+        <view class="timeline-meta-label">最近更新</view>
+        <view class="timeline-meta-value">{{updatedAtText || '等待顾问更新'}}</view>
+      </view>
+    </view>
+    <view wx:if="{{subscriptionEnabled && canEdit}}" class="subscription-panel">
+      <view class="subscription-copy">
+        <view class="subscription-title">接收下一次状态提醒</view>
+        <view class="subscription-desc">一次授权通常对应一次通知，收到提醒后可再次订阅。</view>
+      </view>
+      <button
+        class="subscription-btn ui-btn ui-btn-ghost"
+        loading="{{subscriptionRequesting}}"
+        disabled="{{subscriptionRequesting}}"
+        bindtap="handleRequestStatusSubscription"
+      >
+        立即订阅
+      </button>
+    </view>
+  </view>
+
+  <view wx:if="{{booking.note && !editing}}" class="note-card ui-card">
+    <view class="section-heading">
+      <view>
+        <view class="section-kicker">REQUEST</view>
+        <view class="section-title">需求备注</view>
+      </view>
+      <view class="section-index">03</view>
+    </view>
     <view class="note-content">{{booking.note}}</view>
   </view>
 
   <view wx:if="{{canCancel}}" class="actions">
-    <button class="cancel-btn ui-btn ui-btn-danger-ghost" bindtap="handleCancel">取消预约</button>
+    <view class="action-note">如行程发生变化，可在顾问确认前取消预约</view>
+    <button class="cancel-btn ui-btn ui-btn-danger-ghost" loading="{{loading}}" disabled="{{loading}}" bindtap="handleCancel">取消本次预约</button>
   </view>
 </view>
 
-<view wx:elif="{{loading}}" class="detail-page">
-  <view class="header-card ui-card">
-    <view class="booking-name">预约详情</view>
-    <view class="note-content">加载中...</view>
+<view wx:elif="{{initialLoading || loading}}" class="detail-page detail-skeleton-page">
+  <view class="detail-skeleton-card ui-card">
+    <view class="detail-skeleton-top">
+      <view class="detail-skeleton-brand">
+        <view class="detail-skeleton-emblem skeleton-pulse"></view>
+        <view>
+          <view class="detail-skeleton-kicker skeleton-pulse"></view>
+          <view class="detail-skeleton-brand-title skeleton-pulse"></view>
+        </view>
+      </view>
+      <view class="detail-skeleton-status skeleton-pulse"></view>
+    </view>
+    <view class="detail-skeleton-divider"></view>
+    <view class="detail-skeleton-label skeleton-pulse"></view>
+    <view class="detail-skeleton-title skeleton-pulse"></view>
+    <view class="detail-skeleton-journey">
+      <view class="detail-skeleton-date skeleton-pulse"></view>
+      <view class="detail-skeleton-route skeleton-pulse"></view>
+      <view class="detail-skeleton-date skeleton-pulse"></view>
+    </view>
+    <view class="detail-skeleton-footer">
+      <view class="detail-skeleton-footer-item skeleton-pulse"></view>
+      <view class="detail-skeleton-footer-item skeleton-pulse"></view>
+    </view>
+  </view>
+  <view class="detail-skeleton-info ui-card">
+    <view class="detail-skeleton-section-title skeleton-pulse"></view>
+    <view class="detail-skeleton-info-grid">
+      <view class="detail-skeleton-info-item skeleton-pulse"></view>
+      <view class="detail-skeleton-info-item skeleton-pulse"></view>
+    </view>
   </view>
 </view>
 
-<view wx:else class="detail-page">
-  <view class="header-card ui-card">
-    <view class="booking-name">预约详情</view>
-    <view class="note-content">{{loadFailed ? loadErrorText : '未找到该预约记录'}}</view>
-  </view>
-  <view class="actions">
-    <button wx:if="{{loadFailed}}" class="cancel-btn ui-btn ui-btn-primary" bindtap="handleRetryLoad">重新加载</button>
+<view wx:else class="detail-page state-page">
+  <view class="state-card ui-card">
+    <image class="state-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+    <view class="state-title">预约详情</view>
+    <view class="state-desc">{{loadFailed ? loadErrorText : '未找到该预约记录'}}</view>
+    <button wx:if="{{loadFailed}}" class="retry-btn ui-btn ui-btn-primary" bindtap="handleRetryLoad">重新加载</button>
+    <button class="back-btn ui-btn ui-btn-ghost" bindtap="handleBackBookings">返回预约列表</button>
   </view>
 </view>

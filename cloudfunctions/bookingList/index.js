@@ -5,6 +5,10 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
 
 const BOOKING_STATUSES = ["pending", "contacted", "completed", "cancelled"]
+const PRIORITY_VALUES = ["priority", "normal", "standby"]
+const COORDINATION_VALUES = ["pending", "coordinating", "resolved"]
+const BOOKING_BATCH_SIZE = 100
+const MAX_BOOKING_RECORDS = 2000
 
 function createError(code, message, details) {
   const result = {
@@ -85,6 +89,8 @@ async function hasOpenidCapability(openid, capability) {
 function normalizeFilters(event) {
   const payload = event && typeof event === "object" ? event : {}
   const status = String(payload.status || "").trim()
+  const schedulePriority = String(payload.schedulePriority || "").trim()
+  const coordinationStatus = String(payload.coordinationStatus || "").trim()
   const keyword = String(payload.keyword || "").trim().toUpperCase()
   const limitRaw = Number(payload.limit)
   const pageRaw = Number(payload.page)
@@ -96,8 +102,10 @@ function normalizeFilters(event) {
 
   return {
     status,
+    schedulePriority,
+    coordinationStatus,
     keyword,
-    limit: Math.min(Math.max(limit, 1), 500),
+    limit: Math.min(Math.max(limit, 1), MAX_BOOKING_RECORDS),
     page,
     pageSize: pageSize > 0 ? Math.min(Math.max(pageSize, 1), 100) : 0
   }
@@ -114,6 +122,40 @@ function validateFilters(event) {
           message: "预约状态不合法",
           value: filters.status,
           allowed: ["all"].concat(BOOKING_STATUSES)
+        }
+      ]
+    })
+  }
+
+  if (
+    filters.schedulePriority &&
+    filters.schedulePriority !== "all" &&
+    !PRIORITY_VALUES.includes(filters.schedulePriority)
+  ) {
+    return createError("VALIDATION_ERROR", "筛选条件不合法", {
+      errors: [
+        {
+          field: "schedulePriority",
+          message: "预约优先级不合法",
+          value: filters.schedulePriority,
+          allowed: ["all"].concat(PRIORITY_VALUES)
+        }
+      ]
+    })
+  }
+
+  if (
+    filters.coordinationStatus &&
+    filters.coordinationStatus !== "all" &&
+    !COORDINATION_VALUES.includes(filters.coordinationStatus)
+  ) {
+    return createError("VALIDATION_ERROR", "筛选条件不合法", {
+      errors: [
+        {
+          field: "coordinationStatus",
+          message: "协调状态不合法",
+          value: filters.coordinationStatus,
+          allowed: ["all"].concat(COORDINATION_VALUES)
         }
       ]
     })
@@ -244,6 +286,48 @@ function buildRecentCreatedList(list) {
     }))
 }
 
+async function readBookingsByMode(maxRecords, ordered) {
+  const list = []
+
+  for (let offset = 0; offset <= maxRecords; offset += BOOKING_BATCH_SIZE) {
+    const remaining = maxRecords + 1 - list.length
+    const batchSize = Math.min(BOOKING_BATCH_SIZE, remaining)
+    let query = db.collection("bookings")
+    if (ordered) {
+      query = query.orderBy("createdAt", "desc")
+    }
+    const res = await query.skip(offset).limit(batchSize).get()
+    const batch = res && Array.isArray(res.data) ? res.data : []
+
+    list.push(...batch)
+    if (batch.length < batchSize || list.length > maxRecords) {
+      break
+    }
+  }
+
+  return {
+    list: list.slice(0, maxRecords),
+    truncated: list.length > maxRecords
+  }
+}
+
+async function readBookings(maxRecords) {
+  try {
+    return await readBookingsByMode(maxRecords, true)
+  } catch (indexError) {
+    console.warn({
+      function: "bookingList",
+      stage: "indexFallback",
+      errorMessage:
+        indexError && (indexError.message || indexError.errMsg)
+          ? indexError.message || indexError.errMsg
+          : String(indexError),
+      createdAt: new Date().toISOString()
+    })
+    return readBookingsByMode(maxRecords, false)
+  }
+}
+
 exports.main = async (event) => {
   const wxContext = cloud.getWXContext()
   const openid = wxContext && wxContext.OPENID ? wxContext.OPENID : ""
@@ -260,8 +344,8 @@ exports.main = async (event) => {
     }
 
     const filters = check.value
-    const res = await db.collection("bookings").limit(filters.limit).get()
-    const rawList = res && Array.isArray(res.data) ? res.data : []
+    const bookingRecords = await readBookings(filters.limit)
+    const rawList = bookingRecords.list
 
     const formattedList = rawList.map((item) => ({
       id: item._id || item.id || "",
@@ -276,6 +360,15 @@ exports.main = async (event) => {
       note: item.note || "",
       adminRemark: item.adminRemark || "",
       adminRemarkUpdatedAt: formatTime(item.adminRemarkUpdatedAt),
+      schedulePriority: ["priority", "normal", "standby"].includes(item.schedulePriority)
+        ? item.schedulePriority
+        : "normal",
+      coordinationStatus:
+        item.status === "completed" || item.status === "cancelled"
+          ? "resolved"
+          : ["pending", "coordinating", "resolved"].includes(item.coordinationStatus)
+            ? item.coordinationStatus
+            : "pending",
       status: item.status || "pending",
       createdAt: formatTime(item.createdAt),
       updatedAt: formatTime(item.updatedAt)
@@ -284,6 +377,20 @@ exports.main = async (event) => {
     const filteredList = sortList(
       formattedList.filter((item) => {
         if (filters.status && filters.status !== "all" && item.status !== filters.status) {
+          return false
+        }
+        if (
+          filters.schedulePriority &&
+          filters.schedulePriority !== "all" &&
+          item.schedulePriority !== filters.schedulePriority
+        ) {
+          return false
+        }
+        if (
+          filters.coordinationStatus &&
+          filters.coordinationStatus !== "all" &&
+          item.coordinationStatus !== filters.coordinationStatus
+        ) {
           return false
         }
 
@@ -306,6 +413,7 @@ exports.main = async (event) => {
       ok: true,
       filters,
       total: filteredList.length,
+      truncated: bookingRecords.truncated,
       stats: buildStats(filteredList),
       dashboard: buildDashboardStats(formattedList),
       recentCreatedList: buildRecentCreatedList(formattedList),

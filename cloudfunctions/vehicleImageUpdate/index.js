@@ -4,6 +4,7 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
 const MAX_IMAGE_COUNT = 9
+const MAX_FILE_ID_LENGTH = 1024
 const ALLOWED_ACTIONS = ["add", "remove", "setCover"]
 
 function createError(code, message, details) {
@@ -99,6 +100,17 @@ function normalizeEvent(event) {
   }
 }
 
+function isCurrentVehicleImageFileId(fileId, vehicleId) {
+  const value = String(fileId || "").trim()
+  const id = String(vehicleId || "").trim()
+  return (
+    Boolean(value) &&
+    value.length <= MAX_FILE_ID_LENGTH &&
+    value.startsWith("cloud://") &&
+    value.includes(`/vehicle-images/${id}/`)
+  )
+}
+
 async function deleteFilesBestEffort(fileList, context) {
   const list = normalizeStringArray(fileList)
   if (!list.length) {
@@ -112,7 +124,6 @@ async function deleteFilesBestEffort(fileList, context) {
       function: "vehicleImageUpdate",
       stage: "deleteFile",
       fileCount: list.length,
-      fileList: list,
       context: context || {},
       errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
       stack: error && error.stack ? error.stack : "",
@@ -201,6 +212,12 @@ exports.main = async (event) => {
       })
     }
 
+    if (input.fileId.length > MAX_FILE_ID_LENGTH || input.fileIds.some((fileId) => fileId.length > MAX_FILE_ID_LENGTH)) {
+      return createError("VALIDATION_ERROR", "图片文件 ID 过长", {
+        errors: [{ field: "fileId", message: `图片文件 ID 不能超过 ${MAX_FILE_ID_LENGTH} 个字符` }]
+      })
+    }
+
     const currentRes = await db.collection("vehicles").doc(input.id).get()
     const current = currentRes && currentRes.data ? currentRes.data : null
     if (!current) {
@@ -216,6 +233,15 @@ exports.main = async (event) => {
       if (!input.fileIds.length) {
         return createError("VALIDATION_ERROR", "未提供待上传图片", {
           errors: [{ field: "fileIds", message: "至少上传一张图片" }]
+        })
+      }
+
+      const invalidFileIds = input.fileIds.filter(
+        (fileId) => !isCurrentVehicleImageFileId(fileId, input.id)
+      )
+      if (invalidFileIds.length) {
+        return createError("VALIDATION_ERROR", "图片不属于当前车辆目录", {
+          errors: [{ field: "fileIds", message: "只能添加当前车辆目录下的云图片" }]
         })
       }
 
@@ -282,10 +308,10 @@ exports.main = async (event) => {
       action: "vehicleImageUpdate",
       vehicleId: input.id,
       imageAction: input.action,
-      fileId: input.fileId,
-      fileIds: input.fileIds,
+      fileIdProvided: Boolean(input.fileId),
+      fileIdsCount: input.fileIds.length,
       imageCount: nextImageList.length,
-      coverImage: nextCoverImage
+      hasCoverImage: Boolean(nextCoverImage)
     })
 
     return {
@@ -302,7 +328,8 @@ exports.main = async (event) => {
       openid,
       id: input.id,
       action: input.action,
-      input,
+      fileIdProvided: Boolean(input.fileId),
+      fileIdsCount: input.fileIds.length,
       errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
       stack: error && error.stack ? error.stack : ""
     })

@@ -72,21 +72,30 @@ describe("cloudfunctions/vehicleImageUpdate integration", () => {
     const res = await vehicleImageUpdate.main({
       id: "car_1",
       action: "add",
-      fileIds: ["cloud://img1", "cloud://img2"]
+      fileIds: [
+        "cloud://env.bucket/vehicle-images/car_1/img1.jpg",
+        "cloud://env.bucket/vehicle-images/car_1/img2.jpg"
+      ]
     })
 
     expect(res).toEqual({
       ok: true,
       id: "car_1",
       action: "add",
-      imageList: ["cloud://img1", "cloud://img2"],
-      coverImage: "cloud://img1",
+      imageList: [
+        "cloud://env.bucket/vehicle-images/car_1/img1.jpg",
+        "cloud://env.bucket/vehicle-images/car_1/img2.jpg"
+      ],
+      coverImage: "cloud://env.bucket/vehicle-images/car_1/img1.jpg",
       imageCount: 2
     })
     expect(mocks.update).toHaveBeenCalledWith({
       data: {
-        imageList: ["cloud://img1", "cloud://img2"],
-        coverImage: "cloud://img1",
+        imageList: [
+          "cloud://env.bucket/vehicle-images/car_1/img1.jpg",
+          "cloud://env.bucket/vehicle-images/car_1/img2.jpg"
+        ],
+        coverImage: "cloud://env.bucket/vehicle-images/car_1/img1.jpg",
         updatedAt: mocks.serverDateValue
       }
     })
@@ -189,5 +198,34 @@ describe("cloudfunctions/vehicleImageUpdate integration", () => {
       message: "权限不足"
     })
     expect(mocks.vehiclesDoc).not.toHaveBeenCalled()
+  })
+
+  test("不能把其他车辆目录的云图片添加到当前车辆", async () => {
+    const mocks = createMockDb({
+      rolesData: [{ role: "admin" }],
+      currentData: {
+        _id: "car_1",
+        imageList: [],
+        coverImage: ""
+      },
+      updateResult: { stats: { updated: 1 } }
+    })
+
+    const vehicleImageUpdate = await loadVehicleImageUpdateWith({ openid: "admin_openid", mockDb: mocks.db })
+    const res = await vehicleImageUpdate.main({
+      id: "car_1",
+      action: "add",
+      fileIds: ["cloud://env.bucket/vehicle-images/car_2/img1.jpg"]
+    })
+
+    expect(res).toEqual({
+      ok: false,
+      code: "VALIDATION_ERROR",
+      message: "图片不属于当前车辆目录",
+      details: {
+        errors: [{ field: "fileIds", message: "只能添加当前车辆目录下的云图片" }]
+      }
+    })
+    expect(mocks.update).not.toHaveBeenCalled()
   })
 })

@@ -91,6 +91,7 @@ function formatDetail(detail) {
     updatedAtText: formatDisplayTime(detail.updatedAt),
     vinText: detail.vin || "--",
     engineNumberText: detail.engineNumber || "--",
+    publicDescriptionText: detail.publicDescription || "--",
     noteText: detail.note || "--",
     createdByOpenidText: detail.createdByOpenid || "--"
   }

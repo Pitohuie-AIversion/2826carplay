@@ -8,6 +8,11 @@ function createCloud() {
     database: jest.fn(() => mockDb),
     getWXContext: jest.fn(() => mockContext),
     deleteFile: jest.fn().mockResolvedValue({ fileList: [] }),
+    openapi: {
+      subscribeMessage: {
+        send: jest.fn().mockResolvedValue({})
+      }
+    },
     __setMockContext: (ctx) => {
       mockContext = ctx
     },
@@ -21,6 +26,8 @@ function createCloud() {
       cloud.database.mockClear()
       cloud.getWXContext.mockClear()
       cloud.deleteFile.mockClear()
+      cloud.openapi.subscribeMessage.send.mockReset()
+      cloud.openapi.subscribeMessage.send.mockResolvedValue({})
     }
   }
 

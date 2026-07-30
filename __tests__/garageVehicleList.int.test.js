@@ -1,13 +1,31 @@
 jest.mock("wx-server-sdk")
 
-function createMockDb({ vehiclesData }) {
-  const vehiclesGet = jest.fn().mockResolvedValue({ data: vehiclesData })
-  const vehiclesLimit = jest.fn(() => ({ get: vehiclesGet }))
+function createMockDb({ vehiclesData, orderedError = null }) {
+  const vehiclesLimit = jest.fn((limitValue) => ({
+    get: jest.fn().mockResolvedValue({ data: vehiclesData.slice(0, limitValue) })
+  }))
+  const vehiclesSkip = jest.fn((offset) => ({
+    limit: jest.fn((limitValue) => ({
+      get: jest.fn().mockResolvedValue({ data: vehiclesData.slice(offset, offset + limitValue) })
+    }))
+  }))
+  const vehiclesOrderedSkip = jest.fn((offset) => ({
+    limit: jest.fn((limitValue) => ({
+      get: orderedError
+        ? jest.fn().mockRejectedValue(orderedError)
+        : jest.fn().mockResolvedValue({ data: vehiclesData.slice(offset, offset + limitValue) })
+    }))
+  }))
+  const vehiclesOrderBy = jest.fn(() => ({ skip: vehiclesOrderedSkip }))
 
   const db = {
     collection: jest.fn((name) => {
       if (name === "vehicles") {
-        return { limit: vehiclesLimit }
+        return {
+          limit: vehiclesLimit,
+          skip: vehiclesSkip,
+          orderBy: vehiclesOrderBy
+        }
       }
 
       throw new Error(`Unexpected collection: ${name}`)
@@ -17,7 +35,9 @@ function createMockDb({ vehiclesData }) {
   return {
     db,
     vehiclesLimit,
-    vehiclesGet
+    vehiclesSkip,
+    vehiclesOrderBy,
+    vehiclesOrderedSkip
   }
 }
 
@@ -46,7 +66,8 @@ describe("cloudfunctions/garageVehicleList integration", () => {
           brandModel: "理想 L9",
           registerDate: "2024-01-01",
           status: "idle",
-          note: "旗舰家用 SUV",
+          publicDescription: "旗舰家用 SUV",
+          note: "内部维修记录不得公开",
           imageList: ["cloud://img2"],
           coverImage: "cloud://img1",
           updatedAt: "2026-07-10T10:00:00.000Z"
@@ -68,13 +89,14 @@ describe("cloudfunctions/garageVehicleList integration", () => {
     const garageVehicleList = await loadGarageVehicleListWith({ mockDb: mocks.db })
     const res = await garageVehicleList.main({})
 
-    expect(mocks.vehiclesLimit).toHaveBeenCalledWith(100)
+    expect(mocks.vehiclesOrderBy).toHaveBeenCalledWith("updatedAt", "desc")
+    expect(mocks.vehiclesOrderedSkip).toHaveBeenCalledWith(0)
     expect(res.ok).toBe(true)
     expect(res.list).toHaveLength(1)
     expect(res.list[0]).toMatchObject({
       id: "car_1",
       name: "理想 L9",
-      nickname: "车牌尾号 2345",
+      nickname: "车牌尾号 45",
       brand: "理想",
       category: "city_suv",
       status: "available",
@@ -84,8 +106,10 @@ describe("cloudfunctions/garageVehicleList integration", () => {
       hasImages: true,
       coverPlaceholderText: "理想 L9"
     })
+    expect(res.list[0].description).toBe("旗舰家用 SUV")
+    expect(JSON.stringify(res.list[0])).not.toContain("内部维修记录不得公开")
     expect(res.list[0].images).toEqual(["cloud://img1", "cloud://img2"])
-    expect(res.list[0].tags).toEqual(["SUV", "上牌 2024", "粤A12345"])
+    expect(res.list[0].tags).toEqual(["SUV", "上牌 2024", "粤A***45"])
   })
 
   test("封面图已存在于图片列表时也会排到首页第一张", async () => {
@@ -111,5 +135,53 @@ describe("cloudfunctions/garageVehicleList integration", () => {
     expect(res.list).toHaveLength(1)
     expect(res.list[0].cover).toBe("cloud://img_cover")
     expect(res.list[0].images).toEqual(["cloud://img_cover", "cloud://img_old", "cloud://img_other"])
+  })
+
+  test("超过 100 辆后首页仍可读取后续分页", async () => {
+    const vehiclesData = Array.from({ length: 150 }, (_, index) => ({
+      _id: `car_${index}`,
+      plateNumber: `浙A${String(index).padStart(5, "0")}`,
+      vehicleType: "sedan",
+      brandModel: `Vehicle ${index}`,
+      status: "idle",
+      updatedAt: new Date(Date.UTC(2026, 0, 1, 0, 0, index)).toISOString()
+    }))
+    const mocks = createMockDb({ vehiclesData })
+    const garageVehicleList = await loadGarageVehicleListWith({ mockDb: mocks.db })
+
+    const res = await garageVehicleList.main({ page: 7, pageSize: 20 })
+
+    expect(res.ok).toBe(true)
+    expect(res.total).toBe(150)
+    expect(res.list).toHaveLength(10)
+    expect(res.hasMore).toBe(false)
+    expect(res.truncated).toBe(false)
+    expect(mocks.vehiclesOrderedSkip).toHaveBeenCalledWith(100)
+  })
+
+  test("缺少 updatedAt 索引时首页自动降级读取", async () => {
+    const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {})
+    const mocks = createMockDb({
+      vehiclesData: [
+        {
+          _id: "car_1",
+          plateNumber: "浙A12345",
+          vehicleType: "sedan",
+          brandModel: "MX-5",
+          status: "idle"
+        }
+      ],
+      orderedError: new Error("missing updatedAt index")
+    })
+    const garageVehicleList = await loadGarageVehicleListWith({ mockDb: mocks.db })
+
+    const res = await garageVehicleList.main({ page: 0, pageSize: 20 })
+
+    expect(res.ok).toBe(true)
+    expect(res.total).toBe(1)
+    expect(mocks.vehiclesOrderedSkip).toHaveBeenCalledWith(0)
+    expect(mocks.vehiclesSkip).toHaveBeenCalledWith(0)
+    expect(warnSpy).toHaveBeenCalled()
+    warnSpy.mockRestore()
   })
 })

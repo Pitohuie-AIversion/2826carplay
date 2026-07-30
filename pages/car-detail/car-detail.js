@@ -1,3 +1,5 @@
+const { trackEvent } = require("../../shared/analytics")
+
 function getStatusText(status, fallbackText) {
   const statusTextMap = {
     available: "在库",
@@ -54,10 +56,17 @@ function formatCarViewModel(car) {
 
   const statusCar = attachStatusClass(car)
   const images = Array.isArray(car.images) && car.images.length ? car.images : car.cover ? [car.cover] : []
+  const imageItems = images.map((src, index) => ({
+    key: `vehicle-image-${index}`,
+    src,
+    loaded: false,
+    failed: false
+  }))
 
   return {
     ...statusCar,
     images,
+    imageItems,
     hasImages: images.length > 0,
     statusNoticeText: statusNoticeMap[car.status] || "",
     primaryActionText: primaryActionTextMap[car.status] || "立即预约",
@@ -74,6 +83,10 @@ Page({
     servicePhone: "15715710090",
     carId: "",
     car: null,
+    currentImageIndex: 0,
+    favoriteLoading: false,
+    favorited: false,
+    loading: true,
     loadError: false,
     loadErrorText: "车辆详情加载失败，请返回车库后重试",
     notFoundText: "未找到该车辆，请返回车库重新选择",
@@ -107,6 +120,29 @@ Page({
     })
 
     this.loadCarDetail(carId)
+    this.loadFavoriteStatus(carId)
+    trackEvent("vehicle_detail", carId)
+  },
+
+  loadFavoriteStatus(carId) {
+    if (!carId || !wx.cloud || typeof wx.cloud.callFunction !== "function") {
+      return
+    }
+    wx.cloud.callFunction({
+      name: "favoriteStatus",
+      data: {
+        vehicleId: carId
+      },
+      success: (res) => {
+        const result = res && res.result ? res.result : null
+        if (result && result.ok) {
+          this.setData({
+            favorited: Boolean(result.favorited)
+          })
+        }
+      },
+      fail: () => {}
+    })
   },
 
   loadCarDetail(carId) {
@@ -119,6 +155,11 @@ Page({
       this.setLoadError("云能力未初始化，请稍后重试")
       return
     }
+
+    this.setData({
+      loading: true,
+      loadError: false
+    })
 
     wx.cloud.callFunction({
       name: "vehiclePublicDetail",
@@ -149,6 +190,8 @@ Page({
   setLoadError(message) {
     this.setData({
       car: null,
+      currentImageIndex: 0,
+      loading: false,
       loadError: true,
       loadErrorText: String(message || "车辆详情加载失败，请返回车库后重试")
     })
@@ -162,6 +205,8 @@ Page({
     if (!targetCar) {
       this.setData({
         car: null,
+        currentImageIndex: 0,
+        loading: false,
         loadError: false
       })
       wx.setNavigationBarTitle({
@@ -172,11 +217,96 @@ Page({
 
     this.setData({
       car: formatCarViewModel(targetCar),
+      currentImageIndex: 0,
+      loading: false,
       loadError: false
     })
 
     wx.setNavigationBarTitle({
       title: targetCar.name || "车辆详情"
+    })
+  },
+
+  handleHeroImageLoad(event) {
+    const index = Number(event.currentTarget.dataset.index)
+    if (!Number.isInteger(index) || index < 0) {
+      return
+    }
+
+    this.setData({
+      [`car.imageItems[${index}].loaded`]: true,
+      [`car.imageItems[${index}].failed`]: false
+    })
+  },
+
+  handleHeroImageError(event) {
+    const index = Number(event.currentTarget.dataset.index)
+    if (!Number.isInteger(index) || index < 0) {
+      return
+    }
+
+    this.setData({
+      [`car.imageItems[${index}].loaded`]: false,
+      [`car.imageItems[${index}].failed`]: true
+    })
+  },
+
+  handleHeroSwiperChange(event) {
+    const current = Number(event && event.detail && event.detail.current)
+    this.setData({
+      currentImageIndex: Number.isInteger(current) && current >= 0 ? current : 0
+    })
+  },
+
+  handleFavoriteTap() {
+    if (!this.data.carId || this.data.favoriteLoading) {
+      return
+    }
+    if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
+      wx.showToast({
+        title: "云能力未初始化",
+        icon: "none"
+      })
+      return
+    }
+
+    const nextFavorited = !this.data.favorited
+    this.setData({ favoriteLoading: true })
+    wx.cloud.callFunction({
+      name: "favoriteSet",
+      data: {
+        vehicleId: this.data.carId,
+        favorited: nextFavorited
+      },
+      success: (res) => {
+        const result = res && res.result ? res.result : null
+        if (!result || !result.ok) {
+          wx.showToast({
+            title: (result && result.message) || "收藏操作失败",
+            icon: "none"
+          })
+          return
+        }
+        this.setData({
+          favorited: Boolean(result.favorited)
+        })
+        if (result.favorited) {
+          trackEvent("favorite_add", this.data.carId)
+        }
+        wx.showToast({
+          title: result.favorited ? "已加入收藏" : "已取消收藏",
+          icon: "success"
+        })
+      },
+      fail: (error) => {
+        wx.showToast({
+          title: (error && (error.errMsg || error.message)) || "收藏操作失败",
+          icon: "none"
+        })
+      },
+      complete: () => {
+        this.setData({ favoriteLoading: false })
+      }
     })
   },
 

@@ -1,0 +1,149 @@
+<view class="overview-page management-page">
+  <view class="page-glow"></view>
+
+  <view class="hero-card ui-card ui-card-gradient">
+    <view class="hero-top">
+      <view class="hero-copy">
+        <view class="page-kicker">OPERATIONS PULSE</view>
+        <view class="hero-title">运营概览</view>
+        <view class="hero-desc">集中查看预约跟进、车辆状态与待办提醒</view>
+      </view>
+      <image class="hero-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+    </view>
+    <view class="hero-foot">
+      <view class="live-dot"></view>
+      <view class="hero-foot-text">数据来自当前云环境</view>
+      <view class="refresh-link" bindtap="handleRefresh">{{refreshing ? '刷新中…' : '刷新数据'}}</view>
+    </view>
+  </view>
+
+  <view wx:if="{{loading}}" class="state-card ui-card">
+    <view class="state-loader"></view>
+    <view>
+      <view class="state-title">正在汇总运营数据</view>
+      <view class="state-desc">预约、车辆和隐私待办正在同步</view>
+    </view>
+  </view>
+
+  <view wx:else>
+    <view wx:if="{{loadError}}" class="error-card ui-card">
+      <view class="error-copy">
+        <view class="error-title">部分数据暂未加载</view>
+        <view class="error-desc">{{loadError}}</view>
+      </view>
+      <button class="retry-button ui-btn ui-btn-ghost" bindtap="handleRefresh">重试</button>
+    </view>
+
+    <view class="section-card ui-card">
+      <view class="section-heading">
+        <view>
+          <view class="section-eyebrow">ACTION CENTER</view>
+          <view class="section-title">当前待办</view>
+        </view>
+        <view class="section-index">01</view>
+      </view>
+      <view class="alert-list">
+        <view
+          class="alert-item"
+          wx:for="{{alerts}}"
+          wx:key="key"
+          data-url="{{item.url}}"
+          bindtap="handleRouteTap"
+        >
+          <view class="alert-indicator alert-{{item.tone}}"></view>
+          <view class="alert-copy">
+            <view class="alert-title">{{item.title}}</view>
+            <view class="alert-desc">{{item.desc}}</view>
+          </view>
+          <view class="alert-arrow">›</view>
+        </view>
+      </view>
+    </view>
+
+    <view wx:if="{{canManageBookings}}" class="section-card ui-card">
+      <view class="section-heading">
+        <view>
+          <view class="section-eyebrow">RESERVATION DESK</view>
+          <view class="section-title">预约概况</view>
+        </view>
+        <view class="section-link" data-url="/pages/booking-manage/booking-manage" bindtap="handleRouteTap">查看全部</view>
+      </view>
+      <view wx:if="{{bookingLoaded}}" class="metric-grid">
+        <view class="metric-item metric-{{item.tone}}" wx:for="{{bookingMetrics}}" wx:key="key">
+          <view class="metric-value">{{item.value}}</view>
+          <view class="metric-label">{{item.label}}</view>
+        </view>
+      </view>
+      <view wx:else class="inline-empty">预约统计暂时不可用</view>
+    </view>
+
+    <view wx:if="{{canManageVehicles}}" class="section-card ui-card">
+      <view class="section-heading">
+        <view>
+          <view class="section-eyebrow">FLEET STATUS</view>
+          <view class="section-title">车辆概况</view>
+        </view>
+        <view class="section-link" data-url="/pages/vehicle-manage/vehicle-manage" bindtap="handleRouteTap">查看车库</view>
+      </view>
+      <view wx:if="{{vehicleLoaded}}" class="metric-grid">
+        <view class="metric-item metric-{{item.tone}}" wx:for="{{vehicleMetrics}}" wx:key="key">
+          <view class="metric-value">{{item.value}}</view>
+          <view class="metric-label">{{item.label}}</view>
+        </view>
+      </view>
+      <view wx:else class="inline-empty">车辆统计暂时不可用</view>
+    </view>
+
+    <view wx:if="{{canManageBookings && recentBookings.length}}" class="section-card ui-card">
+      <view class="section-heading">
+        <view>
+          <view class="section-eyebrow">RECENT LEADS</view>
+          <view class="section-title">近期预约</view>
+        </view>
+        <view class="section-index">04</view>
+      </view>
+      <view
+        class="recent-item"
+        wx:for="{{recentBookings}}"
+        wx:key="id"
+        data-url="/pages/booking-manage-detail/booking-manage-detail?id={{item.id}}"
+        bindtap="handleRouteTap"
+      >
+        <view class="recent-main">
+          <view class="recent-title">{{item.title}}</view>
+          <view class="recent-meta">{{item.meta}}</view>
+        </view>
+        <view class="recent-side">
+          <view class="status-pill {{item.statusClass}}">{{item.statusLabel}}</view>
+          <view class="recent-time">{{item.timeText}}</view>
+        </view>
+      </view>
+    </view>
+
+    <view wx:if="{{canManageVehicles && recentVehicles.length}}" class="section-card ui-card">
+      <view class="section-heading">
+        <view>
+          <view class="section-eyebrow">RECENT FLEET</view>
+          <view class="section-title">近期入库</view>
+        </view>
+        <view class="section-index">05</view>
+      </view>
+      <view
+        class="recent-item"
+        wx:for="{{recentVehicles}}"
+        wx:key="id"
+        data-url="/pages/vehicle-detail-manage/vehicle-detail-manage?id={{item.id}}"
+        bindtap="handleRouteTap"
+      >
+        <view class="recent-main">
+          <view class="recent-title">{{item.title}}</view>
+          <view class="recent-meta">{{item.meta}}</view>
+        </view>
+        <view class="recent-side">
+          <view class="status-pill {{item.statusClass}}">{{item.statusLabel}}</view>
+          <view class="recent-time">{{item.timeText}}</view>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

@@ -3,6 +3,45 @@ const cloud = require("wx-server-sdk")
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
+const AUTH_ROLE_FIELDS = {
+  role: true,
+  roles: true,
+  permissions: true,
+  isAdmin: true,
+  admin: true
+}
+const BOOKING_MANAGE_DETAIL_FIELDS = {
+  _id: true,
+  openid: true,
+  vehicleId: true,
+  vehicleName: true,
+  userName: true,
+  phone: true,
+  startDate: true,
+  endDate: true,
+  city: true,
+  note: true,
+  adminRemark: true,
+  adminRemarkUpdatedAt: true,
+  schedulePriority: true,
+  coordinationStatus: true,
+  coordinationUpdatedAt: true,
+  status: true,
+  createdAt: true,
+  updatedAt: true
+}
+const BOOKING_CONFLICT_FIELDS = {
+  _id: true,
+  vehicleId: true,
+  userName: true,
+  phone: true,
+  startDate: true,
+  endDate: true,
+  city: true,
+  status: true,
+  schedulePriority: true,
+  coordinationStatus: true
+}
 const CONFLICT_BATCH_SIZE = 100
 const MAX_CONFLICT_SCAN_RECORDS = 1000
 const MAX_CONFLICT_RESULTS = 20
@@ -74,7 +113,12 @@ async function hasOpenidCapability(openid, capability) {
     return false
   }
 
-  const res = await db.collection("roles").where({ openid }).limit(20).get()
+  const res = await db
+    .collection("roles")
+    .where({ openid })
+    .field(AUTH_ROLE_FIELDS)
+    .limit(20)
+    .get()
   const list = res && Array.isArray(res.data) ? res.data : []
   return list.some((item) => hasCapability(item, capability))
 }
@@ -138,6 +182,7 @@ async function readVehicleBookings(vehicleId) {
     const res = await db
       .collection("bookings")
       .where({ vehicleId })
+      .field(BOOKING_CONFLICT_FIELDS)
       .skip(offset)
       .limit(batchSize)
       .get()
@@ -278,7 +323,11 @@ exports.main = async (event) => {
       })
     }
 
-    const res = await db.collection("bookings").doc(id).get()
+    const res = await db
+      .collection("bookings")
+      .doc(id)
+      .field(BOOKING_MANAGE_DETAIL_FIELDS)
+      .get()
     const item = res && res.data ? res.data : null
     if (!item) {
       return createError("NOT_FOUND", "预约不存在")
@@ -322,22 +371,24 @@ exports.main = async (event) => {
       conflictCheckSkipped: conflictResult.skipped
     }
   } catch (error) {
+    const errorMessage = String(
+      error && (error.message || error.errMsg) ? error.message || error.errMsg : error
+    ).slice(0, 300)
     console.error({
       function: "bookingDetail",
-      openid,
+      authenticated: Boolean(openid),
       id,
-      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
+      errorMessage,
       stack: error && error.stack ? error.stack : "",
       createdAt: new Date().toISOString()
     })
 
     await writeErrorLogBestEffort({
       function: "bookingDetail",
-      openid,
       bookingId: id,
       stage: "main",
-      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
-      stack: error && error.stack ? error.stack : "",
+      authenticated: Boolean(openid),
+      errorMessage,
       occurredAt: new Date().toISOString()
     })
 

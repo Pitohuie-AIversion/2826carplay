@@ -5,7 +5,12 @@
   "scripts": {
     "test": "jest",
     "test:unit": "jest __tests__/shared.vehicle.test.js",
-    "test:integration": "jest __tests__/vehicleCreate.int.test.js"
+    "test:integration": "jest __tests__/vehicleCreate.int.test.js",
+    "check:structure": "node scripts/checkProjectStructure.js",
+    "check:package": "node scripts/checkMiniProgramPackage.js",
+    "check:secrets": "node scripts/checkRepositorySecrets.js",
+    "audit:cloud": "npm audit --package-lock-only --omit=dev --audit-level=critical --prefix cloudfunctions/bookingCreate",
+    "check:release": "npm run check:structure && npm run check:secrets && npm run check:package && npm test -- --runInBand"
   },
   "devDependencies": {
     "jest": "^29.7.0"

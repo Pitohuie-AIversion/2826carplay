@@ -1,0 +1,185 @@
+const fs = require("fs")
+const path = require("path")
+
+jest.mock("../shared/pageAuth", () => ({
+  requirePagePermission: jest.fn()
+}))
+
+function loadPageDefinition() {
+  jest.resetModules()
+  let definition = null
+  global.Page = jest.fn((input) => {
+    definition = input
+  })
+  require("../pages/vehicle-manage/vehicle-manage")
+  return definition
+}
+
+function createPage(definition) {
+  const page = {
+    ...definition,
+    data: {
+      ...definition.data,
+      summaryItems: definition.data.summaryItems.map((item) => ({ ...item })),
+      statusRatioSegments: definition.data.statusRatioSegments.map((item) => ({ ...item }))
+    }
+  }
+  page.setData = jest.fn((patch, done) => {
+    Object.assign(page.data, patch)
+    if (typeof done === "function") {
+      done()
+    }
+  })
+  return page
+}
+
+describe("pages/vehicle-manage 车辆管理列表体验", () => {
+  beforeEach(() => {
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn()
+      },
+      showToast: jest.fn()
+    }
+  })
+
+  afterEach(() => {
+    delete global.Page
+    delete global.wx
+  })
+
+  test("封面与图片数量组合生成素材完整度", () => {
+    wx.cloud.callFunction.mockImplementation(({ success }) => {
+      success({
+        result: {
+          ok: true,
+          total: 3,
+          dashboard: {},
+          recentAddedList: [],
+          page: 0,
+          hasMore: false,
+          list: [
+            { id: "missing", imageCount: 4, coverImage: "" },
+            { id: "basic", imageCount: 1, coverImage: "cloud://cover-1" },
+            { id: "ready", imageCount: 4, coverImage: "cloud://cover-2" }
+          ]
+        }
+      })
+    })
+
+    const page = createPage(loadPageDefinition())
+    page.fetchList()
+
+    expect(page.data.list[0]).toMatchObject({
+      mediaStatusText: "待补封面",
+      mediaStatusClass: "media-health-missing",
+      mediaProgress: 0
+    })
+    expect(page.data.list[1]).toMatchObject({
+      mediaStatusText: "基础素材",
+      mediaStatusClass: "media-health-basic",
+      mediaProgress: 33
+    })
+    expect(page.data.list[2]).toMatchObject({
+      mediaStatusText: "素材充足",
+      mediaStatusClass: "media-health-ready",
+      mediaProgress: 100
+    })
+  })
+
+  test("卡片将核心资料、档案记录与维护操作分层展示", () => {
+    const pageDir = path.resolve(__dirname, "../pages/vehicle-manage")
+    const wxmlSource = fs.readFileSync(path.join(pageDir, "vehicle-manage.wxml"), "utf8")
+    const wxssSource = fs.readFileSync(path.join(pageDir, "vehicle-manage.wxss"), "utf8")
+
+    expect(wxmlSource).toContain("media-health")
+    expect(wxmlSource).toContain("vehicle-record-meta")
+    expect(wxmlSource).toContain("card-primary-actions")
+    expect(wxmlSource).toContain("card-maintenance-actions")
+    expect(wxmlSource).toContain("status-op-check")
+    expect(wxssSource).toContain(".media-health-ready")
+    expect(wxssSource).toContain(".vehicle-record-meta")
+    expect(wxmlSource).toContain('aria-pressed="{{item.status === op.value}}"')
+    expect(wxmlSource).toContain('hover-class="status-op-btn-pressed"')
+    expect(wxssSource).toContain(".status-op-btn-pressed")
+  })
+
+  test("图片占位使用品牌徽标，详情编辑和危险操作使用对应原生图标", () => {
+    const wxmlSource = fs.readFileSync(
+      path.resolve(__dirname, "../pages/vehicle-manage/vehicle-manage.wxml"),
+      "utf8"
+    )
+    const wxssSource = fs.readFileSync(
+      path.resolve(__dirname, "../pages/vehicle-manage/vehicle-manage.wxss"),
+      "utf8"
+    )
+
+    expect(wxmlSource).toContain("vehicle-cover-placeholder-emblem")
+    expect(wxmlSource).toContain("vehicle-cover-placeholder-ring")
+    expect(wxmlSource).toContain('aria-hidden="true" />')
+    expect(wxmlSource).toContain("detail-native-icon")
+    expect(wxmlSource).toContain("edit-native-icon")
+    expect(wxmlSource).toContain("retire-native-icon")
+    expect(wxmlSource).toContain("restore-native-icon")
+    expect(wxmlSource).toContain("delete-native-icon")
+    expect(wxmlSource).toContain("reset-native-icon")
+    expect(wxmlSource).toContain("vehicle-recent-empty-native-icon")
+    expect(wxmlSource).toContain("新增车辆完成后会显示在这里")
+    expect(wxmlSource).toContain('class="recent-entry-chevron"')
+    expect(wxmlSource).toContain('hover-class="recent-item-pressed"')
+    expect(wxmlSource).toContain('hover-class="vehicle-cover-pressed"')
+    expect(wxmlSource).toContain('aria-label="查看车辆 {{item.plateNumber || \'未填写车牌\'}}，{{item.brandModel}} 详情"')
+    expect(wxmlSource).toMatch(/<image wx:if="\{\{item\.coverImage\}\}"[^>]+aria-hidden="true" \/>/)
+    expect(wxmlSource).not.toContain(">✓<")
+    expect(wxssSource).toContain(".recent-empty-native-icon")
+    expect(wxssSource).toContain(".recent-item-pressed")
+    expect(wxssSource).toContain(".vehicle-cover-pressed")
+    expect(wxmlSource).toContain('binderror="handleCoverImageError"')
+    expect(wxmlSource).toContain("封面无法显示")
+    expect(wxssSource).toContain(".vehicle-cover-placeholder-error")
+    expect(wxssSource).toContain(".vehicle-cover-placeholder-emblem")
+  })
+
+  test("封面加载失败时切换为明确的异常占位", () => {
+    const page = createPage(loadPageDefinition())
+    page.data.list = [{
+      id: "vehicle-broken-cover",
+      coverImage: "cloud://missing-cover",
+      mediaStatusText: "基础素材",
+      mediaStatusClass: "media-health-basic",
+      mediaProgress: 33
+    }]
+
+    page.handleCoverImageError({
+      currentTarget: { dataset: { index: 0 } }
+    })
+
+    expect(page.data.list[0]).toMatchObject({
+      coverImage: "",
+      coverLoadFailed: true,
+      mediaStatusText: "封面不可用",
+      mediaStatusClass: "media-health-missing",
+      mediaProgress: 0
+    })
+  })
+
+  test("筛选、分页与读取上限使用对应原生图标", () => {
+    const pageDir = path.resolve(__dirname, "../pages/vehicle-manage")
+    const wxmlSource = fs.readFileSync(path.join(pageDir, "vehicle-manage.wxml"), "utf8")
+    const wxssSource = fs.readFileSync(path.join(pageDir, "vehicle-manage.wxss"), "utf8")
+
+    expect(wxmlSource).toContain("search-action-native-icon")
+    expect(wxmlSource).toContain("reset-native-icon")
+    expect(wxmlSource).toContain("limit-warning-native-icon")
+    expect(wxmlSource).toContain("load-more-native-icon")
+    expect(wxmlSource).toContain("load-complete-native-icon")
+    expect(wxmlSource).toContain('aria-pressed="{{currentStatus === item.value}}"')
+    expect(wxmlSource).toContain('scroll-into-view="vehicle-status-{{currentStatus}}"')
+    expect(wxmlSource).toContain('id="vehicle-status-{{item.value}}"')
+    expect(wxmlSource).toContain('class="ui-scroll-cue"')
+    expect(wxmlSource).not.toContain('bindtap="handleKeywordConfirm">查询</button>')
+    expect(wxmlSource).not.toContain('bindtap="handleReset">重置筛选</button>')
+    expect(wxssSource).toContain(".result-limit-tip")
+    expect(wxssSource).toContain(".load-complete-native-icon")
+  })
+})

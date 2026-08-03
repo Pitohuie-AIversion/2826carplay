@@ -54,6 +54,8 @@ describe("预约管理状态提醒反馈", () => {
     expect(global.wx.showModal).toHaveBeenCalledWith({
       title: "状态已更新",
       content: "预约状态已更新，但提醒发送失败。可在错误日志中查看原因。",
+      confirmText: "知道了",
+      confirmColor: "#528fff",
       showCancel: false,
       complete: expect.any(Function)
     })

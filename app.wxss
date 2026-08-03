@@ -2,6 +2,8 @@ page {
   background: #0b0d10;
   color: #f7f8fa;
   font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
   line-height: 1.6;
 }
 
@@ -20,6 +22,11 @@ scroll-view {
 button {
   border-radius: 18rpx;
   font-weight: 600;
+  transition: opacity 140ms ease, transform 140ms ease, box-shadow 160ms ease;
+}
+
+button::after {
+  border: 0;
 }
 
 button:active {
@@ -30,6 +37,12 @@ button:active {
 button[disabled] {
   opacity: 0.55;
   box-shadow: none;
+  transform: none;
+}
+
+input,
+textarea {
+  caret-color: #6e9fea;
 }
 
 .page-placeholder {
@@ -121,6 +134,8 @@ button[disabled] {
   background: rgba(255, 255, 255, 0.035);
   color: #8f97a3;
   box-sizing: border-box;
+  transition: color 150ms ease, background 150ms ease, border-color 150ms ease,
+    opacity 120ms ease, transform 120ms ease;
 }
 
 .ui-pill-active {
@@ -130,8 +145,37 @@ button[disabled] {
   box-shadow: 0 10rpx 26rpx rgba(24, 94, 210, 0.16);
 }
 
+.ui-pill-pressed,
 .ui-pill:active {
   opacity: 0.8;
+  transform: scale(0.98);
+}
+
+.ui-scroll-shell {
+  position: relative;
+}
+
+.ui-scroll-cue {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 58rpx;
+  pointer-events: none;
+  background: linear-gradient(90deg, rgba(21, 24, 29, 0), rgba(21, 24, 29, 0.96) 74%);
+}
+
+.ui-scroll-cue::after {
+  position: absolute;
+  top: 50%;
+  right: 12rpx;
+  width: 11rpx;
+  height: 11rpx;
+  border-top: 2rpx solid rgba(142, 178, 232, 0.7);
+  border-right: 2rpx solid rgba(142, 178, 232, 0.7);
+  content: "";
+  transform: translateY(-50%) rotate(45deg);
 }
 
 .ui-badge {
@@ -253,8 +297,10 @@ button[disabled] {
   color: #ffffff;
   font-size: 26rpx;
   box-sizing: border-box;
+  transition: border-color 150ms ease, background 150ms ease, box-shadow 150ms ease;
 }
 
 .ui-input:focus {
   border-color: rgba(84, 143, 255, 0.55);
+  box-shadow: 0 0 0 5rpx rgba(84, 143, 255, 0.08);
 }

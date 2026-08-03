@@ -4,6 +4,16 @@ const vehicleUtils = require("./vehicle")
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
+const AUTH_ROLE_FIELDS = {
+  role: true,
+  roles: true,
+  permissions: true,
+  isAdmin: true,
+  admin: true
+}
+const VEHICLE_EXISTENCE_FIELDS = {
+  _id: true
+}
 
 function normalizeStringArray(value) {
   if (!Array.isArray(value)) {
@@ -58,7 +68,12 @@ async function hasOpenidCapability(openid, capability) {
     return false
   }
 
-  const res = await db.collection("roles").where({ openid }).limit(20).get()
+  const res = await db
+    .collection("roles")
+    .where({ openid })
+    .field(AUTH_ROLE_FIELDS)
+    .limit(20)
+    .get()
   const list = res && Array.isArray(res.data) ? res.data : []
   return list.some((item) => hasCapability(item, capability))
 }
@@ -142,7 +157,12 @@ exports.main = async (event) => {
     const payload = check.value
     plateNumber = payload.plateNumber
 
-    const existsRes = await db.collection("vehicles").where({ plateNumber }).limit(1).get()
+    const existsRes = await db
+      .collection("vehicles")
+      .where({ plateNumber })
+      .field(VEHICLE_EXISTENCE_FIELDS)
+      .limit(1)
+      .get()
     const existsList = existsRes && Array.isArray(existsRes.data) ? existsRes.data : []
     if (existsList.length) {
       return vehicleUtils.createError("DUPLICATE_PLATE", "车牌号已存在", { plateNumber })
@@ -165,7 +185,6 @@ exports.main = async (event) => {
       openid,
       action: "vehicleCreate",
       vehicleId,
-      plateNumber,
       vehicleType: payload.vehicleType,
       brandModel: payload.brandModel,
       status: payload.status,
@@ -178,23 +197,23 @@ exports.main = async (event) => {
       return vehicleUtils.createError("DUPLICATE_PLATE", "车牌号已存在", { plateNumber })
     }
 
+    const errorMessage = String(
+      error && (error.message || error.errMsg) ? error.message || error.errMsg : error
+    ).slice(0, 300)
     await writeErrorLogBestEffort({
       function: "vehicleCreate",
-      openid,
-      plateNumber,
+      authenticated: Boolean(openid),
       fieldsProvided:
         event && typeof event === "object"
           ? Object.keys(event).filter((key) => key !== "vin" && key !== "engineNumber" && key !== "note")
           : [],
-      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
-      stack: error && error.stack ? error.stack : ""
+      errorMessage
     })
 
     console.error({
       function: "vehicleCreate",
-      openid,
-      plateNumber,
-      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
+      authenticated: Boolean(openid),
+      errorMessage,
       stack: error && error.stack ? error.stack : "",
       createdAt: new Date().toISOString()
     })

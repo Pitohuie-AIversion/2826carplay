@@ -13,9 +13,12 @@ function createLogQuery(records, orderedError) {
       get: jest.fn().mockResolvedValue({ data: records.slice(offset, offset + limit) })
     }))
   }))
+  const orderBy = jest.fn(() => ({ skip: orderedSkip }))
+  const field = jest.fn(() => ({ orderBy, skip: fallbackSkip }))
   return {
-    orderBy: jest.fn(() => ({ skip: orderedSkip })),
+    orderBy,
     skip: fallbackSkip,
+    field,
     orderedSkip,
     fallbackSkip
   }
@@ -40,13 +43,15 @@ function createMockDb({ roles, auditLogs = [], errorLogs = [], orderedError = nu
       return {
         orderBy: auditQuery.orderBy,
         skip: auditQuery.skip,
+        field: auditQuery.field,
         add: auditAdd
       }
     }
     if (name === "error_logs") {
       return {
         orderBy: errorQuery.orderBy,
-        skip: errorQuery.skip
+        skip: errorQuery.skip,
+        field: errorQuery.field
       }
     }
     throw new Error(`Unexpected collection: ${name}`)
@@ -122,6 +127,15 @@ describe("cloudfunctions/logExportCsv integration", () => {
       total: 1
     })
     expect(auditData.keyword).toBeUndefined()
+    const fieldSpec = mocks.auditQuery.field.mock.calls[0][0]
+    expect(fieldSpec).toEqual(expect.objectContaining({
+      action: true,
+      changedKeys: true,
+      createdAt: true
+    }))
+    expect(fieldSpec).not.toHaveProperty("before")
+    expect(fieldSpec).not.toHaveProperty("after")
+    expect(fieldSpec).not.toHaveProperty("adminRemark")
   })
 
   test("错误日志导出防止表格公式并排除堆栈", async () => {
@@ -131,6 +145,8 @@ describe("cloudfunctions/logExportCsv integration", () => {
         {
           _id: "e1",
           function: "vehicleUpdate",
+          openid: "legacy_operator_secret",
+          targetOpenid: "legacy_target_secret",
           errorCode: "UPDATE_FAILED",
           errorMessage: "=HYPERLINK(\"https://example.com\")",
           stack: "sensitive stack content",
@@ -147,6 +163,19 @@ describe("cloudfunctions/logExportCsv integration", () => {
     expect(res.ok).toBe(true)
     expect(res.csvText).toContain(`"'=HYPERLINK(""https://example.com"")"`)
     expect(res.csvText).not.toContain("sensitive stack content")
+    expect(res.csvText).not.toContain("legacy_operator_secret")
+    expect(res.csvText).not.toContain("legacy_target_secret")
+    expect(res.csvText).not.toContain("操作者OpenID")
+    expect(res.csvText).not.toContain("目标OpenID")
+    const fieldSpec = mocks.errorQuery.field.mock.calls[0][0]
+    expect(fieldSpec).toEqual(expect.objectContaining({
+      function: true,
+      errorMessage: true,
+      createdAt: true
+    }))
+    expect(fieldSpec).not.toHaveProperty("stack")
+    expect(fieldSpec).not.toHaveProperty("openid")
+    expect(fieldSpec).not.toHaveProperty("targetOpenid")
   })
 
   test("匹配记录超过 500 条时明确返回截断", async () => {

@@ -1,7 +1,7 @@
 .management-page {
   position: relative;
   min-height: 100vh;
-  padding: 38rpx 24rpx 70rpx;
+  padding: 38rpx calc(24rpx + env(safe-area-inset-right)) calc(70rpx + env(safe-area-inset-bottom)) calc(24rpx + env(safe-area-inset-left));
   overflow: hidden;
   color: #f7f8fa;
   background: linear-gradient(180deg, #141a25 0%, #0b0d10 620rpx);
@@ -16,7 +16,7 @@
 .management-page.role-page,
 .management-page.audit-page,
 .management-page.error-page {
-  padding: 38rpx 24rpx 70rpx;
+  padding: 38rpx calc(24rpx + env(safe-area-inset-right)) calc(70rpx + env(safe-area-inset-bottom)) calc(24rpx + env(safe-area-inset-left));
   background: linear-gradient(180deg, #141a25 0%, #0b0d10 620rpx);
 }
 
@@ -159,6 +159,92 @@
   border-color: rgba(255, 255, 255, 0.09);
   border-radius: 18rpx;
   background: #101318;
+}
+
+.management-page .management-search {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+}
+
+.management-page .management-search-input {
+  width: 100%;
+  padding-right: 70rpx;
+  padding-left: 70rpx;
+}
+
+.management-page .management-search-icon {
+  position: absolute;
+  top: 50%;
+  left: 25rpx;
+  z-index: 1;
+  width: 22rpx;
+  height: 22rpx;
+  border: 2rpx solid #65758b;
+  border-radius: 50%;
+  box-sizing: border-box;
+  pointer-events: none;
+  transform: translateY(-58%);
+}
+
+.management-page .management-search-icon::after {
+  position: absolute;
+  right: -7rpx;
+  bottom: -5rpx;
+  width: 9rpx;
+  height: 2rpx;
+  border-radius: 2rpx;
+  background: #65758b;
+  content: "";
+  transform: rotate(45deg);
+  transform-origin: left center;
+}
+
+.management-page .management-search-clear {
+  position: absolute;
+  top: 50%;
+  right: 13rpx;
+  z-index: 2;
+  width: 56rpx;
+  height: 56rpx;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.055);
+  color: #758399;
+  line-height: 56rpx;
+  transform: translateY(-50%);
+}
+
+.management-page .management-search-clear::after {
+  border: 0;
+}
+
+.management-page .management-search-clear-icon::before,
+.management-page .management-search-clear-icon::after {
+  position: absolute;
+  top: 23rpx;
+  left: 15rpx;
+  width: 18rpx;
+  height: 2rpx;
+  border-radius: 2rpx;
+  background: currentColor;
+  content: "";
+}
+
+.management-page .management-search-clear-icon::before {
+  transform: rotate(45deg);
+}
+
+.management-page .management-search-clear-icon::after {
+  transform: rotate(-45deg);
+}
+
+.management-page .management-search-clear-pressed {
+  opacity: 0.7;
+  transform: translateY(-50%) scale(0.9);
 }
 
 .management-page .ui-btn {
@@ -447,7 +533,7 @@
   border-radius: 999rpx;
   background: rgba(84, 143, 255, 0.08);
   color: #7eaaf1;
-  font-size: 13rpx;
+  font-size: 15rpx;
   font-weight: 700;
   line-height: 1;
   letter-spacing: 1rpx;

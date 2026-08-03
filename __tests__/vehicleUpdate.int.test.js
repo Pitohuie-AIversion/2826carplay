@@ -124,32 +124,7 @@ describe("cloudfunctions/vehicleUpdate integration", () => {
         openid: "admin_openid",
         action: "vehicleUpdate",
         vehicleId: "car_1",
-        plateNumber: "京A12345",
         changedKeys: ["vehicleType", "brandModel", "registerDate", "status", "location", "transmission", "fuelType", "seats", "priceDay", "publicDescription", "vin", "engineNumber", "note"],
-        before: {
-          vehicleType: undefined,
-          brandModel: undefined,
-          registerDate: undefined,
-          status: undefined,
-          location: undefined,
-          transmission: undefined,
-          fuelType: undefined,
-          seats: undefined,
-          priceDay: undefined,
-          publicDescription: undefined
-        },
-        after: {
-          vehicleType: "sedan",
-          brandModel: "BMW 740Li",
-          registerDate: "2026-07-08",
-          status: "idle",
-          location: "杭州",
-          transmission: "automatic",
-          fuelType: "gasoline",
-          seats: 5,
-          priceDay: 1299,
-          publicDescription: "行政旗舰座驾"
-        },
         createdAt: mocks.serverDateValue
       }
     })
@@ -249,7 +224,6 @@ describe("cloudfunctions/vehicleUpdate integration", () => {
         openid: "admin_openid",
         action: "vehicleUpdate",
         vehicleId: "car_1",
-        plateNumber: "京A12345",
         changedKeys: [
           "location",
           "transmission",
@@ -261,22 +235,6 @@ describe("cloudfunctions/vehicleUpdate integration", () => {
           "engineNumber",
           "note"
         ],
-        before: {
-          location: "杭州",
-          transmission: "automatic",
-          fuelType: "gasoline",
-          seats: 5,
-          priceDay: 1299,
-          publicDescription: "公开说明"
-        },
-        after: {
-          location: "",
-          transmission: "",
-          fuelType: "",
-          seats: null,
-          priceDay: null,
-          publicDescription: ""
-        },
         createdAt: mocks.serverDateValue
       }
     })

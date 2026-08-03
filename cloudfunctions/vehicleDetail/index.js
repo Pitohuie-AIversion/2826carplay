@@ -3,6 +3,35 @@ const cloud = require("wx-server-sdk")
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
+const AUTH_ROLE_FIELDS = {
+  role: true,
+  roles: true,
+  permissions: true,
+  isAdmin: true,
+  admin: true
+}
+const VEHICLE_MANAGE_DETAIL_FIELDS = {
+  _id: true,
+  plateNumber: true,
+  vehicleType: true,
+  brandModel: true,
+  registerDate: true,
+  status: true,
+  location: true,
+  transmission: true,
+  fuelType: true,
+  seats: true,
+  priceDay: true,
+  vin: true,
+  engineNumber: true,
+  publicDescription: true,
+  note: true,
+  imageList: true,
+  coverImage: true,
+  createdByOpenid: true,
+  createdAt: true,
+  updatedAt: true
+}
 
 function createError(code, message, details) {
   const result = {
@@ -71,7 +100,12 @@ async function hasOpenidCapability(openid, capability) {
     return false
   }
 
-  const res = await db.collection("roles").where({ openid }).limit(20).get()
+  const res = await db
+    .collection("roles")
+    .where({ openid })
+    .field(AUTH_ROLE_FIELDS)
+    .limit(20)
+    .get()
   const list = res && Array.isArray(res.data) ? res.data : []
   return list.some((item) => hasCapability(item, capability))
 }
@@ -113,7 +147,11 @@ exports.main = async (event) => {
       })
     }
 
-    const res = await db.collection("vehicles").doc(id).get()
+    const res = await db
+      .collection("vehicles")
+      .doc(id)
+      .field(VEHICLE_MANAGE_DETAIL_FIELDS)
+      .get()
     const item = res && res.data ? res.data : null
     if (!item) {
       return createError("NOT_FOUND", "车辆不存在")
@@ -147,7 +185,7 @@ exports.main = async (event) => {
   } catch (error) {
     console.error({
       function: "vehicleDetail",
-      openid,
+      authenticated: Boolean(openid),
       id,
       errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
       stack: error && error.stack ? error.stack : "",

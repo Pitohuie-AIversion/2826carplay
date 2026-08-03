@@ -17,6 +17,11 @@ function createMockDb({ vehiclesData, orderedError = null }) {
     }))
   }))
   const vehiclesOrderBy = jest.fn(() => ({ skip: vehiclesOrderedSkip }))
+  const vehiclesField = jest.fn(() => ({
+    limit: vehiclesLimit,
+    skip: vehiclesSkip,
+    orderBy: vehiclesOrderBy
+  }))
 
   const db = {
     collection: jest.fn((name) => {
@@ -24,7 +29,8 @@ function createMockDb({ vehiclesData, orderedError = null }) {
         return {
           limit: vehiclesLimit,
           skip: vehiclesSkip,
-          orderBy: vehiclesOrderBy
+          orderBy: vehiclesOrderBy,
+          field: vehiclesField
         }
       }
 
@@ -36,6 +42,7 @@ function createMockDb({ vehiclesData, orderedError = null }) {
     db,
     vehiclesLimit,
     vehiclesSkip,
+    vehiclesField,
     vehiclesOrderBy,
     vehiclesOrderedSkip
   }
@@ -90,6 +97,18 @@ describe("cloudfunctions/garageVehicleList integration", () => {
     const res = await garageVehicleList.main({})
 
     expect(mocks.vehiclesOrderBy).toHaveBeenCalledWith("updatedAt", "desc")
+    expect(mocks.vehiclesField).toHaveBeenCalledWith(
+      expect.objectContaining({
+        _id: true,
+        plateNumber: true,
+        publicDescription: true,
+        imageList: true
+      })
+    )
+    const projection = mocks.vehiclesField.mock.calls[0][0]
+    expect(projection).not.toHaveProperty("vin")
+    expect(projection).not.toHaveProperty("engineNumber")
+    expect(projection).not.toHaveProperty("note")
     expect(mocks.vehiclesOrderedSkip).toHaveBeenCalledWith(0)
     expect(res.ok).toBe(true)
     expect(res.list).toHaveLength(1)

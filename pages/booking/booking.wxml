@@ -1,4 +1,4 @@
-<view class="booking-loading-page" wx:if="{{loadingCar}}">
+<view class="booking-loading-page" wx:if="{{loadingCar}}" aria-hidden="true">
   <view class="booking-loading-header">
     <view>
       <view class="booking-loading-kicker skeleton-pulse"></view>
@@ -20,6 +20,91 @@
   </view>
 </view>
 
+<view class="booking-page booking-success-page" wx:elif="{{submitSuccess && carName}}">
+  <view class="booking-glow"></view>
+  <view class="success-card ui-card ui-card-gradient">
+    <view class="success-mark-wrap">
+      <view class="success-mark-ring"></view>
+      <view class="success-mark" aria-hidden="true">
+        <view class="state-check-icon success-check-icon"></view>
+      </view>
+    </view>
+    <view class="success-kicker">RESERVATION RECEIVED</view>
+    <view class="success-title">预约意向已提交</view>
+    <view class="success-desc">顾问将尽快与您确认车辆档期、价格和取还车安排，请保持手机畅通。</view>
+    <view class="success-status">
+      <view class="success-status-dot"></view>
+      <text>当前状态 · 等待顾问联系</text>
+    </view>
+  </view>
+
+  <view class="success-summary ui-card">
+    <view class="card-heading">
+      <view>
+        <view class="section-kicker">SUBMISSION SUMMARY</view>
+        <view class="section-title">本次预约</view>
+      </view>
+      <image class="success-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
+    </view>
+    <view class="success-summary-list">
+      <view class="success-summary-item">
+        <view class="success-summary-label">预约车辆</view>
+        <view class="success-summary-value">{{submittedSummary.carName}}</view>
+      </view>
+      <view class="success-summary-item">
+        <view class="success-summary-label">用车日期</view>
+        <view class="success-summary-value">{{submittedSummary.dateText}}</view>
+        <view class="success-summary-note">{{submittedSummary.durationText}} · 最终安排以顾问确认为准</view>
+      </view>
+      <view class="success-summary-row">
+        <view class="success-summary-item success-summary-half">
+          <view class="success-summary-label">联系人</view>
+          <view class="success-summary-value">{{submittedSummary.contactText}}</view>
+        </view>
+        <view class="success-summary-item success-summary-half">
+          <view class="success-summary-label">取车城市</view>
+          <view class="success-summary-value">{{submittedSummary.cityText}}</view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="success-next ui-card">
+    <view class="section-kicker">WHAT'S NEXT</view>
+    <view class="section-title">下一步</view>
+    <view class="success-next-steps">
+      <view class="success-next-step">
+        <view class="success-next-index success-next-phone" aria-hidden="true">
+          <view class="success-phone-handle"></view>
+        </view>
+        <view>
+          <view class="success-next-title">等待顾问联系</view>
+          <view class="success-next-desc">核对档期、价格与服务规则</view>
+        </view>
+      </view>
+      <view class="success-next-step">
+        <view class="success-next-index success-next-document" aria-hidden="true">
+          <view class="success-document-line success-document-line-top"></view>
+          <view class="success-document-line"></view>
+        </view>
+        <view>
+          <view class="success-next-title">查看预约进度</view>
+          <view class="success-next-desc">可在我的预约中查看或修改联系方式</view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <button class="success-primary ui-btn ui-btn-primary action-with-icon" bindtap="handleViewSubmittedBooking">
+    <view class="success-action-icon success-action-document" aria-hidden="true"><view class="success-action-document-line"></view></view>
+    <text>查看我的预约</text>
+  </button>
+  <button class="success-secondary ui-btn ui-btn-ghost action-with-icon" bindtap="handleContinueBrowse">
+    <view class="success-action-icon success-action-garage" aria-hidden="true"><view class="success-garage-door"></view></view>
+    <text>继续浏览车库</text>
+  </button>
+</view>
+
 <view class="booking-page" wx:elif="{{carName}}">
   <view class="booking-glow"></view>
 
@@ -29,7 +114,7 @@
       <view class="header-title">预约专属座驾</view>
       <view class="header-desc">填写出行信息，专属顾问将尽快与您确认</view>
     </view>
-    <image class="header-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+    <image class="header-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
   </view>
 
   <view class="booking-card vehicle-card">
@@ -38,7 +123,9 @@
         <view class="section-kicker">SELECTED VEHICLE</view>
         <view class="section-title">已选车辆</view>
       </view>
-      <view class="selection-mark">✓</view>
+      <view class="selection-mark" aria-hidden="true">
+        <view class="state-check-icon selection-check-icon"></view>
+      </view>
     </view>
     <view class="vehicle-name">{{carName}}</view>
     <view class="vehicle-meta">
@@ -53,7 +140,34 @@
         <view class="section-kicker">YOUR DETAILS</view>
         <view class="section-title">预约信息</view>
       </view>
-      <view class="step-label">01 / 03</view>
+      <view class="step-label">01 / 04</view>
+    </view>
+
+    <view class="form-progress" aria-role="group" aria-label="预约信息完成度 {{formProgress.completed}} / {{formProgress.total}}，{{formProgress.nextLabel}}">
+      <view class="form-progress-top">
+        <view class="form-progress-title">信息完成度 {{formProgress.completed}}/{{formProgress.total}}</view>
+        <view class="form-progress-next">{{formProgress.nextLabel}}</view>
+      </view>
+      <view class="form-progress-track" aria-hidden="true">
+        <view
+          class="form-progress-bar {{formProgress.ready ? 'form-progress-bar-ready' : ''}}"
+          style="width: {{formProgress.percent}}%;"
+        ></view>
+      </view>
+      <view class="form-progress-steps">
+        <view class="form-progress-step {{formProgress.contactStepClass}}">
+          <view class="form-step-node"><view class="form-step-node-mark"></view></view>
+          <text>联系资料</text>
+        </view>
+        <view class="form-progress-step {{formProgress.dateStepClass}}">
+          <view class="form-step-node"><view class="form-step-node-mark"></view></view>
+          <text>出行日期</text>
+        </view>
+        <view class="form-progress-step {{formProgress.privacyStepClass}}">
+          <view class="form-step-node"><view class="form-step-node-mark"></view></view>
+          <text>隐私确认</text>
+        </view>
+      </view>
     </view>
 
     <view class="form-item">
@@ -62,12 +176,16 @@
         <view class="required-mark">必填</view>
       </view>
       <input
-        class="form-input"
+        class="form-input {{formProgress.userNameComplete ? 'form-control-complete' : ''}}"
         placeholder="请输入联系人姓名"
         placeholder-class="input-placeholder"
         value="{{form.userName}}"
+        maxlength="20"
         data-field="userName"
         bindinput="handleInput"
+        confirm-type="next"
+        aria-label="填写联系人姓名"
+        aria-required="{{true}}"
       />
     </view>
 
@@ -77,14 +195,17 @@
         <view class="required-mark">必填</view>
       </view>
       <input
-        class="form-input"
-        type="digit"
+        class="form-input {{formProgress.phoneComplete ? 'form-control-complete' : ''}}"
+        type="number"
         maxlength="11"
         placeholder="请输入 11 位手机号"
         placeholder-class="input-placeholder"
         value="{{form.phone}}"
         data-field="phone"
         bindinput="handleInput"
+        confirm-type="done"
+        aria-label="填写十一位手机号"
+        aria-required="{{true}}"
       />
     </view>
 
@@ -96,21 +217,21 @@
 
     <view class="form-row">
       <view class="form-item form-item-half">
-        <view class="form-label">取车日期</view>
-        <picker mode="date" value="{{form.startDate}}" start="{{today}}" data-field="startDate" bindchange="handleDateChange">
-          <view class="form-picker {{form.startDate ? 'form-picker-filled' : ''}}">
+        <view class="form-label-row"><view class="form-label">取车日期</view><view class="required-mark">必填</view></view>
+        <picker mode="date" value="{{form.startDate}}" start="{{today}}" data-field="startDate" bindchange="handleDateChange" aria-label="选择取车日期" aria-required="{{true}}">
+          <view class="form-picker {{form.startDate ? 'form-picker-filled' : ''}} {{formProgress.startDateComplete ? 'form-control-complete' : ''}}" hover-class="booking-picker-pressed">
             <text>{{form.startDate || '选择日期'}}</text>
-            <text class="picker-arrow">⌄</text>
+            <view class="picker-arrow" aria-hidden="true"><view class="picker-chevron"></view></view>
           </view>
         </picker>
       </view>
 
       <view class="form-item form-item-half">
-        <view class="form-label">还车日期</view>
-        <picker mode="date" value="{{form.endDate}}" start="{{endMinDate}}" data-field="endDate" bindchange="handleDateChange">
-          <view class="form-picker {{form.endDate ? 'form-picker-filled' : ''}}">
+        <view class="form-label-row"><view class="form-label">还车日期</view><view class="required-mark">必填</view></view>
+        <picker mode="date" value="{{form.endDate}}" start="{{endMinDate}}" data-field="endDate" bindchange="handleDateChange" aria-label="选择还车日期" aria-required="{{true}}">
+          <view class="form-picker {{form.endDate ? 'form-picker-filled' : ''}} {{formProgress.endDateComplete ? 'form-control-complete' : ''}}" hover-class="booking-picker-pressed">
             <text>{{form.endDate || '选择日期'}}</text>
-            <text class="picker-arrow">⌄</text>
+            <view class="picker-arrow" aria-hidden="true"><view class="picker-chevron"></view></view>
           </view>
         </picker>
       </view>
@@ -119,10 +240,10 @@
     <view class="availability-card availability-{{availabilityState}}">
       <view class="availability-icon">
         <view wx:if="{{availabilityState === 'checking'}}" class="availability-spinner"></view>
-        <text wx:elif="{{availabilityState === 'clear'}}">✓</text>
-        <text wx:elif="{{availabilityState === 'conflict'}}">!</text>
-        <text wx:elif="{{availabilityState === 'unknown'}}">?</text>
-        <text wx:else>◇</text>
+        <view wx:elif="{{availabilityState === 'clear'}}" class="state-check-icon availability-check-icon" aria-hidden="true"></view>
+        <view wx:elif="{{availabilityState === 'conflict'}}" class="state-alert-icon" aria-hidden="true"></view>
+        <view wx:elif="{{availabilityState === 'unknown'}}" class="state-question-icon" aria-hidden="true"></view>
+        <view wx:else class="availability-calendar-icon" aria-hidden="true"></view>
       </view>
       <view class="availability-copy">
         <view class="availability-title">
@@ -134,15 +255,18 @@
         wx:if="{{availabilityState === 'unknown' && form.startDate && form.endDate}}"
         class="availability-retry"
         bindtap="checkVehicleAvailability"
+        hover-class="booking-link-pressed"
+        aria-role="button"
+        aria-label="重新检查车辆档期"
       >重试</view>
     </view>
 
     <view class="form-item">
-      <view class="form-label">取车城市</view>
-      <picker wx:if="{{cityOptions.length}}" mode="selector" range="{{cityOptions}}" value="{{pickerCityIndex}}" bindchange="handleCityChange">
-        <view class="form-picker {{form.city ? 'form-picker-filled' : ''}}">
+      <view class="form-label-row"><view class="form-label">取车城市</view><view class="optional-mark">选填</view></view>
+      <picker wx:if="{{cityOptions.length}}" mode="selector" range="{{cityOptions}}" value="{{pickerCityIndex}}" bindchange="handleCityChange" aria-label="选择取车城市">
+        <view class="form-picker {{form.city ? 'form-picker-filled' : ''}}" hover-class="booking-picker-pressed">
           <text>{{form.city || '请选择取车城市'}}</text>
-          <text class="picker-arrow">⌄</text>
+          <view class="picker-arrow" aria-hidden="true"><view class="picker-chevron"></view></view>
         </view>
       </picker>
       <input
@@ -151,15 +275,18 @@
         placeholder="请输入取车城市"
         placeholder-class="input-placeholder"
         value="{{form.city}}"
+        maxlength="20"
         data-field="city"
         bindinput="handleInput"
+        confirm-type="done"
+        aria-label="填写取车城市，选填"
       />
     </view>
 
     <view class="form-item">
       <view class="form-label-row">
         <view class="form-label">备注</view>
-        <view class="optional-mark">选填 · 最多 200 字</view>
+        <view class="optional-mark">选填 · {{form.note.length || 0}} / 200</view>
       </view>
       <textarea
         class="form-textarea"
@@ -169,6 +296,7 @@
         data-field="note"
         bindinput="handleInput"
         maxlength="200"
+        aria-label="填写预约备注，选填，最多二百字"
       />
     </view>
   </view>
@@ -179,15 +307,16 @@
         <view class="section-kicker">PRIVACY</view>
         <view class="section-title">信息使用说明</view>
       </view>
-      <view class="step-label">02 / 03</view>
+      <view class="step-label">02 / 04</view>
     </view>
     <view class="privacy-copy">{{privacyTip}}</view>
-    <checkbox-group class="privacy-agreement" bindchange="handlePrivacyAgreementChange">
+    <checkbox-group class="privacy-agreement {{privacyAgreed ? 'privacy-agreement-complete' : ''}}" bindchange="handlePrivacyAgreementChange" aria-label="阅读并同意隐私政策" aria-required="{{true}}">
       <label class="privacy-agreement-label">
-        <checkbox value="agreed" checked="{{privacyAgreed}}" color="#548fff" />
+        <checkbox value="agreed" checked="{{privacyAgreed}}" color="#548fff" aria-label="同意隐私政策" aria-checked="{{privacyAgreed}}" />
         <text>我已阅读并同意</text>
+        <text class="privacy-required-mark">必填</text>
       </label>
-      <text class="privacy-policy-link" bindtap="handleOpenPrivacyPolicy">《隐私政策》</text>
+      <text class="privacy-policy-link" bindtap="handleOpenPrivacyPolicy" hover-class="booking-link-pressed" aria-role="link" aria-label="查看隐私政策">《隐私政策》</text>
     </checkbox-group>
     <view wx:if="{{subscriptionEnabled}}" class="subscription-hint">
       <view class="subscription-dot"></view>
@@ -195,20 +324,75 @@
     </view>
   </view>
 
+  <view wx:if="{{formProgress.ready}}" class="booking-card confirmation-card">
+    <view class="card-heading">
+      <view>
+        <view class="section-kicker">FINAL CHECK</view>
+        <view class="section-title">确认预约信息</view>
+      </view>
+      <view class="step-label">03 / 04</view>
+    </view>
+    <view class="confirmation-grid">
+      <view class="confirmation-item confirmation-item-wide">
+        <view class="confirmation-label">预约车辆</view>
+        <view class="confirmation-value">{{bookingSummary.carName}}</view>
+      </view>
+      <view class="confirmation-item confirmation-item-wide">
+        <view class="confirmation-label">用车日期</view>
+        <view class="confirmation-value">{{bookingSummary.dateText}}</view>
+        <view class="confirmation-subvalue">{{bookingSummary.durationText}}</view>
+      </view>
+      <view class="confirmation-item">
+        <view class="confirmation-label">联系人</view>
+        <view class="confirmation-value">{{bookingSummary.contactText}}</view>
+      </view>
+      <view class="confirmation-item">
+        <view class="confirmation-label">取车城市</view>
+        <view class="confirmation-value">{{bookingSummary.cityText}}</view>
+      </view>
+    </view>
+    <view class="confirmation-tip">
+      <view class="confirmation-tip-dot"></view>
+      <view>请确认以上信息。提交后可在“我的预约”查看进度，进行中可修改联系方式。</view>
+    </view>
+  </view>
+
   <view class="submit-section">
-    <view class="submit-kicker">03 / 03 · SUBMIT</view>
-    <button class="submit-button {{isSubmitting || !privacyAgreed ? 'submit-button-disabled' : ''}}" bindtap="handleSubmit" disabled="{{isSubmitting || !privacyAgreed}}">
-      <text>{{submitButtonText}}</text>
-      <text class="submit-arrow">→</text>
+    <view class="submit-kicker">04 / 04 · SUBMIT</view>
+    <view class="submit-readiness {{formProgress.ready ? 'submit-readiness-ready' : ''}}">
+      <view class="submit-readiness-icon" aria-hidden="true"><view class="submit-readiness-mark"></view></view>
+      <text>{{formProgress.submitHint}}</text>
+    </view>
+    <button
+      class="submit-button {{isSubmitting || !formProgress.ready ? 'submit-button-disabled' : ''}} {{isSubmitting ? 'submit-button-loading' : ''}}"
+      bindtap="handleSubmit"
+      loading="{{isSubmitting}}"
+      disabled="{{isSubmitting || !formProgress.ready}}"
+      hover-class="submit-button-pressed"
+      aria-label="{{submitButtonText}}"
+    >
+      <view class="submit-button-copy">
+        <view wx:if="{{!isSubmitting}}" class="submit-native-icon" aria-hidden="true"><view class="submit-native-line"></view></view>
+        <text>{{submitButtonText}}</text>
+      </view>
+      <view wx:if="{{!isSubmitting}}" class="submit-arrow" aria-hidden="true">
+        <view class="submit-arrow-line"></view>
+      </view>
     </button>
     <view class="submit-note">提交预约不产生费用，最终安排以顾问确认为准</view>
   </view>
 </view>
 
 <view class="empty-page" wx:else>
-  <image class="empty-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+  <image class="empty-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
   <view class="empty-title">预约咨询</view>
   <view class="empty-desc">{{loadError ? loadErrorText : notFoundText}}</view>
-  <button wx:if="{{loadError}}" class="empty-action" bindtap="handleRetryLoad">重新加载</button>
-  <button wx:else class="empty-action" bindtap="handleBackGarage">返回车库首页</button>
+  <button wx:if="{{loadError}}" class="empty-action action-with-icon" bindtap="handleRetryLoad" hover-class="booking-action-pressed">
+    <view class="success-action-icon success-action-refresh" aria-hidden="true"></view>
+    <text>重新加载</text>
+  </button>
+  <button wx:else class="empty-action action-with-icon" bindtap="handleBackGarage" hover-class="booking-action-pressed">
+    <view class="success-action-icon success-action-garage" aria-hidden="true"><view class="success-garage-door"></view></view>
+    <text>返回车库首页</text>
+  </button>
 </view>

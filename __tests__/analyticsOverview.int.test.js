@@ -14,8 +14,13 @@ function loadModule({ openid, roles, events, vehicles }) {
 
   const eventOrderBy = jest.fn()
   const eventSkip = jest.fn()
+  const eventField = jest.fn()
   function createEventQuery(offset) {
     const query = {
+      field: jest.fn((projection) => {
+        eventField(projection)
+        return query
+      }),
       orderBy: jest.fn((...args) => {
         eventOrderBy(...args)
         return query
@@ -33,10 +38,13 @@ function loadModule({ openid, roles, events, vehicles }) {
     return query
   }
 
-  const vehicleDoc = jest.fn((id) => ({
+  const vehicleField = jest.fn((id, projection) => ({
     get: jest.fn().mockResolvedValue({
       data: vehicles[id] || null
     })
+  }))
+  const vehicleDoc = jest.fn((id) => ({
+    field: jest.fn((projection) => vehicleField(id, projection))
   }))
 
   cloud.__setMockDb({
@@ -58,7 +66,15 @@ function loadModule({ openid, roles, events, vehicles }) {
   jest.isolateModules(() => {
     mod = require("../cloudfunctions/analyticsOverview/index")
   })
-  return { mod, rolesWhere, vehicleDoc, eventOrderBy, eventSkip }
+  return {
+    mod,
+    rolesWhere,
+    vehicleDoc,
+    vehicleField,
+    eventField,
+    eventOrderBy,
+    eventSkip
+  }
 }
 
 describe("cloudfunctions/analyticsOverview integration", () => {
@@ -91,6 +107,11 @@ describe("cloudfunctions/analyticsOverview integration", () => {
     const res = await mocks.mod.main({ days: 7 })
 
     expect(res.ok).toBe(true)
+    expect(mocks.eventField).toHaveBeenCalledWith({
+      eventType: true,
+      vehicleId: true,
+      createdAt: true
+    })
     expect(res.metrics).toEqual({
       garage_view: 1,
       vehicle_detail: 2,
@@ -110,6 +131,9 @@ describe("cloudfunctions/analyticsOverview integration", () => {
       })
     )
     expect(res.topVehicles[0]).not.toHaveProperty("vin")
+    expect(mocks.vehicleField).toHaveBeenCalledWith("vehicle_1", {
+      brandModel: true
+    })
     expect(res.trend).toHaveLength(7)
   })
 

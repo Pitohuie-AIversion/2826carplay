@@ -2,6 +2,9 @@ jest.mock("../shared/pageAuth", () => ({
   requirePagePermission: jest.fn()
 }))
 
+const fs = require("fs")
+const path = require("path")
+
 function loadPageDefinition() {
   jest.resetModules()
   let definition = null
@@ -56,6 +59,7 @@ describe("pages/operations-overview", () => {
         ok: true,
         counts: {
           bookingPending: 6,
+          bookingCoordinationPending: 7,
           privacyPending: 2,
           privacyProcessing: 1,
           storageCleanupPending: 3
@@ -83,12 +87,30 @@ describe("pages/operations-overview", () => {
     expect(page.data.loadError).toBe("")
     expect(page.data.vehicleMetrics.find((item) => item.key === "total").value).toBe(8)
     expect(page.data.bookingMetrics.find((item) => item.key === "pending").value).toBe(9)
-    expect(page.data.alerts.find((item) => item.key === "booking").title).toBe("6 条预约待联系")
+    expect(page.data.alerts.find((item) => item.key === "booking").title).toBe("7 条预约待协调")
     expect(page.data.alerts.find((item) => item.key === "booking").url).toBe(
       "/pages/booking-workbench/booking-workbench"
     )
     expect(page.data.alerts.find((item) => item.key === "privacy").value).toBe(3)
     expect(page.data.alerts.find((item) => item.key === "storage").value).toBe(3)
+    expect(page.data.pendingActionCount).toBe(15)
+    expect(page.data.attentionAreaCount).toBe(4)
+    expect(page.data.loadedSourceCount).toBe(3)
+    expect(page.data.requestedSourceCount).toBe(3)
+    expect(page.data.lastSyncedText).toMatch(/^\d{2}-\d{2} \d{2}:\d{2}$/)
+    expect(page.data.vehicleMetrics.find((item) => item.key === "maintenance").iconClass).toBe(
+      "metric-icon-maintenance"
+    )
+    expect(page.data.bookingMetrics.find((item) => item.key === "pending").iconClass).toBe(
+      "metric-icon-contact"
+    )
+    expect(page.data.alerts.find((item) => item.key === "booking")).toMatchObject({
+      iconClass: "alert-native-icon-booking",
+      actionLabel: "立即处理"
+    })
+    expect(page.data.syncProgress).toBe(100)
+    expect(page.data.syncStateClass).toBe("sync-state-complete")
+    expect(page.data.operationStateClass).toBe("operation-state-attention")
   })
 
   test("单项失败时保留其他模块并显示不可用提示", async () => {
@@ -112,7 +134,10 @@ describe("pages/operations-overview", () => {
           success({
             result: {
               ok: true,
-              counts: { bookingPending: 1 },
+              counts: {
+                bookingPending: 1,
+                bookingCoordinationPending: 2
+              },
               unavailable: [],
               partial: false
             }
@@ -133,6 +158,51 @@ describe("pages/operations-overview", () => {
     expect(page.data.vehicleLoaded).toBe(false)
     expect(page.data.loadError).toBe("车辆统计加载失败")
     expect(page.data.alerts.find((item) => item.key === "vehicle").tone).toBe("neutral")
-    expect(page.data.alerts.find((item) => item.key === "booking").value).toBe(1)
+    expect(page.data.alerts.find((item) => item.key === "booking").value).toBe(2)
+    expect(page.data.pendingActionCount).toBe(2)
+    expect(page.data.attentionAreaCount).toBe(1)
+    expect(page.data.loadedSourceCount).toBe(2)
+    expect(page.data.requestedSourceCount).toBe(3)
+    expect(page.data.syncProgress).toBe(67)
+    expect(page.data.syncStateLabel).toBe("部分数据可用")
+    expect(page.data.syncStateClass).toBe("sync-state-partial")
+  })
+
+  test("运营总览使用同步进度、业务图标和原生导航箭头", () => {
+    const pageDir = path.resolve(__dirname, "../pages/operations-overview")
+    const wxmlSource = fs.readFileSync(path.join(pageDir, "operations-overview.wxml"), "utf8")
+    const wxssSource = fs.readFileSync(path.join(pageDir, "operations-overview.wxss"), "utf8")
+
+    expect(wxmlSource).toContain('class="hero-sync {{syncStateClass}}"')
+    expect(wxmlSource).toContain('aria-label="{{loading || refreshing ? \'正在刷新运营数据\' : \'刷新运营数据\'}}"')
+    expect(wxmlSource).toContain("{{syncProgress}}%")
+    expect(wxmlSource).toContain('class="overview-skeleton"')
+    expect(wxmlSource).toContain("overview-skeleton-pulse")
+    expect(wxmlSource).toContain("overview-skeleton-alert")
+    expect(wxmlSource).toContain("overview-skeleton-metrics")
+    expect(wxmlSource).not.toContain('class="state-loader"')
+    expect(wxmlSource).toContain('class="pulse-native-icon pulse-native-icon-action"')
+    expect(wxmlSource).toContain('class="alert-native-icon {{item.iconClass}}"')
+    expect(wxmlSource).toContain('class="metric-native-icon {{item.iconClass}}"')
+    expect(wxmlSource).toContain('class="recent-native-icon {{item.iconClass}}"')
+    expect(wxmlSource).toContain('class="section-link-chevron"')
+    expect(wxmlSource).toContain('class="recent-chevron"')
+    expect(wxmlSource).toContain('hover-class="section-link-pressed"')
+    expect(wxmlSource).toContain('hover-class="recent-item-pressed"')
+    expect(wxmlSource).toContain('aria-label="查看 {{item.title}}，{{item.meta}}，{{item.statusLabel}}"')
+    expect(wxmlSource).toContain("booking-section-native-icon inline-empty-native-icon")
+    expect(wxmlSource).toContain("vehicle-section-native-icon inline-empty-native-icon")
+    expect(wxmlSource).toContain("已同步的其他模块不受影响，可稍后刷新重试")
+    expect(wxmlSource).not.toMatch(/[›✓✔]/)
+    expect(wxssSource).toContain(".sync-state-complete .hero-sync-progress")
+    expect(wxssSource).toContain(".alert-native-icon-storage")
+    expect(wxssSource).toContain(".metric-icon-maintenance")
+    expect(wxssSource).toContain(".inline-empty-native-icon")
+    expect(wxssSource).toContain(".overview-skeleton-stat")
+    expect(wxssSource).toContain(".overview-skeleton-metric")
+    expect(wxssSource).toContain(".section-link-pressed")
+    expect(wxssSource).toContain(".recent-item-pressed")
+    expect(wxssSource).toMatch(/\.recent-title\s*\{[^}]*-webkit-line-clamp:\s*2/s)
+    expect(wxssSource).toContain(".refresh-link-pressed")
   })
 })

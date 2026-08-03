@@ -3,6 +3,16 @@ const cloud = require("wx-server-sdk")
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
+const AUTH_ROLE_FIELDS = {
+  role: true,
+  roles: true,
+  permissions: true,
+  isAdmin: true,
+  admin: true
+}
+const VEHICLE_STATUS_FIELDS = {
+  status: true
+}
 
 const VEHICLE_STATUSES = ["active", "idle", "maintenance", "retired"]
 
@@ -73,7 +83,12 @@ async function hasOpenidCapability(openid, capability) {
     return false
   }
 
-  const res = await db.collection("roles").where({ openid }).limit(20).get()
+  const res = await db
+    .collection("roles")
+    .where({ openid })
+    .field(AUTH_ROLE_FIELDS)
+    .limit(20)
+    .get()
   const list = res && Array.isArray(res.data) ? res.data : []
   return list.some((item) => hasCapability(item, capability))
 }
@@ -171,7 +186,11 @@ exports.main = async (event) => {
       return check
     }
 
-    const currentRes = await db.collection("vehicles").doc(input.id).get()
+    const currentRes = await db
+      .collection("vehicles")
+      .doc(input.id)
+      .field(VEHICLE_STATUS_FIELDS)
+      .get()
     const current = currentRes && currentRes.data ? currentRes.data : null
     if (!current) {
       return createError("NOT_FOUND", "车辆不存在")
@@ -211,23 +230,25 @@ exports.main = async (event) => {
       message: "车辆状态已更新"
     }
   } catch (error) {
+    const errorMessage = String(
+      error && (error.message || error.errMsg) ? error.message || error.errMsg : error
+    ).slice(0, 300)
     await writeErrorLogBestEffort({
       function: "vehicleUpdateStatus",
-      openid,
       vehicleId: input.id,
       stage: "main",
       toStatus: input.status,
-      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
-      stack: error && error.stack ? error.stack : "",
+      authenticated: Boolean(openid),
+      errorMessage,
       occurredAt: new Date().toISOString()
     })
 
     console.error({
       function: "vehicleUpdateStatus",
-      openid,
+      authenticated: Boolean(openid),
       id: input.id,
       status: input.status,
-      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
+      errorMessage,
       stack: error && error.stack ? error.stack : "",
       createdAt: new Date().toISOString()
     })

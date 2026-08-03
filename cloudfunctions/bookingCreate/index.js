@@ -4,6 +4,24 @@ const crypto = require("crypto")
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
+const RECENT_BOOKING_FIELDS = {
+  status: true,
+  vehicleId: true,
+  startDate: true,
+  endDate: true,
+  createdAt: true
+}
+const IDEMPOTENT_BOOKING_FIELDS = {
+  _id: true,
+  openid: true,
+  requestId: true
+}
+const BOOKING_VEHICLE_FIELDS = {
+  name: true,
+  brandModel: true,
+  plateNumber: true,
+  status: true
+}
 const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000
 const RATE_LIMIT_MAX_REQUESTS = 5
 const RECENT_BOOKING_LIMIT = 100
@@ -36,6 +54,29 @@ function normalizeText(value, maxLen) {
   }
 
   return text
+}
+
+function maskPlateNumber(value) {
+  const text = String(value || "").trim()
+  if (!text) {
+    return ""
+  }
+  if (text.length <= 3) {
+    return "***"
+  }
+  if (text.length === 4) {
+    return `${text.slice(0, 1)}**${text.slice(-1)}`
+  }
+  return `${text.slice(0, 2)}${"*".repeat(text.length - 4)}${text.slice(-2)}`
+}
+
+function getBookingVehicleName(vehicle) {
+  return normalizeText(
+    (vehicle && (vehicle.brandModel || vehicle.name)) ||
+      maskPlateNumber(vehicle && vehicle.plateNumber) ||
+      "预约车辆",
+    50
+  )
 }
 
 function normalizeEvent(event) {
@@ -155,6 +196,7 @@ async function queryRecentBookings(openid) {
     const res = await db
       .collection("bookings")
       .where({ openid })
+      .field(RECENT_BOOKING_FIELDS)
       .orderBy("createdAt", "desc")
       .limit(RECENT_BOOKING_LIMIT)
       .get()
@@ -179,6 +221,7 @@ async function queryRecentBookings(openid) {
     const res = await db
       .collection("bookings")
       .where({ openid })
+      .field(RECENT_BOOKING_FIELDS)
       .skip(offset)
       .limit(batchSize)
       .get()
@@ -233,7 +276,11 @@ async function findIdempotentBooking(openid, requestId) {
 
   const bookingId = buildBookingDocumentId(openid, requestId)
   try {
-    const res = await db.collection("bookings").doc(bookingId).get()
+    const res = await db
+      .collection("bookings")
+      .doc(bookingId)
+      .field(IDEMPOTENT_BOOKING_FIELDS)
+      .get()
     const booking = res && res.data ? res.data : null
     if (!booking) {
       return { bookingId, existing: false, conflict: false }
@@ -333,7 +380,11 @@ exports.main = async (event) => {
       return submissionError
     }
 
-    const vehicleRes = await db.collection("vehicles").doc(input.vehicleId).get()
+    const vehicleRes = await db
+      .collection("vehicles")
+      .doc(input.vehicleId)
+      .field(BOOKING_VEHICLE_FIELDS)
+      .get()
     const vehicle = vehicleRes && vehicleRes.data ? vehicleRes.data : null
     if (!vehicle) {
       return createError("NOT_FOUND", "车辆不存在")
@@ -346,7 +397,7 @@ exports.main = async (event) => {
     const bookingData = {
       openid,
       vehicleId: input.vehicleId,
-      vehicleName: normalizeText(vehicle.name || vehicle.plateNumber || "", 50),
+      vehicleName: getBookingVehicleName(vehicle),
       userName: input.userName,
       phone: input.phone,
       startDate: input.startDate,
@@ -376,11 +427,7 @@ exports.main = async (event) => {
       openid,
       action: "bookingCreate",
       bookingId,
-      vehicleId: input.vehicleId,
-      vehicleName: bookingData.vehicleName,
-      startDate: input.startDate,
-      endDate: input.endDate,
-      city: input.city
+      vehicleId: input.vehicleId
     })
 
     return {
@@ -389,21 +436,22 @@ exports.main = async (event) => {
       message: "预约信息已提交，客服将尽快联系您"
     }
   } catch (error) {
+    const errorMessage = String(
+      error && (error.message || error.errMsg) ? error.message || error.errMsg : error
+    ).slice(0, 300)
     await writeErrorLogBestEffort({
       function: "bookingCreate",
-      openid,
       vehicleId: input.vehicleId,
-      startDate: input.startDate,
-      endDate: input.endDate,
-      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
-      stack: error && error.stack ? error.stack : ""
+      authenticated: Boolean(openid),
+      dateRangeProvided: Boolean(input.startDate && input.endDate),
+      errorMessage
     })
 
     console.error({
       function: "bookingCreate",
-      openid,
+      authenticated: Boolean(openid),
       vehicleId: input.vehicleId,
-      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
+      errorMessage,
       stack: error && error.stack ? error.stack : "",
       createdAt: new Date().toISOString()
     })

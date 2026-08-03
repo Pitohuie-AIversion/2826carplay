@@ -1,0 +1,56 @@
+<view class="core-nav" aria-role="tablist" aria-label="核心页面导航">
+  <button
+    class="core-nav-item {{activeKey === 'garage' ? 'core-nav-item-active' : ''}}"
+    data-key="garage"
+    bindtap="handleNavigate"
+    hover-class="core-nav-item-pressed"
+    hover-stay-time="80"
+    aria-label="打开车库"
+    aria-role="tab"
+    aria-selected="{{activeKey === 'garage'}}"
+  >
+    <image class="core-nav-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
+    <text class="core-nav-label">车库</text>
+  </button>
+  <button
+    class="core-nav-item {{activeKey === 'favorites' ? 'core-nav-item-active' : ''}}"
+    data-key="favorites"
+    bindtap="handleNavigate"
+    hover-class="core-nav-item-pressed"
+    hover-stay-time="80"
+    aria-label="打开收藏"
+    aria-role="tab"
+    aria-selected="{{activeKey === 'favorites'}}"
+  >
+    <view class="core-nav-icon core-nav-icon-heart" aria-hidden="true">
+      <view class="core-nav-heart-shape"></view>
+    </view>
+    <text class="core-nav-label">收藏</text>
+  </button>
+  <button
+    class="core-nav-item {{activeKey === 'bookings' ? 'core-nav-item-active' : ''}}"
+    data-key="bookings"
+    bindtap="handleNavigate"
+    hover-class="core-nav-item-pressed"
+    hover-stay-time="80"
+    aria-label="打开预约"
+    aria-role="tab"
+    aria-selected="{{activeKey === 'bookings'}}"
+  >
+    <view class="core-nav-icon core-nav-icon-calendar" aria-hidden="true"></view>
+    <text class="core-nav-label">预约</text>
+  </button>
+  <button
+    class="core-nav-item {{activeKey === 'mine' ? 'core-nav-item-active' : ''}}"
+    data-key="mine"
+    bindtap="handleNavigate"
+    hover-class="core-nav-item-pressed"
+    hover-stay-time="80"
+    aria-label="打开我的"
+    aria-role="tab"
+    aria-selected="{{activeKey === 'mine'}}"
+  >
+    <view class="core-nav-icon core-nav-icon-profile" aria-hidden="true"></view>
+    <text class="core-nav-label">我的</text>
+  </button>
+</view>

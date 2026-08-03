@@ -1,7 +1,8 @@
 const { requirePagePermission } = require("../../shared/pageAuth")
+const { formatToastTitle } = require("../../shared/uiFeedback")
 const {
   canShareCsvFile,
-  getErrorMessage,
+  isUserCancelError,
   openCsvFile,
   removeCsvFile,
   saveCsvFile,
@@ -31,9 +32,15 @@ const ACTION_OPTIONS = [
   { value: "privacyRequestCancel", label: "隐私撤回" },
   { value: "privacyRequestUpdateStatus", label: "隐私处理" },
   { value: "privacyRequestDataInventory", label: "隐私数据核验" },
+  { value: "privacyRequestDataExportCsv", label: "隐私数据导出" },
   { value: "logExportCsv", label: "日志导出" },
   { value: "analyticsCleanup", label: "匿名数据清理" }
 ]
+
+const ACTION_LABEL_MAP = ACTION_OPTIONS.reduce((map, item) => {
+  map[item.value] = item.label
+  return map
+}, {})
 
 const PRIORITY_LABEL_MAP = {
   priority: "优先",
@@ -45,6 +52,73 @@ const COORDINATION_LABEL_MAP = {
   pending: "待协调",
   coordinating: "协调中",
   resolved: "已协调"
+}
+
+function buildAuditView(action) {
+  const value = String(action || "")
+  const eventLabel = ACTION_LABEL_MAP[value] || "其他操作"
+
+  if (value === "bootstrapAdmin" || value === "roleUpsert") {
+    return {
+      eventLabel,
+      eventGroup: "权限安全",
+      eventClass: "audit-event-access",
+      eventIconClass: "audit-event-icon-access"
+    }
+  }
+
+  if (value.startsWith("vehicle")) {
+    return {
+      eventLabel,
+      eventGroup: "车辆管理",
+      eventClass: "audit-event-vehicle",
+      eventIconClass: "audit-event-icon-vehicle"
+    }
+  }
+
+  if (value.startsWith("booking")) {
+    return {
+      eventLabel,
+      eventGroup: "预约服务",
+      eventClass: "audit-event-booking",
+      eventIconClass: "audit-event-icon-booking"
+    }
+  }
+
+  if (value.startsWith("privacyRequest")) {
+    return {
+      eventLabel,
+      eventGroup: "隐私服务",
+      eventClass: "audit-event-privacy",
+      eventIconClass: "audit-event-icon-privacy"
+    }
+  }
+
+  return {
+    eventLabel,
+    eventGroup: "系统运营",
+    eventClass: "audit-event-operation",
+    eventIconClass: "audit-event-icon-operation"
+  }
+}
+
+function buildSummaryRows(summary) {
+  return String(summary || "")
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => {
+      const separatorIndex = line.indexOf("：")
+      if (separatorIndex < 0) {
+        return {
+          label: "详情",
+          value: line
+        }
+      }
+      return {
+        label: line.slice(0, separatorIndex),
+        value: line.slice(separatorIndex + 1) || "—"
+      }
+    })
 }
 
 function formatDisplayTime(value) {
@@ -68,55 +142,55 @@ function formatDisplayTime(value) {
 function buildSummary(item) {
   const action = item.action || ""
   if (action === "roleUpsert") {
-    return `目标：${item.targetOpenid || "--"}\n权限：${Array.isArray(item.toPermissions) ? item.toPermissions.join(", ") : "--"}`
+    return `目标：${item.targetOpenid || "—"}\n权限：${Array.isArray(item.toPermissions) ? item.toPermissions.join(", ") : "—"}`
   }
 
   if (action === "bootstrapAdmin") {
-    return `目标：${item.targetOpenid || "--"}\n口令保护：${item.tokenProtected ? "已开启" : "未开启"}`
+    return `目标：${item.targetOpenid || "—"}\n口令保护：${item.tokenProtected ? "已开启" : "未开启"}`
   }
 
   if (action === "operationConfigUpdate") {
-    return `变更字段：${Array.isArray(item.changedKeys) ? item.changedKeys.join(", ") : "--"}`
+    return `变更字段：${Array.isArray(item.changedKeys) ? item.changedKeys.join(", ") : "—"}`
   }
 
   if (action === "vehicleCreate") {
-    return `车辆：${item.vehicleId || "--"}\n车型：${item.brandModel || "--"}`
+    return `车辆：${item.vehicleId || "—"}\n车型：${item.brandModel || "—"}`
   }
 
   if (action === "vehicleUpdate") {
-    return `车辆：${item.vehicleId || "--"}\n变更字段：${Array.isArray(item.changedKeys) ? item.changedKeys.join(", ") : "--"}`
+    return `车辆：${item.vehicleId || "—"}\n变更字段：${Array.isArray(item.changedKeys) ? item.changedKeys.join(", ") : "—"}`
   }
 
   if (action === "vehicleUpdateStatus") {
-    return `车辆：${item.vehicleId || "--"}\n状态：${item.fromStatus || "--"} → ${item.toStatus || "--"}`
+    return `车辆：${item.vehicleId || "—"}\n状态：${item.fromStatus || "—"} → ${item.toStatus || "—"}`
   }
 
   if (action === "vehicleRetire" || action === "vehicleRestore") {
-    return `车辆：${item.vehicleId || "--"}\n状态：${item.fromStatus || "--"} → ${item.toStatus || "--"}`
+    return `车辆：${item.vehicleId || "—"}\n状态：${item.fromStatus || "—"} → ${item.toStatus || "—"}`
   }
 
   if (action === "bookingCreate") {
-    return `预约：${item.bookingId || "--"}\n车辆：${item.vehicleName || "--"}`
+    return `预约：${item.bookingId || "—"}\n车辆：${item.vehicleId || "—"}`
   }
 
   if (action === "bookingCancel") {
-    return `预约：${item.bookingId || "--"}\n状态：${item.fromStatus || "--"} → ${item.toStatus || "--"}`
+    return `预约：${item.bookingId || "—"}\n状态：${item.fromStatus || "—"} → ${item.toStatus || "—"}`
   }
 
   if (action === "bookingUpdateStatus") {
-    return `预约：${item.bookingId || "--"}\n状态：${item.fromStatus || "--"} → ${item.toStatus || "--"}`
+    return `预约：${item.bookingId || "—"}\n状态：${item.fromStatus || "—"} → ${item.toStatus || "—"}`
   }
 
   if (action === "bookingUpdateAdminRemark") {
-    return `预约：${item.bookingId || "--"}\n备注长度：${item.remarkLength || 0}`
+    return `预约：${item.bookingId || "—"}\n备注长度：${item.remarkLength || 0}`
   }
 
   if (action === "bookingUpdateCoordination") {
-    return `预约：${item.bookingId || "--"}\n优先级：${PRIORITY_LABEL_MAP[item.fromPriority] || "--"} → ${PRIORITY_LABEL_MAP[item.toPriority] || "--"}\n协调状态：${COORDINATION_LABEL_MAP[item.fromCoordinationStatus] || "--"} → ${COORDINATION_LABEL_MAP[item.toCoordinationStatus] || "--"}`
+    return `预约：${item.bookingId || "—"}\n优先级：${PRIORITY_LABEL_MAP[item.fromPriority] || "—"} → ${PRIORITY_LABEL_MAP[item.toPriority] || "—"}\n协调状态：${COORDINATION_LABEL_MAP[item.fromCoordinationStatus] || "—"} → ${COORDINATION_LABEL_MAP[item.toCoordinationStatus] || "—"}`
   }
 
   if (action === "bookingUpdateMyContact") {
-    return `预约：${item.bookingId || "--"}\n变更字段：${Array.isArray(item.changedKeys) ? item.changedKeys.join(", ") : "--"}`
+    return `预约：${item.bookingId || "—"}\n变更字段：${Array.isArray(item.changedKeys) ? item.changedKeys.join(", ") : "—"}`
   }
 
   if (action === "bookingExportCsv") {
@@ -124,27 +198,36 @@ function buildSummary(item) {
   }
 
   if (action === "vehicleDelete") {
-    return `车辆：${item.vehicleId || "--"}`
+    return `车辆：${item.vehicleId || "—"}`
   }
 
   if (action === "vehicleImageUpdate") {
-    return `车辆：${item.vehicleId || "--"}\n操作：${item.imageAction || "--"}`
+    return `车辆：${item.vehicleId || "—"}\n操作：${item.imageAction || "—"}`
   }
 
   if (action === "privacyRequestCreate") {
-    return `申请：${item.requestId || "--"}\n类型：${item.requestType || "--"}`
+    return `申请：${item.requestId || "—"}\n类型：${item.requestType || "—"}`
   }
 
   if (action === "privacyRequestCancel") {
-    return `申请：${item.requestId || "--"}\n类型：${item.requestType || "--"}\n状态：${item.fromStatus || "--"} → ${item.toStatus || "--"}`
+    return `申请：${item.requestId || "—"}\n类型：${item.requestType || "—"}\n状态：${item.fromStatus || "—"} → ${item.toStatus || "—"}`
   }
 
   if (action === "privacyRequestUpdateStatus") {
-    return `申请：${item.requestId || "--"}\n类型：${item.requestType || "--"}\n状态：${item.fromStatus || "--"} → ${item.toStatus || "--"}`
+    return `申请：${item.requestId || "—"}\n类型：${item.requestType || "—"}\n状态：${item.fromStatus || "—"} → ${item.toStatus || "—"}`
   }
 
-  if (action === "privacyRequestDataInventory") {
-    return `申请：${item.requestId || "--"}\n类型：${item.requestType || "--"}\n预约：${item.bookingCount || 0}\n收藏：${item.favoriteCount || 0}\n隐私申请：${item.privacyRequestCount || 0}\n结果：${item.partial ? "部分可用" : "完整"}`
+  if (
+    action === "privacyRequestDataInventory" ||
+    action === "privacyRequestDataExportCsv"
+  ) {
+    const resultLabel =
+      action === "privacyRequestDataExportCsv"
+        ? "CSV 已生成"
+        : item.partial
+          ? "部分可用"
+          : "完整"
+    return `申请：${item.requestId || "—"}\n类型：${item.requestType || "—"}\n预约：${item.bookingCount || 0}\n收藏：${item.favoriteCount || 0}\n隐私申请：${item.privacyRequestCount || 0}\n结果：${resultLabel}`
   }
 
   if (action === "analyticsCleanup") {
@@ -166,6 +249,7 @@ Page({
     pageAuthorized: false,
     keyword: "",
     currentAction: "all",
+    currentActionLabel: "全部操作",
     actionOptions: ACTION_OPTIONS,
     page: 0,
     pageSize: 20,
@@ -204,6 +288,13 @@ Page({
     this.setData({ keyword: value })
   },
 
+  handleClearKeyword() {
+    if (!this.data.keyword) {
+      return
+    }
+    this.setData({ keyword: "" }, () => this.fetchList())
+  },
+
   handleSearch() {
     this.fetchList()
   },
@@ -215,9 +306,21 @@ Page({
     }
 
     this.setData({
-      currentAction: action
+      currentAction: action,
+      currentActionLabel: action === "all" ? "全部操作" : ACTION_LABEL_MAP[action] || "其他操作"
     })
     this.fetchList()
+  },
+
+  handleResetFilters() {
+    if (!this.data.keyword && this.data.currentAction === "all") {
+      return
+    }
+    this.setData({
+      keyword: "",
+      currentAction: "all",
+      currentActionLabel: "全部操作"
+    }, () => this.fetchList())
   },
 
   handleLoadMore() {
@@ -256,7 +359,7 @@ Page({
         const result = res && res.result ? res.result : null
         if (!result || !result.ok || !result.csvText) {
           wx.showToast({
-            title: (result && result.message) || "导出失败",
+              title: formatToastTitle(result && result.message, "导出失败"),
             icon: "none"
           })
           this.setData({ exporting: false })
@@ -284,6 +387,8 @@ Page({
                 content: result.sourceTruncated
                   ? `已导出最近扫描结果中的 ${result.total || 0} 条，日志超过 2000 条扫描上限，请缩小筛选范围后分批归档。`
                   : `符合条件 ${result.matchedTotal || 0} 条，本次已导出 ${result.total || 0} 条，请分批归档。`,
+                confirmText: "知道了",
+                confirmColor: "#528fff",
                 showCancel: false
               })
             } else {
@@ -295,7 +400,7 @@ Page({
           })
           .catch((error) => {
             wx.showToast({
-              title: getErrorMessage(error) || "保存失败",
+              title: "保存失败",
               icon: "none"
             })
             this.setData({ exporting: false })
@@ -303,7 +408,7 @@ Page({
       },
       fail: (error) => {
         wx.showToast({
-          title: getErrorMessage(error) || "导出失败",
+          title: "导出失败",
           icon: "none"
         })
         this.setData({ exporting: false })
@@ -315,7 +420,10 @@ Page({
     if (!this.data.exportFilePath || !this.data.exportFileName) {
       return
     }
-    shareCsvFile(this.data.exportFilePath, this.data.exportFileName).catch(() => {
+    shareCsvFile(this.data.exportFilePath, this.data.exportFileName).catch((error) => {
+      if (isUserCancelError(error)) {
+        return
+      }
       this.handleOpenExportedFile()
     })
   },
@@ -340,6 +448,8 @@ Page({
     wx.showModal({
       title: "删除本地 CSV",
       content: "将从当前设备删除这份导出文件，删除后无法恢复。云端审计日志不会受到影响。",
+      confirmText: "确认删除",
+      confirmColor: "#d46868",
       success: (res) => {
         if (!res.confirm) {
           return
@@ -357,7 +467,7 @@ Page({
           })
           .catch((error) => {
             wx.showToast({
-              title: getErrorMessage(error) || "删除失败",
+              title: "删除失败",
               icon: "none"
             })
           })
@@ -399,7 +509,7 @@ Page({
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
           wx.showToast({
-            title: (result && result.message) || "加载失败",
+          title: formatToastTitle(result && result.message, "加载失败"),
             icon: "none"
           })
           this.setData({
@@ -418,11 +528,16 @@ Page({
         }
 
         const list = Array.isArray(result.list)
-          ? result.list.map((item) => ({
-              ...item,
-              createdAtText: formatDisplayTime(item.createdAt),
-              summary: buildSummary(item)
-            }))
+          ? result.list.map((item) => {
+              const summary = buildSummary(item)
+              return {
+                ...item,
+                ...buildAuditView(item.action),
+                createdAtText: formatDisplayTime(item.createdAt),
+                summary,
+                summaryRows: buildSummaryRows(summary)
+              }
+            })
           : []
 
         this.setData({
@@ -440,7 +555,7 @@ Page({
       },
       fail: (error) => {
         wx.showToast({
-          title: (error && (error.errMsg || error.message)) || "加载失败",
+          title: "加载失败",
           icon: "none"
         })
         this.setData({

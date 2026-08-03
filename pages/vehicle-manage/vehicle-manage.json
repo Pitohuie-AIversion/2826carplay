@@ -1,3 +1,6 @@
 {
-  "navigationBarTitleText": "车辆管理"
+  "navigationBarTitleText": "车辆管理",
+  "enablePullDownRefresh": true,
+  "backgroundColor": "#101010",
+  "backgroundTextStyle": "light"
 }

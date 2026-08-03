@@ -2,7 +2,7 @@
 
 .vehicle-detail-page {
   min-height: 100vh;
-  padding: 24rpx 24rpx 56rpx;
+  padding: 24rpx calc(24rpx + env(safe-area-inset-right)) calc(56rpx + env(safe-area-inset-bottom)) calc(24rpx + env(safe-area-inset-left));
   background: #101010;
   box-sizing: border-box;
 }
@@ -89,6 +89,12 @@
   overflow: hidden;
   text-overflow: ellipsis;
   box-sizing: border-box;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.status-op-btn-pressed {
+  opacity: 0.72;
+  transform: scale(0.975);
 }
 
 .status-op-btn-active {
@@ -203,6 +209,92 @@
   height: 220rpx;
   border-radius: 12rpx;
   background: #2a2a2a;
+  transition: filter 120ms ease, transform 120ms ease;
+}
+
+.vehicle-image-pressed {
+  filter: brightness(0.82);
+  transform: scale(0.985);
+}
+
+.vehicle-image-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  border: 1rpx dashed rgba(216, 137, 92, 0.3);
+  background:
+    radial-gradient(circle at 50% 20%, rgba(191, 112, 72, 0.12), transparent 55%),
+    #171416;
+  color: #a87562;
+}
+
+.vehicle-image-fallback-mark {
+  position: relative;
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1rpx rgba(216, 137, 92, 0.18), 0 8rpx 24rpx rgba(108, 54, 37, 0.24);
+}
+
+.vehicle-image-fallback-emblem {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  opacity: 0.72;
+}
+
+.vehicle-image-fallback-ring {
+  position: absolute;
+  top: -6rpx;
+  right: -6rpx;
+  bottom: -6rpx;
+  left: -6rpx;
+  border: 1rpx solid rgba(216, 137, 92, 0.42);
+  border-radius: 50%;
+  box-shadow: inset 0 0 12rpx rgba(191, 112, 72, 0.12);
+}
+
+.vehicle-image-fallback-text {
+  margin-top: 12rpx;
+  color: #b78771;
+  font-size: 18rpx;
+  line-height: 1.4;
+}
+
+.mini-placeholder-warning {
+  color: #c98e70;
+}
+
+.mini-placeholder-warning-mark {
+  position: relative;
+  width: 18rpx;
+  height: 18rpx;
+  margin-right: 8rpx;
+  border: 2rpx solid currentColor;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+
+.mini-placeholder-warning-mark::before,
+.mini-placeholder-warning-mark::after {
+  position: absolute;
+  left: 7rpx;
+  width: 2rpx;
+  border-radius: 2rpx;
+  background: currentColor;
+  content: "";
+}
+
+.mini-placeholder-warning-mark::before {
+  top: 3rpx;
+  height: 6rpx;
+}
+
+.mini-placeholder-warning-mark::after {
+  bottom: 2rpx;
+  height: 2rpx;
 }
 
 .image-badge {
@@ -238,6 +330,12 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.vehicle-detail-button-pressed {
+  opacity: 0.72;
+  transform: scale(0.975);
 }
 
 .secondary-mini-button {
@@ -444,4 +542,667 @@
   margin-top: 26rpx;
   font-size: 23rpx;
   line-height: 84rpx;
+}
+
+.summary-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.summary-meta-row,
+.summary-meta-item {
+  display: flex;
+  align-items: center;
+}
+
+.summary-meta-row {
+  margin-top: 16rpx;
+  color: #68778a;
+  font-size: 17rpx;
+  line-height: 1.45;
+}
+
+.summary-meta-divider {
+  width: 1rpx;
+  height: 18rpx;
+  margin: 0 14rpx;
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.summary-image-icon {
+  position: relative;
+  width: 20rpx;
+  height: 17rpx;
+  margin-right: 7rpx;
+  overflow: hidden;
+  border: 2rpx solid currentColor;
+  border-radius: 3rpx;
+  box-sizing: border-box;
+}
+
+.summary-image-icon::before {
+  position: absolute;
+  right: -1rpx;
+  bottom: -6rpx;
+  width: 12rpx;
+  height: 12rpx;
+  border-top: 2rpx solid currentColor;
+  border-left: 2rpx solid currentColor;
+  content: "";
+  transform: rotate(45deg);
+}
+
+.detail-section-heading,
+.detail-section-heading-main,
+.note-heading {
+  display: flex;
+  align-items: center;
+}
+
+.detail-section-heading,
+.note-heading {
+  justify-content: space-between;
+}
+
+.detail-section-heading-main {
+  min-width: 0;
+}
+
+.detail-section-kicker {
+  color: #60738f;
+  font-size: 14rpx;
+  font-weight: 650;
+  line-height: 1.4;
+  letter-spacing: 2rpx;
+}
+
+.detail-section-kicker + .section-title {
+  margin-top: 3rpx;
+}
+
+.detail-section-index {
+  flex-shrink: 0;
+  margin-left: 18rpx;
+  color: #4e6079;
+  font-size: 16rpx;
+  font-weight: 650;
+}
+
+.detail-section-desc {
+  margin-top: 18rpx;
+  color: #687587;
+  font-size: 19rpx;
+  line-height: 1.6;
+}
+
+.detail-section-glyph {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 58rpx;
+  height: 58rpx;
+  margin-right: 16rpx;
+  border: 1rpx solid rgba(102, 153, 232, 0.19);
+  border-radius: 18rpx;
+  background: rgba(70, 119, 194, 0.1);
+  color: #7caaf0;
+}
+
+.detail-section-glyph-icon {
+  position: relative;
+  box-sizing: border-box;
+}
+
+.detail-section-glyph-status .detail-section-glyph-icon {
+  width: 31rpx;
+  height: 22rpx;
+}
+
+.detail-section-glyph-status .detail-section-glyph-icon::before,
+.detail-section-glyph-status .detail-section-glyph-icon::after {
+  position: absolute;
+  left: 0;
+  width: 31rpx;
+  height: 3rpx;
+  border-radius: 999rpx;
+  background: currentColor;
+  content: "";
+}
+
+.detail-section-glyph-status .detail-section-glyph-icon::before {
+  top: 3rpx;
+  box-shadow: 0 14rpx currentColor;
+}
+
+.detail-section-glyph-status .detail-section-glyph-icon::after {
+  top: -1rpx;
+  left: 6rpx;
+  width: 10rpx;
+  height: 10rpx;
+  border: 3rpx solid currentColor;
+  border-radius: 50%;
+  background: #1b2737;
+  box-sizing: border-box;
+  box-shadow: 11rpx 14rpx 0 -3rpx #1b2737, 11rpx 14rpx 0 0 currentColor;
+}
+
+.detail-section-glyph-profile .detail-section-glyph-icon {
+  width: 32rpx;
+  height: 17rpx;
+  margin-top: 7rpx;
+  border: 3rpx solid currentColor;
+  border-radius: 7rpx 7rpx 5rpx 5rpx;
+}
+
+.detail-section-glyph-profile .detail-section-glyph-icon::before {
+  position: absolute;
+  top: -10rpx;
+  left: 5rpx;
+  width: 16rpx;
+  height: 11rpx;
+  border: 3rpx solid currentColor;
+  border-bottom: 0;
+  border-radius: 7rpx 7rpx 0 0;
+  box-sizing: border-box;
+  content: "";
+}
+
+.detail-section-glyph-profile .detail-section-glyph-icon::after {
+  position: absolute;
+  bottom: -7rpx;
+  left: 3rpx;
+  width: 6rpx;
+  height: 6rpx;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 16rpx 0 currentColor;
+  content: "";
+}
+
+.detail-section-glyph-admin .detail-section-glyph-icon {
+  width: 28rpx;
+  height: 30rpx;
+  border: 3rpx solid currentColor;
+  border-radius: 5rpx;
+}
+
+.detail-section-glyph-admin .detail-section-glyph-icon::before {
+  position: absolute;
+  top: 6rpx;
+  left: 5rpx;
+  width: 5rpx;
+  height: 5rpx;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 9rpx 0 currentColor;
+  content: "";
+}
+
+.detail-section-glyph-admin .detail-section-glyph-icon::after {
+  position: absolute;
+  bottom: 5rpx;
+  left: 5rpx;
+  width: 12rpx;
+  height: 2rpx;
+  border-radius: 999rpx;
+  background: currentColor;
+  content: "";
+}
+
+.detail-section-glyph-images .detail-section-glyph-icon {
+  width: 31rpx;
+  height: 27rpx;
+  overflow: hidden;
+  border: 3rpx solid currentColor;
+  border-radius: 5rpx;
+}
+
+.detail-section-glyph-images .detail-section-glyph-icon::before {
+  position: absolute;
+  right: 4rpx;
+  bottom: -7rpx;
+  width: 18rpx;
+  height: 18rpx;
+  border-top: 3rpx solid currentColor;
+  border-left: 3rpx solid currentColor;
+  content: "";
+  transform: rotate(45deg);
+}
+
+.detail-section-glyph-images .detail-section-glyph-icon::after {
+  position: absolute;
+  top: 4rpx;
+  left: 5rpx;
+  width: 5rpx;
+  height: 5rpx;
+  border-radius: 50%;
+  background: currentColor;
+  content: "";
+}
+
+.status-op-content,
+.danger-button-content,
+.upload-button-content,
+.mini-button-content,
+.detail-action-content,
+.mini-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.status-op-content {
+  height: 100%;
+}
+
+.status-op-dot {
+  flex-shrink: 0;
+  width: 8rpx;
+  height: 8rpx;
+  margin-right: 9rpx;
+  border-radius: 50%;
+  background: #758196;
+}
+
+.status-op-dot-idle {
+  background: #64c891;
+}
+
+.status-op-dot-active {
+  background: #6fa5f2;
+}
+
+.status-op-dot-maintenance {
+  background: #d9a957;
+}
+
+.status-op-check {
+  width: 6rpx;
+  height: 11rpx;
+  margin: -4rpx 0 0 10rpx;
+  border-right: 2rpx solid #9fc2fa;
+  border-bottom: 2rpx solid #9fc2fa;
+  box-sizing: border-box;
+  transform: rotate(45deg);
+}
+
+.danger-zone {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10rpx;
+  padding: 20rpx;
+  border: 1rpx solid rgba(221, 92, 92, 0.14);
+  border-radius: 18rpx;
+  background: rgba(153, 55, 55, 0.06);
+}
+
+.danger-zone-copy {
+  flex: 1;
+  min-width: 0;
+  padding-right: 18rpx;
+}
+
+.danger-zone-title {
+  color: #dc8a8a;
+  font-size: 20rpx;
+  font-weight: 650;
+}
+
+.danger-zone-desc {
+  margin-top: 5rpx;
+  color: #79686c;
+  font-size: 16rpx;
+  line-height: 1.5;
+}
+
+.vehicle-detail-page .danger-zone .retire-inline-btn {
+  flex-shrink: 0;
+  width: 184rpx;
+  height: 68rpx;
+  margin: 0;
+  border-radius: 16rpx;
+  font-size: 19rpx;
+  line-height: 68rpx;
+}
+
+.retire-native-icon {
+  width: 18rpx;
+  height: 18rpx;
+  margin-right: 8rpx;
+  border: 2rpx solid currentColor;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+
+.retire-native-icon::after {
+  display: block;
+  width: 8rpx;
+  height: 2rpx;
+  margin: 6rpx auto 0;
+  border-radius: 999rpx;
+  background: currentColor;
+  content: "";
+}
+
+.restore-native-icon {
+  position: relative;
+  width: 17rpx;
+  height: 17rpx;
+  margin-right: 9rpx;
+  border: 2rpx solid currentColor;
+  border-left-color: transparent;
+  border-radius: 50%;
+  box-sizing: border-box;
+  transform: rotate(-34deg);
+}
+
+.restore-native-icon::before {
+  position: absolute;
+  top: -3rpx;
+  left: -2rpx;
+  width: 0;
+  height: 0;
+  border-top: 4rpx solid transparent;
+  border-right: 6rpx solid currentColor;
+  border-bottom: 4rpx solid transparent;
+  content: "";
+}
+
+.visibility-chip {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-left: 18rpx;
+  padding: 8rpx 13rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.08);
+  border-radius: 999rpx;
+  color: #778598;
+  font-size: 16rpx;
+  line-height: 1.3;
+}
+
+.visibility-chip-public {
+  border-color: rgba(87, 158, 233, 0.18);
+  background: rgba(67, 126, 191, 0.08);
+  color: #77a9e3;
+}
+
+.visibility-chip-private {
+  border-color: rgba(214, 166, 84, 0.16);
+  background: rgba(157, 111, 35, 0.07);
+  color: #c79e5c;
+}
+
+.visibility-eye-icon {
+  position: relative;
+  width: 18rpx;
+  height: 12rpx;
+  margin-right: 7rpx;
+  border: 2rpx solid currentColor;
+  border-radius: 50% 50% 48% 48%;
+  box-sizing: border-box;
+}
+
+.visibility-eye-icon::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4rpx;
+  height: 4rpx;
+  border-radius: 50%;
+  background: currentColor;
+  content: "";
+  transform: translate(-50%, -50%);
+}
+
+.visibility-lock-icon {
+  position: relative;
+  width: 15rpx;
+  height: 13rpx;
+  margin-right: 7rpx;
+  border: 2rpx solid currentColor;
+  border-radius: 3rpx;
+  box-sizing: border-box;
+}
+
+.visibility-lock-shackle {
+  position: absolute;
+  bottom: 9rpx;
+  left: 50%;
+  width: 9rpx;
+  height: 8rpx;
+  border: 2rpx solid currentColor;
+  border-bottom: 0;
+  border-radius: 7rpx 7rpx 0 0;
+  box-sizing: border-box;
+  transform: translateX(-50%);
+}
+
+.upload-button-content {
+  white-space: nowrap;
+}
+
+.upload-native-icon {
+  position: relative;
+  width: 19rpx;
+  height: 16rpx;
+  margin-right: 9rpx;
+  border: 2rpx solid currentColor;
+  border-top: 0;
+  border-radius: 0 0 3rpx 3rpx;
+  box-sizing: border-box;
+}
+
+.upload-native-icon::before {
+  position: absolute;
+  bottom: 5rpx;
+  left: 50%;
+  width: 2rpx;
+  height: 13rpx;
+  border-radius: 999rpx;
+  background: currentColor;
+  content: "";
+  transform: translateX(-50%);
+}
+
+.upload-native-icon::after {
+  position: absolute;
+  bottom: 13rpx;
+  left: 50%;
+  width: 7rpx;
+  height: 7rpx;
+  border-top: 2rpx solid currentColor;
+  border-left: 2rpx solid currentColor;
+  content: "";
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.vehicle-detail-page .image-card {
+  position: relative;
+}
+
+.vehicle-detail-page .image-badge {
+  position: absolute;
+  top: 28rpx;
+  left: 28rpx;
+  display: flex;
+  align-items: center;
+  margin: 0;
+  padding: 7rpx 12rpx;
+  background: rgba(32, 152, 91, 0.92);
+  box-shadow: 0 7rpx 18rpx rgba(0, 0, 0, 0.24);
+}
+
+.image-badge-check,
+.mini-placeholder-check {
+  width: 5rpx;
+  height: 10rpx;
+  margin: -3rpx 8rpx 0 2rpx;
+  border-right: 2rpx solid currentColor;
+  border-bottom: 2rpx solid currentColor;
+  box-sizing: border-box;
+  transform: rotate(45deg);
+}
+
+.mini-button-content {
+  height: 100%;
+}
+
+.cover-native-icon {
+  position: relative;
+  width: 18rpx;
+  height: 15rpx;
+  margin-right: 7rpx;
+  overflow: hidden;
+  border: 2rpx solid currentColor;
+  border-radius: 3rpx;
+  box-sizing: border-box;
+}
+
+.cover-native-icon::after {
+  position: absolute;
+  right: -1rpx;
+  bottom: -5rpx;
+  width: 10rpx;
+  height: 10rpx;
+  border-top: 2rpx solid currentColor;
+  border-left: 2rpx solid currentColor;
+  content: "";
+  transform: rotate(45deg);
+}
+
+.trash-native-icon {
+  position: relative;
+  width: 14rpx;
+  height: 16rpx;
+  margin: 3rpx 8rpx 0 0;
+  border: 2rpx solid currentColor;
+  border-top: 0;
+  border-radius: 0 0 3rpx 3rpx;
+  box-sizing: border-box;
+}
+
+.trash-native-icon::before {
+  position: absolute;
+  top: -5rpx;
+  left: -3rpx;
+  width: 16rpx;
+  height: 2rpx;
+  border-radius: 999rpx;
+  background: currentColor;
+  box-shadow: 5rpx -3rpx 0 -1rpx currentColor;
+  content: "";
+}
+
+.vehicle-detail-page .mini-placeholder {
+  color: #67bf91;
+  line-height: 64rpx;
+}
+
+.empty-image-box {
+  flex-direction: column;
+  min-height: 250rpx;
+  padding: 34rpx 24rpx;
+  box-sizing: border-box;
+}
+
+.empty-image-icon {
+  position: relative;
+  width: 58rpx;
+  height: 50rpx;
+  overflow: hidden;
+  border: 3rpx solid #6888b5;
+  border-radius: 9rpx;
+  box-sizing: border-box;
+}
+
+.empty-image-sun {
+  position: absolute;
+  top: 8rpx;
+  left: 10rpx;
+  width: 8rpx;
+  height: 8rpx;
+  border: 2rpx solid #6888b5;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+
+.empty-image-mountain {
+  position: absolute;
+  right: 5rpx;
+  bottom: -13rpx;
+  width: 35rpx;
+  height: 35rpx;
+  border-top: 3rpx solid #6888b5;
+  border-left: 3rpx solid #6888b5;
+  transform: rotate(45deg);
+}
+
+.empty-image-title {
+  margin-top: 19rpx;
+  color: #dfe6ef;
+  font-size: 23rpx;
+  font-weight: 650;
+}
+
+.empty-image-desc {
+  max-width: 480rpx;
+  margin-top: 8rpx;
+  color: #667386;
+  font-size: 18rpx;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.detail-action-dock {
+  position: sticky;
+  z-index: 8;
+  bottom: calc(env(safe-area-inset-bottom) + 12rpx);
+  margin-top: 8rpx;
+  padding: 18rpx;
+  border-color: rgba(91, 143, 224, 0.2);
+  border-radius: 25rpx;
+  background: rgba(20, 25, 33, 0.97);
+  box-shadow: 0 22rpx 54rpx rgba(0, 0, 0, 0.35);
+  box-sizing: border-box;
+}
+
+.detail-action-content {
+  height: 100%;
+}
+
+.back-native-icon {
+  width: 9rpx;
+  height: 9rpx;
+  margin-right: 10rpx;
+  border-bottom: 2rpx solid currentColor;
+  border-left: 2rpx solid currentColor;
+  transform: rotate(45deg);
+}
+
+.edit-native-icon {
+  position: relative;
+  width: 7rpx;
+  height: 21rpx;
+  margin-right: 12rpx;
+  border-radius: 3rpx;
+  background: currentColor;
+  transform: rotate(42deg);
+}
+
+.edit-native-icon::after {
+  position: absolute;
+  right: 0;
+  bottom: -6rpx;
+  left: 0;
+  width: 0;
+  height: 0;
+  margin: auto;
+  border-right: 4rpx solid transparent;
+  border-left: 4rpx solid transparent;
+  border-top: 6rpx solid currentColor;
+  content: "";
 }

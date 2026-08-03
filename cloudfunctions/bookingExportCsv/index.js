@@ -3,10 +3,35 @@ const cloud = require("wx-server-sdk")
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
+const AUTH_ROLE_FIELDS = {
+  role: true,
+  roles: true,
+  permissions: true,
+  isAdmin: true,
+  admin: true
+}
 
 const BOOKING_STATUSES = ["pending", "contacted", "completed", "cancelled"]
 const BOOKING_BATCH_SIZE = 100
 const MAX_EXPORT_SOURCE_RECORDS = 2000
+const BOOKING_EXPORT_FIELDS = {
+  _id: true,
+  id: true,
+  vehicleId: true,
+  vehicleName: true,
+  userName: true,
+  phone: true,
+  startDate: true,
+  endDate: true,
+  city: true,
+  note: true,
+  adminRemark: true,
+  schedulePriority: true,
+  coordinationStatus: true,
+  status: true,
+  createdAt: true,
+  updatedAt: true
+}
 
 function createError(code, message, details) {
   const result = {
@@ -20,6 +45,16 @@ function createError(code, message, details) {
   }
 
   return result
+}
+
+function normalizeText(value, maxLength) {
+  const text = String(value || "").trim()
+  return maxLength && text.length > maxLength ? text.slice(0, maxLength) : text
+}
+
+function limitText(value, maxLength) {
+  const text = String(value === undefined || value === null ? "" : value)
+  return maxLength && text.length > maxLength ? text.slice(0, maxLength) : text
 }
 
 function normalizeStringArray(value) {
@@ -75,7 +110,12 @@ async function hasOpenidCapability(openid, capability) {
     return false
   }
 
-  const res = await db.collection("roles").where({ openid }).limit(20).get()
+  const res = await db
+    .collection("roles")
+    .where({ openid })
+    .field(AUTH_ROLE_FIELDS)
+    .limit(20)
+    .get()
   const list = res && Array.isArray(res.data) ? res.data : []
   return list.some((item) => hasCapability(item, capability))
 }
@@ -128,10 +168,10 @@ async function writeAuditLogBestEffort(payload) {
 
 function normalizeFilters(event) {
   const payload = event && typeof event === "object" ? event : {}
-  const status = String(payload.status || "").trim()
-  const schedulePriority = String(payload.schedulePriority || "").trim()
-  const coordinationStatus = String(payload.coordinationStatus || "").trim()
-  const keyword = String(payload.keyword || "").trim().toUpperCase()
+  const status = normalizeText(payload.status, 50)
+  const schedulePriority = normalizeText(payload.schedulePriority, 50)
+  const coordinationStatus = normalizeText(payload.coordinationStatus, 50)
+  const keyword = normalizeText(payload.keyword, 100).toUpperCase()
   const limitRaw = Number(payload.limit)
   const limit = Number.isFinite(limitRaw) ? Math.floor(limitRaw) : 500
 
@@ -245,7 +285,7 @@ async function readBookingsByMode(ordered) {
   for (let offset = 0; offset <= MAX_EXPORT_SOURCE_RECORDS; offset += BOOKING_BATCH_SIZE) {
     const remaining = MAX_EXPORT_SOURCE_RECORDS + 1 - list.length
     const batchSize = Math.min(BOOKING_BATCH_SIZE, remaining)
-    let query = db.collection("bookings")
+    let query = db.collection("bookings").field(BOOKING_EXPORT_FIELDS)
     if (ordered) {
       query = query.orderBy("createdAt", "desc")
     }
@@ -380,16 +420,16 @@ exports.main = async (event) => {
 
     const matchedList = rawList
       .map((item) => ({
-        id: item._id || item.id || "",
-        vehicleId: item.vehicleId || "",
-        vehicleName: item.vehicleName || "",
-        userName: item.userName || "",
-        phone: item.phone || "",
-        startDate: item.startDate || "",
-        endDate: item.endDate || "",
-        city: item.city || "",
-        note: item.note || "",
-        adminRemark: item.adminRemark || "",
+        id: normalizeText(item._id || item.id, 128),
+        vehicleId: normalizeText(item.vehicleId, 128),
+        vehicleName: limitText(item.vehicleName, 100),
+        userName: limitText(item.userName, 50),
+        phone: normalizeText(item.phone, 30),
+        startDate: normalizeText(item.startDate, 20),
+        endDate: normalizeText(item.endDate, 20),
+        city: limitText(item.city, 50),
+        note: limitText(item.note, 500),
+        adminRemark: limitText(item.adminRemark, 200),
         schedulePriority: ["priority", "normal", "standby"].includes(item.schedulePriority)
           ? item.schedulePriority
           : "normal",
@@ -470,20 +510,22 @@ exports.main = async (event) => {
       csvText
     }
   } catch (error) {
+    const errorMessage = String(
+      error && (error.message || error.errMsg) ? error.message || error.errMsg : error
+    ).slice(0, 300)
     await writeErrorLogBestEffort({
       function: "bookingExportCsv",
-      openid,
       stage: "main",
+      authenticated: Boolean(openid),
       ...logContext,
-      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
-      stack: error && error.stack ? error.stack : "",
+      errorMessage,
       occurredAt: new Date().toISOString()
     })
 
     console.error({
       function: "bookingExportCsv",
-      openid,
-      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
+      authenticated: Boolean(openid),
+      errorMessage,
       stack: error && error.stack ? error.stack : "",
       createdAt: new Date().toISOString()
     })

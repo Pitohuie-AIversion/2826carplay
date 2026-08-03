@@ -3,7 +3,7 @@
   "condition": {},
   "projectname": "2826carplay",
   "setting": {
-    "urlCheck": false,
+    "urlCheck": true,
     "coverView": false,
     "lazyloadPlaceholderEnable": false,
     "skylineRenderEnable": false,

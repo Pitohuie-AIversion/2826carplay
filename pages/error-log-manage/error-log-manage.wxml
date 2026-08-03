@@ -1,4 +1,4 @@
-<view class="error-page management-page">
+<view wx:if="{{pageAuthorized}}" class="error-page management-page">
   <view class="page-glow error-glow"></view>
   <view class="header hero-card ui-card ui-card-gradient">
     <view class="hero-top">
@@ -7,7 +7,7 @@
         <view class="title">错误日志</view>
         <view class="desc">检查云函数异常与线上运行风险</view>
       </view>
-      <image class="hero-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+      <image class="hero-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
     </view>
   </view>
 
@@ -19,48 +19,70 @@
       </view>
       <view class="section-index">01</view>
     </view>
-    <input
-      class="keyword-input ui-input"
-      placeholder="搜索 OpenID / 车辆ID / 预约ID / 错误信息"
-      value="{{keyword}}"
-      bindinput="handleKeywordInput"
-      confirm-type="search"
-      bindconfirm="handleSearch"
-    />
+    <view class="management-search">
+      <view class="management-search-icon" aria-hidden="true"></view>
+      <input
+        class="keyword-input management-search-input ui-input"
+        placeholder="搜索 OpenID / 车辆ID / 预约ID / 错误信息"
+        aria-label="错误日志搜索关键词"
+        value="{{keyword}}"
+        bindinput="handleKeywordInput"
+        maxlength="40"
+        confirm-type="search"
+        bindconfirm="handleSearch"
+      />
+      <button
+        wx:if="{{keyword}}"
+        class="management-search-clear"
+        bindtap="handleClearKeyword"
+        hover-class="management-search-clear-pressed"
+        aria-label="清空搜索关键词"
+      ><view class="management-search-clear-icon" aria-hidden="true"></view></button>
+    </view>
 
-    <scroll-view class="func-scroll" scroll-x enable-flex show-scrollbar="{{false}}">
-      <view class="func-list">
-        <view
-          wx:for="{{funcOptions}}"
-          wx:key="value"
-          class="func-chip ui-pill {{currentFunc === item.value ? 'ui-pill-active' : ''}}"
-          data-value="{{item.value}}"
-          bindtap="handleFuncTap"
-        >
-          {{item.label}}
+    <view class="func-scroll-shell ui-scroll-shell">
+      <scroll-view class="func-scroll" scroll-x scroll-with-animation scroll-into-view="error-func-{{currentFunc}}" enhanced enable-flex show-scrollbar="{{false}}" aria-label="异常来源筛选，可横向滑动">
+        <view class="func-list">
+          <view
+            id="error-func-{{item.value}}"
+            wx:for="{{funcOptions}}"
+            wx:key="value"
+            class="func-chip ui-pill {{currentFunc === item.value ? 'ui-pill-active' : ''}}"
+            data-value="{{item.value}}"
+            bindtap="handleFuncTap"
+            hover-class="ui-pill-pressed"
+            aria-role="button"
+            aria-pressed="{{currentFunc === item.value}}"
+          >
+            {{item.label}}
+          </view>
         </view>
-      </view>
-    </scroll-view>
+      </scroll-view>
+      <view wx:if="{{funcOptions.length > 3}}" class="ui-scroll-cue" aria-hidden="true"></view>
+    </view>
 
     <view class="actions">
-      <button class="action-btn ui-btn ui-btn-primary" bindtap="handleSearch">查询</button>
-      <button class="action-btn action-btn-last ui-btn ui-btn-ghost" loading="{{exporting}}" disabled="{{loading || exporting}}" bindtap="handleExport">导出 CSV</button>
+      <button class="action-btn ui-btn ui-btn-primary" bindtap="handleSearch"><view class="button-native-icon query-native-icon" aria-hidden="true"></view>查询</button>
+      <button class="action-btn action-btn-last ui-btn ui-btn-ghost" loading="{{exporting}}" disabled="{{loading || exporting}}" bindtap="handleExport"><view wx:if="{{!exporting}}" class="button-native-icon export-native-icon" aria-hidden="true"></view><text>{{exporting ? '正在导出' : '导出 CSV'}}</text></button>
     </view>
 
     <view wx:if="{{exportFilePath}}" class="export-actions">
-      <view class="export-tip">CSV 已生成：{{exportFileName}}</view>
+      <view class="export-tip"><view class="file-native-icon" aria-hidden="true"></view><view class="export-tip-copy"><view class="export-tip-label">诊断文件已就绪</view><view class="export-tip-name">{{exportFileName}}</view></view></view>
       <view class="export-buttons">
-        <button wx:if="{{canShareExport}}" class="export-button ui-btn ui-btn-primary" bindtap="handleShareExportedFile">分享文件</button>
-        <button class="export-button ui-btn ui-btn-ghost" bindtap="handleOpenExportedFile">打开文件</button>
-        <button class="export-button ui-btn ui-btn-ghost" bindtap="handleDeleteExportedFile">删除文件</button>
+        <button wx:if="{{canShareExport}}" class="export-button ui-btn ui-btn-primary" bindtap="handleShareExportedFile"><view class="export-action-icon share-native-icon" aria-hidden="true"></view>分享</button>
+        <button class="export-button ui-btn ui-btn-ghost" bindtap="handleOpenExportedFile"><view class="export-action-icon open-native-icon" aria-hidden="true"></view>打开</button>
+        <button class="export-button export-button-danger ui-btn ui-btn-ghost" bindtap="handleDeleteExportedFile"><view class="export-action-icon delete-native-icon" aria-hidden="true"></view>删除</button>
       </view>
     </view>
 
-    <view class="result-count">当前筛选结果 {{total}}{{truncated ? '+' : ''}} 条</view>
-    <view wx:if="{{truncated}}" class="result-count">当前最多展示已读取的 2000 条记录，请缩小筛选范围。</view>
+    <view class="filter-result-bar">
+      <view class="filter-result-state"><view class="filter-result-dot"></view><view>诊断范围</view></view>
+      <view class="filter-result-value">{{currentFuncLabel}} · {{total}}{{truncated ? '+' : ''}} 条</view>
+    </view>
+    <view wx:if="{{truncated}}" class="result-warning"><view class="warning-native-icon" aria-hidden="true"></view><view>当前最多展示已读取的 2000 条记录，请缩小筛选范围。</view></view>
   </view>
 
-  <view wx:if="{{(initialLoading || loading) && !list.length}}" class="log-list-skeleton log-list-skeleton-error">
+  <view wx:if="{{(initialLoading || loading) && !list.length}}" class="log-list-skeleton log-list-skeleton-error" aria-hidden="true">
     <view class="log-skeleton-heading">
       <view>
         <view class="log-skeleton-kicker manage-skeleton-pulse"></view>
@@ -95,29 +117,44 @@
       </view>
       <view class="list-count">{{total}}{{truncated ? '+' : ''}} 条</view>
     </view>
-    <view class="log-item ui-card ui-card-soft" wx:for="{{list}}" wx:key="id">
-      <view class="log-head">
-        <view class="log-title-group">
-          <view class="log-kind log-kind-error"><view class="log-kind-dot"></view>ERROR</view>
-          <view class="log-func">{{item.function || '--'}}</view>
+    <view class="error-timeline">
+      <view class="timeline-item {{item.eventClass}}" wx:for="{{list}}" wx:key="id" wx:for-index="index">
+        <view class="timeline-rail" aria-hidden="true">
+          <view class="timeline-marker"><view class="error-event-icon {{item.eventIconClass}}"></view></view>
+          <view wx:if="{{index !== list.length - 1}}" class="timeline-line"></view>
         </view>
-        <view class="log-time">{{item.createdAtText || '--'}}</view>
+        <view class="log-item ui-card ui-card-soft">
+          <view class="log-head">
+            <view class="log-title-copy">
+              <view class="log-badge-row"><view class="log-kind log-kind-error"><view class="log-kind-dot"></view>{{item.errorSignal}}</view><view class="source-group">{{item.sourceGroup}}</view></view>
+              <view class="log-func">{{item.sourceLabel}}</view>
+              <view class="log-func-code">{{item.function || '—'}}</view>
+            </view>
+            <view class="log-time"><view class="time-native-icon" aria-hidden="true"></view><view>{{item.createdAtText || '—'}}</view></view>
+          </view>
+          <view wx:if="{{item.messagePreview}}" class="log-message"><view class="message-native-icon" aria-hidden="true"></view><view class="log-message-copy"><view class="log-meta-label">异常摘要</view><view class="log-message-value">{{item.messagePreview}}</view></view></view>
+          <view wx:if="{{item.summaryRows.length}}" class="log-detail-grid">
+            <view class="log-detail-item" wx:for="{{item.summaryRows}}" wx:key="label" wx:for-item="detail">
+              <view class="log-detail-label">{{detail.label}}</view>
+              <view class="log-detail-value">{{detail.value}}</view>
+            </view>
+          </view>
+          <view class="diagnostic-hint"><view class="diagnostic-native-icon" aria-hidden="true"></view><view class="diagnostic-copy"><view class="diagnostic-label">排查建议</view><view class="diagnostic-value">{{item.diagnosticHint}}</view></view></view>
+        </view>
       </view>
-      <view wx:if="{{item.messagePreview}}" class="log-message">{{item.messagePreview}}</view>
-      <view wx:if="{{item.summary}}" class="log-summary">{{item.summary}}</view>
-      <button wx:if="{{item.stack}}" class="copy-btn ui-btn ui-btn-ghost" data-stack="{{item.stack}}" bindtap="handleCopyStack">复制堆栈</button>
     </view>
 
     <view class="load-more">
-      <button wx:if="{{hasMore && !loading}}" class="load-more-btn ui-btn ui-btn-ghost" bindtap="handleLoadMore">加载更多</button>
-      <view wx:elif="{{!hasMore}}" class="load-more-end">已加载全部</view>
+      <button wx:if="{{hasMore && !loading}}" class="load-more-btn ui-btn ui-btn-ghost" bindtap="handleLoadMore"><view class="log-action-content"><view class="load-more-native-icon" aria-hidden="true"></view><text>加载更多</text></view></button>
+      <view wx:elif="{{!hasMore}}" class="load-more-end"><view class="load-complete-native-icon" aria-hidden="true"></view><text>已加载全部</text></view>
     </view>
   </view>
 
   <view wx:else class="empty ui-card">
-    <image class="manage-empty-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+    <image class="manage-empty-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
     <view class="manage-empty-kicker">SYSTEM HEALTHY</view>
     <view class="empty-title">{{emptyTitle}}</view>
     <view class="empty-desc">{{emptyDesc}}</view>
+    <button wx:if="{{keyword || currentFunc !== 'all'}}" class="empty-reset-btn ui-btn ui-btn-ghost" bindtap="handleResetFilters"><view class="reset-native-icon" aria-hidden="true"></view>重置筛选</button>
   </view>
 </view>

@@ -1,3 +1,6 @@
+const fs = require("fs")
+const path = require("path")
+
 function loadPageDefinition() {
   jest.resetModules()
   let definition = null
@@ -73,12 +76,14 @@ describe("pages/booking-workbench", () => {
     expect(page.data.summary.priority).toBe(1)
     expect(page.data.summary.overdue).toBe(1)
     expect(page.data.queue[0].id).toBe("booking_1")
+    expect(page.data.lastSyncedText).toMatch(/^\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)
   })
 
   test("支持切换队列、拨号和进入预约详情", () => {
     global.wx = {
       makePhoneCall: jest.fn(),
       navigateTo: jest.fn(),
+      setClipboardData: jest.fn(),
       showToast: jest.fn()
     }
     const page = createPage(loadPageDefinition(), {
@@ -108,6 +113,13 @@ describe("pages/booking-workbench", () => {
         }
       }
     })
+    page.handleCopyPhone({
+      currentTarget: {
+        dataset: {
+          phone: "13800000000"
+        }
+      }
+    })
     page.handleViewDetail({
       currentTarget: {
         dataset: {
@@ -121,9 +133,15 @@ describe("pages/booking-workbench", () => {
     expect(global.wx.makePhoneCall).toHaveBeenCalledWith(expect.objectContaining({
       phoneNumber: "13800000000"
     }))
-    expect(global.wx.navigateTo).toHaveBeenCalledWith({
-      url: "/pages/booking-manage-detail/booking-manage-detail?id=booking_1"
+    expect(global.wx.setClipboardData).toHaveBeenCalledWith({
+      data: "13800000000",
+      success: expect.any(Function),
+      fail: expect.any(Function)
     })
+    expect(global.wx.navigateTo).toHaveBeenCalledWith(expect.objectContaining({
+      url: "/pages/booking-manage-detail/booking-manage-detail?id=booking_1",
+      fail: expect.any(Function)
+    }))
   })
 
   test("支持按多个字段本地搜索并清空关键词", () => {
@@ -145,6 +163,7 @@ describe("pages/booking-workbench", () => {
           userName: "赵四",
           phone: "13900000000",
           city: "杭州",
+          adminRemark: "客户希望周五回电",
           status: "pending",
           coordinationStatus: "pending",
           createdAt: "2026-01-02T00:00:00.000Z"
@@ -167,6 +186,170 @@ describe("pages/booking-workbench", () => {
 
     expect(page.data.keyword).toBe("")
     expect(page.data.queue).toHaveLength(2)
+
+    page.handleKeywordInput({
+      detail: {
+        value: "周五回电"
+      }
+    })
+    expect(page.data.queue.map((item) => item.id)).toEqual([
+      "booking_hangzhou"
+    ])
+  })
+
+  test("支持手动刷新并在同步过程中阻止重复请求", () => {
+    const page = createPage(loadPageDefinition(), {
+      pageAuthorized: true,
+      loading: false,
+      refreshing: false
+    })
+    page.fetchBookings = jest.fn()
+
+    page.handleManualRefresh()
+    page.data.refreshing = true
+    page.handleManualRefresh()
+
+    expect(page.fetchBookings).toHaveBeenCalledTimes(1)
+  })
+
+  test("手机号缺失时显示异常状态并阻止复制", () => {
+    global.wx = {
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition(), {
+      allBookings: [
+        {
+          id: "booking_without_phone",
+          status: "pending",
+          coordinationStatus: "pending",
+          phone: "invalid"
+        }
+      ]
+    })
+
+    page.applyWorkbench()
+    page.handleCopyPhone({
+      currentTarget: {
+        dataset: {
+          phone: "invalid"
+        }
+      }
+    })
+
+    expect(page.data.queue[0].phoneAvailable).toBe(false)
+    expect(page.data.queue[0].phoneDisplay).toBe("手机号待补充")
+    expect(page.data.summary.contactIssue).toBe(1)
+    page.handleFilterTap({
+      currentTarget: {
+        dataset: {
+          mode: "contactIssue"
+        }
+      }
+    })
+    expect(page.data.queue.map((item) => item.id)).toEqual([
+      "booking_without_phone"
+    ])
+    expect(global.wx.showToast).toHaveBeenCalledWith({
+      title: "手机号不可用",
+      icon: "none"
+    })
+  })
+
+  test("支持按智能优先、等待时间和用车日期切换排序", () => {
+    const page = createPage(loadPageDefinition(), {
+      allBookings: [
+        {
+          id: "priority_newer",
+          startDate: "2026-08-20",
+          status: "pending",
+          schedulePriority: "priority",
+          coordinationStatus: "pending",
+          createdAt: "2026-01-03T00:00:00.000Z"
+        },
+        {
+          id: "oldest",
+          startDate: "2026-08-25",
+          status: "pending",
+          schedulePriority: "normal",
+          coordinationStatus: "pending",
+          createdAt: "2026-01-01T00:00:00.000Z"
+        },
+        {
+          id: "pickup_first",
+          startDate: "2026-08-10",
+          status: "pending",
+          schedulePriority: "normal",
+          coordinationStatus: "pending",
+          createdAt: "2026-01-02T00:00:00.000Z"
+        }
+      ]
+    })
+
+    page.applyWorkbench()
+    expect(page.data.queue[0].id).toBe("priority_newer")
+
+    page.handleSortTap({
+      currentTarget: {
+        dataset: {
+          sort: "waiting"
+        }
+      }
+    })
+    expect(page.data.queue[0].id).toBe("oldest")
+    expect(page.data.sortHint).toBe("按提交时间从早到晚排列")
+
+    page.handleSortTap({
+      currentTarget: {
+        dataset: {
+          sort: "pickup"
+        }
+      }
+    })
+    expect(page.data.queue[0].id).toBe("pickup_first")
+    expect(page.data.selectedSort).toBe("pickup")
+  })
+
+  test("存在筛选、搜索或排序条件时可一键重置视图", () => {
+    const page = createPage(loadPageDefinition(), {
+      allBookings: [
+        {
+          id: "booking_reset",
+          userName: "测试客户",
+          status: "pending",
+          coordinationStatus: "pending"
+        }
+      ]
+    })
+
+    page.handleKeywordInput({
+      detail: {
+        value: "测试客户"
+      }
+    })
+    page.handleSortTap({
+      currentTarget: {
+        dataset: {
+          sort: "waiting"
+        }
+      }
+    })
+    page.handleFilterTap({
+      currentTarget: {
+        dataset: {
+          mode: "pending"
+        }
+      }
+    })
+
+    expect(page.data.viewCustomized).toBe(true)
+
+    page.handleResetView()
+
+    expect(page.data.keyword).toBe("")
+    expect(page.data.selectedSort).toBe("smart")
+    expect(page.data.selectedMode).toBe("todo")
+    expect(page.data.viewCustomized).toBe(false)
+    expect(page.data.queue).toHaveLength(1)
   })
 
   test("待协调预约可一键开始协调并刷新队列", () => {
@@ -213,6 +396,209 @@ describe("pages/booking-workbench", () => {
     expect(page.data.updatingId).toBe("")
   })
 
+  test("可在工作台快速调整优先级并刷新重排", () => {
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(({ success }) => {
+          success({
+            result: {
+              ok: true,
+              changed: true
+            }
+          })
+        })
+      },
+      showActionSheet: jest.fn(({ success }) => {
+        success({
+          tapIndex: 0
+        })
+      }),
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition())
+    page.fetchBookings = jest.fn()
+
+    page.handlePriorityTap({
+      currentTarget: {
+        dataset: {
+          id: "booking_priority",
+          schedulePriority: "normal",
+          coordinationStatus: "pending"
+        }
+      }
+    })
+
+    expect(global.wx.showActionSheet).toHaveBeenCalledWith({
+      alertText: "调整预约优先级",
+      itemList: ["优先", "常规", "候补"],
+      itemColor: "#528fff",
+      success: expect.any(Function)
+    })
+    expect(global.wx.cloud.callFunction).toHaveBeenCalledWith({
+      name: "bookingUpdateCoordination",
+      data: {
+        id: "booking_priority",
+        schedulePriority: "priority",
+        coordinationStatus: "pending"
+      },
+      success: expect.any(Function),
+      fail: expect.any(Function)
+    })
+    expect(global.wx.showToast).toHaveBeenCalledWith({
+      title: "优先级已更新",
+      icon: "success"
+    })
+    expect(page.fetchBookings).toHaveBeenCalled()
+  })
+
+  test("可在队列卡片内编辑并保存内部备注", () => {
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(({ success }) => {
+          success({
+            result: {
+              ok: true,
+              adminRemark: "客户希望周五回电"
+            }
+          })
+        })
+      },
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition(), {
+      allBookings: [
+        {
+          id: "booking_remark",
+          adminRemark: "原备注"
+        }
+      ]
+    })
+    page.fetchBookings = jest.fn()
+
+    page.handleOpenRemark({
+      currentTarget: {
+        dataset: {
+          id: "booking_remark",
+          remark: "原备注"
+        }
+      }
+    })
+    page.handleRemarkInput({
+      detail: {
+        value: "  客户希望周五回电  "
+      }
+    })
+    page.handleSaveRemark()
+
+    expect(global.wx.cloud.callFunction).toHaveBeenCalledWith({
+      name: "bookingUpdateAdminRemark",
+      data: {
+        id: "booking_remark",
+        adminRemark: "客户希望周五回电"
+      },
+      success: expect.any(Function),
+      fail: expect.any(Function)
+    })
+    expect(global.wx.showToast).toHaveBeenCalledWith({
+      title: "内部备注已保存",
+      icon: "success"
+    })
+    expect(page.data.editingRemarkId).toBe("")
+    expect(page.data.savingRemark).toBe(false)
+    expect(page.fetchBookings).toHaveBeenCalled()
+  })
+
+  test("待联系预约确认后可标记已联系并反馈提醒结果", () => {
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(({ success }) => {
+          success({
+            result: {
+              ok: true,
+              status: "contacted",
+              notificationStatus: "sent"
+            }
+          })
+        })
+      },
+      showModal: jest.fn(({ success }) => {
+        success({
+          confirm: true
+        })
+      }),
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition())
+    page.fetchBookings = jest.fn()
+
+    page.handleMarkContacted({
+      currentTarget: {
+        dataset: {
+          id: "booking_contact",
+          status: "pending"
+        }
+      }
+    })
+
+    expect(global.wx.showModal).toHaveBeenCalledWith({
+      title: "确认已联系客户？",
+      content: "预约将更新为「已联系」；如客户已订阅，系统会发送状态提醒。",
+      confirmText: "确认更新",
+      confirmColor: "#528fff",
+      success: expect.any(Function),
+      fail: expect.any(Function)
+    })
+    expect(global.wx.cloud.callFunction).toHaveBeenCalledWith({
+      name: "bookingUpdateStatus",
+      data: {
+        id: "booking_contact",
+        status: "contacted"
+      },
+      success: expect.any(Function),
+      fail: expect.any(Function)
+    })
+    expect(global.wx.showToast).toHaveBeenCalledWith({
+      title: "已联系，提醒已发送",
+      icon: "none"
+    })
+    expect(page.fetchBookings).toHaveBeenCalled()
+    expect(page.data.statusUpdatingId).toBe("")
+  })
+
+  test("客户状态更新成功但提醒失败时给出明确反馈", () => {
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(({ success }) => {
+          success({
+            result: {
+              ok: true,
+              status: "contacted",
+              notificationStatus: "failed"
+            }
+          })
+        })
+      },
+      showModal: jest.fn(),
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition())
+    page.fetchBookings = jest.fn()
+
+    page.updateContactedStatus("booking_notify_failed")
+
+    expect(global.wx.showModal).toHaveBeenCalledWith({
+      title: "状态已更新",
+      content: "客户状态已更新，但提醒发送失败。可在错误日志中查看原因。",
+      confirmText: "知道了",
+      confirmColor: "#528fff",
+      showCancel: false,
+      complete: expect.any(Function)
+    })
+    expect(global.wx.showToast).not.toHaveBeenCalled()
+    global.wx.showModal.mock.calls[0][0].complete()
+    expect(page.fetchBookings).toHaveBeenCalled()
+  })
+
   test("协调中的预约确认后可标记为已协调", () => {
     global.wx = {
       cloud: {
@@ -249,6 +635,7 @@ describe("pages/booking-workbench", () => {
         title: "确认完成协调？",
         content: "完成后，该预约将从待协调队列中移除。",
         confirmText: "确认完成",
+        confirmColor: "#528fff",
         success: expect.any(Function),
         fail: expect.any(Function)
       })
@@ -268,5 +655,63 @@ describe("pages/booking-workbench", () => {
       icon: "success"
     })
     expect(page.fetchBookings).toHaveBeenCalled()
+  })
+
+  test("工作台队列使用原生业务图标与日期路线组件", () => {
+    const pageDir = path.resolve(__dirname, "../pages/booking-workbench")
+    const wxml = fs.readFileSync(path.join(pageDir, "booking-workbench.wxml"), "utf8")
+    const wxss = fs.readFileSync(path.join(pageDir, "booking-workbench.wxss"), "utf8")
+
+    expect(wxml).toContain("summary-native-icon-todo")
+    expect(wxml).toContain("summary-native-icon-priority")
+    expect(wxml).toContain("summary-card-active-primary")
+    expect(wxml).toContain("summary-card-active-warning")
+    expect(wxml).toContain("summary-card-active-danger")
+    expect(wxml).toContain("summary-card-active-muted")
+    expect(wxml).not.toContain("summary-card summary-card-main")
+    expect(wxml).toContain('hover-class="summary-card-pressed"')
+    expect(wxml).toContain('hover-class="stage-item-pressed"')
+    expect(wxml).toContain('aria-pressed="{{selectedMode === item.key}}"')
+    expect(wxml).toContain('scroll-into-view="workbench-filter-{{selectedMode}}"')
+    expect(wxml).toContain('id="workbench-filter-{{item.key}}"')
+    expect(wxml).toContain('aria-pressed="{{selectedSort === item.key}}"')
+    expect(wxml).toContain('class="workbench-skeleton"')
+    expect(wxml).toContain("workbench-skeleton-summary-grid")
+    expect(wxml).toContain("workbench-skeleton-stage-row")
+    expect(wxml).toContain("workbench-skeleton-booking")
+    expect(wxml).not.toContain('class="state-loader"')
+    expect(wxml).toContain("queue-vehicle-icon")
+    expect(wxml).toContain("phone-copy-native-icon")
+    expect(wxml).toContain("workbench-inline-pressed")
+    expect(wxml).toContain('aria-disabled="{{!item.phoneAvailable}}"')
+    expect(wxml).toContain('aria-label="编辑 {{item.userName}} 的内部备注"')
+    expect(wxml).toContain("date-route-chevron")
+    expect(wxml).toContain("remark-add-native-icon")
+    expect(wxml).toContain("coordination-native-icon")
+    expect(wxml).toContain("queue-call-native-icon")
+    expect(wxml).toContain("queue-detail-native-icon")
+    expect(wxml).toContain("manage-native-icon")
+    expect(wxml).toContain("reset-view-native-icon")
+    expect(wxml).toContain("inline-error-native-icon")
+    expect(wxml).toContain('aria-label="清除工作台筛选与排序"')
+    expect(wxml).toContain('class="reset-view" aria-role="button"')
+    expect(wxml).toContain('hover-class="reset-view-pressed"')
+    expect(wxml).toContain("status-pill-pressed")
+    expect(wxml).not.toContain("{{item.startDate}} → {{item.endDate}}")
+    expect(wxml).not.toContain("＋ 添加内部备注")
+    expect(wxss).toContain(".date-route")
+    expect(wxss).toContain(".remark-save-native-icon")
+    expect(wxss).toContain(".scope-tip-with-icon")
+    expect(wxss).toContain(".reset-view-native-icon")
+    expect(wxss).toContain(".reset-view-pressed")
+    expect(wxss).toContain(".status-pill-pressed")
+    expect(wxss).toContain(".workbench-skeleton-summary")
+    expect(wxss).toContain(".workbench-skeleton-queue")
+    expect(wxss).toContain(".inline-error-native-mark")
+    expect(wxss).toContain(".summary-card-active-warning")
+    expect(wxss).toContain(".summary-card-pressed")
+    expect(wxss).toContain(".workbench-inline-pressed")
+    expect(wxml).toContain("workbench-button-pressed")
+    expect(wxss).toContain(".workbench-button-pressed")
   })
 })

@@ -3,6 +3,16 @@ const cloud = require("wx-server-sdk")
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
+const AUTH_ROLE_FIELDS = {
+  role: true,
+  roles: true,
+  permissions: true,
+  isAdmin: true,
+  admin: true
+}
+const ANALYTICS_EVENT_ID_FIELDS = {
+  _id: true
+}
 const RETENTION_DAYS = 90
 const DEFAULT_LIMIT = 100
 const MAX_LIMIT = 100
@@ -30,7 +40,12 @@ async function isAdminOpenid(openid) {
   if (!openid) {
     return false
   }
-  const res = await db.collection("roles").where({ openid }).limit(20).get()
+  const res = await db
+    .collection("roles")
+    .where({ openid })
+    .field(AUTH_ROLE_FIELDS)
+    .limit(20)
+    .get()
   const list = res && Array.isArray(res.data) ? res.data : []
   return list.some(hasAdminRole)
 }
@@ -133,6 +148,7 @@ exports.main = async (event) => {
       .where({
         createdAt: db.command.lt(cutoff)
       })
+      .field(ANALYTICS_EVENT_ID_FIELDS)
       .limit(limit)
       .get()
     const records =
@@ -151,8 +167,8 @@ exports.main = async (event) => {
     if (result.failed > 0) {
       await writeErrorLogBestEffort({
         function: "analyticsCleanup",
-        openid,
         stage: "removeRecords",
+        authenticated: Boolean(openid),
         retentionDays: RETENTION_DAYS,
         failed: result.failed,
         errorMessage: result.firstErrorMessage || "部分匿名事件删除失败",
@@ -173,8 +189,8 @@ exports.main = async (event) => {
   } catch (error) {
     await writeErrorLogBestEffort({
       function: "analyticsCleanup",
-      openid,
       stage: "main",
+      authenticated: Boolean(openid),
       retentionDays: RETENTION_DAYS,
       limit,
       errorMessage: normalizeErrorMessage(error),

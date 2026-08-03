@@ -3,6 +3,21 @@ const cloud = require("wx-server-sdk")
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
+const BOOKING_MY_DETAIL_FIELDS = {
+  _id: true,
+  openid: true,
+  vehicleId: true,
+  vehicleName: true,
+  userName: true,
+  phone: true,
+  startDate: true,
+  endDate: true,
+  city: true,
+  note: true,
+  status: true,
+  createdAt: true,
+  updatedAt: true
+}
 
 function createError(code, message, details) {
   const result = {
@@ -36,6 +51,15 @@ function formatTime(input) {
   }
 
   return ""
+}
+
+function buildVehicleDisplayIdentity(value) {
+  const vehicleName = String(value || "").trim()
+  const normalized = vehicleName.toUpperCase()
+  const isPlateNumber = /^[京津沪渝冀豫云辽黑湘皖鲁新苏浙赣鄂桂甘晋蒙陕吉闽贵粤青藏川宁琼][A-Z][A-HJ-NP-Z0-9]{5,6}$/.test(normalized)
+  return isPlateNumber
+    ? { vehicleName: "预约车辆", vehicleReference: `车牌尾号 ${normalized.slice(-2)}` }
+    : { vehicleName: vehicleName || "预约车辆", vehicleReference: "" }
 }
 
 async function writeErrorLogBestEffort(payload) {
@@ -77,7 +101,7 @@ exports.main = async (event) => {
       })
     }
 
-    const res = await db.collection("bookings").doc(id).get()
+    const res = await db.collection("bookings").doc(id).field(BOOKING_MY_DETAIL_FIELDS).get()
     const item = res && res.data ? res.data : null
     if (!item) {
       return createError("NOT_FOUND", "预约不存在")
@@ -87,12 +111,14 @@ exports.main = async (event) => {
       return createError("FORBIDDEN", "只能查看自己的预约")
     }
 
+    const vehicleIdentity = buildVehicleDisplayIdentity(item.vehicleName)
+
     return {
       ok: true,
       detail: {
         id: item._id || item.id || "",
         vehicleId: item.vehicleId || "",
-        vehicleName: item.vehicleName || "",
+        ...vehicleIdentity,
         userName: item.userName || "",
         phone: item.phone || "",
         startDate: item.startDate || "",
@@ -105,22 +131,24 @@ exports.main = async (event) => {
       }
     }
   } catch (error) {
+    const errorMessage = String(
+      error && (error.message || error.errMsg) ? error.message || error.errMsg : error
+    ).slice(0, 300)
     console.error({
       function: "bookingMyDetail",
-      openid,
+      authenticated: Boolean(openid),
       id,
-      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
+      errorMessage,
       stack: error && error.stack ? error.stack : "",
       createdAt: new Date().toISOString()
     })
 
     await writeErrorLogBestEffort({
       function: "bookingMyDetail",
-      openid,
       bookingId: id,
       stage: "main",
-      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
-      stack: error && error.stack ? error.stack : "",
+      authenticated: Boolean(openid),
+      errorMessage,
       occurredAt: new Date().toISOString()
     })
 

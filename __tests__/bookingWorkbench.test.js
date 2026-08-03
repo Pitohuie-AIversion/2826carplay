@@ -12,6 +12,7 @@ describe("shared/bookingWorkbench", () => {
       [
         {
           id: "priority",
+          phone: "13800000001",
           status: "pending",
           schedulePriority: "priority",
           coordinationStatus: "pending",
@@ -26,6 +27,7 @@ describe("shared/bookingWorkbench", () => {
         },
         {
           id: "standby",
+          phone: "13800000002",
           status: "contacted",
           schedulePriority: "standby",
           coordinationStatus: "coordinating",
@@ -54,6 +56,8 @@ describe("shared/bookingWorkbench", () => {
       pending: 2,
       priority: 1,
       overdue: 1,
+      pickupAttention: 0,
+      contactIssue: 1,
       standby: 1,
       coordinating: 1
     })
@@ -63,6 +67,11 @@ describe("shared/bookingWorkbench", () => {
       "standby"
     ])
     expect(view.queue[0].badges.map((item) => item.key)).toContain("overdue")
+    expect(
+      buildBookingWorkbench(view.queue, "contactIssue", now).queue.map(
+        (item) => item.id
+      )
+    ).toEqual(["overdue"])
   })
 
   test("不同工作台筛选只返回对应待办", () => {
@@ -104,5 +113,55 @@ describe("shared/bookingWorkbench", () => {
     expect(item.coordinationStatus).toBe("pending")
     expect(item.overdue).toBe(true)
     expect(item.waitingText).toBe("已等待 1 天")
+  })
+
+  test("标记七天内及已过用车日的记录并提供用车提醒筛选", () => {
+    const list = [
+      {
+        id: "past",
+        status: "pending",
+        coordinationStatus: "pending",
+        startDate: "2026-08-09"
+      },
+      {
+        id: "today",
+        status: "pending",
+        coordinationStatus: "pending",
+        startDate: "2026-08-10"
+      },
+      {
+        id: "seven_days",
+        status: "contacted",
+        coordinationStatus: "coordinating",
+        startDate: "2026-08-17"
+      },
+      {
+        id: "later",
+        status: "pending",
+        coordinationStatus: "pending",
+        startDate: "2026-08-18"
+      }
+    ]
+
+    const view = buildBookingWorkbench(list, "pickupAttention", now)
+
+    expect(view.summary.pickupAttention).toBe(3)
+    expect(view.queue.map((item) => item.id)).toEqual([
+      "past",
+      "today",
+      "seven_days"
+    ])
+    expect(view.queue[0].badges).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        key: "pickupAttention",
+        text: "用车日已过",
+        tone: "danger"
+      })
+    ]))
+    expect(view.queue[1].badges).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        text: "今天用车"
+      })
+    ]))
   })
 })

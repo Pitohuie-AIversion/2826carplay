@@ -3,6 +3,32 @@ const cloud = require("wx-server-sdk")
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
+const AUTH_ROLE_FIELDS = {
+  role: true,
+  roles: true,
+  permissions: true,
+  isAdmin: true,
+  admin: true
+}
+const BOOKING_MANAGE_LIST_FIELDS = {
+  _id: true,
+  openid: true,
+  vehicleId: true,
+  vehicleName: true,
+  userName: true,
+  phone: true,
+  startDate: true,
+  endDate: true,
+  city: true,
+  note: true,
+  adminRemark: true,
+  adminRemarkUpdatedAt: true,
+  schedulePriority: true,
+  coordinationStatus: true,
+  status: true,
+  createdAt: true,
+  updatedAt: true
+}
 
 const BOOKING_STATUSES = ["pending", "contacted", "completed", "cancelled"]
 const PRIORITY_VALUES = ["priority", "normal", "standby"]
@@ -81,7 +107,12 @@ async function hasOpenidCapability(openid, capability) {
     return false
   }
 
-  const res = await db.collection("roles").where({ openid }).limit(20).get()
+  const res = await db
+    .collection("roles")
+    .where({ openid })
+    .field(AUTH_ROLE_FIELDS)
+    .limit(20)
+    .get()
   const list = res && Array.isArray(res.data) ? res.data : []
   return list.some((item) => hasCapability(item, capability))
 }
@@ -292,7 +323,7 @@ async function readBookingsByMode(maxRecords, ordered) {
   for (let offset = 0; offset <= maxRecords; offset += BOOKING_BATCH_SIZE) {
     const remaining = maxRecords + 1 - list.length
     const batchSize = Math.min(BOOKING_BATCH_SIZE, remaining)
-    let query = db.collection("bookings")
+    let query = db.collection("bookings").field(BOOKING_MANAGE_LIST_FIELDS)
     if (ordered) {
       query = query.orderBy("createdAt", "desc")
     }
@@ -423,7 +454,7 @@ exports.main = async (event) => {
   } catch (error) {
     console.error({
       function: "bookingList",
-      openid,
+      authenticated: Boolean(openid),
       errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
       stack: error && error.stack ? error.stack : "",
       createdAt: new Date().toISOString()

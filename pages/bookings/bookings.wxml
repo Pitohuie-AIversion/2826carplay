@@ -7,10 +7,10 @@
       <view class="page-title">我的预约</view>
       <view class="page-desc">查看顾问联系进度与车辆出行日期</view>
     </view>
-    <image class="header-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+    <image class="header-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
   </view>
 
-  <view wx:if="{{(initialLoading || loading) && !list.length}}" class="bookings-skeleton">
+  <view wx:if="{{(initialLoading || loading) && !list.length}}" class="bookings-skeleton" aria-hidden="true">
     <view class="skeleton-heading">
       <view>
         <view class="skeleton-kicker skeleton-pulse"></view>
@@ -47,10 +47,13 @@
   </view>
 
   <view wx:elif="{{loadFailed && !list.length}}" class="empty ui-card">
-    <image class="empty-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+    <image class="empty-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
     <view class="empty-title">加载失败</view>
     <view class="empty-desc">{{loadErrorText}}</view>
-    <button class="empty-action ui-btn ui-btn-primary" bindtap="handleRetryLoad">重新加载</button>
+    <button class="empty-action ui-btn ui-btn-primary action-with-icon" bindtap="handleRetryLoad">
+      <view class="native-action-icon native-action-icon-refresh" aria-hidden="true"></view>
+      <text>重新加载</text>
+    </button>
   </view>
 
   <view wx:elif="{{list.length}}" class="booking-list">
@@ -59,17 +62,94 @@
         <view class="list-kicker">RESERVATIONS</view>
         <view class="list-title">预约记录</view>
       </view>
-      <view class="list-count">{{list.length}} 条记录</view>
+      <view class="list-count">{{currentFilterLabel}} · {{visibleList.length}} 条</view>
     </view>
 
-    <view class="booking-item ui-card" wx:for="{{list}}" wx:key="id">
-      <view class="booking-accent"></view>
+    <view class="journey-summary journey-summary-with-filter ui-card">
+      <view class="journey-summary-caption">{{hasMore ? '当前已加载记录' : '全部预约状态'}}</view>
+      <view class="journey-summary-grid">
+        <view class="journey-summary-item">
+          <view class="summary-native-icon summary-native-icon-ongoing" aria-hidden="true">
+            <view class="summary-clock-hand"></view>
+          </view>
+          <view class="journey-summary-value journey-summary-value-primary">{{listSummary.ongoing}}</view>
+          <view class="journey-summary-label">进行中</view>
+        </view>
+        <view class="journey-summary-divider"></view>
+        <view class="journey-summary-item">
+          <view class="summary-native-icon summary-native-icon-completed" aria-hidden="true">
+            <view class="summary-check"></view>
+          </view>
+          <view class="journey-summary-value">{{listSummary.completed}}</view>
+          <view class="journey-summary-label">已完成</view>
+        </view>
+        <view class="journey-summary-divider"></view>
+        <view class="journey-summary-item">
+          <view class="summary-native-icon summary-native-icon-cancelled" aria-hidden="true">
+            <view class="summary-cancel-line"></view>
+          </view>
+          <view class="journey-summary-value journey-summary-value-muted">{{listSummary.cancelled}}</view>
+          <view class="journey-summary-label">已取消</view>
+        </view>
+      </view>
+      <view class="booking-filters" aria-role="group" aria-label="预约状态筛选">
+        <button
+          class="booking-filter {{currentFilter === 'all' ? 'booking-filter-active' : ''}}"
+          data-filter="all"
+          bindtap="handleFilterTap"
+          hover-class="booking-filter-pressed"
+          aria-pressed="{{currentFilter === 'all'}}"
+          aria-label="查看当前已加载的 {{list.length}} 条预约"
+        >全部</button>
+        <button
+          class="booking-filter {{currentFilter === 'ongoing' ? 'booking-filter-active' : ''}}"
+          data-filter="ongoing"
+          bindtap="handleFilterTap"
+          hover-class="booking-filter-pressed"
+          aria-pressed="{{currentFilter === 'ongoing'}}"
+          aria-label="查看进行中的 {{listSummary.ongoing}} 条预约"
+        >进行中</button>
+        <button
+          class="booking-filter {{currentFilter === 'completed' ? 'booking-filter-active' : ''}}"
+          data-filter="completed"
+          bindtap="handleFilterTap"
+          hover-class="booking-filter-pressed"
+          aria-pressed="{{currentFilter === 'completed'}}"
+          aria-label="查看已完成的 {{listSummary.completed}} 条预约"
+        >已完成</button>
+        <button
+          class="booking-filter {{currentFilter === 'cancelled' ? 'booking-filter-active' : ''}}"
+          data-filter="cancelled"
+          bindtap="handleFilterTap"
+          hover-class="booking-filter-pressed"
+          aria-pressed="{{currentFilter === 'cancelled'}}"
+          aria-label="查看已取消的 {{listSummary.cancelled}} 条预约"
+        >已取消</button>
+      </view>
+    </view>
+
+    <view wx:if="{{visibleList.length}}">
+    <view class="booking-item ui-card" wx:for="{{visibleList}}" wx:key="id">
+      <view class="booking-accent booking-accent-{{item.journeyProgress.tone}}"></view>
       <view class="booking-top">
-        <view class="booking-index">BOOKING · 0{{index + 1}}</view>
-        <view class="booking-status ui-status ui-status-lg {{item.statusClass}}">{{item.statusText}}</view>
+        <view class="booking-index">BOOKING · {{index + 1 < 10 ? '0' : ''}}{{index + 1}}</view>
+        <view class="booking-status ui-status ui-status-lg {{item.statusClass}}">
+          <view class="booking-status-dot"></view>
+          <text>{{item.statusText}}</text>
+        </view>
       </view>
 
-      <view class="booking-name">{{item.vehicleName}}</view>
+      <view class="booking-name-row">
+        <view class="vehicle-native-icon" aria-hidden="true">
+          <view class="vehicle-native-window"></view>
+          <view class="vehicle-native-wheel vehicle-native-wheel-left"></view>
+          <view class="vehicle-native-wheel vehicle-native-wheel-right"></view>
+        </view>
+        <view class="booking-vehicle-copy">
+          <view class="booking-name">{{item.vehicleName}}</view>
+          <view wx:if="{{item.vehicleReference}}" class="booking-vehicle-reference">{{item.vehicleReference}}</view>
+        </view>
+      </view>
 
       <view class="journey-panel">
         <view class="journey-date">
@@ -79,7 +159,9 @@
         <view class="journey-route">
           <view class="route-dot"></view>
           <view class="route-line"></view>
-          <view class="route-arrow">›</view>
+          <view class="route-arrow" aria-hidden="true">
+            <view class="route-chevron"></view>
+          </view>
         </view>
         <view class="journey-date journey-date-end">
           <view class="journey-label">还车</view>
@@ -92,14 +174,49 @@
         <text>{{item.city || '待确认城市'}}</text>
       </view>
 
+      <view class="booking-progress booking-progress-{{item.journeyProgress.tone}}" aria-role="group" aria-label="预约进度，{{item.journeyProgress.stageText}}">
+        <view class="booking-progress-heading">
+          <view class="booking-progress-kicker">BOOKING PROGRESS</view>
+          <view class="booking-progress-stage">{{item.journeyProgress.stageText}}</view>
+        </view>
+        <view class="booking-progress-track" aria-hidden="true">
+          <view class="booking-progress-fill" style="width: {{item.journeyProgress.width}};"></view>
+          <view class="booking-progress-node booking-progress-node-one {{item.journeyProgress.stepOneClass}}"><view class="progress-node-mark"></view></view>
+          <view class="booking-progress-node booking-progress-node-two {{item.journeyProgress.stepTwoClass}}"><view class="progress-node-mark"></view></view>
+          <view class="booking-progress-node booking-progress-node-three {{item.journeyProgress.stepThreeClass}}"><view class="progress-node-mark"></view></view>
+        </view>
+        <view class="booking-progress-labels">
+          <text>已提交</text>
+          <text>已联系</text>
+          <text>已结束</text>
+        </view>
+      </view>
+
+      <view class="booking-guidance booking-guidance-{{item.statusGuidance.tone}}">
+        <view class="booking-guidance-native-icon" aria-hidden="true">
+          <view class="booking-guidance-icon-mark"></view>
+        </view>
+        <view>
+          <view class="booking-guidance-title">{{item.statusGuidance.title}}</view>
+          <view class="booking-guidance-desc">{{item.statusGuidance.desc}}</view>
+        </view>
+      </view>
+
       <view wx:if="{{item.note}}" class="booking-note-box">
-        <view class="booking-note-label">需求备注</view>
+        <view class="booking-note-heading">
+          <view class="note-native-icon" aria-hidden="true">
+            <view class="note-native-line note-native-line-long"></view>
+            <view class="note-native-line"></view>
+          </view>
+          <view class="booking-note-label">需求备注</view>
+        </view>
         <view class="booking-note">{{item.note}}</view>
       </view>
 
       <view class="booking-actions">
         <button class="booking-btn ui-btn ui-btn-primary {{item.canCancel ? '' : 'booking-btn-last'}}" data-id="{{item.id}}" bindtap="handleViewDetail">
-          查看预约单
+          <view class="native-action-icon native-action-icon-document" aria-hidden="true"><view class="document-line"></view></view>
+          <text>查看预约单</text>
         </button>
         <button
           wx:if="{{item.canCancel}}"
@@ -107,19 +224,42 @@
           data-id="{{item.id}}"
           bindtap="handleCancel"
         >
-          取消预约
+          <view class="native-action-icon native-action-icon-cancel" aria-hidden="true"></view>
+          <text>取消预约</text>
         </button>
       </view>
     </view>
+    </view>
 
-    <button wx:if="{{hasMore}}" class="load-more ui-btn ui-btn-ghost" loading="{{loading}}" bindtap="handleLoadMore">加载更多预约</button>
+    <view wx:else class="filter-empty ui-card">
+      <view class="filter-empty-icon" aria-hidden="true">
+        <view class="filter-empty-line filter-empty-line-top"></view>
+        <view class="filter-empty-line filter-empty-line-bottom"></view>
+      </view>
+      <view class="filter-empty-title">暂无{{currentFilterLabel}}记录</view>
+      <view class="filter-empty-desc">其他状态的预约仍会保留，您可以切换筛选继续查看。</view>
+      <button class="filter-empty-action ui-btn ui-btn-ghost action-with-icon" bindtap="handleShowAllBookings">
+        <view class="native-action-icon native-action-icon-filter" aria-hidden="true"></view>
+        <text>查看全部预约</text>
+      </button>
+    </view>
+
+    <button wx:if="{{hasMore}}" class="load-more ui-btn ui-btn-ghost action-with-icon" loading="{{loading}}" disabled="{{loading}}" bindtap="handleLoadMore">
+      <view wx:if="{{!loading}}" class="native-action-icon native-action-icon-more" aria-hidden="true"></view>
+      <text>{{loading ? '正在加载' : '加载更多预约'}}</text>
+    </button>
+    <view wx:else class="list-end">{{hasMore ? '' : '已加载全部预约'}}</view>
   </view>
 
   <view wx:else class="empty ui-card">
-    <image class="empty-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+    <image class="empty-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
     <view class="empty-kicker">NO RESERVATIONS</view>
     <view class="empty-title">暂无预约</view>
     <view class="empty-desc">去车库挑一辆喜欢的车，开启下一段旅程</view>
-    <button class="empty-action ui-btn ui-btn-primary" bindtap="handleBackGarage">浏览车库</button>
+    <button class="empty-action ui-btn ui-btn-primary action-with-icon" bindtap="handleBackGarage">
+      <view class="native-action-icon native-action-icon-garage" aria-hidden="true"><view class="garage-door"></view></view>
+      <text>浏览车库</text>
+    </button>
   </view>
+  <core-nav active-key="bookings" />
 </view>

@@ -1,27 +1,57 @@
+const { formatToastTitle } = require("../../shared/uiFeedback")
+
 const MENU_ITEMS = [
-  { key: "bookings", title: "我的预约", desc: "查看已提交的预约咨询", section: "会员服务", sectionKicker: "MEMBER", glyph: "订" },
-  { key: "favorites", title: "我的收藏", desc: "收藏喜欢的车型，方便再次查看", section: "会员服务", sectionKicker: "MEMBER", glyph: "藏" },
-  { key: "faq", title: "常见问题", desc: "了解预约流程、档期与取还车说明", section: "会员服务", sectionKicker: "MEMBER", glyph: "问" },
-  { key: "rules", title: "平台规则", desc: "价格、档期、押金和规则以客服最终确认为准", section: "会员服务", sectionKicker: "MEMBER", glyph: "规" },
-  { key: "privacy", title: "隐私政策", desc: "了解个人信息的收集、使用与删除方式", section: "会员服务", sectionKicker: "MEMBER", glyph: "隐" },
-  { key: "privacyRequest", title: "个人信息申请", desc: "提交查询、更正或删除申请并查看处理进度", section: "会员服务", sectionKicker: "MEMBER", glyph: "申" },
-  { key: "operationsOverview", title: "运营概览", desc: "集中查看预约、车辆状态与待办提醒", section: "运营管理", sectionKicker: "OPERATIONS", glyph: "览" },
-  { key: "analyticsManage", title: "数据分析", desc: "查看车辆热度、预约漏斗与行为趋势", section: "运营管理", sectionKicker: "OPERATIONS", glyph: "析" },
-  { key: "bookingWorkbench", title: "待协调工作台", desc: "集中处理优先、候补与超时预约", section: "运营管理", sectionKicker: "OPERATIONS", glyph: "协" },
-  { key: "bookingCalendar", title: "预约日历", desc: "按月查看每日预约与车辆档期安排", section: "运营管理", sectionKicker: "OPERATIONS", glyph: "历" },
-  { key: "vehicleManage", title: "车辆管理", desc: "查看已录入车辆并按状态筛选", section: "运营管理", sectionKicker: "OPERATIONS", glyph: "车" },
-  { key: "vehicleCreate", title: "新增车辆", desc: "录入新的车辆信息", section: "运营管理", sectionKicker: "OPERATIONS", glyph: "新" },
-  { key: "bookingManage", title: "预约管理", desc: "查看全部预约并更新状态", section: "运营管理", sectionKicker: "OPERATIONS", glyph: "约" },
-  { key: "roleManage", title: "权限管理", desc: "按 OpenID 分配车辆与预约管理权限", section: "系统管理", sectionKicker: "SYSTEM", glyph: "权" },
-  { key: "configManage", title: "运营配置", desc: "配置品牌、电话、首页文案与预约说明", section: "系统管理", sectionKicker: "SYSTEM", glyph: "配" },
-  { key: "auditLogManage", title: "审计日志", desc: "查看权限分配与配置变更记录", section: "系统管理", sectionKicker: "SYSTEM", glyph: "审" },
-  { key: "errorLogManage", title: "错误日志", desc: "查看云函数异常记录，便于线上排障", section: "系统管理", sectionKicker: "SYSTEM", glyph: "错" },
-  { key: "systemHealth", title: "上线检查", desc: "只读检查云环境数据与关键配置", section: "系统管理", sectionKicker: "SYSTEM", glyph: "检" },
-  { key: "privacyRequestManage", title: "隐私申请处理", desc: "处理用户个人信息查询、更正与删除申请", section: "系统管理", sectionKicker: "SYSTEM", glyph: "私" },
-  { key: "storageCleanup", title: "存储清理", desc: "重试清理删除失败的车辆图片", section: "系统管理", sectionKicker: "SYSTEM", glyph: "清" },
-  { key: "getOpenid", title: "查询 OpenID", desc: "获取当前微信用户的 OpenID 并复制", section: "账户工具", sectionKicker: "UTILITIES", glyph: "ID" },
-  { key: "bootstrapAdmin", title: "初始化管理员", desc: "仅限首次配置时使用，自动把当前账号设为首个管理员", section: "账户工具", sectionKicker: "UTILITIES", glyph: "启" }
+  { key: "bookings", title: "我的预约", desc: "查看已提交的预约咨询", section: "会员服务", sectionKicker: "MEMBER", icon: "calendar" },
+  { key: "favorites", title: "我的收藏", desc: "收藏喜欢的车型，方便再次查看", section: "会员服务", sectionKicker: "MEMBER", icon: "heart" },
+  { key: "faq", title: "常见问题", desc: "了解预约流程、档期与取还车说明", section: "会员服务", sectionKicker: "MEMBER", icon: "chat" },
+  { key: "rules", title: "平台规则", desc: "价格、档期、押金和规则以客服最终确认为准", section: "会员服务", sectionKicker: "MEMBER", icon: "document" },
+  { key: "privacy", title: "隐私政策", desc: "了解个人信息的收集、使用与删除方式", section: "会员服务", sectionKicker: "MEMBER", icon: "shield" },
+  { key: "privacyRequest", title: "个人信息申请", desc: "提交查询、更正或删除申请并查看处理进度", section: "会员服务", sectionKicker: "MEMBER", icon: "lock" },
+  { key: "operationsOverview", title: "运营概览", desc: "集中查看预约、车辆状态与待办提醒", section: "运营管理", sectionKicker: "OPERATIONS", icon: "dashboard" },
+  { key: "analyticsManage", title: "数据分析", desc: "查看车辆热度、预约漏斗与行为趋势", section: "运营管理", sectionKicker: "OPERATIONS", icon: "chart" },
+  { key: "bookingWorkbench", title: "待协调工作台", desc: "集中处理优先、候补与超时预约", section: "运营管理", sectionKicker: "OPERATIONS", icon: "queue" },
+  { key: "bookingCalendar", title: "预约日历", desc: "按月查看每日预约与车辆档期安排", section: "运营管理", sectionKicker: "OPERATIONS", icon: "calendar" },
+  { key: "vehicleManage", title: "车辆管理", desc: "查看已录入车辆并按状态筛选", section: "运营管理", sectionKicker: "OPERATIONS", icon: "car" },
+  { key: "vehicleCreate", title: "新增车辆", desc: "录入新的车辆信息", section: "运营管理", sectionKicker: "OPERATIONS", icon: "plus" },
+  { key: "bookingManage", title: "预约管理", desc: "查看全部预约并更新状态", section: "运营管理", sectionKicker: "OPERATIONS", icon: "calendar" },
+  { key: "roleManage", title: "权限管理", desc: "按 OpenID 分配车辆与预约管理权限", section: "系统管理", sectionKicker: "SYSTEM", icon: "users" },
+  { key: "configManage", title: "运营配置", desc: "配置品牌、电话、首页文案与预约说明", section: "系统管理", sectionKicker: "SYSTEM", icon: "sliders" },
+  { key: "auditLogManage", title: "审计日志", desc: "查看权限分配与配置变更记录", section: "系统管理", sectionKicker: "SYSTEM", icon: "document" },
+  { key: "errorLogManage", title: "错误日志", desc: "查看云函数异常记录，便于线上排障", section: "系统管理", sectionKicker: "SYSTEM", icon: "alert" },
+  { key: "systemHealth", title: "上线检查", desc: "只读检查云环境数据与关键配置", section: "系统管理", sectionKicker: "SYSTEM", icon: "check" },
+  { key: "privacyRequestManage", title: "隐私申请处理", desc: "处理用户个人信息查询、更正与删除申请", section: "系统管理", sectionKicker: "SYSTEM", icon: "shield" },
+  { key: "storageCleanup", title: "存储清理", desc: "重试清理删除失败的车辆图片", section: "系统管理", sectionKicker: "SYSTEM", icon: "trash" },
+  { key: "getOpenid", title: "查询 OpenID", desc: "获取当前微信用户的 OpenID 并复制", section: "账户工具", sectionKicker: "UTILITIES", icon: "key" },
+  { key: "bootstrapAdmin", title: "初始化管理员", desc: "仅限首次配置时使用，自动把当前账号设为首个管理员", section: "账户工具", sectionKicker: "UTILITIES", icon: "lock" }
 ]
+
+const MEMBER_QUICK_ACTIONS = [
+  {
+    key: "bookings",
+    title: "我的预约",
+    desc: "查看进度",
+    kicker: "BOOKINGS",
+    icon: "calendar",
+    accent: "blue"
+  },
+  {
+    key: "favorites",
+    title: "我的收藏",
+    desc: "心仪车辆",
+    kicker: "FAVORITES",
+    icon: "heart",
+    accent: "green"
+  },
+  {
+    key: "privacyRequest",
+    title: "信息申请",
+    desc: "资料权益",
+    kicker: "PRIVACY",
+    icon: "lock",
+    accent: "violet"
+  }
+]
+const MEMBER_QUICK_ACTION_KEYS = new Set(MEMBER_QUICK_ACTIONS.map((item) => item.key))
 
 function buildVisibleMenuItems(options) {
   const input = options && typeof options === "object" ? options : {}
@@ -34,6 +64,10 @@ function buildVisibleMenuItems(options) {
   const canViewErrorLogs = Boolean(input.canViewErrorLogs)
 
   const visibleItems = MENU_ITEMS.filter((item) => {
+    if (MEMBER_QUICK_ACTION_KEYS.has(item.key)) {
+      return false
+    }
+
     if (item.key === "bootstrapAdmin" && (envVersion === "release" || canManageRoles)) {
       return false
     }
@@ -108,7 +142,12 @@ function applyOperationSummary(menuItems, summary) {
   const counts = summary && typeof summary === "object" ? summary : {}
   const badgeCounts = {
     bookingManage: Number(counts.bookingPending) || 0,
-    bookingWorkbench: Number(counts.bookingPending) || 0,
+    bookingWorkbench:
+      Number(
+        Object.prototype.hasOwnProperty.call(counts, "bookingCoordinationPending")
+          ? counts.bookingCoordinationPending
+          : counts.bookingPending
+      ) || 0,
     privacyRequestManage:
       (Number(counts.privacyPending) || 0) + (Number(counts.privacyProcessing) || 0),
     storageCleanup: Number(counts.storageCleanupPending) || 0
@@ -118,6 +157,80 @@ function applyOperationSummary(menuItems, summary) {
     ...item,
     badgeText: formatBadgeCount(badgeCounts[item.key])
   }))
+}
+
+function formatSummaryTime(value) {
+  const date = value instanceof Date ? value : new Date(value || Date.now())
+  if (Number.isNaN(date.getTime())) {
+    return "—"
+  }
+  const pad = (number) => String(number).padStart(2, "0")
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+function buildOperationPulse(summary) {
+  const source = summary && typeof summary === "object" ? summary : {}
+  const counts = source.counts && typeof source.counts === "object" ? source.counts : {}
+  const unavailable = new Set(Array.isArray(source.unavailable) ? source.unavailable : [])
+  const items = []
+  const iconClasses = {
+    booking: "operation-pulse-icon-booking",
+    privacy: "operation-pulse-icon-privacy",
+    storage: "operation-pulse-icon-storage"
+  }
+  const hasOwn = (key) => Object.prototype.hasOwnProperty.call(counts, key)
+  const addItem = (key, label, value, isUnavailable) => {
+    items.push({
+      key,
+      label,
+      iconClass: iconClasses[key] || "operation-pulse-icon-default",
+      value: isUnavailable ? 0 : Number(value) || 0,
+      displayValue: isUnavailable ? "—" : formatBadgeCount(value) || "0",
+      unavailable: Boolean(isUnavailable)
+    })
+  }
+
+  if (hasOwn("bookingCoordinationPending") || hasOwn("bookingPending")) {
+    const coordinationKey = hasOwn("bookingCoordinationPending")
+      ? "bookingCoordinationPending"
+      : "bookingPending"
+    addItem(
+      "booking",
+      "预约协调",
+      counts[coordinationKey],
+      unavailable.has(coordinationKey)
+    )
+  }
+
+  if (hasOwn("privacyPending") || hasOwn("privacyProcessing")) {
+    const privacyUnavailable =
+      unavailable.has("privacyPending") || unavailable.has("privacyProcessing")
+    addItem(
+      "privacy",
+      "隐私申请",
+      (Number(counts.privacyPending) || 0) + (Number(counts.privacyProcessing) || 0),
+      privacyUnavailable
+    )
+  }
+
+  if (hasOwn("storageCleanupPending")) {
+    addItem(
+      "storage",
+      "存储清理",
+      counts.storageCleanupPending,
+      unavailable.has("storageCleanupPending")
+    )
+  }
+
+  const availableItems = items.filter((item) => !item.unavailable)
+  return {
+    visible: items.length > 0,
+    total: availableItems.reduce((total, item) => total + item.value, 0),
+    attentionAreas: availableItems.filter((item) => item.value > 0).length,
+    partial: Boolean(source.partial || items.some((item) => item.unavailable)),
+    updatedText: formatSummaryTime(),
+    items
+  }
 }
 
 function buildMemberRole(result) {
@@ -156,10 +269,19 @@ Page({
     permissionsLoading: true,
     permissionsReady: false,
     summaryLoading: false,
+    operationPulse: {
+      visible: false,
+      total: 0,
+      attentionAreas: 0,
+      partial: false,
+      updatedText: "—",
+      items: []
+    },
     myPermissions: {},
     roleKicker: "VERIFYING",
     roleLabel: "正在确认身份",
     roleClass: "profile-role-loading",
+    memberQuickActions: MEMBER_QUICK_ACTIONS,
     menuItems: buildVisibleMenuItems({
       envVersion: "release",
       canManageRoles: false,
@@ -306,12 +428,25 @@ Page({
           return
         }
         this.setData({
-          menuItems: applyOperationSummary(this.data.menuItems, result.counts)
+          menuItems: applyOperationSummary(this.data.menuItems, result.counts),
+          operationPulse: buildOperationPulse(result)
         })
       },
       fail: () => {},
       complete: () => {
         this.setData({ summaryLoading: false })
+      }
+    })
+  },
+
+  handleOperationPulseTap() {
+    wx.navigateTo({
+      url: "/pages/operations-overview/operations-overview",
+      fail: () => {
+        wx.showToast({
+          title: "页面跳转失败",
+          icon: "none"
+        })
       }
     })
   },
@@ -474,12 +609,14 @@ Page({
       wx.showModal({
         title: "清理存储队列",
         content: "将重试删除此前清理失败的车辆图片，每次最多处理 5 条。确认继续？",
+        confirmText: "确认清理",
+        confirmColor: "#d46868",
         success: (modalRes) => {
           if (!modalRes.confirm) {
             return
           }
 
-          wx.showLoading({ title: "清理中" })
+          wx.showLoading({ title: "清理中…", mask: true })
           wx.cloud.callFunction({
             name: "pendingFileDeletionProcess",
             data: { limit: 5 },
@@ -488,22 +625,38 @@ Page({
               const result = res && res.result ? res.result : null
               if (!result || !result.ok) {
                 wx.showToast({
-                  title: (result && result.message) || "清理失败",
+                  title: formatToastTitle(result && result.message, "清理失败"),
                   icon: "none"
                 })
                 return
               }
 
+              const details = [
+                `本次检查 ${result.processed || 0} 条`,
+                `已清理 ${result.deleted || 0} 条`,
+                `失败 ${result.failed || 0} 条`
+              ]
+              if (result.deferred) {
+                details.push(`等待安全核验 ${result.deferred} 条`)
+              }
+              if (result.preserved) {
+                details.push(`保留在用图片 ${result.preserved} 张`)
+              }
+              if (result.invalid) {
+                details.push(`移除无效任务 ${result.invalid} 条`)
+              }
               wx.showModal({
-                title: "清理完成",
-                content: `处理 ${result.processed || 0} 条，成功 ${result.deleted || 0} 条，失败 ${result.failed || 0} 条。${result.hasMore ? "队列可能仍有记录，可再次执行。" : ""}`,
+                title: "清理结果",
+                content: `${details.join("，")}。${result.hasMore ? "队列仍有记录，可稍后再次执行。" : "当前队列已检查完毕。"}`,
+                confirmText: "知道了",
+                confirmColor: "#528fff",
                 showCancel: false
               })
             },
             fail: (error) => {
               wx.hideLoading()
               wx.showToast({
-                title: (error && (error.errMsg || error.message)) || "清理失败",
+                title: "清理失败",
                 icon: "none"
               })
             }
@@ -525,6 +678,8 @@ Page({
       wx.showModal({
         title: "输入初始化口令",
         content: "仅当 roles 集合没有任何记录时可用，口令只随本次请求发送。",
+        confirmText: "确认初始化",
+        confirmColor: "#528fff",
         editable: true,
         placeholderText: "BOOTSTRAP_TOKEN",
         success: (modalRes) => {
@@ -542,7 +697,8 @@ Page({
           }
 
           wx.showLoading({
-            title: "初始化中"
+            title: "初始化中…",
+            mask: true
           })
 
           wx.cloud.callFunction({
@@ -560,6 +716,8 @@ Page({
                 wx.showModal({
                   title: "管理员初始化结果",
                   content: `${title}\n\nOpenID：${(result && result.openid) || ""}`,
+                  confirmText: "知道了",
+                  confirmColor: "#528fff",
                   showCancel: false
                 })
                 return
@@ -569,6 +727,8 @@ Page({
                 wx.showModal({
                   title: "初始化失败",
                   content: "初始化口令不正确，请检查后重试。",
+                  confirmText: "知道了",
+                  confirmColor: "#528fff",
                   showCancel: false
                 })
                 return
@@ -577,7 +737,11 @@ Page({
               if (result && result.code === "BOOTSTRAP_DISABLED") {
                 wx.showModal({
                   title: "初始化未启用",
-                  content: "请先在云函数控制台配置 BOOTSTRAP_TOKEN，再使用体验版或开发版初始化。",
+                  content:
+                    result.message ||
+                    "请先在云函数控制台配置 32 至 256 位随机 BOOTSTRAP_TOKEN，再使用体验版或开发版初始化。",
+                  confirmText: "知道了",
+                  confirmColor: "#528fff",
                   showCancel: false
                 })
                 return
@@ -586,13 +750,15 @@ Page({
               wx.showModal({
                 title: "初始化失败",
                 content: title,
+                confirmText: "知道了",
+                confirmColor: "#528fff",
                 showCancel: false
               })
             },
             fail: (error) => {
               wx.hideLoading()
               wx.showToast({
-                title: (error && (error.errMsg || error.message)) || "初始化失败",
+                title: "初始化失败",
                 icon: "none"
               })
             }
@@ -612,7 +778,8 @@ Page({
       }
 
       wx.showLoading({
-        title: "查询中"
+        title: "查询中…",
+        mask: true
       })
 
       wx.cloud.callFunction({
@@ -625,7 +792,7 @@ Page({
 
           if (!openid) {
             wx.showToast({
-              title: "未获取到 OpenID",
+              title: "账号获取失败",
               icon: "none"
             })
             return
@@ -634,16 +801,17 @@ Page({
           wx.setClipboardData({
             data: openid,
             success: () => {
-              wx.showModal({
-                title: "OpenID 已复制",
-                content: openid,
-                showCancel: false
+              wx.showToast({
+                title: "账号已复制",
+                icon: "none"
               })
             },
             fail: () => {
               wx.showModal({
-                title: "当前 OpenID",
-                content: openid,
+                title: "当前账号",
+                content: `OpenID：${openid}`,
+                confirmText: "知道了",
+                confirmColor: "#528fff",
                 showCancel: false
               })
             }
@@ -652,7 +820,7 @@ Page({
         fail: (error) => {
           wx.hideLoading()
           wx.showToast({
-            title: (error && (error.errMsg || error.message)) || "查询失败",
+            title: "查询失败",
             icon: "none"
           })
         }
@@ -765,43 +933,34 @@ Page({
     }
 
     wx.showToast({
-      title: `${title} 即将开放`,
+      title: formatToastTitle(`${title} 即将开放`, "功能即将开放"),
       icon: "none"
     })
   },
 
   handlePhoneCall() {
-    wx.makePhoneCall({
-      phoneNumber: this.data.servicePhone,
-      fail: () => {
-        wx.showToast({
-          title: `请联系客服：${this.data.servicePhone}`,
-          icon: "none"
-        })
-      }
-    })
-  },
-
-  handleBackHome() {
-    const pages = getCurrentPages()
-
-    if (pages.length > 1) {
-      wx.navigateBack({
-        delta: 1,
-        fail: () => {
-          wx.redirectTo({
-            url: "/pages/garage/garage"
-          })
-        }
+    const phone = String(this.data.servicePhone || "").trim()
+    if (!phone) {
+      wx.showToast({
+        title: "客服电话暂不可用",
+        icon: "none"
       })
       return
     }
 
-    wx.redirectTo({
-      url: "/pages/garage/garage",
-      fail: () => {
-        wx.reLaunch({
-          url: "/pages/garage/garage"
+    wx.makePhoneCall({
+      phoneNumber: phone,
+      fail: (error) => {
+        const message = error && (error.errMsg || error.message)
+        if (message && String(message).includes("cancel")) {
+          return
+        }
+        wx.showModal({
+          title: "拨号失败",
+          content: `请联系客服：${phone}`,
+          confirmText: "知道了",
+          confirmColor: "#528fff",
+          showCancel: false
         })
       }
     })

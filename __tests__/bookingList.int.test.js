@@ -22,6 +22,11 @@ function createMockDb({ rolesData, bookingData, orderedError = null }) {
     }))
   }))
   const bookingsOrderBy = jest.fn(() => ({ skip: bookingsOrderedSkip }))
+  const bookingsField = jest.fn(() => ({
+    limit: bookingsLimit,
+    skip: bookingsSkip,
+    orderBy: bookingsOrderBy
+  }))
 
   const db = {
     collection: jest.fn((name) => {
@@ -30,9 +35,7 @@ function createMockDb({ rolesData, bookingData, orderedError = null }) {
       }
       if (name === "bookings") {
         return {
-          limit: bookingsLimit,
-          skip: bookingsSkip,
-          orderBy: bookingsOrderBy
+          field: bookingsField
         }
       }
       throw new Error(`Unexpected collection: ${name}`)
@@ -44,6 +47,7 @@ function createMockDb({ rolesData, bookingData, orderedError = null }) {
     rolesWhere,
     rolesLimit,
     bookingsLimit,
+    bookingsField,
     bookingsSkip,
     bookingsOrderBy,
     bookingsOrderedSkip
@@ -120,6 +124,20 @@ describe("cloudfunctions/bookingList integration", () => {
         createdAt: expect.any(String)
       }
     ])
+    const fields = mocks.bookingsField.mock.calls[0][0]
+    expect(fields).toEqual(
+      expect.objectContaining({
+        _id: true,
+        openid: true,
+        phone: true,
+        note: true,
+        adminRemark: true,
+        coordinationStatus: true
+      })
+    )
+    expect(fields).not.toHaveProperty("subscribeMessageAccepted")
+    expect(fields).not.toHaveProperty("requestId")
+    expect(fields).not.toHaveProperty("futureInternalField")
   })
 
   test("关键词可命中管理员备注", async () => {

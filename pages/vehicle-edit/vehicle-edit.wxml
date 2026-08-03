@@ -1,4 +1,4 @@
-<view class="vehicle-edit-page vehicle-form-page">
+<view wx:if="{{pageAuthorized}}" class="vehicle-edit-page vehicle-form-page">
   <view class="page-glow"></view>
 
   <view class="hero-card">
@@ -7,12 +7,23 @@
         <view class="page-kicker">FLEET EDITOR</view>
         <view class="hero-title">编辑车辆</view>
       </view>
-      <image class="hero-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+      <image class="hero-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
     </view>
     <view class="hero-desc">维护车辆基础资料、租赁信息与展示素材</view>
+    <view wx:if="{{!loading && !loadFailed}}" class="vehicle-form-progress {{formProgress.ready ? 'vehicle-form-progress-ready' : ''}}" aria-role="group" aria-label="车辆必填信息完成度 {{formProgress.completed}} / {{formProgress.total}}，{{formProgress.hint}}">
+      <view class="vehicle-form-progress-head">
+        <view class="vehicle-form-progress-title">必填信息完成度</view>
+        <view class="vehicle-form-progress-value">{{formProgress.completed}} / {{formProgress.total}}</view>
+      </view>
+      <view class="vehicle-form-progress-track" aria-hidden="true"><view class="vehicle-form-progress-fill" style="width: {{formProgress.percent}}%;"></view></view>
+      <view class="vehicle-form-progress-hint">
+        <view class="vehicle-form-progress-icon" aria-hidden="true"><view class="vehicle-form-progress-check"></view></view>
+        <text>{{formProgress.hint}}</text>
+      </view>
+    </view>
   </view>
 
-  <view class="loading-card" wx:if="{{loading}}">
+  <view class="loading-card" wx:if="{{loading}}" aria-hidden="true">
     <view class="vehicle-form-skeleton-heading">
       <view>
         <view class="vehicle-form-skeleton-kicker vehicle-form-skeleton-pulse"></view>
@@ -38,20 +49,27 @@
   </view>
 
   <view class="vehicle-form-state" wx:elif="{{loadFailed}}">
-    <image class="vehicle-form-state-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+    <image class="vehicle-form-state-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
     <view class="vehicle-form-state-kicker">FLEET EDITOR</view>
     <view class="vehicle-form-state-title">车辆档案不可用</view>
     <view class="vehicle-form-state-desc">{{loadErrorText}}</view>
-    <button wx:if="{{id}}" class="vehicle-form-state-button vehicle-form-state-button-primary" bindtap="handleRetryLoad">重新加载</button>
-    <button class="vehicle-form-state-button vehicle-form-state-button-secondary" bindtap="handleBackList">返回车辆列表</button>
+    <button wx:if="{{id}}" class="vehicle-form-state-button vehicle-form-state-button-primary" bindtap="handleRetryLoad" hover-class="vehicle-form-state-button-pressed">
+      <view class="vehicle-form-action-content"><view class="vehicle-action-native-icon vehicle-retry-native-icon" aria-hidden="true"></view><text>重新加载</text></view>
+    </button>
+    <button class="vehicle-form-state-button vehicle-form-state-button-secondary" bindtap="handleBackList" hover-class="vehicle-form-state-button-pressed">
+      <view class="vehicle-form-action-content"><view class="vehicle-action-native-icon vehicle-back-native-icon" aria-hidden="true"></view><text>返回车辆列表</text></view>
+    </button>
   </view>
 
   <view wx:else>
     <view class="form-card">
       <view class="section-heading">
-        <view>
-          <view class="section-kicker">IDENTITY</view>
-          <view class="section-title">车辆身份</view>
+        <view class="section-heading-main">
+          <view class="vehicle-section-glyph vehicle-section-glyph-identity" aria-hidden="true"><view class="vehicle-section-glyph-icon"></view></view>
+          <view>
+            <view class="section-kicker">IDENTITY</view>
+            <view class="section-title">车辆身份</view>
+          </view>
         </view>
         <view class="section-index">01</view>
       </view>
@@ -61,21 +79,24 @@
         <view class="field-group field-group-half">
           <view class="field-label field-label-row"><text>车牌号</text><text class="field-required">必填</text></view>
           <input
-            class="field-input"
+            class="field-input {{formProgress.plateNumberComplete ? 'vehicle-form-control-complete' : ''}}"
             placeholder="例如 京A12345"
             placeholder-class="input-placeholder"
             value="{{form.plateNumber}}"
             maxlength="8"
             bindinput="handlePlateInput"
+            confirm-type="next"
+            aria-label="填写车牌号"
+            aria-required="{{true}}"
           />
         </view>
 
         <view class="field-group field-group-half">
           <view class="field-label field-label-row"><text>车辆类型</text><text class="field-required">必填</text></view>
-          <picker range="{{vehicleTypeLabels}}" value="{{vehicleTypeIndex}}" bindchange="handleVehicleTypeChange">
-            <view class="picker-field {{form.vehicleType ? '' : 'picker-field-placeholder'}}">
+          <picker range="{{vehicleTypeLabels}}" value="{{vehicleTypeIndex}}" bindchange="handleVehicleTypeChange" aria-label="选择车辆类型" aria-required="{{true}}">
+            <view class="picker-field {{form.vehicleType ? '' : 'picker-field-placeholder'}} {{formProgress.vehicleTypeComplete ? 'vehicle-form-control-complete' : ''}}" hover-class="vehicle-picker-pressed">
               <text>{{vehicleTypeLabel || "选择类型"}}</text>
-              <text class="picker-arrow">⌄</text>
+              <view class="picker-arrow" aria-hidden="true"><view class="picker-chevron"></view></view>
             </view>
           </picker>
         </view>
@@ -84,33 +105,36 @@
       <view class="field-group">
         <view class="field-label field-label-row"><text>品牌型号</text><text class="field-required">必填</text></view>
         <input
-          class="field-input"
+          class="field-input {{formProgress.brandModelComplete ? 'vehicle-form-control-complete' : ''}}"
           placeholder="例如 BMW 740Li"
           placeholder-class="input-placeholder"
           value="{{form.brandModel}}"
           maxlength="50"
           data-field="brandModel"
           bindinput="handleTextInput"
+          confirm-type="done"
+          aria-label="填写车辆品牌型号"
+          aria-required="{{true}}"
         />
       </view>
 
       <view class="form-row">
         <view class="field-group field-group-half">
           <view class="field-label field-label-row"><text>注册日期</text><text class="field-required">必填</text></view>
-          <picker mode="date" end="{{today}}" value="{{form.registerDate}}" bindchange="handleDateChange">
-            <view class="picker-field {{form.registerDate ? '' : 'picker-field-placeholder'}}">
+          <picker mode="date" end="{{today}}" value="{{form.registerDate}}" bindchange="handleDateChange" aria-label="选择注册日期" aria-required="{{true}}">
+            <view class="picker-field {{form.registerDate ? '' : 'picker-field-placeholder'}} {{formProgress.registerDateComplete ? 'vehicle-form-control-complete' : ''}}" hover-class="vehicle-picker-pressed">
               <text>{{form.registerDate || "选择日期"}}</text>
-              <text class="picker-arrow">⌄</text>
+              <view class="picker-arrow" aria-hidden="true"><view class="picker-chevron"></view></view>
             </view>
           </picker>
         </view>
 
         <view class="field-group field-group-half">
           <view class="field-label field-label-row"><text>使用状态</text><text class="field-required">必填</text></view>
-          <picker range="{{statusLabels}}" value="{{statusIndex}}" bindchange="handleStatusChange">
-            <view class="picker-field {{form.status ? '' : 'picker-field-placeholder'}}">
+          <picker range="{{statusLabels}}" value="{{statusIndex}}" bindchange="handleStatusChange" aria-label="选择使用状态" aria-required="{{true}}">
+            <view class="picker-field {{form.status ? '' : 'picker-field-placeholder'}} {{formProgress.statusComplete ? 'vehicle-form-control-complete' : ''}}" hover-class="vehicle-picker-pressed">
               <text>{{statusLabel || "选择状态"}}</text>
-              <text class="picker-arrow">⌄</text>
+              <view class="picker-arrow" aria-hidden="true"><view class="picker-chevron"></view></view>
             </view>
           </picker>
         </view>
@@ -119,9 +143,12 @@
 
     <view class="form-card">
       <view class="section-heading">
-        <view>
-          <view class="section-kicker">RENTAL PROFILE</view>
-          <view class="section-title">展示与租赁</view>
+        <view class="section-heading-main">
+          <view class="vehicle-section-glyph vehicle-section-glyph-rental" aria-hidden="true"><view class="vehicle-section-glyph-icon"></view></view>
+          <view>
+            <view class="section-kicker">RENTAL PROFILE</view>
+            <view class="section-title">展示与租赁</view>
+          </view>
         </view>
         <view class="section-index">02</view>
       </view>
@@ -131,30 +158,30 @@
       <view class="form-row">
         <view class="field-group field-group-half">
           <view class="field-label">取车城市</view>
-          <input class="field-input" placeholder="例如 杭州" placeholder-class="input-placeholder" value="{{form.location}}" maxlength="20" data-field="location" bindinput="handleTextInput" />
+          <input class="field-input" placeholder="例如 杭州" placeholder-class="input-placeholder" value="{{form.location}}" maxlength="20" data-field="location" bindinput="handleTextInput" confirm-type="done" aria-label="所在城市" />
         </view>
         <view class="field-group field-group-half">
           <view class="field-label">日租金</view>
-          <input class="field-input" type="number" placeholder="例如 699" placeholder-class="input-placeholder" value="{{form.priceDay}}" maxlength="5" data-field="priceDay" bindinput="handleTextInput" />
+          <input class="field-input" type="number" placeholder="例如 699" placeholder-class="input-placeholder" value="{{form.priceDay}}" maxlength="5" data-field="priceDay" bindinput="handleTextInput" confirm-type="done" aria-label="日租价格" />
         </view>
       </view>
 
       <view class="form-row">
         <view class="field-group field-group-half">
           <view class="field-label">变速箱</view>
-          <picker range="{{transmissionLabels}}" value="{{transmissionIndex}}" bindchange="handleTransmissionChange">
-            <view class="picker-field {{form.transmission ? '' : 'picker-field-placeholder'}}">
+          <picker range="{{transmissionLabels}}" value="{{transmissionIndex}}" bindchange="handleTransmissionChange" aria-label="选择变速箱类型">
+            <view class="picker-field {{form.transmission ? '' : 'picker-field-placeholder'}}" hover-class="vehicle-picker-pressed">
               <text>{{transmissionLabel || "选择类型"}}</text>
-              <text class="picker-arrow">⌄</text>
+              <view class="picker-arrow" aria-hidden="true"><view class="picker-chevron"></view></view>
             </view>
           </picker>
         </view>
         <view class="field-group field-group-half">
           <view class="field-label">燃油类型</view>
-          <picker range="{{fuelTypeLabels}}" value="{{fuelTypeIndex}}" bindchange="handleFuelTypeChange">
-            <view class="picker-field {{form.fuelType ? '' : 'picker-field-placeholder'}}">
+          <picker range="{{fuelTypeLabels}}" value="{{fuelTypeIndex}}" bindchange="handleFuelTypeChange" aria-label="选择燃油类型">
+            <view class="picker-field {{form.fuelType ? '' : 'picker-field-placeholder'}}" hover-class="vehicle-picker-pressed">
               <text>{{fuelTypeLabel || "选择类型"}}</text>
-              <text class="picker-arrow">⌄</text>
+              <view class="picker-arrow" aria-hidden="true"><view class="picker-chevron"></view></view>
             </view>
           </picker>
         </view>
@@ -162,7 +189,7 @@
 
       <view class="field-group">
         <view class="field-label">座位数</view>
-        <input class="field-input" type="number" placeholder="例如 5" placeholder-class="input-placeholder" value="{{form.seats}}" maxlength="1" data-field="seats" bindinput="handleTextInput" />
+        <input class="field-input" type="number" placeholder="例如 5" placeholder-class="input-placeholder" value="{{form.seats}}" maxlength="1" data-field="seats" bindinput="handleTextInput" confirm-type="done" aria-label="座位数" />
       </view>
 
       <view class="field-group">
@@ -175,6 +202,7 @@
           maxlength="200"
           data-field="publicDescription"
           bindinput="handleTextInput"
+          aria-label="公开说明"
         />
         <view class="section-helper">此内容会显示在首页和车辆详情，请勿填写内部档案信息。</view>
       </view>
@@ -182,9 +210,12 @@
 
     <view class="form-card">
       <view class="section-heading">
-        <view>
-          <view class="section-kicker">ARCHIVE</view>
-          <view class="section-title">档案与备注</view>
+        <view class="section-heading-main">
+          <view class="vehicle-section-glyph vehicle-section-glyph-archive" aria-hidden="true"><view class="vehicle-section-glyph-icon"></view></view>
+          <view>
+            <view class="section-kicker">ARCHIVE</view>
+            <view class="section-title">档案与备注</view>
+          </view>
         </view>
         <view class="section-index">03</view>
       </view>
@@ -193,12 +224,12 @@
 
       <view class="field-group">
         <view class="field-label">VIN</view>
-        <input class="field-input" placeholder="选填，最多 32 位" placeholder-class="input-placeholder" value="{{form.vin}}" maxlength="32" data-field="vin" bindinput="handleTextInput" />
+        <input class="field-input" placeholder="选填，最多 32 位" placeholder-class="input-placeholder" value="{{form.vin}}" maxlength="32" data-field="vin" bindinput="handleTextInput" confirm-type="done" aria-label="车辆识别码 VIN" />
       </view>
 
       <view class="field-group">
         <view class="field-label">发动机号</view>
-        <input class="field-input" placeholder="选填，最多 32 位" placeholder-class="input-placeholder" value="{{form.engineNumber}}" maxlength="32" data-field="engineNumber" bindinput="handleTextInput" />
+        <input class="field-input" placeholder="选填，最多 32 位" placeholder-class="input-placeholder" value="{{form.engineNumber}}" maxlength="32" data-field="engineNumber" bindinput="handleTextInput" confirm-type="done" aria-label="发动机号" />
       </view>
 
       <view class="field-group">
@@ -211,17 +242,24 @@
           maxlength="200"
           data-field="note"
           bindinput="handleTextInput"
+          aria-label="内部备注"
         />
       </view>
     </view>
 
-    <view class="action-row">
-      <button class="secondary-button" bindtap="handleManageImages" disabled="{{loading || isSubmitting}}" hover-class="vehicle-form-button-pressed">
-        管理车辆图片
-      </button>
-      <button class="submit-button" bindtap="handleSubmit" loading="{{isSubmitting}}" disabled="{{isSubmitting}}" hover-class="vehicle-form-button-pressed">
-        {{isSubmitting ? "正在保存" : "保存车辆资料"}}
-      </button>
+    <view class="vehicle-submit-dock">
+      <view class="vehicle-submit-state {{formProgress.ready ? 'vehicle-submit-state-ready' : ''}}">
+        <view class="vehicle-submit-state-icon" aria-hidden="true"><view class="vehicle-submit-state-check"></view></view>
+        <view>{{formProgress.ready ? '必填信息完整，可保存车辆资料' : formProgress.hint}}</view>
+      </view>
+      <view class="action-row">
+        <button class="secondary-button" bindtap="handleManageImages" disabled="{{loading || isSubmitting}}" hover-class="vehicle-form-button-pressed">
+          <view class="vehicle-form-action-content"><view class="vehicle-action-native-icon vehicle-image-native-icon" aria-hidden="true"><view class="vehicle-image-native-sun"></view></view><text>管理车辆图片</text></view>
+        </button>
+        <button class="submit-button" bindtap="handleSubmit" loading="{{isSubmitting}}" disabled="{{isSubmitting}}" hover-class="vehicle-form-button-pressed">
+          <view class="vehicle-form-action-content"><view wx:if="{{!isSubmitting}}" class="vehicle-action-native-icon vehicle-save-native-icon" aria-hidden="true"></view><text>{{isSubmitting ? "正在保存" : "保存车辆资料"}}</text></view>
+        </button>
+      </view>
     </view>
   </view>
 </view>

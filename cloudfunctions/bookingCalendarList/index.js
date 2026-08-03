@@ -3,6 +3,21 @@ const cloud = require("wx-server-sdk")
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
+const AUTH_ROLE_FIELDS = {
+  role: true,
+  roles: true,
+  permissions: true,
+  isAdmin: true,
+  admin: true
+}
+const BOOKING_CALENDAR_FIELDS = {
+  _id: true,
+  vehicleId: true,
+  vehicleName: true,
+  startDate: true,
+  endDate: true,
+  status: true
+}
 const BOOKING_BATCH_SIZE = 100
 const MAX_BOOKING_RECORDS = 2000
 
@@ -43,7 +58,12 @@ async function canView(openid) {
   if (!openid) {
     return false
   }
-  const res = await db.collection("roles").where({ openid }).limit(20).get()
+  const res = await db
+    .collection("roles")
+    .where({ openid })
+    .field(AUTH_ROLE_FIELDS)
+    .limit(20)
+    .get()
   const list = res && Array.isArray(res.data) ? res.data : []
   return list.some(hasAccess)
 }
@@ -89,7 +109,7 @@ async function readBookingsByMode(monthStart, monthEnd, ranged) {
   ) {
     const remaining = MAX_BOOKING_RECORDS + 1 - list.length
     const batchSize = Math.min(BOOKING_BATCH_SIZE, remaining)
-    let query = db.collection("bookings")
+    let query = db.collection("bookings").field(BOOKING_CALENDAR_FIELDS)
     if (ranged) {
       query = query.where({
         startDate: db.command.lte(monthEnd),
@@ -180,9 +200,9 @@ exports.main = async (event) => {
   } catch (error) {
     await writeErrorLogBestEffort({
       function: "bookingCalendarList",
-      openid,
       stage: "main",
       month,
+      authenticated: Boolean(openid),
       errorMessage:
         error && (error.message || error.errMsg)
           ? String(error.message || error.errMsg).slice(0, 300)

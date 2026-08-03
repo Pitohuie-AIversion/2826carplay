@@ -7,9 +7,14 @@ function createMockDb({ rolesData, bookingData, rangeError = null }) {
   }))
   const rangeWhere = jest.fn()
   const bookingSkip = jest.fn()
+  const bookingField = jest.fn()
 
   function createBookingQuery(offset, ranged) {
     return {
+      field: jest.fn((fields) => {
+        bookingField(fields)
+        return createBookingQuery(offset, ranged)
+      }),
       where: jest.fn((filter) => {
         rangeWhere(filter)
         return createBookingQuery(0, true)
@@ -54,6 +59,7 @@ function createMockDb({ rolesData, bookingData, rangeError = null }) {
     rolesWhere,
     rangeWhere,
     bookingSkip,
+    bookingField,
     lte,
     gte,
     errorAdd
@@ -125,6 +131,21 @@ describe("cloudfunctions/bookingCalendarList integration", () => {
       startDate: { __op: "lte", value: "2026-07-31" },
       endDate: { __op: "gte", value: "2026-07-01" }
     })
+    expect(mocks.bookingField).toHaveBeenCalledWith({
+      _id: true,
+      vehicleId: true,
+      vehicleName: true,
+      startDate: true,
+      endDate: true,
+      status: true
+    })
+    const fieldSpec = mocks.bookingField.mock.calls[0][0]
+    expect(fieldSpec).not.toHaveProperty("openid")
+    expect(fieldSpec).not.toHaveProperty("phone")
+    expect(fieldSpec).not.toHaveProperty("userName")
+    expect(fieldSpec).not.toHaveProperty("city")
+    expect(fieldSpec).not.toHaveProperty("note")
+    expect(fieldSpec).not.toHaveProperty("adminRemark")
     expect(res.list).toEqual([
       {
         id: "booking_1",
@@ -208,6 +229,7 @@ describe("cloudfunctions/bookingCalendarList integration", () => {
     expect(res.ok).toBe(true)
     expect(res.list).toHaveLength(1)
     expect(mocks.bookingSkip).toHaveBeenCalledTimes(2)
+    expect(mocks.bookingField).toHaveBeenCalledTimes(2)
     expect(warnSpy).toHaveBeenCalled()
     warnSpy.mockRestore()
   })

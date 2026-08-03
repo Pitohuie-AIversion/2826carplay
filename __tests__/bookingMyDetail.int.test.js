@@ -2,7 +2,8 @@ jest.mock("wx-server-sdk")
 
 function createMockDb({ bookingData }) {
   const get = jest.fn().mockResolvedValue({ data: bookingData })
-  const doc = jest.fn(() => ({ get }))
+  const field = jest.fn(() => ({ get }))
+  const doc = jest.fn(() => ({ field }))
 
   const db = {
     collection: jest.fn((name) => {
@@ -15,7 +16,8 @@ function createMockDb({ bookingData }) {
 
   return {
     db,
-    doc
+    doc,
+    field
   }
 }
 
@@ -63,6 +65,7 @@ describe("cloudfunctions/bookingMyDetail integration", () => {
         id: "booking_1",
         vehicleId: "car_1",
         vehicleName: "MX-5",
+        vehicleReference: "",
         userName: "张三",
         phone: "13800000000",
         startDate: "2026-07-20",
@@ -75,6 +78,11 @@ describe("cloudfunctions/bookingMyDetail integration", () => {
       }
     })
     expect(mocks.doc).toHaveBeenCalledWith("booking_1")
+    const fields = mocks.field.mock.calls[0][0]
+    expect(fields.openid).toBe(true)
+    expect(fields.adminRemark).toBeUndefined()
+    expect(fields.coordinationStatus).toBeUndefined()
+    expect(fields.coordinationNote).toBeUndefined()
   })
 
   test("不能查看别人的预约详情", async () => {
@@ -93,5 +101,24 @@ describe("cloudfunctions/bookingMyDetail integration", () => {
       code: "FORBIDDEN",
       message: "只能查看自己的预约"
     })
+  })
+
+  test("预约详情不会返回历史记录中的完整车牌", async () => {
+    const mocks = createMockDb({
+      bookingData: {
+        _id: "booking_2",
+        openid: "user_openid",
+        vehicleName: "粤A12345"
+      }
+    })
+
+    const mod = await loadBookingMyDetailWith({ openid: "user_openid", mockDb: mocks.db })
+    const res = await mod.main({ id: "booking_2" })
+
+    expect(res.detail).toMatchObject({
+      vehicleName: "预约车辆",
+      vehicleReference: "车牌尾号 45"
+    })
+    expect(JSON.stringify(res.detail)).not.toContain("粤A12345")
   })
 })

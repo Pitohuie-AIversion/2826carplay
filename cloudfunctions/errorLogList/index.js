@@ -3,10 +3,29 @@ const cloud = require("wx-server-sdk")
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
+const AUTH_ROLE_FIELDS = {
+  role: true,
+  roles: true,
+  permissions: true,
+  isAdmin: true,
+  admin: true
+}
 const DEFAULT_PAGE_SIZE = 20
 const MAX_PAGE_SIZE = 50
 const LOG_BATCH_SIZE = 100
 const MAX_LOG_RECORDS = 2000
+const ERROR_LOG_FIELDS = {
+  _id: true,
+  function: true,
+  stage: true,
+  vehicleId: true,
+  bookingId: true,
+  targetStatus: true,
+  errorCode: true,
+  errorMessage: true,
+  occurredAt: true,
+  createdAt: true
+}
 
 function normalizeText(value, maxLen) {
   const text = String(value || "").trim()
@@ -49,7 +68,12 @@ async function isAdminOpenid(openid) {
     return false
   }
 
-  const res = await db.collection("roles").where({ openid }).limit(20).get()
+  const res = await db
+    .collection("roles")
+    .where({ openid })
+    .field(AUTH_ROLE_FIELDS)
+    .limit(20)
+    .get()
   const list = res && Array.isArray(res.data) ? res.data : []
   return list.some((item) => hasAdminRole(item))
 }
@@ -92,8 +116,6 @@ function formatTime(input) {
 function toSearchText(item) {
   return [
     item.function,
-    item.openid,
-    item.targetOpenid,
     item.vehicleId,
     item.bookingId,
     item.stage,
@@ -113,7 +135,7 @@ async function readErrorLogsByMode(ordered) {
   for (let offset = 0; offset <= MAX_LOG_RECORDS; offset += LOG_BATCH_SIZE) {
     const remaining = MAX_LOG_RECORDS + 1 - list.length
     const batchSize = Math.min(LOG_BATCH_SIZE, remaining)
-    let query = db.collection("error_logs")
+    let query = db.collection("error_logs").field(ERROR_LOG_FIELDS)
     if (ordered) {
       query = query.orderBy("createdAt", "desc")
     }
@@ -170,16 +192,13 @@ exports.main = async (event) => {
     const list = rawList
       .map((item) => ({
         id: item._id || "",
-        function: String(item.function || "").trim(),
-        stage: String(item.stage || "").trim(),
-        openid: String(item.openid || "").trim(),
-        targetOpenid: String(item.targetOpenid || "").trim(),
-        vehicleId: String(item.vehicleId || "").trim(),
-        bookingId: String(item.bookingId || "").trim(),
-        targetStatus: String(item.targetStatus || "").trim(),
-        errorCode: String(item.errorCode || "").trim(),
-        errorMessage: String(item.errorMessage || "").trim(),
-        stack: String(item.stack || "").trim(),
+        function: normalizeText(item.function, 80),
+        stage: normalizeText(item.stage, 80),
+        vehicleId: normalizeText(item.vehicleId, 128),
+        bookingId: normalizeText(item.bookingId, 128),
+        targetStatus: normalizeText(item.targetStatus, 50),
+        errorCode: normalizeText(item.errorCode, 80),
+        errorMessage: normalizeText(item.errorMessage, 300),
         occurredAt: formatTime(item.occurredAt),
         createdAt: formatTime(item.createdAt)
       }))
@@ -213,7 +232,7 @@ exports.main = async (event) => {
   } catch (error) {
     console.error({
       function: "errorLogList",
-      openid,
+      authenticated: Boolean(openid),
       errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
       stack: error && error.stack ? error.stack : "",
       createdAt: new Date().toISOString()

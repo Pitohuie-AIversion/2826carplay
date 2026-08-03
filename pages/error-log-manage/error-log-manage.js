@@ -1,7 +1,8 @@
 const { requirePagePermission } = require("../../shared/pageAuth")
+const { formatToastTitle } = require("../../shared/uiFeedback")
 const {
   canShareCsvFile,
-  getErrorMessage,
+  isUserCancelError,
   openCsvFile,
   removeCsvFile,
   saveCsvFile,
@@ -31,6 +32,53 @@ const FUNC_OPTIONS = [
   { value: "operationConfigUpdate", label: "运营配置" }
 ]
 
+const FUNC_LABEL_MAP = FUNC_OPTIONS.reduce((map, item) => {
+  map[item.value] = item.label
+  return map
+}, {})
+
+function buildErrorView(item) {
+  const func = String(item.function || "")
+  const sourceLabel = FUNC_LABEL_MAP[func] || "未知服务"
+  let sourceGroup = "系统运营"
+  let eventClass = "error-event-operation"
+  let eventIconClass = "error-event-icon-operation"
+
+  if (func === "bootstrapAdmin" || func === "roleUpsert") {
+    sourceGroup = "权限安全"
+    eventClass = "error-event-access"
+    eventIconClass = "error-event-icon-access"
+  } else if (func.startsWith("vehicle")) {
+    sourceGroup = "车辆管理"
+    eventClass = "error-event-vehicle"
+    eventIconClass = "error-event-icon-vehicle"
+  } else if (func.startsWith("booking")) {
+    sourceGroup = "预约服务"
+    eventClass = "error-event-booking"
+    eventIconClass = "error-event-icon-booking"
+  } else if (func.startsWith("privacyRequest")) {
+    sourceGroup = "隐私服务"
+    eventClass = "error-event-privacy"
+    eventIconClass = "error-event-icon-privacy"
+  }
+
+  let diagnosticHint = "结合发生时间前往云函数日志查看完整调用链"
+  if (item.errorCode) {
+    diagnosticHint = `优先按错误码 ${item.errorCode} 检索云函数日志`
+  } else if (item.stage) {
+    diagnosticHint = `建议先检查“${item.stage}”阶段的调用与配置`
+  }
+
+  return {
+    sourceLabel,
+    sourceGroup,
+    eventClass,
+    eventIconClass,
+    errorSignal: item.errorCode ? "错误码已记录" : "运行异常",
+    diagnosticHint
+  }
+}
+
 function formatDisplayTime(value) {
   if (!value) {
     return ""
@@ -51,12 +99,6 @@ function formatDisplayTime(value) {
 
 function buildSummary(item) {
   const parts = []
-  if (item.openid) {
-    parts.push(`操作者：${item.openid}`)
-  }
-  if (item.targetOpenid) {
-    parts.push(`目标：${item.targetOpenid}`)
-  }
   if (item.vehicleId) {
     parts.push(`车辆：${item.vehicleId}`)
   }
@@ -75,6 +117,22 @@ function buildSummary(item) {
   return parts.join("\n")
 }
 
+function buildSummaryRows(summary) {
+  return String(summary || "")
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => {
+      const separatorIndex = line.indexOf("：")
+      if (separatorIndex < 0) {
+        return { label: "详情", value: line }
+      }
+      return {
+        label: line.slice(0, separatorIndex),
+        value: line.slice(separatorIndex + 1) || "—"
+      }
+    })
+}
+
 function buildMessagePreview(message) {
   const text = String(message || "").trim()
   if (!text) {
@@ -83,7 +141,7 @@ function buildMessagePreview(message) {
   if (text.length <= 140) {
     return text
   }
-  return `${text.slice(0, 140)}...`
+  return `${text.slice(0, 140)}…`
 }
 
 Page({
@@ -94,6 +152,7 @@ Page({
     pageAuthorized: false,
     keyword: "",
     currentFunc: "all",
+    currentFuncLabel: "全部函数",
     funcOptions: FUNC_OPTIONS,
     page: 0,
     pageSize: 20,
@@ -132,6 +191,13 @@ Page({
     this.setData({ keyword: value })
   },
 
+  handleClearKeyword() {
+    if (!this.data.keyword) {
+      return
+    }
+    this.setData({ keyword: "" }, () => this.fetchList())
+  },
+
   handleSearch() {
     this.fetchList()
   },
@@ -143,9 +209,21 @@ Page({
     }
 
     this.setData({
-      currentFunc: value
+      currentFunc: value,
+      currentFuncLabel: value === "all" ? "全部函数" : FUNC_LABEL_MAP[value] || "未知服务"
     })
     this.fetchList()
+  },
+
+  handleResetFilters() {
+    if (!this.data.keyword && this.data.currentFunc === "all") {
+      return
+    }
+    this.setData({
+      keyword: "",
+      currentFunc: "all",
+      currentFuncLabel: "全部函数"
+    }, () => this.fetchList())
   },
 
   handleLoadMore() {
@@ -184,7 +262,7 @@ Page({
         const result = res && res.result ? res.result : null
         if (!result || !result.ok || !result.csvText) {
           wx.showToast({
-            title: (result && result.message) || "导出失败",
+              title: formatToastTitle(result && result.message, "导出失败"),
             icon: "none"
           })
           this.setData({ exporting: false })
@@ -212,6 +290,8 @@ Page({
                 content: result.sourceTruncated
                   ? `已导出最近扫描结果中的 ${result.total || 0} 条，日志超过 2000 条扫描上限，请缩小筛选范围后分批归档。`
                   : `符合条件 ${result.matchedTotal || 0} 条，本次已导出 ${result.total || 0} 条，请分批归档。`,
+                confirmText: "知道了",
+                confirmColor: "#528fff",
                 showCancel: false
               })
             } else {
@@ -223,7 +303,7 @@ Page({
           })
           .catch((error) => {
             wx.showToast({
-              title: getErrorMessage(error) || "保存失败",
+              title: "保存失败",
               icon: "none"
             })
             this.setData({ exporting: false })
@@ -231,7 +311,7 @@ Page({
       },
       fail: (error) => {
         wx.showToast({
-          title: getErrorMessage(error) || "导出失败",
+          title: "导出失败",
           icon: "none"
         })
         this.setData({ exporting: false })
@@ -243,7 +323,10 @@ Page({
     if (!this.data.exportFilePath || !this.data.exportFileName) {
       return
     }
-    shareCsvFile(this.data.exportFilePath, this.data.exportFileName).catch(() => {
+    shareCsvFile(this.data.exportFilePath, this.data.exportFileName).catch((error) => {
+      if (isUserCancelError(error)) {
+        return
+      }
       this.handleOpenExportedFile()
     })
   },
@@ -268,6 +351,8 @@ Page({
     wx.showModal({
       title: "删除本地 CSV",
       content: "将从当前设备删除这份导出文件，删除后无法恢复。云端错误日志不会受到影响。",
+      confirmText: "确认删除",
+      confirmColor: "#d46868",
       success: (res) => {
         if (!res.confirm) {
           return
@@ -285,34 +370,10 @@ Page({
           })
           .catch((error) => {
             wx.showToast({
-              title: getErrorMessage(error) || "删除失败",
+              title: "删除失败",
               icon: "none"
             })
           })
-      }
-    })
-  },
-
-  handleCopyStack(event) {
-    const stack = event.currentTarget.dataset.stack
-    const text = String(stack || "")
-    if (!text) {
-      return
-    }
-
-    wx.setClipboardData({
-      data: text,
-      success: () => {
-        wx.showToast({
-          title: "已复制",
-          icon: "none"
-        })
-      },
-      fail: () => {
-        wx.showToast({
-          title: "复制失败",
-          icon: "none"
-        })
       }
     })
   },
@@ -351,7 +412,7 @@ Page({
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
           wx.showToast({
-            title: (result && result.message) || "加载失败",
+          title: formatToastTitle(result && result.message, "加载失败"),
             icon: "none"
           })
           this.setData({
@@ -370,12 +431,17 @@ Page({
         }
 
         const list = Array.isArray(result.list)
-          ? result.list.map((item) => ({
-              ...item,
-              createdAtText: formatDisplayTime(item.createdAt || item.occurredAt),
-              summary: buildSummary(item),
-              messagePreview: buildMessagePreview(item.errorMessage)
-            }))
+          ? result.list.map((item) => {
+              const summary = buildSummary(item)
+              return {
+                ...item,
+                ...buildErrorView(item),
+                createdAtText: formatDisplayTime(item.createdAt || item.occurredAt),
+                summary,
+                summaryRows: buildSummaryRows(summary),
+                messagePreview: buildMessagePreview(item.errorMessage)
+              }
+            })
           : []
 
         this.setData({
@@ -393,7 +459,7 @@ Page({
       },
       fail: (error) => {
         wx.showToast({
-          title: (error && (error.errMsg || error.message)) || "加载失败",
+          title: "加载失败",
           icon: "none"
         })
         this.setData({

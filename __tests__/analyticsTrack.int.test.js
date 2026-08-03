@@ -5,12 +5,13 @@ function loadModule(openid) {
   const cloud = require("wx-server-sdk")
   cloud.__reset()
   cloud.__setMockContext({ OPENID: openid })
-  const add = jest.fn().mockResolvedValue({ _id: "event_1" })
+  const set = jest.fn().mockResolvedValue({ updated: 1 })
+  const doc = jest.fn(() => ({ set }))
   const serverDateValue = { __type: "serverDate" }
   cloud.__setMockDb({
     collection: jest.fn((name) => {
       if (name === "analytics_events") {
-        return { add }
+        return { doc }
       }
       throw new Error(`Unexpected collection: ${name}`)
     }),
@@ -20,7 +21,7 @@ function loadModule(openid) {
   jest.isolateModules(() => {
     mod = require("../cloudfunctions/analyticsTrack/index")
   })
-  return { mod, add, serverDateValue }
+  return { mod, doc, set, serverDateValue }
 }
 
 describe("cloudfunctions/analyticsTrack integration", () => {
@@ -35,15 +36,57 @@ describe("cloudfunctions/analyticsTrack integration", () => {
     })
 
     expect(res).toEqual({ ok: true })
-    expect(mocks.add).toHaveBeenCalledWith({
+    expect(mocks.doc).toHaveBeenCalledWith(expect.stringMatching(/^analytics_[a-f0-9]{32}$/))
+    expect(mocks.set).toHaveBeenCalledWith({
       data: {
         eventType: "vehicle_detail",
         vehicleId: "vehicle_1",
         createdAt: mocks.serverDateValue
       }
     })
-    expect(JSON.stringify(mocks.add.mock.calls[0][0])).not.toContain("user_openid")
-    expect(JSON.stringify(mocks.add.mock.calls[0][0])).not.toContain("18800000000")
+    expect(JSON.stringify(mocks.doc.mock.calls)).not.toContain("user_openid")
+    expect(JSON.stringify(mocks.set.mock.calls)).not.toContain("user_openid")
+    expect(JSON.stringify(mocks.set.mock.calls)).not.toContain("18800000000")
+  })
+
+  test("相同账号和事件在 5 秒内只写入一次", async () => {
+    const nowSpy = jest.spyOn(Date, "now").mockReturnValue(100000)
+    const mocks = loadModule("user_openid")
+
+    const first = mocks.mod.main({
+      eventType: "vehicle_detail",
+      vehicleId: "vehicle_1"
+    })
+    const second = mocks.mod.main({
+      eventType: "vehicle_detail",
+      vehicleId: "vehicle_2"
+    })
+    const results = await Promise.all([first, second])
+
+    expect(results).toEqual([{ ok: true }, { ok: true }])
+    expect(mocks.doc).toHaveBeenCalledTimes(1)
+    expect(mocks.set).toHaveBeenCalledTimes(1)
+    nowSpy.mockRestore()
+  })
+
+  test("写入失败后允许立即重试", async () => {
+    const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {})
+    const mocks = loadModule("user_openid")
+    mocks.set
+      .mockRejectedValueOnce(new Error("temporary error"))
+      .mockResolvedValueOnce({ updated: 1 })
+
+    const first = await mocks.mod.main({
+      eventType: "garage_view"
+    })
+    const second = await mocks.mod.main({
+      eventType: "garage_view"
+    })
+
+    expect(first.code).toBe("INTERNAL_ERROR")
+    expect(second).toEqual({ ok: true })
+    expect(mocks.set).toHaveBeenCalledTimes(2)
+    warnSpy.mockRestore()
   })
 
   test("未知事件在写入前被拒绝", async () => {
@@ -54,6 +97,6 @@ describe("cloudfunctions/analyticsTrack integration", () => {
     })
 
     expect(res.code).toBe("VALIDATION_ERROR")
-    expect(mocks.add).not.toHaveBeenCalled()
+    expect(mocks.set).not.toHaveBeenCalled()
   })
 })

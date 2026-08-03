@@ -5,6 +5,24 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
 const ROLE_BATCH_SIZE = 100
 const MAX_ROLE_RECORDS = 2000
+const AUTH_ROLE_FIELDS = {
+  role: true,
+  roles: true,
+  permissions: true,
+  isAdmin: true,
+  admin: true
+}
+const ROLE_LIST_FIELDS = {
+  _id: true,
+  openid: true,
+  role: true,
+  roles: true,
+  permissions: true,
+  isAdmin: true,
+  admin: true,
+  createdAt: true,
+  updatedAt: true
+}
 
 function normalizeStringArray(value) {
   if (!Array.isArray(value)) {
@@ -62,7 +80,12 @@ async function isAdminOpenid(openid) {
     return false
   }
 
-  const res = await db.collection("roles").where({ openid }).limit(20).get()
+  const res = await db
+    .collection("roles")
+    .where({ openid })
+    .field(AUTH_ROLE_FIELDS)
+    .limit(20)
+    .get()
   const list = res && Array.isArray(res.data) ? res.data : []
   return list.some((item) => hasAdminRole(item))
 }
@@ -82,7 +105,12 @@ async function listRoleRecords() {
   for (let offset = 0; offset <= MAX_ROLE_RECORDS; offset += ROLE_BATCH_SIZE) {
     const remaining = MAX_ROLE_RECORDS + 1 - list.length
     const batchSize = Math.min(ROLE_BATCH_SIZE, remaining)
-    const res = await db.collection("roles").skip(offset).limit(batchSize).get()
+    const res = await db
+      .collection("roles")
+      .field(ROLE_LIST_FIELDS)
+      .skip(offset)
+      .limit(batchSize)
+      .get()
     const batch = res && Array.isArray(res.data) ? res.data : []
 
     list.push(...batch)
@@ -145,7 +173,7 @@ exports.main = async (event) => {
   } catch (error) {
     console.error({
       function: "roleList",
-      openid,
+      authenticated: Boolean(openid),
       errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
       stack: error && error.stack ? error.stack : "",
       createdAt: new Date().toISOString()

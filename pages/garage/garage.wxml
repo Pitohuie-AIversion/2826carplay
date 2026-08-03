@@ -10,26 +10,65 @@
     <view class="header-main">
       <view class="page-title">{{pageTitle}}</view>
       <view class="brand-mark">
-        <image class="brand-mark-image" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+        <image class="brand-mark-image" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
       </view>
     </view>
     <view class="page-desc">{{pageSubtitle}}</view>
   </view>
 
-  <scroll-view wx:if="{{(!initialLoading && !loadingCars) || cars.length}}" class="category-scroll" scroll-x enable-flex show-scrollbar="{{false}}">
-    <view class="category-list">
-      <view
-        wx:for="{{categories}}"
-        wx:key="id"
-        class="category-item ui-pill {{currentCategory === item.id ? 'ui-pill-active' : ''}}"
-        data-category-id="{{item.id}}"
-        bindtap="handleCategoryTap"
-      >
-        <text>{{item.name}}</text>
-        <text class="category-count ui-badge">{{item.count}}</text>
+  <view wx:if="{{(!initialLoading && !loadingCars) || cars.length}}" class="garage-search ui-card">
+    <view class="search-symbol" aria-hidden="true"></view>
+    <input
+      class="search-input"
+      value="{{searchKeyword}}"
+      placeholder="搜索车型、品牌或车辆标签"
+      aria-label="车辆搜索关键词"
+      placeholder-class="search-placeholder"
+      maxlength="40"
+      confirm-type="search"
+      bindinput="handleSearchInput"
+    />
+    <button
+      wx:if="{{searchKeyword}}"
+      class="search-clear"
+      bindtap="handleClearSearch"
+      hover-class="search-clear-pressed"
+      aria-label="清空车辆搜索关键词"
+    ><view class="search-clear-icon" aria-hidden="true"></view></button>
+  </view>
+
+  <view wx:if="{{(!initialLoading && !loadingCars) || cars.length}}" class="category-scroll-shell">
+    <scroll-view
+      class="category-scroll"
+      scroll-x
+      scroll-with-animation
+      scroll-into-view="garage-category-{{currentCategory}}"
+      enhanced
+      enable-flex
+      show-scrollbar="{{false}}"
+      aria-label="车辆分类，可横向滑动"
+    >
+      <view class="category-list">
+        <view
+          id="garage-category-{{item.id}}"
+          wx:for="{{categories}}"
+          wx:key="id"
+          class="category-item ui-pill {{currentCategory === item.id ? 'ui-pill-active' : ''}}"
+          data-category-id="{{item.id}}"
+          bindtap="handleCategoryTap"
+          hover-class="ui-pill-pressed"
+          aria-role="button"
+          aria-pressed="{{currentCategory === item.id}}"
+        >
+          <text>{{item.name}}</text>
+          <text class="category-count ui-badge">{{item.count}}</text>
+        </view>
       </view>
+    </scroll-view>
+    <view wx:if="{{categories.length > 3}}" class="horizontal-scroll-cue" aria-hidden="true">
+      <view class="horizontal-scroll-cue-arrow"></view>
     </view>
-  </scroll-view>
+  </view>
 
   <view wx:if="{{(!initialLoading && !loadingCars) || cars.length}}" class="summary-panel ui-card ui-card-soft">
     <view class="summary-copy">
@@ -47,8 +86,16 @@
         </view>
       </view>
     </view>
-    <view class="summary-service" bindtap="handlePhoneCall">
-      <view class="service-icon">⌁</view>
+    <view
+      class="summary-service"
+      bindtap="handlePhoneCall"
+      hover-class="summary-service-pressed"
+      aria-role="button"
+      aria-label="拨打专属顾问电话"
+    >
+      <view class="service-icon" aria-hidden="true">
+        <view class="service-phone-icon"></view>
+      </view>
       <view class="service-copy">
         <view class="service-label">专属顾问</view>
         <view class="service-phone">{{servicePhone}}</view>
@@ -56,7 +103,7 @@
     </view>
   </view>
 
-  <view class="garage-skeleton" wx:if="{{(initialLoading || loadingCars) && !cars.length}}">
+  <view class="garage-skeleton" wx:if="{{(initialLoading || loadingCars) && !cars.length}}" aria-hidden="true">
     <view class="garage-skeleton-pills">
       <view class="garage-skeleton-pill skeleton-pulse"></view>
       <view class="garage-skeleton-pill garage-skeleton-pill-wide skeleton-pulse"></view>
@@ -95,19 +142,57 @@
     </view>
   </view>
 
-  <view class="empty-state" wx:elif="{{loadError}}">
+  <view
+    wx:if="{{((!initialLoading && !loadingCars) || cars.length) && categorySummary.total}}"
+    class="availability-filter availability-filter-compact ui-card"
+  >
+    <view class="availability-copy">
+      <view class="availability-filter-native-icon" aria-hidden="true">
+        <view class="availability-filter-line availability-filter-line-top"></view>
+        <view class="availability-filter-line availability-filter-line-bottom"></view>
+      </view>
+      <view class="availability-title">车辆状态</view>
+    </view>
+    <view class="availability-options">
+      <view
+        class="availability-option {{!availableOnly ? 'availability-option-active' : ''}}"
+        data-mode="all"
+        bindtap="handleAvailabilityFilterTap"
+        hover-class="availability-option-pressed"
+        aria-role="button"
+        aria-pressed="{{!availableOnly}}"
+        aria-label="查看全部 {{categorySummary.total}} 辆车辆"
+      >
+        全部
+      </view>
+      <view
+        class="availability-option {{availableOnly ? 'availability-option-active' : ''}}"
+        data-mode="available"
+        bindtap="handleAvailabilityFilterTap"
+        hover-class="availability-option-pressed"
+        aria-role="button"
+        aria-pressed="{{availableOnly}}"
+        aria-label="只看可预约的 {{categorySummary.available}} 辆车辆"
+      >
+        可预约
+      </view>
+    </view>
+  </view>
+
+  <view class="empty-state" wx:if="{{loadError}}">
+    <view class="garage-state-icon garage-error-native-icon" aria-hidden="true"><view class="garage-error-native-mark"></view></view>
     <view class="empty-title">加载失败</view>
     <view class="empty-desc">{{loadErrorText}}</view>
-    <button class="ui-btn ui-btn-primary" bindtap="handleRetryLoad">重新加载</button>
+    <button class="ui-btn ui-btn-primary" bindtap="handleRetryLoad"><view class="garage-action-content"><view class="garage-action-native-icon garage-retry-native-icon" aria-hidden="true"></view><text>重新加载</text></view></button>
   </view>
 
   <view class="car-list" wx:elif="{{filteredCars.length}}">
     <view class="list-heading">
       <view>
         <view class="list-kicker">CURATED FLEET</view>
-        <view class="list-title">为你甄选</view>
+        <view class="list-title">{{searchKeyword ? '搜索结果' : '为你甄选'}}</view>
       </view>
-      <view class="list-count">{{filteredCars.length}} VEHICLES</view>
+      <view class="list-count">{{searchKeyword && hasMore ? '当前已加载 ' : ''}}{{filteredCars.length}} VEHICLES</view>
     </view>
     <car-card
       wx:for="{{filteredCars}}"
@@ -122,32 +207,40 @@
       disabled="{{loadingCars}}"
       bindtap="handleLoadMore"
     >
-      加载更多车辆
+      <view class="garage-action-content"><view wx:if="{{!loadingCars}}" class="garage-action-native-icon garage-more-native-icon" aria-hidden="true"></view><text>{{loadingCars ? '正在加载' : '加载更多车辆'}}</text></view>
     </button>
+    <view wx:elif="{{!truncated}}" class="garage-list-end"><view class="garage-complete-native-icon" aria-hidden="true"></view><text>已展示当前全部车辆</text></view>
     <view wx:if="{{truncated}}" class="garage-capacity-tip">当前最多展示 2000 辆，请联系管理员缩小车辆范围。</view>
   </view>
 
   <view class="empty-state" wx:else>
-    <view class="empty-title">暂无车辆</view>
-    <view class="empty-desc">{{emptyText}}</view>
+    <view wx:if="{{searchKeyword}}" class="garage-state-icon garage-search-empty-native-icon" aria-hidden="true"></view>
+    <view wx:elif="{{availableOnly && categorySummary.total}}" class="garage-state-icon garage-filter-empty-native-icon" aria-hidden="true"><view class="garage-filter-empty-line garage-filter-empty-line-top"></view><view class="garage-filter-empty-line garage-filter-empty-line-bottom"></view></view>
+    <view wx:else class="garage-state-icon garage-empty-native-icon" aria-hidden="true"><view class="garage-empty-native-door"></view></view>
+    <view class="empty-title">{{searchKeyword ? '没有找到相关车辆' : availableOnly && categorySummary.total ? '当前暂无可预约车辆' : '暂无车辆'}}</view>
+    <view class="empty-desc">
+      {{searchKeyword ? '试试车型、品牌或车辆标签；当前搜索范围为已加载车辆' : availableOnly && categorySummary.total ? '可查看全部状态，或联系专属顾问确认后续档期' : emptyText}}
+    </view>
+    <button
+      wx:if="{{searchKeyword && hasMore}}"
+      class="ui-btn ui-btn-primary"
+      loading="{{loadingCars}}"
+      disabled="{{loadingCars}}"
+      bindtap="handleLoadMore"
+    ><view class="garage-action-content"><view wx:if="{{!loadingCars}}" class="garage-action-native-icon garage-search-more-native-icon" aria-hidden="true"></view><text>{{loadingCars ? '正在搜索' : '继续搜索更多车辆'}}</text></view></button>
+    <button
+      wx:if="{{searchKeyword}}"
+      class="ui-btn ui-btn-ghost empty-secondary-action"
+      bindtap="handleClearSearch"
+    ><view class="garage-action-content"><view class="garage-action-native-icon garage-clear-native-icon" aria-hidden="true"></view><text>清除搜索</text></view></button>
+    <button
+      wx:elif="{{availableOnly && categorySummary.total}}"
+      class="ui-btn ui-btn-ghost"
+      bindtap="handleShowAllStatuses"
+    >
+      <view class="garage-action-content"><view class="garage-action-native-icon garage-status-native-icon" aria-hidden="true"></view><text>查看全部状态</text></view>
+    </button>
   </view>
 
-  <view class="bottom-bar">
-    <button class="bottom-action action-contact" open-type="contact">
-      <text class="bottom-icon bottom-icon-active">◈</text>
-      <text class="bottom-label bottom-label-active">客服</text>
-    </button>
-    <button class="bottom-action" bindtap="handlePhoneCall">
-      <text class="bottom-icon">⌕</text>
-      <text class="bottom-label">电话</text>
-    </button>
-    <button class="bottom-action" open-type="share">
-      <text class="bottom-icon">↗</text>
-      <text class="bottom-label">分享</text>
-    </button>
-    <button class="bottom-action" bindtap="handleMineTap">
-      <text class="bottom-icon">◎</text>
-      <text class="bottom-label">我的</text>
-    </button>
-  </view>
+  <core-nav active-key="garage" />
 </view>

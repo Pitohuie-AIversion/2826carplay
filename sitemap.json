@@ -11,22 +11,6 @@
     },
     {
       "action": "allow",
-      "page": "pages/booking/booking"
-    },
-    {
-      "action": "allow",
-      "page": "pages/mine/mine"
-    },
-    {
-      "action": "allow",
-      "page": "pages/bookings/bookings"
-    },
-    {
-      "action": "allow",
-      "page": "pages/booking-detail/booking-detail"
-    },
-    {
-      "action": "allow",
       "page": "pages/content-page/content-page"
     },
     {

@@ -18,6 +18,11 @@ function createMockDb({ rolesData, errorData }) {
     }))
   }))
   const errorOrderBy = jest.fn(() => ({ skip: errorSkip }))
+  const errorField = jest.fn(() => ({
+    limit: errorLimit,
+    skip: errorSkip,
+    orderBy: errorOrderBy
+  }))
 
   const db = {
     collection: jest.fn((name) => {
@@ -25,7 +30,12 @@ function createMockDb({ rolesData, errorData }) {
         return { where: rolesWhere }
       }
       if (name === "error_logs") {
-        return { limit: errorLimit, skip: errorSkip, orderBy: errorOrderBy }
+        return {
+          limit: errorLimit,
+          skip: errorSkip,
+          orderBy: errorOrderBy,
+          field: errorField
+        }
       }
       throw new Error(`Unexpected collection: ${name}`)
     })
@@ -35,7 +45,8 @@ function createMockDb({ rolesData, errorData }) {
     db,
     errorLimit,
     errorSkip,
-    errorOrderBy
+    errorOrderBy,
+    errorField
   }
 }
 
@@ -71,6 +82,20 @@ describe("cloudfunctions/errorLogList integration", () => {
     expect(res.total).toBe(2)
     expect(res.list).toHaveLength(1)
     expect(res.hasMore).toBe(true)
+    expect(mocks.errorField).toHaveBeenCalledWith({
+      _id: true,
+      function: true,
+      stage: true,
+      vehicleId: true,
+      bookingId: true,
+      targetStatus: true,
+      errorCode: true,
+      errorMessage: true,
+      occurredAt: true,
+      createdAt: true
+    })
+    expect(res.list[0]).not.toHaveProperty("openid")
+    expect(res.list[0]).not.toHaveProperty("targetOpenid")
   })
 
   test("func 可筛选", async () => {
@@ -101,7 +126,8 @@ describe("cloudfunctions/errorLogList integration", () => {
           bookingId: "booking_88",
           targetStatus: "contacted",
           errorCode: "50002",
-          errorMessage: "api unavailable",
+          errorMessage: `api unavailable ${"x".repeat(400)}`,
+          stack: "Error: api unavailable at /workspace/private/source.js:42:7",
           createdAt: "2026-07-29T08:00:00.000Z"
         }
       ]
@@ -120,6 +146,33 @@ describe("cloudfunctions/errorLogList integration", () => {
         errorCode: "50002"
       })
     )
+    expect(res.list[0]).not.toHaveProperty("stack")
+    expect(res.list[0].errorMessage).toHaveLength(300)
+  })
+
+  test("历史错误日志中的身份字段不会被读取或返回", async () => {
+    const mocks = createMockDb({
+      rolesData: [{ openid: "admin_openid", role: "admin" }],
+      errorData: [
+        {
+          _id: "e_legacy",
+          function: "roleUpsert",
+          openid: "legacy_operator_secret",
+          targetOpenid: "legacy_target_secret",
+          errorMessage: "save failed",
+          createdAt: "2026-07-16T00:00:00.000Z"
+        }
+      ]
+    })
+    const mod = await loadErrorLogListWith({ openid: "admin_openid", mockDb: mocks.db })
+
+    const res = await mod.main({})
+    const fields = mocks.errorField.mock.calls[0][0]
+
+    expect(fields).not.toHaveProperty("openid")
+    expect(fields).not.toHaveProperty("targetOpenid")
+    expect(JSON.stringify(res.list)).not.toContain("legacy_operator_secret")
+    expect(JSON.stringify(res.list)).not.toContain("legacy_target_secret")
   })
 
   test("非 admin 返回 FORBIDDEN", async () => {

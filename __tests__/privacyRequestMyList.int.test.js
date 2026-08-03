@@ -9,9 +9,12 @@ function createMockDb({ records, orderedError = null }) {
   const orderBy = jest.fn(() => ({ skip: orderedSkip }))
   const fallbackGet = jest.fn().mockResolvedValue({ data: records })
   const fallbackLimit = jest.fn(() => ({ get: fallbackGet }))
-  const where = jest.fn(() => ({
+  const field = jest.fn(() => ({
     orderBy,
     limit: fallbackLimit
+  }))
+  const where = jest.fn(() => ({
+    field
   }))
 
   return {
@@ -24,6 +27,7 @@ function createMockDb({ records, orderedError = null }) {
       })
     },
     where,
+    field,
     orderBy,
     fallbackLimit
   }
@@ -76,6 +80,21 @@ describe("cloudfunctions/privacyRequestMyList integration", () => {
     })
     expect(res.list[0].handledBy).toBeUndefined()
     expect(res.list[0].openid).toBeUndefined()
+    const fields = mocks.field.mock.calls[0][0]
+    expect(fields).toEqual(
+      expect.objectContaining({
+        _id: true,
+        type: true,
+        description: true,
+        status: true,
+        resolutionNote: true,
+        createdAt: true,
+        updatedAt: true
+      })
+    )
+    expect(fields.openid).toBeUndefined()
+    expect(fields.handledBy).toBeUndefined()
+    expect(fields.dataExportedBy).toBeUndefined()
   })
 
   test("缺少复合索引时自动降级并按时间排序", async () => {

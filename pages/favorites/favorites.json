@@ -2,7 +2,9 @@
   "navigationBarTitleText": "我的收藏",
   "enablePullDownRefresh": true,
   "backgroundColor": "#101010",
+  "backgroundTextStyle": "light",
   "usingComponents": {
-    "car-card": "/components/car-card/car-card"
+    "car-card": "/components/car-card/car-card",
+    "core-nav": "/components/core-nav/core-nav"
   }
 }

@@ -6,9 +6,9 @@
     <view class="intro-desc">管理预约与专属服务</view>
   </view>
 
-  <view class="profile-card ui-card ui-card-gradient">
+  <view class="profile-card ui-card ui-card-gradient" aria-role="group" aria-label="{{userName}}，{{roleLabel}}，{{userDesc}}">
     <view class="avatar-ring">
-      <image class="avatar-image" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+      <image class="avatar-image" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
     </view>
     <view class="profile-info">
       <view class="profile-name">{{userName}}</view>
@@ -22,52 +22,172 @@
         <text>{{roleLabel}}</text>
       </view>
     </view>
-    <image class="profile-watermark" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+    <image class="profile-watermark" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
+  </view>
+
+  <view
+    wx:if="{{operationPulse.visible}}"
+    class="operation-pulse operation-pulse-priority ui-card"
+    bindtap="handleOperationPulseTap"
+    hover-class="operation-pulse-pressed"
+    aria-role="button"
+    aria-label="查看运营概览，{{operationPulse.total}} 项待处理"
+  >
+    <view class="operation-pulse-top">
+      <view>
+        <view class="section-kicker">OPERATIONS PULSE</view>
+        <view class="operation-pulse-title">
+          {{operationPulse.total ? operationPulse.total + ' 项待处理' : '当前暂无待办'}}
+        </view>
+      </view>
+      <view class="operation-pulse-side">
+        <view class="operation-pulse-state {{operationPulse.partial ? 'operation-pulse-state-warning' : ''}}">
+          <view class="operation-pulse-state-icon {{summaryLoading ? 'operation-pulse-state-icon-loading' : operationPulse.partial ? 'operation-pulse-state-icon-warning' : 'operation-pulse-state-icon-ready'}}" aria-hidden="true"><view class="operation-pulse-state-mark"></view></view>
+          <text>{{summaryLoading ? '同步中…' : operationPulse.partial ? '部分同步' : '已同步 ' + operationPulse.updatedText}}</text>
+        </view>
+        <view class="operation-pulse-arrow" aria-hidden="true">
+          <view class="direction-arrow-icon"></view>
+        </view>
+      </view>
+    </view>
+    <view class="operation-pulse-items">
+      <view
+        class="operation-pulse-item {{item.unavailable ? 'operation-pulse-item-unavailable' : ''}}"
+        wx:for="{{operationPulse.items}}"
+        wx:key="key"
+      >
+        <view class="operation-pulse-native-icon {{item.iconClass}}" aria-hidden="true"></view>
+        <view class="operation-pulse-value">{{item.displayValue}}</view>
+        <view class="operation-pulse-label">{{item.label}}</view>
+      </view>
+    </view>
+    <view class="operation-pulse-foot">
+      {{operationPulse.attentionAreas ? operationPulse.attentionAreas + ' 个模块需要关注，点击查看处理建议' : '各模块状态平稳，点击查看运营详情'}}
+    </view>
+  </view>
+
+  <view class="member-services ui-card">
+    <view class="section-heading member-services-heading">
+      <view>
+        <view class="section-kicker">MY JOURNEY</view>
+        <view class="section-title">常用服务</view>
+      </view>
+      <view class="member-services-note">快捷直达</view>
+    </view>
+    <view class="member-shortcuts">
+      <view
+        class="member-shortcut member-shortcut-{{item.accent}}"
+        wx:for="{{memberQuickActions}}"
+        wx:key="key"
+        data-key="{{item.key}}"
+        data-title="{{item.title}}"
+        bindtap="handleMenuTap"
+        hover-class="member-shortcut-pressed"
+        aria-role="button"
+        aria-label="{{item.title}}，{{item.desc}}"
+      >
+        <view class="member-shortcut-top">
+          <view class="member-shortcut-symbol" aria-hidden="true">
+            <view class="member-shortcut-icon member-shortcut-icon-{{item.icon}}">
+              <view wx:if="{{item.icon === 'heart'}}" class="member-shortcut-heart-shape"></view>
+            </view>
+          </view>
+          <view class="member-shortcut-arrow" aria-hidden="true">
+            <view class="direction-arrow-icon"></view>
+          </view>
+        </view>
+        <view class="member-shortcut-kicker">{{item.kicker}}</view>
+        <view class="member-shortcut-title">{{item.title}}</view>
+        <view class="member-shortcut-desc">{{item.desc}}</view>
+      </view>
+    </view>
   </view>
 
   <view class="section-card ui-card">
     <view class="section-heading">
       <view>
         <view class="section-kicker">SERVICES</view>
-        <view class="section-title">功能中心</view>
+        <view class="section-title">更多服务</view>
       </view>
-      <view class="section-count">{{permissionsLoading ? 'SYNC' : menuItems.length + ' ENTRIES'}}</view>
+      <view class="section-count {{permissionsLoading ? 'section-count-loading' : ''}}">
+        <block wx:if="{{permissionsLoading}}">
+          <view class="section-count-dot" aria-hidden="true"></view>
+          <text>同步权限</text>
+        </block>
+        <block wx:else><text class="section-count-value">{{menuItems.length}}</text><text>项服务</text></block>
+      </view>
     </view>
-    <block wx:for="{{menuItems}}" wx:key="key">
-      <view wx:if="{{item.showSectionHeader}}" class="menu-group-heading {{index === 0 ? 'menu-group-heading-first' : ''}}">
-        <view class="menu-group-line"></view>
+    <view wx:if="{{permissionsLoading}}" class="menu-skeleton" aria-hidden="true">
+      <view class="menu-skeleton-group">
+        <view class="menu-skeleton-group-line"></view>
         <view>
-          <view class="menu-group-kicker">{{item.sectionKicker}}</view>
-          <view class="menu-group-title">{{item.section}}</view>
+          <view class="menu-skeleton-kicker menu-skeleton-pulse"></view>
+          <view class="menu-skeleton-group-title menu-skeleton-pulse"></view>
         </view>
       </view>
-      <view
-        class="menu-item {{index === menuItems.length - 1 ? 'menu-item-last' : ''}}"
-        data-key="{{item.key}}"
-        data-title="{{item.title}}"
-        bindtap="handleMenuTap"
-        hover-class="menu-item-pressed"
-      >
-        <view class="menu-glyph {{item.key === 'errorLogManage' ? 'menu-glyph-danger' : ''}}">{{item.glyph}}</view>
-        <view class="menu-copy">
-          <view class="menu-title">{{item.title}}</view>
-          <view class="menu-desc">{{item.desc}}</view>
+      <view class="menu-skeleton-row" wx:for="{{[1, 2, 3, 4]}}" wx:key="*this">
+        <view class="menu-skeleton-icon menu-skeleton-pulse"></view>
+        <view class="menu-skeleton-copy">
+          <view class="menu-skeleton-title menu-skeleton-pulse"></view>
+          <view class="menu-skeleton-desc menu-skeleton-pulse"></view>
         </view>
-        <view wx:if="{{item.badgeText}}" class="menu-badge">{{item.badgeText}}</view>
-        <view class="menu-arrow">↗</view>
+        <view class="menu-skeleton-arrow menu-skeleton-pulse"></view>
       </view>
+    </view>
+    <block wx:else>
+      <block wx:for="{{menuItems}}" wx:key="key">
+        <view wx:if="{{item.showSectionHeader}}" class="menu-group-heading {{index === 0 ? 'menu-group-heading-first' : ''}}">
+          <view class="menu-group-line"></view>
+          <view>
+            <view class="menu-group-kicker">{{item.sectionKicker}}</view>
+            <view class="menu-group-title">{{item.section}}</view>
+          </view>
+        </view>
+        <view
+          class="menu-item {{index === menuItems.length - 1 ? 'menu-item-last' : ''}}"
+          data-key="{{item.key}}"
+          data-title="{{item.title}}"
+          bindtap="handleMenuTap"
+          hover-class="menu-item-pressed"
+          aria-role="button"
+          aria-label="{{item.title}}，{{item.desc}}{{item.badgeText ? '，' + item.badgeText + ' 项待处理' : ''}}"
+        >
+          <view class="menu-glyph {{item.key === 'errorLogManage' ? 'menu-glyph-danger' : ''}}" aria-hidden="true">
+            <view class="menu-icon menu-icon-{{item.icon}}">
+              <view wx:if="{{item.icon === 'heart'}}" class="menu-heart-shape"></view>
+            </view>
+          </view>
+          <view class="menu-copy">
+            <view class="menu-title">{{item.title}}</view>
+            <view class="menu-desc">{{item.desc}}</view>
+          </view>
+          <view wx:if="{{item.badgeText}}" class="menu-badge">{{item.badgeText}}</view>
+          <view class="menu-arrow" aria-hidden="true">
+            <view class="direction-arrow-icon"></view>
+          </view>
+        </view>
+      </block>
     </block>
   </view>
 
-  <view class="section-card ui-card">
-    <view class="section-kicker">CONCIERGE</view>
-    <view class="section-title">联系客服</view>
-    <view class="section-desc">如需确认车辆档期、价格或取还车规则，可直接联系在线客服。</view>
+  <view class="section-card contact-card ui-card">
+    <view class="contact-heading">
+      <view>
+        <view class="section-kicker">CONCIERGE</view>
+        <view class="section-title">联系客服</view>
+      </view>
+      <view class="concierge-native-icon" aria-hidden="true"><view class="concierge-native-head"></view><view class="concierge-native-mic"></view></view>
+    </view>
+    <view class="section-desc">如需确认车辆档期、价格或取还车规则，可选择在线客服或电话咨询。</view>
     <view class="contact-actions">
-      <button class="action-button ui-btn ui-btn-ghost" open-type="contact" hover-class="mine-button-pressed">在线客服</button>
-      <button class="action-button ui-btn ui-btn-ghost action-button-offset" bindtap="handlePhoneCall" hover-class="mine-button-pressed">电话咨询</button>
+      <button class="action-button ui-btn ui-btn-ghost" open-type="contact" hover-class="mine-button-pressed" aria-label="联系极境车库在线客服">
+        <view class="contact-action-content"><view class="contact-action-native-icon contact-chat-native-icon" aria-hidden="true"></view><text>在线客服</text></view>
+      </button>
+      <button class="action-button ui-btn ui-btn-ghost action-button-offset" bindtap="handlePhoneCall" hover-class="mine-button-pressed" aria-label="拨打极境车库咨询电话">
+        <view class="contact-action-content"><view class="contact-action-native-icon contact-phone-native-icon" aria-hidden="true"></view><text>电话咨询</text></view>
+      </button>
     </view>
   </view>
 
-  <button class="home-button ui-btn ui-btn-primary" bindtap="handleBackHome" hover-class="mine-button-pressed">返回车库首页</button>
+  <core-nav active-key="mine" />
 </view>

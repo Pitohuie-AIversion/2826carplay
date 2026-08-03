@@ -1,5 +1,6 @@
 const { requirePagePermission } = require("../../shared/pageAuth")
-const { removeCsvFile } = require("../../shared/csvFile")
+const { isUserCancelError, removeCsvFile } = require("../../shared/csvFile")
+const { formatToastTitle } = require("../../shared/uiFeedback")
 
 const STATUS_OPTIONS = [
   { value: "all", label: "全部" },
@@ -57,6 +58,8 @@ function showStatusUpdateFeedback(result, done) {
     wx.showModal({
       title: "状态已更新",
       content: "预约状态已更新，但提醒发送失败。可在错误日志中查看原因。",
+      confirmText: "知道了",
+      confirmColor: "#528fff",
       showCancel: false,
       complete: done
     })
@@ -144,11 +147,11 @@ function buildRecentCreatedViewModel(list) {
     const status = item.status || "pending"
     return {
       id: item.id || "",
-      vehicleName: item.vehicleName || "--",
-      userName: item.userName || "--",
-      city: item.city || "--",
-      startDate: item.startDate || "--",
-      endDate: item.endDate || "--",
+      vehicleName: item.vehicleName || "—",
+      userName: item.userName || "—",
+      city: item.city || "—",
+      startDate: item.startDate || "—",
+      endDate: item.endDate || "—",
       status,
       statusText: STATUS_TEXT_MAP[status] || "待联系",
       statusClass: STATUS_CLASS_MAP[status] || "status-pending",
@@ -186,6 +189,40 @@ function normalizePhone(value) {
     return ""
   }
   return phone
+}
+
+function buildJourneyView(status) {
+  const current = String(status || "pending")
+  if (current === "contacted") {
+    return {
+      journeyStage: 2,
+      journeyProgress: 67,
+      journeyHint: "下一步：完成协调并确认行程",
+      journeyClass: "booking-journey-contacted"
+    }
+  }
+  if (current === "completed") {
+    return {
+      journeyStage: 3,
+      journeyProgress: 100,
+      journeyHint: "本次预约跟进已完成",
+      journeyClass: "booking-journey-completed"
+    }
+  }
+  if (current === "cancelled") {
+    return {
+      journeyStage: 0,
+      journeyProgress: 0,
+      journeyHint: "本次预约已取消",
+      journeyClass: "booking-journey-cancelled"
+    }
+  }
+  return {
+    journeyStage: 1,
+    journeyProgress: 33,
+    journeyHint: "下一步：联系客户确认需求",
+    journeyClass: "booking-journey-pending"
+  }
 }
 
 function ensureCsvFileName(name) {
@@ -302,6 +339,13 @@ Page({
     this.setData({ keyword: value })
   },
 
+  handleClearKeyword() {
+    if (!this.data.keyword) {
+      return
+    }
+    this.setData({ keyword: "" }, () => this.fetchList())
+  },
+
   handleKeywordConfirm() {
     this.fetchList()
   },
@@ -390,7 +434,7 @@ Page({
         const result = res && res.result ? res.result : null
         if (!result || !result.ok || !result.csvText) {
           wx.showToast({
-            title: (result && result.message) || "导出失败",
+          title: formatToastTitle(result && result.message, "导出失败"),
             icon: "none"
           })
           this.setData({ loading: false })
@@ -408,7 +452,7 @@ Page({
       },
       fail: (error) => {
         wx.showToast({
-          title: (error && (error.errMsg || error.message)) || "导出失败",
+          title: "导出失败",
           icon: "none"
         })
         this.setData({ loading: false })
@@ -446,22 +490,24 @@ Page({
         }
         if (truncated) {
           wx.showModal({
-            title: "CSV已生成",
+            title: "CSV 已生成",
             content: sourceTruncated
               ? `已导出最近扫描结果中的 ${total} 条，数据超过 2000 条扫描上限，请缩小筛选范围后分批导出。`
               : `符合条件 ${matchedTotal} 条，本次已导出 ${total} 条，请缩小筛选范围后分批导出。`,
+            confirmText: "知道了",
+            confirmColor: "#528fff",
             showCancel: false
           })
         } else {
           wx.showToast({
-            title: "CSV已生成，请点击下方按钮分享",
+            title: "CSV 已生成",
             icon: "none"
           })
         }
       },
       fail: (error) => {
         wx.showToast({
-          title: getErrorMessage(error) || "保存失败",
+          title: "保存失败",
           icon: "none"
         })
         this.setData({ loading: false })
@@ -501,6 +547,8 @@ Page({
     wx.showModal({
       title: "删除本地 CSV",
       content: "将从当前设备删除这份导出文件，删除后无法恢复。云端预约数据不会受到影响。",
+      confirmText: "确认删除",
+      confirmColor: "#d46868",
       success: (res) => {
         if (!res.confirm) {
           return
@@ -518,7 +566,7 @@ Page({
           })
           .catch((error) => {
             wx.showToast({
-              title: getErrorMessage(error) || "删除失败",
+              title: "删除失败",
               icon: "none"
             })
           })
@@ -530,7 +578,7 @@ Page({
     const share = wx.shareFileMessage
     if (isDevtoolsEnv()) {
       wx.showToast({
-        title: "开发者工具不支持直接分享，将为你打开文件",
+        title: "将打开文件",
         icon: "none"
       })
       this.openCsvFile(filePath)
@@ -543,14 +591,18 @@ Page({
         fileName,
         success: () => {
           wx.showToast({
-            title: "已生成文件，可直接分享",
+            title: "文件已生成",
             icon: "none"
           })
         },
         fail: (error) => {
+          if (isUserCancelError(error)) {
+            return
+          }
+
           if (isTapGestureShareError(error)) {
             wx.showToast({
-              title: "当前环境限制直接分享，已为你打开文件",
+              title: "将打开文件",
               icon: "none"
             })
             this.openCsvFile(filePath)
@@ -559,7 +611,7 @@ Page({
 
           if (isDevtoolsNotSupportedShareError(error)) {
             wx.showToast({
-              title: "当前环境不支持直接分享，将为你打开文件",
+              title: "将打开文件",
               icon: "none"
             })
             this.openCsvFile(filePath)
@@ -567,7 +619,7 @@ Page({
           }
 
           wx.showToast({
-            title: getErrorMessage(error) || "分享失败",
+            title: "分享失败",
             icon: "none"
           })
         }
@@ -588,7 +640,7 @@ Page({
         success: () => {},
         fail: () => {
           wx.showToast({
-            title: "文件已生成",
+            title: "文件打开失败",
             icon: "none"
           })
         }
@@ -597,7 +649,7 @@ Page({
     }
 
     wx.showToast({
-      title: "文件已生成",
+      title: "暂不支持打开",
       icon: "none"
     })
   },
@@ -652,19 +704,13 @@ Page({
 
     wx.makePhoneCall({
       phoneNumber: phone,
-      success: () => {
-        wx.showToast({
-          title: "已打开拨号",
-          icon: "none"
-        })
-      },
       fail: (error) => {
         const message = error && (error.errMsg || error.message)
         if (message && String(message).includes("cancel")) {
           return
         }
         wx.showToast({
-          title: "拨号失败，请进入详情复制号码",
+          title: "拨号失败，请复制号码",
           icon: "none"
         })
       }
@@ -687,6 +733,8 @@ Page({
     wx.showModal({
       title: "更新状态",
       content: `确认将该预约更新为「${statusText}」？`,
+      confirmText: "确认更新",
+      confirmColor: status === "cancelled" ? "#d46868" : "#528fff",
       success: (modalRes) => {
         if (!modalRes.confirm) {
           return
@@ -734,7 +782,7 @@ Page({
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
           wx.showToast({
-            title: (result && result.message) || "更新失败",
+          title: formatToastTitle(result && result.message, "更新失败"),
             icon: "none"
           })
           this.setData({ loading: false })
@@ -747,7 +795,7 @@ Page({
       },
       fail: (error) => {
         wx.showToast({
-          title: (error && (error.errMsg || error.message)) || "更新失败",
+          title: "更新失败",
           icon: "none"
         })
         this.setData({ loading: false })
@@ -775,7 +823,7 @@ Page({
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
           wx.showToast({
-            title: (result && result.message) || "保存失败",
+          title: formatToastTitle(result && result.message, "保存失败"),
             icon: "none"
           })
           this.setData({ loading: false })
@@ -791,7 +839,7 @@ Page({
       },
       fail: (error) => {
         wx.showToast({
-          title: (error && (error.errMsg || error.message)) || "保存失败",
+          title: "保存失败",
           icon: "none"
         })
         this.setData({ loading: false })
@@ -858,7 +906,8 @@ Page({
             priorityClass: `priority-${schedulePriority}`,
             coordinationStatus,
             coordinationStatusText: COORDINATION_TEXT_MAP[coordinationStatus],
-            coordinationClass: `coordination-${coordinationStatus}`
+            coordinationClass: `coordination-${coordinationStatus}`,
+            ...buildJourneyView(status)
           }
         })
 
@@ -881,7 +930,7 @@ Page({
       },
       fail: (error) => {
         wx.showToast({
-          title: (error && (error.errMsg || error.message)) || "加载失败",
+          title: "加载失败",
           icon: "none"
         })
         this.setData({

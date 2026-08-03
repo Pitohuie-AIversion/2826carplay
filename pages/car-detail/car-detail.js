@@ -1,14 +1,15 @@
 const { trackEvent } = require("../../shared/analytics")
+const { formatToastTitle } = require("../../shared/uiFeedback")
 
 function getStatusText(status, fallbackText) {
   const statusTextMap = {
-    available: "在库",
-    rented: "在用",
+    available: "可预约",
+    rented: "使用中",
     maintenance: "维护中",
     reserved: "已预约"
   }
 
-  return statusTextMap[status] || fallbackText || "在库"
+  return statusTextMap[status] || fallbackText || "可预约"
 }
 
 function attachStatusClass(car) {
@@ -30,14 +31,14 @@ function formatCarViewModel(car) {
   const transmissionMap = {
     manual: "手动挡",
     automatic: "自动挡",
-    unknown: "--"
+    unknown: "—"
   }
 
   const fuelTypeMap = {
     gasoline: "燃油",
     electric: "纯电",
     hybrid: "混动",
-    unknown: "--"
+    unknown: "—"
   }
 
   const statusNoticeMap = {
@@ -52,6 +53,13 @@ function formatCarViewModel(car) {
     reserved: "咨询候补",
     rented: "咨询档期",
     maintenance: "咨询恢复时间"
+  }
+
+  const actionHintMap = {
+    available: "提交意向后，由顾问确认档期、价格与服务规则",
+    reserved: "可先登记候补意向，由顾问协助确认档期",
+    rented: "可先咨询后续档期，由顾问联系确认时间",
+    maintenance: "可先咨询恢复时间或获取相近车型推荐"
   }
 
   const statusCar = attachStatusClass(car)
@@ -70,9 +78,11 @@ function formatCarViewModel(car) {
     hasImages: images.length > 0,
     statusNoticeText: statusNoticeMap[car.status] || "",
     primaryActionText: primaryActionTextMap[car.status] || "立即预约",
-    transmissionText: transmissionMap[car.transmission] || car.transmission || "--",
-    fuelTypeText: fuelTypeMap[car.fuelType] || car.fuelType || "--",
-    seatsText: car.seatsText || (car.seats ? `${car.seats} 座` : "--"),
+    actionHintText:
+      actionHintMap[car.status] || "提交意向后，由顾问确认档期、价格与服务规则",
+    transmissionText: transmissionMap[car.transmission] || car.transmission || "—",
+    fuelTypeText: fuelTypeMap[car.fuelType] || car.fuelType || "—",
+    seatsText: car.seatsText || (car.seats ? `${car.seats} 座` : "—"),
     brand: car.brand || "未知品牌",
     location: car.location || "门店咨询"
   }
@@ -90,6 +100,11 @@ Page({
     loadError: false,
     loadErrorText: "车辆详情加载失败，请返回车库后重试",
     notFoundText: "未找到该车辆，请返回车库重新选择",
+    serviceSteps: [
+      { key: "request", index: "01", title: "提交意向", desc: "填写日期与联系方式" },
+      { key: "confirm", index: "02", title: "顾问确认", desc: "核对档期、价格和规则" },
+      { key: "delivery", index: "03", title: "安排交付", desc: "确认取还车时间与方式" }
+    ],
     rentalTips: [
       "车辆价格、可用时间、押金和取还车规则以客服最终确认为准。",
       "提交预约后，客服将与您确认车辆档期和具体租赁细节。"
@@ -119,9 +134,34 @@ Page({
       carId
     })
 
+    this.loadOperationConfig()
     this.loadCarDetail(carId)
     this.loadFavoriteStatus(carId)
     trackEvent("vehicle_detail", carId)
+  },
+
+  loadOperationConfig() {
+    if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
+      return
+    }
+
+    wx.cloud.callFunction({
+      name: "operationConfigGet",
+      success: (res) => {
+        const result = res && res.result ? res.result : null
+        const servicePhone =
+          result && result.ok && result.config
+            ? String(result.config.servicePhone || "").trim()
+            : ""
+
+        if (servicePhone) {
+          this.setData({
+            servicePhone
+          })
+        }
+      },
+      fail: () => {}
+    })
   },
 
   loadFavoriteStatus(carId) {
@@ -253,8 +293,35 @@ Page({
 
   handleHeroSwiperChange(event) {
     const current = Number(event && event.detail && event.detail.current)
+    const car = this.data.car
+    const imageCount = car && Array.isArray(car.imageItems) ? car.imageItems.length : 0
     this.setData({
-      currentImageIndex: Number.isInteger(current) && current >= 0 ? current : 0
+      currentImageIndex:
+        Number.isInteger(current) && current >= 0 && current < imageCount ? current : 0
+    })
+  },
+
+  handleHeroImageTap(event) {
+    const car = this.data.car
+    if (!car || !Array.isArray(car.images) || !car.images.length) {
+      return
+    }
+    const index = Number(event.currentTarget.dataset.index)
+    const currentIndex =
+      Number.isInteger(index) && index >= 0 && index < car.images.length
+        ? index
+        : this.data.currentImageIndex
+    const current = car.images[currentIndex] || car.images[0]
+
+    wx.previewImage({
+      current,
+      urls: car.images,
+      fail: () => {
+        wx.showToast({
+          title: "图片预览失败",
+          icon: "none"
+        })
+      }
     })
   },
 
@@ -282,7 +349,7 @@ Page({
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
           wx.showToast({
-            title: (result && result.message) || "收藏操作失败",
+          title: formatToastTitle(result && result.message, "收藏操作失败"),
             icon: "none"
           })
           return
@@ -300,7 +367,7 @@ Page({
       },
       fail: (error) => {
         wx.showToast({
-          title: (error && (error.errMsg || error.message)) || "收藏操作失败",
+          title: "收藏操作失败",
           icon: "none"
         })
       },
@@ -316,17 +383,39 @@ Page({
     }
 
     wx.navigateTo({
-      url: `/pages/booking/booking?carId=${this.data.carId}`
+      url: `/pages/booking/booking?carId=${this.data.carId}`,
+      fail: () => {
+        wx.showToast({
+          title: "预约页面打开失败",
+          icon: "none"
+        })
+      }
     })
   },
 
   handlePhoneCall() {
+    const phone = String(this.data.servicePhone || "").trim()
+    if (!phone) {
+      wx.showToast({
+        title: "客服电话暂不可用",
+        icon: "none"
+      })
+      return
+    }
+
     wx.makePhoneCall({
-      phoneNumber: this.data.servicePhone,
-      fail: () => {
-        wx.showToast({
-          title: `请联系客服：${this.data.servicePhone}`,
-          icon: "none"
+      phoneNumber: phone,
+      fail: (error) => {
+        const message = error && (error.errMsg || error.message)
+        if (message && String(message).includes("cancel")) {
+          return
+        }
+        wx.showModal({
+          title: "拨号失败",
+          content: `请联系客服：${phone}`,
+          confirmText: "知道了",
+          confirmColor: "#528fff",
+          showCancel: false
         })
       }
     })
@@ -340,7 +429,18 @@ Page({
         delta: 1,
         fail: () => {
           wx.redirectTo({
-            url: "/pages/garage/garage"
+            url: "/pages/garage/garage",
+            fail: () => {
+              wx.reLaunch({
+                url: "/pages/garage/garage",
+                fail: () => {
+                  wx.showToast({
+                    title: "返回车库失败",
+                    icon: "none"
+                  })
+                }
+              })
+            }
           })
         }
       })
@@ -351,7 +451,13 @@ Page({
       url: "/pages/garage/garage",
       fail: () => {
         wx.reLaunch({
-          url: "/pages/garage/garage"
+          url: "/pages/garage/garage",
+          fail: () => {
+            wx.showToast({
+              title: "返回车库失败",
+              icon: "none"
+            })
+          }
         })
       }
     })

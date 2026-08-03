@@ -5,6 +5,24 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
 const VEHICLE_BATCH_SIZE = 100
 const MAX_VEHICLE_RECORDS = 2000
+const PUBLIC_VEHICLE_FIELDS = {
+  _id: true,
+  plateNumber: true,
+  vehicleType: true,
+  brandModel: true,
+  registerDate: true,
+  status: true,
+  location: true,
+  transmission: true,
+  fuelType: true,
+  seats: true,
+  priceDay: true,
+  publicDescription: true,
+  imageList: true,
+  coverImage: true,
+  updatedAt: true,
+  createdAt: true
+}
 
 const VEHICLE_TYPE_LABEL_MAP = {
   sedan: "轿车",
@@ -261,7 +279,7 @@ async function readVehiclesByMode(ordered) {
   for (let offset = 0; offset <= MAX_VEHICLE_RECORDS; offset += VEHICLE_BATCH_SIZE) {
     const remaining = MAX_VEHICLE_RECORDS + 1 - list.length
     const batchSize = Math.min(VEHICLE_BATCH_SIZE, remaining)
-    let query = db.collection("vehicles")
+    let query = db.collection("vehicles").field(PUBLIC_VEHICLE_FIELDS)
     if (ordered) {
       query = query.orderBy("updatedAt", "desc")
     }

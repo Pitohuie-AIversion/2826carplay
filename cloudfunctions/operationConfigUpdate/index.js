@@ -3,13 +3,25 @@ const cloud = require("wx-server-sdk")
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
+const AUTH_ROLE_FIELDS = {
+  role: true,
+  roles: true,
+  permissions: true,
+  isAdmin: true,
+  admin: true
+}
+const OPERATION_CONFIG_UPDATE_FIELDS = {
+  _id: true,
+  value: true
+}
 const CONFIG_KEY = "operation_settings"
+const LEGACY_GARAGE_SUBTITLE = "后台车辆资料已接入首页展示，上传封面后会同步展示到车库首页"
 const DEFAULT_CONFIG = {
   brandName: "极境车库",
   servicePhone: "15715710090",
   mineUserDesc: "查看预约、个人信息申请与车库服务",
   garagePageTitle: "极境车库",
-  garagePageSubtitle: "后台车辆资料已接入首页展示，上传封面后会同步展示到车库首页",
+  garagePageSubtitle: "甄选座驾，为每一次出发预留专属席位",
   cityOptions: ["杭州", "上海"],
   faqContent:
     "1. 预约提交后，客服会尽快联系您确认档期与细节。\n2. 车辆价格、押金与取还车规则以最终沟通结果为准。\n3. 如需取消预约，可前往【我的预约】操作。",
@@ -37,6 +49,7 @@ function isValidServicePhone(value) {
 
 function normalizeConfig(raw) {
   const input = raw && typeof raw === "object" ? raw : {}
+  const garagePageSubtitle = normalizeText(input.garagePageSubtitle, 80)
   const cityOptions = Array.isArray(input.cityOptions)
     ? input.cityOptions
         .map((item) => normalizeText(item, 20))
@@ -50,7 +63,10 @@ function normalizeConfig(raw) {
     servicePhone: normalizeText(input.servicePhone, 20) || DEFAULT_CONFIG.servicePhone,
     mineUserDesc: normalizeText(input.mineUserDesc, 80) || DEFAULT_CONFIG.mineUserDesc,
     garagePageTitle: normalizeText(input.garagePageTitle, 20) || DEFAULT_CONFIG.garagePageTitle,
-    garagePageSubtitle: normalizeText(input.garagePageSubtitle, 80) || DEFAULT_CONFIG.garagePageSubtitle,
+    garagePageSubtitle:
+      !garagePageSubtitle || garagePageSubtitle === LEGACY_GARAGE_SUBTITLE
+        ? DEFAULT_CONFIG.garagePageSubtitle
+        : garagePageSubtitle,
     cityOptions: cityOptions.length ? cityOptions : DEFAULT_CONFIG.cityOptions.slice(),
     faqContent: normalizeText(input.faqContent, 1000) || DEFAULT_CONFIG.faqContent,
     rulesContent: normalizeText(input.rulesContent, 1000) || DEFAULT_CONFIG.rulesContent,
@@ -69,11 +85,7 @@ function diffConfig(prev, next) {
     return JSON.stringify(prevValue) !== JSON.stringify(nextValue)
   })
 
-  return {
-    changedKeys,
-    before: changedKeys.reduce((acc, key) => ({ ...acc, [key]: before[key] }), {}),
-    after: changedKeys.reduce((acc, key) => ({ ...acc, [key]: after[key] }), {})
-  }
+  return changedKeys
 }
 
 function hasAdminRole(record) {
@@ -101,7 +113,12 @@ async function isAdminOpenid(openid) {
     return false
   }
 
-  const res = await db.collection("roles").where({ openid }).limit(20).get()
+  const res = await db
+    .collection("roles")
+    .where({ openid })
+    .field(AUTH_ROLE_FIELDS)
+    .limit(20)
+    .get()
   const list = res && Array.isArray(res.data) ? res.data : []
   return list.some((item) => hasAdminRole(item))
 }
@@ -202,7 +219,12 @@ exports.main = async (event) => {
       }
     }
 
-    const existedRes = await db.collection("app_configs").where({ key: CONFIG_KEY }).limit(1).get()
+    const existedRes = await db
+      .collection("app_configs")
+      .where({ key: CONFIG_KEY })
+      .field(OPERATION_CONFIG_UPDATE_FIELDS)
+      .limit(1)
+      .get()
     const existedList = existedRes && Array.isArray(existedRes.data) ? existedRes.data : []
     const existed = existedList.length ? existedList[0] : null
     const now = db.serverDate()
@@ -227,13 +249,11 @@ exports.main = async (event) => {
       })
     }
 
-    const diff = diffConfig(existed && existed.value, config)
+    const changedKeys = diffConfig(existed && existed.value, config)
     await writeAuditLogBestEffort({
       openid,
       action: "operationConfigUpdate",
-      changedKeys: diff.changedKeys,
-      before: diff.before,
-      after: diff.after
+      changedKeys
     })
 
     return {
@@ -242,20 +262,22 @@ exports.main = async (event) => {
       message: "运营配置已保存"
     }
   } catch (error) {
+    const errorMessage = String(
+      error && (error.message || error.errMsg) ? error.message || error.errMsg : error
+    ).slice(0, 300)
     console.error({
       function: "operationConfigUpdate",
-      openid,
-      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
+      authenticated: Boolean(openid),
+      errorMessage,
       stack: error && error.stack ? error.stack : "",
       createdAt: new Date().toISOString()
     })
 
     await writeErrorLogBestEffort({
       function: "operationConfigUpdate",
-      openid,
       stage: "main",
-      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
-      stack: error && error.stack ? error.stack : "",
+      authenticated: Boolean(openid),
+      errorMessage,
       occurredAt: new Date().toISOString()
     })
 

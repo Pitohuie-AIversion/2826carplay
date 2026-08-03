@@ -3,6 +3,14 @@ const cloud = require("wx-server-sdk")
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
+const AUTH_ROLE_FIELDS = {
+  role: true,
+  roles: true,
+  permissions: true,
+  isAdmin: true,
+  admin: true
+}
+const _ = db.command
 
 function normalizeStringArray(value) {
   if (!Array.isArray(value)) {
@@ -41,7 +49,12 @@ function hasBookingCapability(record) {
 }
 
 async function readPermissions(openid) {
-  const res = await db.collection("roles").where({ openid }).limit(20).get()
+  const res = await db
+    .collection("roles")
+    .where({ openid })
+    .field(AUTH_ROLE_FIELDS)
+    .limit(20)
+    .get()
   const list = res && Array.isArray(res.data) ? res.data : []
   return {
     isAdmin: list.some(hasAdminRole),
@@ -79,6 +92,46 @@ async function countSafely(key, queryFactory) {
   }
 }
 
+async function countCoordinationPendingSafely() {
+  try {
+    const activeStatus = _.in(["pending", "contacted"])
+    const [activeResult, resolvedResult] = await Promise.all([
+      db.collection("bookings").where({ status: activeStatus }).count(),
+      db
+        .collection("bookings")
+        .where({
+          status: activeStatus,
+          coordinationStatus: "resolved"
+        })
+        .count()
+    ])
+    return {
+      key: "bookingCoordinationPending",
+      count: Math.max(
+        0,
+        normalizeCount(activeResult) - normalizeCount(resolvedResult)
+      ),
+      available: true
+    }
+  } catch (error) {
+    console.warn({
+      function: "operationSummaryGet",
+      stage: "count",
+      metric: "bookingCoordinationPending",
+      errorMessage:
+        error && (error.message || error.errMsg)
+          ? error.message || error.errMsg
+          : String(error),
+      createdAt: new Date().toISOString()
+    })
+    return {
+      key: "bookingCoordinationPending",
+      count: 0,
+      available: false
+    }
+  }
+}
+
 exports.main = async () => {
   const wxContext = cloud.getWXContext()
   const openid = wxContext && wxContext.OPENID ? wxContext.OPENID : ""
@@ -106,7 +159,8 @@ exports.main = async () => {
       tasks.push(
         countSafely("bookingPending", () =>
           db.collection("bookings").where({ status: "pending" })
-        )
+        ),
+        countCoordinationPendingSafely()
       )
     }
     if (permissions.isAdmin) {
@@ -126,6 +180,7 @@ exports.main = async () => {
     const metrics = await Promise.all(tasks)
     const counts = {
       bookingPending: 0,
+      bookingCoordinationPending: 0,
       privacyPending: 0,
       privacyProcessing: 0,
       storageCleanupPending: 0
@@ -147,7 +202,7 @@ exports.main = async () => {
   } catch (error) {
     console.error({
       function: "operationSummaryGet",
-      openid,
+      authenticated: Boolean(openid),
       errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
       stack: error && error.stack ? error.stack : "",
       createdAt: new Date().toISOString()

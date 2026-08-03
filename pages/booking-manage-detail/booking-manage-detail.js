@@ -1,4 +1,5 @@
 const { requirePagePermission } = require("../../shared/pageAuth")
+const { formatToastTitle } = require("../../shared/uiFeedback")
 
 const STATUS_TEXT_MAP = {
   pending: "待联系",
@@ -32,6 +33,8 @@ function showStatusUpdateFeedback(result, done) {
     wx.showModal({
       title: "状态已更新",
       content: "预约状态已更新，但提醒发送失败。可在错误日志中查看原因。",
+      confirmText: "知道了",
+      confirmColor: "#528fff",
       showCancel: false,
       complete: done
     })
@@ -276,7 +279,7 @@ Page({
         const current = result && result.ok ? result.detail : null
         if (!current) {
           wx.showToast({
-            title: (result && result.message) || "预约不存在",
+          title: formatToastTitle(result && result.message, "预约不存在"),
             icon: "none"
           })
           this.setData({
@@ -299,7 +302,7 @@ Page({
       },
       fail: (error) => {
         wx.showToast({
-          title: (error && (error.errMsg || error.message)) || "加载失败",
+          title: "加载失败",
           icon: "none"
         })
         this.setData({
@@ -337,7 +340,7 @@ Page({
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
           wx.showToast({
-            title: (result && result.message) || "保存失败",
+          title: formatToastTitle(result && result.message, "保存失败"),
             icon: "none"
           })
           this.setData({ loading: false })
@@ -352,7 +355,7 @@ Page({
       },
       fail: (error) => {
         wx.showToast({
-          title: (error && (error.errMsg || error.message)) || "保存失败",
+          title: "保存失败",
           icon: "none"
         })
         this.setData({ loading: false })
@@ -399,7 +402,7 @@ Page({
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
           wx.showToast({
-            title: (result && result.message) || "协调安排更新失败",
+          title: formatToastTitle(result && result.message, "协调更新失败"),
             icon: "none"
           })
           this.setData({ coordinationLoading: false })
@@ -415,7 +418,7 @@ Page({
       },
       fail: (error) => {
         wx.showToast({
-          title: (error && (error.errMsg || error.message)) || "协调安排更新失败",
+          title: "协调更新失败",
           icon: "none"
         })
         this.setData({ coordinationLoading: false })
@@ -435,12 +438,6 @@ Page({
 
     wx.makePhoneCall({
       phoneNumber: phone,
-      success: () => {
-        wx.showToast({
-          title: "已打开拨号",
-          icon: "none"
-        })
-      },
       fail: (error) => {
         const message = error && (error.errMsg || error.message)
         if (message && String(message).includes("cancel")) {
@@ -468,7 +465,13 @@ Page({
       return
     }
     wx.navigateTo({
-      url: `/pages/booking-manage-detail/booking-manage-detail?id=${id}`
+      url: `/pages/booking-manage-detail/booking-manage-detail?id=${id}`,
+      fail: () => {
+        wx.showToast({
+          title: "冲突预约打开失败",
+          icon: "none"
+        })
+      }
     })
   },
 
@@ -493,6 +496,12 @@ Page({
 
     wx.setClipboardData({
       data: value,
+      success: () => {
+        wx.showToast({
+          title: `${labels[field]}已复制`,
+          icon: "none"
+        })
+      },
       fail: () => {
         wx.showToast({
           title: `${labels[field]}复制失败`,
@@ -517,6 +526,8 @@ Page({
     wx.showModal({
       title: "更新状态",
       content: `确认将该预约更新为「${statusText}」？`,
+      confirmText: "确认更新",
+      confirmColor: status === "cancelled" ? "#d46868" : "#528fff",
       success: (res) => {
         if (!res.confirm) {
           return
@@ -540,7 +551,7 @@ Page({
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
           wx.showToast({
-            title: (result && result.message) || "更新失败",
+          title: formatToastTitle(result && result.message, "更新失败"),
             icon: "none"
           })
           this.setData({ loading: false })
@@ -553,7 +564,7 @@ Page({
       },
       fail: (error) => {
         wx.showToast({
-          title: (error && (error.errMsg || error.message)) || "更新失败",
+          title: "更新失败",
           icon: "none"
         })
         this.setData({ loading: false })
@@ -572,7 +583,18 @@ Page({
         delta: 1,
         fail: () => {
           wx.redirectTo({
-            url: "/pages/booking-manage/booking-manage"
+            url: "/pages/booking-manage/booking-manage",
+            fail: () => {
+              wx.reLaunch({
+                url: "/pages/booking-manage/booking-manage",
+                fail: () => {
+                  wx.showToast({
+                    title: "返回预约管理失败",
+                    icon: "none"
+                  })
+                }
+              })
+            }
           })
         }
       })
@@ -580,7 +602,18 @@ Page({
     }
 
     wx.redirectTo({
-      url: "/pages/booking-manage/booking-manage"
+      url: "/pages/booking-manage/booking-manage",
+      fail: () => {
+        wx.reLaunch({
+          url: "/pages/booking-manage/booking-manage",
+          fail: () => {
+            wx.showToast({
+              title: "返回预约管理失败",
+              icon: "none"
+            })
+          }
+        })
+      }
     })
   }
 })

@@ -7,7 +7,8 @@ function loadModule(openid, records) {
   cloud.__setMockContext({ OPENID: openid })
   const get = jest.fn().mockResolvedValue({ data: records })
   const limit = jest.fn(() => ({ get }))
-  const where = jest.fn(() => ({ limit }))
+  const field = jest.fn(() => ({ limit }))
+  const where = jest.fn(() => ({ field, limit }))
   cloud.__setMockDb({
     collection: jest.fn((name) => {
       if (name === "favorites") {
@@ -20,12 +21,12 @@ function loadModule(openid, records) {
   jest.isolateModules(() => {
     mod = require("../cloudfunctions/favoriteStatus/index")
   })
-  return { mod, where }
+  return { mod, where, field }
 }
 
 describe("cloudfunctions/favoriteStatus integration", () => {
   test("只按当前用户和车辆查询收藏状态", async () => {
-    const { mod, where } = loadModule("user_openid", [{ _id: "favorite_1" }])
+    const { mod, where, field } = loadModule("user_openid", [{ _id: "favorite_1" }])
 
     const res = await mod.main({ vehicleId: "vehicle_1" })
 
@@ -38,6 +39,7 @@ describe("cloudfunctions/favoriteStatus integration", () => {
       openid: "user_openid",
       vehicleId: "vehicle_1"
     })
+    expect(field).toHaveBeenCalledWith({ _id: true })
   })
 
   test("未登录用户不可读取收藏状态", async () => {

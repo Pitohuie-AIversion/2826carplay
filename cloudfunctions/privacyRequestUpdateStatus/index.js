@@ -3,6 +3,18 @@ const cloud = require("wx-server-sdk")
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
+const AUTH_ROLE_FIELDS = {
+  role: true,
+  roles: true,
+  permissions: true,
+  isAdmin: true,
+  admin: true
+}
+const PRIVACY_REQUEST_STATUS_FIELDS = {
+  type: true,
+  status: true,
+  dataExportedAt: true
+}
 const STATUS_TRANSITIONS = {
   pending: ["processing", "completed", "rejected"],
   processing: ["completed", "rejected"],
@@ -36,7 +48,12 @@ async function isAdminOpenid(openid) {
   if (!openid) {
     return false
   }
-  const res = await db.collection("roles").where({ openid }).limit(20).get()
+  const res = await db
+    .collection("roles")
+    .where({ openid })
+    .field(AUTH_ROLE_FIELDS)
+    .limit(20)
+    .get()
   const list = res && Array.isArray(res.data) ? res.data : []
   return list.some(hasAdminRole)
 }
@@ -94,7 +111,11 @@ exports.main = async (event) => {
       return createError("VALIDATION_ERROR", "完成或驳回申请时，请填写至少 2 字的处理说明")
     }
 
-    const currentRes = await db.collection("privacy_requests").doc(input.id).get()
+    const currentRes = await db
+      .collection("privacy_requests")
+      .doc(input.id)
+      .field(PRIVACY_REQUEST_STATUS_FIELDS)
+      .get()
     const current = currentRes && currentRes.data ? currentRes.data : null
     if (!current) {
       return createError("NOT_FOUND", "隐私申请不存在")
@@ -116,6 +137,16 @@ exports.main = async (event) => {
         currentStatus,
         allowedStatuses
       })
+    }
+    if (
+      String(current.type || "") === "access" &&
+      input.status === "completed" &&
+      !current.dataExportedAt
+    ) {
+      return createError(
+        "DATA_EXPORT_REQUIRED",
+        "请先核验并导出完整个人数据，再完成查询申请"
+      )
     }
 
     const updateRes = await db.collection("privacy_requests").where({
@@ -153,7 +184,7 @@ exports.main = async (event) => {
   } catch (error) {
     console.error({
       function: "privacyRequestUpdateStatus",
-      openid,
+      authenticated: Boolean(openid),
       requestId: input.id,
       targetStatus: input.status,
       errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),

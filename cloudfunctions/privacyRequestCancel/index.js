@@ -3,6 +3,11 @@ const cloud = require("wx-server-sdk")
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
+const PRIVACY_REQUEST_CANCEL_FIELDS = {
+  openid: true,
+  type: true,
+  status: true
+}
 
 function createError(code, message) {
   return {
@@ -47,7 +52,11 @@ exports.main = async (event) => {
       return createError("VALIDATION_ERROR", "申请 ID 不能为空")
     }
 
-    const currentRes = await db.collection("privacy_requests").doc(id).get()
+    const currentRes = await db
+      .collection("privacy_requests")
+      .doc(id)
+      .field(PRIVACY_REQUEST_CANCEL_FIELDS)
+      .get()
     const current = currentRes && currentRes.data ? currentRes.data : null
     if (!current) {
       return createError("NOT_FOUND", "隐私申请不存在")
@@ -95,7 +104,7 @@ exports.main = async (event) => {
   } catch (error) {
     console.error({
       function: "privacyRequestCancel",
-      openid,
+      authenticated: Boolean(openid),
       requestId: id,
       errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
       stack: error && error.stack ? error.stack : "",

@@ -3,6 +3,13 @@ const cloud = require("wx-server-sdk")
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
+const AUTH_ROLE_FIELDS = {
+  role: true,
+  roles: true,
+  permissions: true,
+  isAdmin: true,
+  admin: true
+}
 
 function normalizeStringArray(value) {
   if (!Array.isArray(value)) {
@@ -75,7 +82,12 @@ exports.main = async () => {
       }
     }
 
-    const res = await db.collection("roles").where({ openid }).limit(20).get()
+    const res = await db
+      .collection("roles")
+      .where({ openid })
+      .field(AUTH_ROLE_FIELDS)
+      .limit(20)
+      .get()
     const roleList = res && Array.isArray(res.data) ? res.data : []
     const permissions = []
     roleList.forEach((item) => {
@@ -88,7 +100,6 @@ exports.main = async () => {
 
     return {
       ok: true,
-      openid,
       isAdmin: permissions.includes("admin"),
       permissions,
       canManageRoles: permissions.includes("admin"),
@@ -101,7 +112,7 @@ exports.main = async () => {
   } catch (error) {
     console.error({
       function: "getMyPermissions",
-      openid,
+      authenticated: Boolean(openid),
       errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
       stack: error && error.stack ? error.stack : "",
       createdAt: new Date().toISOString()

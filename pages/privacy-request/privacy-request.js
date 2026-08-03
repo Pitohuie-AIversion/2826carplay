@@ -1,3 +1,5 @@
+const { formatToastTitle } = require("../../shared/uiFeedback")
+
 const TYPE_OPTIONS = [
   { value: "access", label: "查询信息", desc: "申请了解平台当前保存的个人信息" },
   { value: "correction", label: "更正信息", desc: "申请修正不准确或已变化的个人信息" },
@@ -11,12 +13,34 @@ const TYPE_LABELS = {
 }
 
 const STATUS_META = {
-  pending: { label: "待处理", className: "status-pending" },
-  processing: { label: "处理中", className: "status-processing" },
-  completed: { label: "已完成", className: "status-completed" },
-  rejected: { label: "未通过", className: "status-rejected" },
-  cancelled: { label: "已撤回", className: "status-cancelled" }
+  pending: {
+    label: "待处理",
+    className: "status-pending",
+    stageHint: "申请已进入队列，开始处理前可随时撤回"
+  },
+  processing: {
+    label: "处理中",
+    className: "status-processing",
+    stageHint: "工作人员正在核验相关信息，请留意处理反馈"
+  },
+  completed: {
+    label: "已完成",
+    className: "status-completed",
+    stageHint: "本次申请已处理完成，请查看下方反馈"
+  },
+  rejected: {
+    label: "未通过",
+    className: "status-rejected",
+    stageHint: "本次申请未通过，请根据反馈调整后再提交"
+  },
+  cancelled: {
+    label: "已撤回",
+    className: "status-cancelled",
+    stageHint: "本次申请已撤回，如仍有需要可重新提交"
+  }
 }
+
+const ACTIVE_STATUSES = new Set(["pending", "processing"])
 
 function formatDisplayTime(value) {
   if (!value) {
@@ -34,17 +58,86 @@ function formatDisplayTime(value) {
   return `${year}-${month}-${day} ${hour}:${minute}`
 }
 
+function buildDescriptionState(value) {
+  const text = String(value || "")
+  const length = text.length
+  const trimmedLength = text.trim().length
+  const formReady = trimmedLength >= 2 && length <= 500
+
+  return {
+    description: text,
+    descriptionLength: length,
+    formReady,
+    descriptionHint: formReady
+      ? "说明已填写，可以提交申请"
+      : trimmedLength
+        ? `还需补充 ${Math.max(2 - trimmedLength, 0)} 个字`
+        : "请简要说明希望处理的具体信息"
+  }
+}
+
+function normalizeRequestItem(item) {
+  const source = item && typeof item === "object" ? item : {}
+  const status = Object.prototype.hasOwnProperty.call(STATUS_META, source.status)
+    ? source.status
+    : "pending"
+  const statusMeta = STATUS_META[status]
+  return {
+    ...source,
+    status,
+    typeLabel: TYPE_LABELS[source.type] || "隐私申请",
+    statusLabel: statusMeta.label,
+    statusClass: statusMeta.className,
+    stageHint: statusMeta.stageHint,
+    createdAtText: formatDisplayTime(source.createdAt),
+    canCancel: status === "pending",
+    active: ACTIVE_STATUSES.has(status)
+  }
+}
+
+function buildRequestView(list, filter) {
+  const normalizedList = (Array.isArray(list) ? list : []).map(normalizeRequestItem)
+  const activeCount = normalizedList.filter((item) => item.active).length
+  const completedCount = normalizedList.length - activeCount
+  const visibleList =
+    filter === "active"
+      ? normalizedList.filter((item) => item.active)
+      : filter === "completed"
+        ? normalizedList.filter((item) => !item.active)
+        : normalizedList
+
+  return {
+    list: normalizedList,
+    visibleList,
+    requestSummary: {
+      total: normalizedList.length,
+      active: activeCount,
+      completed: completedCount
+    }
+  }
+}
+
 Page({
   data: {
     typeOptions: TYPE_OPTIONS.map((item) => ({ ...item, active: item.value === "access" })),
     currentType: "access",
     description: "",
+    descriptionLength: 0,
+    descriptionHint: "请简要说明希望处理的具体信息",
+    formReady: false,
     submitting: false,
     cancellingId: "",
     initialLoading: true,
     loading: false,
     loadError: "",
     list: [],
+    visibleList: [],
+    currentFilter: "all",
+    requestSummary: {
+      total: 0,
+      active: 0,
+      completed: 0
+    },
     page: 0,
     pageSize: 20,
     hasMore: false
@@ -75,9 +168,25 @@ Page({
   },
 
   handleDescriptionInput(event) {
-    this.setData({
-      description: String((event.detail && event.detail.value) || "")
+    this.setData(buildDescriptionState((event.detail && event.detail.value) || ""))
+  },
+
+  handleRecordFilterTap(event) {
+    const filter = String(event.currentTarget.dataset.filter || "")
+    if (!["all", "active", "completed"].includes(filter) || filter === this.data.currentFilter) {
+      return
+    }
+    this.applyRequestList(this.data.list, {
+      filter
     })
+  },
+
+  handleShowAllRecords() {
+    if (this.data.currentFilter !== "all") {
+      this.applyRequestList(this.data.list, {
+        filter: "all"
+      })
+    }
   },
 
   handleSubmit() {
@@ -94,7 +203,7 @@ Page({
     }
     if (description.length > 500) {
       wx.showToast({
-        title: "申请说明不能超过 500 字",
+        title: "说明最多 500 字",
         icon: "none"
       })
       return
@@ -118,12 +227,12 @@ Page({
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
           wx.showToast({
-            title: (result && result.message) || "提交失败",
+          title: formatToastTitle(result && result.message, "提交失败"),
             icon: "none"
           })
           return
         }
-        this.setData({ description: "" })
+        this.setData(buildDescriptionState(""))
         wx.showToast({
           title: "申请已提交",
           icon: "success"
@@ -132,7 +241,7 @@ Page({
       },
       fail: (error) => {
         wx.showToast({
-          title: (error && (error.errMsg || error.message)) || "提交失败",
+          title: "提交失败",
           icon: "none"
         })
       },
@@ -162,6 +271,8 @@ Page({
     wx.showModal({
       title: "撤回隐私申请",
       content: "仅待处理申请可以撤回。撤回后如仍有需要，可稍后重新提交。",
+      confirmText: "确认撤回",
+      confirmColor: "#d46868",
       success: (res) => {
         if (res.confirm) {
           this.cancelRequest(id)
@@ -187,7 +298,7 @@ Page({
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
           wx.showToast({
-            title: (result && result.message) || "撤回失败",
+          title: formatToastTitle(result && result.message, "撤回失败"),
             icon: "none"
           })
           if (result && ["STATUS_CONFLICT", "STATUS_NOT_ALLOWED"].includes(result.code)) {
@@ -203,7 +314,7 @@ Page({
       },
       fail: (error) => {
         wx.showToast({
-          title: (error && (error.errMsg || error.message)) || "撤回失败",
+          title: "撤回失败",
           icon: "none"
         })
       },
@@ -211,6 +322,27 @@ Page({
         this.setData({ cancellingId: "" })
       }
     })
+  },
+
+  applyRequestList(list, options) {
+    const input = options && typeof options === "object" ? options : {}
+    const filter =
+      ["all", "active", "completed"].includes(input.filter)
+        ? input.filter
+        : this.data.currentFilter
+    const view = buildRequestView(list, filter)
+    const patch = {
+      ...view,
+      currentFilter: filter
+    }
+
+    if (Number.isInteger(input.page)) {
+      patch.page = input.page
+    }
+    if (typeof input.hasMore === "boolean") {
+      patch.hasMore = input.hasMore
+    }
+    this.setData(patch)
   },
 
   fetchList(options) {
@@ -246,41 +378,46 @@ Page({
           this.setData({
             initialLoading: false,
             loading: false,
-            loadError: (result && result.message) || "申请记录加载失败",
-            list: append ? this.data.list : []
+            loadError: (result && result.message) || "申请记录加载失败"
           })
+          if (!append) {
+            this.applyRequestList([], {
+              filter: this.data.currentFilter,
+              page: 0,
+              hasMore: false
+            })
+          }
           return
         }
 
         const list = Array.isArray(result.list)
-          ? result.list.map((item) => {
-              const statusMeta = STATUS_META[item.status] || STATUS_META.pending
-              return {
-                ...item,
-                typeLabel: TYPE_LABELS[item.type] || "隐私申请",
-                statusLabel: statusMeta.label,
-                statusClass: statusMeta.className,
-                createdAtText: formatDisplayTime(item.createdAt),
-                canCancel: item.status === "pending"
-              }
-            })
+          ? result.list
           : []
+        const nextList = append ? this.data.list.concat(list) : list
+        this.applyRequestList(nextList, {
+          filter: this.data.currentFilter,
+          page: Number.isInteger(result.page) ? result.page : nextPage,
+          hasMore: Boolean(result.hasMore)
+        })
         this.setData({
           initialLoading: false,
           loading: false,
-          loadError: "",
-          page: Number.isInteger(result.page) ? result.page : nextPage,
-          hasMore: Boolean(result.hasMore),
-          list: append ? this.data.list.concat(list) : list
+          loadError: ""
         })
       },
       fail: (error) => {
         this.setData({
           initialLoading: false,
           loading: false,
-          loadError: (error && (error.errMsg || error.message)) || "申请记录加载失败",
-          list: append ? this.data.list : []
+          loadError: (error && (error.errMsg || error.message)) || "申请记录加载失败"
         })
+        if (!append) {
+          this.applyRequestList([], {
+            filter: this.data.currentFilter,
+            page: 0,
+            hasMore: false
+          })
+        }
       },
       complete: () => {
         if (typeof input.done === "function") {

@@ -6,9 +6,25 @@ const db = cloud.database()
 const DEFAULT_PAGE_SIZE = 10
 const MAX_PAGE_SIZE = 20
 const FALLBACK_MAX_RECORDS = 500
+const FAVORITE_RECORD_FIELDS = {
+  _id: true,
+  vehicleId: true,
+  createdAt: true
+}
+const FAVORITE_CARD_FIELDS = {
+  _id: true,
+  brandModel: true,
+  plateNumber: true,
+  vehicleType: true,
+  status: true,
+  transmission: true,
+  priceDay: true,
+  coverImage: true,
+  imageList: true
+}
 const STATUS_MAP = {
-  idle: { status: "available", statusText: "在库" },
-  active: { status: "rented", statusText: "在用" },
+  idle: { status: "available", statusText: "可预约" },
+  active: { status: "rented", statusText: "使用中" },
   maintenance: { status: "maintenance", statusText: "维护中" }
 }
 
@@ -100,7 +116,11 @@ function buildVehicleCard(vehicle) {
 
 async function readVehicle(vehicleId) {
   try {
-    const res = await db.collection("vehicles").doc(vehicleId).get()
+    const res = await db
+      .collection("vehicles")
+      .doc(vehicleId)
+      .field(FAVORITE_CARD_FIELDS)
+      .get()
     return res && res.data ? res.data : null
   } catch (error) {
     return null
@@ -112,6 +132,7 @@ async function readFavoritePage(openid, page, pageSize) {
     const res = await db
       .collection("favorites")
       .where({ openid })
+      .field(FAVORITE_RECORD_FIELDS)
       .orderBy("createdAt", "desc")
       .skip(page * pageSize)
       .limit(pageSize + 1)
@@ -134,6 +155,7 @@ async function readFavoritePage(openid, page, pageSize) {
     const res = await db
       .collection("favorites")
       .where({ openid })
+      .field(FAVORITE_RECORD_FIELDS)
       .limit(FALLBACK_MAX_RECORDS + 1)
       .get()
     const rawList = res && Array.isArray(res.data) ? res.data : []
@@ -195,7 +217,7 @@ exports.main = async (event) => {
   } catch (error) {
     console.error({
       function: "favoriteMyList",
-      openid,
+      authenticated: Boolean(openid),
       errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
       stack: error && error.stack ? error.stack : "",
       createdAt: new Date().toISOString()

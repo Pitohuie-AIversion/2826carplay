@@ -1,11 +1,14 @@
 const { requirePagePermission } = require("../../shared/pageAuth")
+const { formatToastTitle } = require("../../shared/uiFeedback")
+
+const LEGACY_GARAGE_SUBTITLE = "后台车辆资料已接入首页展示，上传封面后会同步展示到车库首页"
 
 const DEFAULT_CONFIG = {
   brandName: "极境车库",
   servicePhone: "15715710090",
   mineUserDesc: "查看预约、个人信息申请与车库服务",
   garagePageTitle: "极境车库",
-  garagePageSubtitle: "后台车辆资料已接入首页展示，上传封面后会同步展示到车库首页",
+  garagePageSubtitle: "甄选座驾，为每一次出发预留专属席位",
   cityOptions: ["杭州", "上海"],
   faqContent:
     "1. 预约提交后，客服会尽快联系您确认档期与细节。\n2. 车辆价格、押金与取还车规则以最终沟通结果为准。\n3. 如需取消预约，可前往【我的预约】操作。",
@@ -22,6 +25,11 @@ function isValidServicePhone(value) {
   return /^\+?[0-9-]{6,20}$/.test(phone) && digitCount >= 6 && digitCount <= 15
 }
 
+function normalizeGarageSubtitle(value) {
+  const subtitle = String(value || "").trim()
+  return !subtitle || subtitle === LEGACY_GARAGE_SUBTITLE ? DEFAULT_CONFIG.garagePageSubtitle : subtitle
+}
+
 function buildForm(config) {
   const source = config && typeof config === "object" ? config : DEFAULT_CONFIG
   return {
@@ -29,7 +37,7 @@ function buildForm(config) {
     servicePhone: source.servicePhone || DEFAULT_CONFIG.servicePhone,
     mineUserDesc: source.mineUserDesc || DEFAULT_CONFIG.mineUserDesc,
     garagePageTitle: source.garagePageTitle || DEFAULT_CONFIG.garagePageTitle,
-    garagePageSubtitle: source.garagePageSubtitle || DEFAULT_CONFIG.garagePageSubtitle,
+    garagePageSubtitle: normalizeGarageSubtitle(source.garagePageSubtitle),
     cityOptionsText: Array.isArray(source.cityOptions) ? source.cityOptions.join("\n") : DEFAULT_CONFIG.cityOptions.join("\n"),
     faqContent: source.faqContent || DEFAULT_CONFIG.faqContent,
     rulesContent: source.rulesContent || DEFAULT_CONFIG.rulesContent,
@@ -68,6 +76,7 @@ Page({
     hasLoadedConfig: false,
     loadFailed: false,
     loadErrorText: "",
+    isDirty: false,
     form: buildForm(DEFAULT_CONFIG)
   },
 
@@ -127,6 +136,7 @@ Page({
           hasLoadedConfig: true,
           loadFailed: false,
           loadErrorText: "",
+          isDirty: false,
           form: buildForm(result.config)
         })
         if (typeof done === "function") {
@@ -153,7 +163,8 @@ Page({
     }
 
     this.setData({
-      [`form.${field}`]: String((event.detail && event.detail.value) || "")
+      [`form.${field}`]: String((event.detail && event.detail.value) || ""),
+      isDirty: true
     })
   },
 
@@ -167,7 +178,8 @@ Page({
     }
 
     this.setData({
-      form: buildForm(DEFAULT_CONFIG)
+      form: buildForm(DEFAULT_CONFIG),
+      isDirty: true
     })
   },
 
@@ -182,7 +194,7 @@ Page({
 
     if (!this.data.hasLoadedConfig || this.data.loadFailed) {
       wx.showToast({
-        title: "配置未加载成功，暂不允许保存",
+        title: "配置未就绪",
         icon: "none"
       })
       return
@@ -210,7 +222,7 @@ Page({
       !/^[A-Za-z0-9_-]{10,128}$/.test(submitConfig.bookingStatusTemplateId)
     ) {
       wx.showToast({
-        title: "订阅模板 ID 格式不正确",
+        title: "模板编号有误",
         icon: "none"
       })
       return
@@ -218,7 +230,8 @@ Page({
 
     this.setData({ saving: true })
     wx.showLoading({
-      title: "保存中"
+      title: "保存中…",
+      mask: true
     })
 
     wx.cloud.callFunction({
@@ -231,7 +244,7 @@ Page({
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
           wx.showToast({
-            title: (result && result.message) || "保存失败",
+          title: formatToastTitle(result && result.message, "保存失败"),
             icon: "none"
           })
           this.setData({ saving: false })
@@ -239,18 +252,19 @@ Page({
         }
 
         wx.showToast({
-          title: result.message || "保存成功",
+        title: formatToastTitle(result.message, "保存成功"),
           icon: "success"
         })
         this.setData({
           saving: false,
+          isDirty: false,
           form: buildForm(result.config || DEFAULT_CONFIG)
         })
       },
       fail: (error) => {
         wx.hideLoading()
         wx.showToast({
-          title: (error && (error.errMsg || error.message)) || "保存失败",
+          title: "保存失败",
           icon: "none"
         })
         this.setData({ saving: false })

@@ -1,11 +1,26 @@
 const cloud = require("wx-server-sdk")
+const crypto = require("crypto")
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
+const AUTH_ROLE_FIELDS = {
+  role: true,
+  roles: true,
+  permissions: true,
+  isAdmin: true,
+  admin: true
+}
+const VEHICLE_IMAGE_FIELDS = {
+  imageList: true,
+  coverImage: true
+}
 const MAX_IMAGE_COUNT = 9
 const MAX_FILE_ID_LENGTH = 1024
-const ALLOWED_ACTIONS = ["add", "remove", "setCover"]
+const ORPHAN_CLEANUP_GRACE_MS = 30 * 1000
+const MIN_VALID_UPLOAD_TIMESTAMP = Date.UTC(2020, 0, 1)
+const MAX_UPLOAD_CLOCK_SKEW_MS = 5 * 60 * 1000
+const ALLOWED_ACTIONS = ["add", "remove", "setCover", "cleanupUpload"]
 
 function createError(code, message, details) {
   const result = {
@@ -74,7 +89,12 @@ async function hasOpenidCapability(openid, capability) {
     return false
   }
 
-  const res = await db.collection("roles").where({ openid }).limit(20).get()
+  const res = await db
+    .collection("roles")
+    .where({ openid })
+    .field(AUTH_ROLE_FIELDS)
+    .limit(20)
+    .get()
   const list = res && Array.isArray(res.data) ? res.data : []
   return list.some((item) => hasCapability(item, capability))
 }
@@ -111,11 +131,24 @@ function isCurrentVehicleImageFileId(fileId, vehicleId) {
   )
 }
 
+function normalizeDeletionContext(context) {
+  const input = context && typeof context === "object" ? context : {}
+  return {
+    vehicleId: String(input.vehicleId || input.id || "").trim().slice(0, 128),
+    action: String(input.action || "removeImage").trim().slice(0, 32)
+  }
+}
+
+function getSafeErrorCode(error) {
+  return String((error && (error.code || error.errCode)) || "").trim().slice(0, 64)
+}
+
 async function deleteFilesBestEffort(fileList, context) {
   const list = normalizeStringArray(fileList)
   if (!list.length) {
     return
   }
+  const safeContext = normalizeDeletionContext(context)
 
   try {
     await cloud.deleteFile({ fileList: list })
@@ -124,9 +157,8 @@ async function deleteFilesBestEffort(fileList, context) {
       function: "vehicleImageUpdate",
       stage: "deleteFile",
       fileCount: list.length,
-      context: context || {},
-      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
-      stack: error && error.stack ? error.stack : "",
+      context: safeContext,
+      errorCode: getSafeErrorCode(error),
       createdAt: new Date().toISOString()
     })
 
@@ -134,13 +166,58 @@ async function deleteFilesBestEffort(fileList, context) {
       await db.collection("pending_file_deletions").add({
         data: {
           fileList: list,
-          context: context || {},
+          context: safeContext,
           source: "vehicleImageUpdate",
           createdAt: db.serverDate()
         }
       })
     } catch (queueError) {}
   }
+}
+
+async function queueUploadedFilesForCleanup(fileList, vehicleId) {
+  const list = normalizeStringArray(fileList)
+  if (!list.length) {
+    return 0
+  }
+  const normalizedVehicleId = String(vehicleId || "").trim().slice(0, 128)
+
+  await Promise.all(list.map((fileId) => {
+    const digest = crypto
+      .createHash("sha256")
+      .update(`${normalizedVehicleId}|${fileId}`)
+      .digest("hex")
+      .slice(0, 32)
+    return db
+      .collection("pending_file_deletions")
+      .doc(`pending_image_cleanup_${digest}`)
+      .set({
+        data: {
+          fileList: [fileId],
+          context: {
+            vehicleId: normalizedVehicleId,
+            action: "cleanupUpload"
+          },
+          source: "vehicleImageUploadCleanup",
+          notBeforeAt: new Date(
+            resolveUploadTimestamp(fileId) + ORPHAN_CLEANUP_GRACE_MS
+          ),
+          createdAt: db.serverDate()
+        }
+      })
+  }))
+  return list.length
+}
+
+function resolveUploadTimestamp(fileId) {
+  const match = String(fileId || "").match(/\/(\d{13})_\d+\.[^/?]+(?:\?|$)/)
+  const timestamp = match ? Number(match[1]) : 0
+  const now = Date.now()
+  return Number.isFinite(timestamp) &&
+    timestamp >= MIN_VALID_UPLOAD_TIMESTAMP &&
+    timestamp <= now + MAX_UPLOAD_CLOCK_SKEW_MS
+    ? timestamp
+    : now
 }
 
 async function writeAuditLogBestEffort(payload) {
@@ -208,7 +285,7 @@ exports.main = async (event) => {
 
     if (!ALLOWED_ACTIONS.includes(input.action)) {
       return createError("VALIDATION_ERROR", "图片操作类型不合法", {
-        errors: [{ field: "action", message: "仅支持 add/remove/setCover" }]
+        errors: [{ field: "action", message: "仅支持 add/remove/setCover/cleanupUpload" }]
       })
     }
 
@@ -218,7 +295,46 @@ exports.main = async (event) => {
       })
     }
 
-    const currentRes = await db.collection("vehicles").doc(input.id).get()
+    if (input.action === "cleanupUpload") {
+      if (!input.fileIds.length || input.fileIds.length > MAX_IMAGE_COUNT) {
+        return createError("VALIDATION_ERROR", "待清理图片数量不合法", {
+          errors: [{ field: "fileIds", message: `每次只能清理 1 至 ${MAX_IMAGE_COUNT} 张图片` }]
+        })
+      }
+
+      const invalidFileIds = input.fileIds.filter(
+        (fileId) => !isCurrentVehicleImageFileId(fileId, input.id)
+      )
+      if (invalidFileIds.length) {
+        return createError("VALIDATION_ERROR", "图片不属于当前车辆目录", {
+          errors: [{ field: "fileIds", message: "只能清理当前车辆目录下的云图片" }]
+        })
+      }
+
+      const queuedCount = await queueUploadedFilesForCleanup(input.fileIds, input.id)
+      await writeAuditLogBestEffort({
+        openid,
+        action: "vehicleImageUpdate",
+        vehicleId: input.id,
+        imageAction: input.action,
+        fileIdsCount: input.fileIds.length
+      })
+
+      return {
+        ok: true,
+        id: input.id,
+        action: input.action,
+        requestedCount: input.fileIds.length,
+        queuedCount,
+        message: "已提交未入库图片核验清理"
+      }
+    }
+
+    const currentRes = await db
+      .collection("vehicles")
+      .doc(input.id)
+      .field(VEHICLE_IMAGE_FIELDS)
+      .get()
     const current = currentRes && currentRes.data ? currentRes.data : null
     if (!current) {
       return createError("NOT_FOUND", "车辆不存在")
@@ -300,7 +416,10 @@ exports.main = async (event) => {
     })
 
     if (shouldDeleteFile) {
-      await deleteFilesBestEffort([input.fileId], { openid, id: input.id, action: input.action })
+      await deleteFilesBestEffort([input.fileId], {
+        vehicleId: input.id,
+        action: input.action
+      })
     }
 
     await writeAuditLogBestEffort({
@@ -323,23 +442,25 @@ exports.main = async (event) => {
       imageCount: nextImageList.length
     }
   } catch (error) {
+    const errorMessage = String(
+      error && (error.message || error.errMsg) ? error.message || error.errMsg : error
+    ).slice(0, 300)
     await writeErrorLogBestEffort({
       function: "vehicleImageUpdate",
-      openid,
       id: input.id,
       action: input.action,
+      authenticated: Boolean(openid),
       fileIdProvided: Boolean(input.fileId),
       fileIdsCount: input.fileIds.length,
-      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
-      stack: error && error.stack ? error.stack : ""
+      errorMessage
     })
 
     console.error({
       function: "vehicleImageUpdate",
-      openid,
+      authenticated: Boolean(openid),
       id: input.id,
       action: input.action,
-      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
+      errorMessage,
       stack: error && error.stack ? error.stack : "",
       createdAt: new Date().toISOString()
     })

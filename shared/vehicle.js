@@ -104,6 +104,22 @@ function isValidPlateNumber(plateNumber) {
   return COMMON_PLATE_RE.test(plate) || NEV_SMALL_RE.test(plate) || NEV_LARGE_RE.test(plate)
 }
 
+function buildVehicleDisplayIdentity(value) {
+  const vehicleName = String(value || "").trim()
+  if (!isValidPlateNumber(vehicleName)) {
+    return {
+      vehicleName: vehicleName || "预约车辆",
+      vehicleReference: ""
+    }
+  }
+
+  const plateNumber = normalizePlateNumber(vehicleName)
+  return {
+    vehicleName: "预约车辆",
+    vehicleReference: `车牌尾号 ${plateNumber.slice(-2)}`
+  }
+}
+
 function isValidYmdDate(dateStr) {
   const str = String(dateStr || "")
 
@@ -341,6 +357,7 @@ module.exports = {
   normalizeOptionalText,
   normalizeOptionalInt,
   isValidPlateNumber,
+  buildVehicleDisplayIdentity,
   isValidYmdDate,
   normalizeVehicleInput,
   validateVehicle,

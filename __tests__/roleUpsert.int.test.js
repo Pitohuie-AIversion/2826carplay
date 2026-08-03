@@ -7,12 +7,18 @@ function createMockDb({ rolesData }) {
     update: rolesUpdate,
     set: rolesSet
   }))
+  const rolesField = jest.fn()
   const rolesWhere = jest.fn((filter) => ({
-    limit: jest.fn((limitValue) => ({
-      get: jest.fn().mockResolvedValue({
-        data: rolesData.filter((item) => item.openid === filter.openid).slice(0, limitValue)
-      })
-    }))
+    field: jest.fn((fields) => {
+      rolesField(fields)
+      return {
+        limit: jest.fn((limitValue) => ({
+          get: jest.fn().mockResolvedValue({
+            data: rolesData.filter((item) => item.openid === filter.openid).slice(0, limitValue)
+          })
+        }))
+      }
+    })
   }))
   const serverDateValue = { __type: "serverDate" }
   const serverDate = jest.fn(() => serverDateValue)
@@ -36,6 +42,7 @@ function createMockDb({ rolesData }) {
     rolesSet,
     rolesUpdate,
     rolesWhere,
+    rolesField,
     serverDateValue
   }
 }
@@ -78,6 +85,10 @@ describe("cloudfunctions/roleUpsert integration", () => {
       updated: false,
       message: "权限已创建"
     })
+    expect(mocks.rolesField).toHaveBeenCalledTimes(2)
+    expect(mocks.rolesField.mock.calls[0][0]).not.toHaveProperty("openid")
+    expect(mocks.rolesField.mock.calls[1][0]).not.toHaveProperty("createdByOpenid")
+    expect(mocks.rolesField.mock.calls[1][0]).not.toHaveProperty("updatedByOpenid")
     expect(mocks.rolesDoc).toHaveBeenCalledWith("role_ec29837e250492cf7ed652e81e9")
     expect(mocks.rolesSet).toHaveBeenCalledWith({
       data: {

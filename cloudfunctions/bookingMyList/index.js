@@ -5,6 +5,20 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
 const FALLBACK_BATCH_SIZE = 100
 const FALLBACK_MAX_RECORDS = 1000
+const BOOKING_MY_LIST_FIELDS = {
+  _id: true,
+  vehicleId: true,
+  vehicleName: true,
+  userName: true,
+  phone: true,
+  startDate: true,
+  endDate: true,
+  city: true,
+  note: true,
+  status: true,
+  createdAt: true,
+  updatedAt: true
+}
 
 function createError(code, message, details) {
   const result = {
@@ -36,6 +50,15 @@ function normalizePageSize(value) {
   }
 
   return intValue
+}
+
+function buildVehicleDisplayIdentity(value) {
+  const vehicleName = String(value || "").trim()
+  const normalized = vehicleName.toUpperCase()
+  const isPlateNumber = /^[京津沪渝冀豫云辽黑湘皖鲁新苏浙赣鄂桂甘晋蒙陕吉闽贵粤青藏川宁琼][A-Z][A-HJ-NP-Z0-9]{5,6}$/.test(normalized)
+  return isPlateNumber
+    ? { vehicleName: "预约车辆", vehicleReference: `车牌尾号 ${normalized.slice(-2)}` }
+    : { vehicleName: vehicleName || "预约车辆", vehicleReference: "" }
 }
 
 function toTimestamp(value) {
@@ -70,6 +93,7 @@ async function queryWithConfiguredIndex(openid, page, pageSize) {
   const res = await db
     .collection("bookings")
     .where({ openid })
+    .field(BOOKING_MY_LIST_FIELDS)
     .orderBy("createdAt", "desc")
     .skip(page * pageSize)
     .limit(pageSize + 1)
@@ -91,6 +115,7 @@ async function queryWithoutCompositeIndex(openid, page, pageSize) {
     const res = await db
       .collection("bookings")
       .where({ openid })
+      .field(BOOKING_MY_LIST_FIELDS)
       .skip(offset)
       .limit(batchSize)
       .get()
@@ -150,25 +175,28 @@ exports.main = async (event) => {
       page,
       pageSize,
       hasMore,
-      list: list.map((item) => ({
-        id: item._id,
-        vehicleId: item.vehicleId,
-        vehicleName: item.vehicleName || "",
-        userName: item.userName || "",
-        phone: item.phone || "",
-        startDate: item.startDate || "",
-        endDate: item.endDate || "",
-        city: item.city || "",
-        note: item.note || "",
-        status: item.status || "pending",
-        createdAt: item.createdAt,
-        updatedAt: item.updatedAt
-      }))
+      list: list.map((item) => {
+        const vehicleIdentity = buildVehicleDisplayIdentity(item.vehicleName)
+        return {
+          id: item._id,
+          vehicleId: item.vehicleId,
+          ...vehicleIdentity,
+          userName: item.userName || "",
+          phone: item.phone || "",
+          startDate: item.startDate || "",
+          endDate: item.endDate || "",
+          city: item.city || "",
+          note: item.note || "",
+          status: item.status || "pending",
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt
+        }
+      })
     }
   } catch (error) {
     console.error({
       function: "bookingMyList",
-      openid,
+      authenticated: Boolean(openid),
       errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
       stack: error && error.stack ? error.stack : "",
       createdAt: new Date().toISOString()

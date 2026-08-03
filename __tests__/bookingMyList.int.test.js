@@ -5,7 +5,8 @@ function createMockDb({ bookingsData }) {
   const limit = jest.fn(() => ({ get }))
   const skip = jest.fn(() => ({ limit }))
   const orderBy = jest.fn(() => ({ skip }))
-  const where = jest.fn(() => ({ orderBy }))
+  const field = jest.fn(() => ({ orderBy }))
+  const where = jest.fn(() => ({ field }))
 
   const db = {
     collection: jest.fn((name) => {
@@ -19,6 +20,7 @@ function createMockDb({ bookingsData }) {
   return {
     db,
     where,
+    field,
     orderBy,
     skip,
     limit
@@ -34,9 +36,12 @@ function createFallbackMockDb({ fallbackData }) {
   const fallbackGet = jest.fn().mockResolvedValue({ data: fallbackData })
   const fallbackLimit = jest.fn(() => ({ get: fallbackGet }))
   const fallbackSkip = jest.fn(() => ({ limit: fallbackLimit }))
-  const where = jest.fn(() => ({
+  const field = jest.fn(() => ({
     orderBy,
     skip: fallbackSkip
+  }))
+  const where = jest.fn(() => ({
+    field
   }))
 
   const db = {
@@ -50,6 +55,7 @@ function createFallbackMockDb({ fallbackData }) {
 
   return {
     db,
+    field,
     orderBy,
     fallbackSkip,
     fallbackLimit
@@ -93,6 +99,10 @@ describe("cloudfunctions/bookingMyList integration", () => {
     expect(mocks.orderBy).toHaveBeenCalledWith("createdAt", "desc")
     expect(mocks.skip).toHaveBeenCalledWith(2)
     expect(mocks.limit).toHaveBeenCalledWith(3)
+    const fields = mocks.field.mock.calls[0][0]
+    expect(fields.openid).toBeUndefined()
+    expect(fields.adminRemark).toBeUndefined()
+    expect(fields.coordinationStatus).toBeUndefined()
   })
 
   test("未登录返回 UNAUTHORIZED", async () => {
@@ -108,6 +118,21 @@ describe("cloudfunctions/bookingMyList integration", () => {
       code: "UNAUTHORIZED",
       message: "未获取到用户身份"
     })
+  })
+
+  test("历史预约中的完整车牌只返回尾号辅助信息", async () => {
+    const mocks = createMockDb({
+      bookingsData: [{ _id: "b1", vehicleName: "粤A12345" }]
+    })
+
+    const mod = await loadBookingMyListWith({ openid: "user_openid", mockDb: mocks.db })
+    const res = await mod.main({ page: 0, pageSize: 20 })
+
+    expect(res.list[0]).toMatchObject({
+      vehicleName: "预约车辆",
+      vehicleReference: "车牌尾号 45"
+    })
+    expect(JSON.stringify(res.list[0])).not.toContain("粤A12345")
   })
 
   test("缺少复合索引时在云函数内排序并分页", async () => {

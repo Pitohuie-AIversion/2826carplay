@@ -5,6 +5,10 @@ function getErrorMessage(error) {
   return String(error.errMsg || error.message || error)
 }
 
+function isUserCancelError(error) {
+  return getErrorMessage(error).toLowerCase().includes("cancel")
+}
+
 function ensureCsvFileName(name, fallback) {
   const raw = String(name || "").trim()
   const safeFallback = String(fallback || "export.csv").trim() || "export.csv"
@@ -120,6 +124,7 @@ module.exports = {
   canShareCsvFile,
   ensureCsvFileName,
   getErrorMessage,
+  isUserCancelError,
   openCsvFile,
   removeCsvFile,
   saveCsvFile,

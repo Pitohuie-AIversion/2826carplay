@@ -8,6 +8,12 @@ const ACTIVE_STATUSES = ["pending", "processing"]
 const MIN_DESCRIPTION_LENGTH = 2
 const MAX_DESCRIPTION_LENGTH = 500
 const DUPLICATE_SCAN_LIMIT = 100
+const PRIVACY_REQUEST_CONFLICT_FIELDS = {
+  _id: true,
+  type: true,
+  status: true,
+  createdAt: true
+}
 
 function createError(code, message, details) {
   const result = {
@@ -49,6 +55,7 @@ async function findConflictingRequest(openid, type) {
   const res = await db
     .collection("privacy_requests")
     .where({ openid })
+    .field(PRIVACY_REQUEST_CONFLICT_FIELDS)
     .limit(DUPLICATE_SCAN_LIMIT)
     .get()
   const list = res && Array.isArray(res.data) ? res.data : []
@@ -156,7 +163,7 @@ exports.main = async (event) => {
   } catch (error) {
     console.error({
       function: "privacyRequestCreate",
-      openid,
+      authenticated: Boolean(openid),
       requestType: input.type,
       errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
       stack: error && error.stack ? error.stack : "",

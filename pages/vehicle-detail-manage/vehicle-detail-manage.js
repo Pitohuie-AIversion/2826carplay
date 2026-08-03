@@ -1,4 +1,8 @@
 const { requirePagePermission } = require("../../shared/pageAuth")
+const { formatToastTitle } = require("../../shared/uiFeedback")
+
+const MAX_IMAGE_UPLOAD_BYTES = 10 * 1024 * 1024
+const ALLOWED_IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp"])
 
 const STATUS_LABEL_MAP = {
   active: "在用",
@@ -42,12 +46,12 @@ const FUEL_TYPE_LABEL_MAP = {
 
 function formatDisplayTime(value) {
   if (!value) {
-    return "--"
+    return "—"
   }
 
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) {
-    return "--"
+    return "—"
   }
 
   const year = date.getFullYear()
@@ -64,7 +68,8 @@ function buildImageItems(detail) {
 
   return imageList.map((fileId) => ({
     fileId,
-    isCover: fileId === coverImage
+    isCover: fileId === coverImage,
+    imageFailed: false
   }))
 }
 
@@ -82,24 +87,59 @@ function formatDetail(detail) {
     statusText: STATUS_LABEL_MAP[detail.status] || detail.status || "未知",
     statusClass: STATUS_CLASS_MAP[detail.status] || "status-idle",
     vehicleTypeText: VEHICLE_TYPE_LABEL_MAP[detail.vehicleType] || detail.vehicleType || "未知",
-    transmissionText: TRANSMISSION_LABEL_MAP[detail.transmission] || detail.transmission || "--",
-    fuelTypeText: FUEL_TYPE_LABEL_MAP[detail.fuelType] || detail.fuelType || "--",
-    seatsText: detail.seats ? `${detail.seats} 座` : "--",
-    locationText: detail.location || "--",
-    priceDayText: detail.priceDay || detail.priceDay === 0 ? `￥${detail.priceDay} / 24小时` : "--",
+    transmissionText: TRANSMISSION_LABEL_MAP[detail.transmission] || detail.transmission || "—",
+    fuelTypeText: FUEL_TYPE_LABEL_MAP[detail.fuelType] || detail.fuelType || "—",
+    seatsText: detail.seats ? `${detail.seats} 座` : "—",
+    locationText: detail.location || "—",
+    priceDayText: detail.priceDay || detail.priceDay === 0 ? `￥${detail.priceDay} / 24小时` : "—",
     createdAtText: formatDisplayTime(detail.createdAt),
     updatedAtText: formatDisplayTime(detail.updatedAt),
-    vinText: detail.vin || "--",
-    engineNumberText: detail.engineNumber || "--",
-    publicDescriptionText: detail.publicDescription || "--",
-    noteText: detail.note || "--",
-    createdByOpenidText: detail.createdByOpenid || "--"
+    vinText: detail.vin || "—",
+    engineNumberText: detail.engineNumber || "—",
+    publicDescriptionText: detail.publicDescription || "—",
+    noteText: detail.note || "—",
+    createdByOpenidText: detail.createdByOpenid || "—"
   }
 }
 
 function getFileExtension(filePath) {
   const match = String(filePath || "").match(/\.([a-zA-Z0-9]+)(\?|$)/)
-  return match && match[1] ? match[1].toLowerCase() : "jpg"
+  const extension = match && match[1] ? match[1].toLowerCase() : "jpg"
+  return ALLOWED_IMAGE_EXTENSIONS.has(extension) ? extension : ""
+}
+
+function isUserCancelError(error) {
+  const message = error && (error.errMsg || error.message || error)
+  return String(message || "").toLowerCase().includes("cancel")
+}
+
+function normalizeChosenImages(chooseRes) {
+  const input = chooseRes && typeof chooseRes === "object" ? chooseRes : {}
+  const tempFiles = Array.isArray(input.tempFiles) ? input.tempFiles : []
+  const fallbackPaths = Array.isArray(input.tempFilePaths) ? input.tempFilePaths : []
+  const candidates = tempFiles.length
+    ? tempFiles.map((item) => ({
+        path: String((item && item.path) || "").trim(),
+        size: Number(item && item.size)
+      }))
+    : fallbackPaths.map((path) => ({ path: String(path || "").trim(), size: 0 }))
+  const filePaths = []
+  let rejectedCount = 0
+
+  candidates.forEach((item) => {
+    const validSize =
+      !Number.isFinite(item.size) ||
+      (item.size >= 0 && item.size <= MAX_IMAGE_UPLOAD_BYTES)
+    if (!item.path || !getFileExtension(item.path) || !validSize) {
+      rejectedCount += 1
+      return
+    }
+    if (!filePaths.includes(item.path)) {
+      filePaths.push(item.path)
+    }
+  })
+
+  return { filePaths, rejectedCount }
 }
 
 function normalizeStringArray(input) {
@@ -117,7 +157,7 @@ function normalizeStringArray(input) {
   return result
 }
 
-function deleteFilesBestEffort(fileList) {
+function deleteCloudFilesDirectBestEffort(fileList) {
   const list = normalizeStringArray(fileList)
   if (!list.length) {
     return
@@ -130,6 +170,30 @@ function deleteFilesBestEffort(fileList) {
   try {
     wx.cloud.deleteFile({
       fileList: list,
+      fail: () => {}
+    })
+  } catch (error) {}
+}
+
+function requestUploadedFileCleanup(vehicleId, fileList) {
+  const id = String(vehicleId || "").trim()
+  const list = normalizeStringArray(fileList)
+  if (!id || !list.length) {
+    return
+  }
+
+  if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
+    return
+  }
+
+  try {
+    wx.cloud.callFunction({
+      name: "vehicleImageUpdate",
+      data: {
+        id,
+        action: "cleanupUpload",
+        fileIds: list
+      },
       fail: () => {}
     })
   } catch (error) {}
@@ -167,7 +231,7 @@ Page({
     const id = String((options && options.id) || "").trim()
     if (!id) {
       wx.showToast({
-        title: "缺少车辆ID",
+        title: "车辆编号缺失",
         icon: "none"
       })
       this.setData({
@@ -222,7 +286,7 @@ Page({
         const result = res && res.result ? res.result : null
         if (!result || !result.ok || !result.detail) {
           wx.showToast({
-            title: (result && result.message) || "加载失败",
+          title: formatToastTitle(result && result.message, "加载失败"),
             icon: "none"
           })
           this.setData({
@@ -246,7 +310,7 @@ Page({
       },
       fail: (error) => {
         wx.showToast({
-          title: (error && (error.errMsg || error.message)) || "加载失败",
+          title: "加载失败",
           icon: "none"
         })
         this.setData({
@@ -265,7 +329,13 @@ Page({
     }
 
     wx.navigateTo({
-      url: `/pages/vehicle-edit/vehicle-edit?id=${this.data.id}`
+      url: `/pages/vehicle-edit/vehicle-edit?id=${this.data.id}`,
+      fail: () => {
+        wx.showToast({
+          title: "编辑页面打开失败",
+          icon: "none"
+        })
+      }
     })
   },
 
@@ -293,6 +363,8 @@ Page({
     wx.showModal({
       title: "更新状态",
       content: `确认将车辆 ${plateNumber || id} 状态更新为「${statusText}」？`,
+      confirmText: "确认更新",
+      confirmColor: "#528fff",
       success: (modalRes) => {
         if (!modalRes.confirm) {
           return
@@ -315,7 +387,8 @@ Page({
     wx.showModal({
       title: "停用车辆",
       content: `确认将车辆 ${plateNumber || id} 标记为停用？`,
-      confirmColor: "#eb5757",
+      confirmText: "确认停用",
+      confirmColor: "#d46868",
       success: (modalRes) => {
         if (!modalRes.confirm) {
           return
@@ -338,6 +411,8 @@ Page({
     wx.showModal({
       title: "恢复启用",
       content: `确认将车辆 ${plateNumber || id} 恢复为可管理状态？`,
+      confirmText: "确认恢复",
+      confirmColor: "#528fff",
       success: (modalRes) => {
         if (!modalRes.confirm) {
           return
@@ -362,7 +437,8 @@ Page({
     })
 
     wx.showLoading({
-      title: "更新中"
+      title: "更新中…",
+      mask: true
     })
 
     wx.cloud.callFunction({
@@ -374,14 +450,14 @@ Page({
         if (!result || !result.ok) {
           this.setData({ updatingStatus: false })
           wx.showToast({
-            title: (result && result.message) || "更新失败",
+          title: formatToastTitle(result && result.message, "更新失败"),
             icon: "none"
           })
           return
         }
 
         wx.showToast({
-          title: result.message || "状态已更新",
+        title: formatToastTitle(result.message, "状态已更新"),
           icon: "success"
         })
         this.fetchDetail(id, () => {
@@ -392,7 +468,7 @@ Page({
         wx.hideLoading()
         this.setData({ updatingStatus: false })
         wx.showToast({
-          title: (error && (error.errMsg || error.message)) || "更新失败",
+          title: "更新失败",
           icon: "none"
         })
       }
@@ -413,7 +489,8 @@ Page({
     })
 
     wx.showLoading({
-      title: "停用中"
+      title: "停用中…",
+      mask: true
     })
 
     wx.cloud.callFunction({
@@ -425,14 +502,14 @@ Page({
         if (!result || !result.ok) {
           this.setData({ updatingStatus: false })
           wx.showToast({
-            title: (result && result.message) || "停用失败",
+          title: formatToastTitle(result && result.message, "停用失败"),
             icon: "none"
           })
           return
         }
 
         wx.showToast({
-          title: result.message || "停用成功",
+        title: formatToastTitle(result.message, "停用成功"),
           icon: "success"
         })
         this.fetchDetail(id, () => {
@@ -443,7 +520,7 @@ Page({
         wx.hideLoading()
         this.setData({ updatingStatus: false })
         wx.showToast({
-          title: (error && (error.errMsg || error.message)) || "停用失败",
+          title: "停用失败",
           icon: "none"
         })
       }
@@ -464,7 +541,8 @@ Page({
     })
 
     wx.showLoading({
-      title: "恢复中"
+      title: "恢复中…",
+      mask: true
     })
 
     wx.cloud.callFunction({
@@ -476,14 +554,14 @@ Page({
         if (!result || !result.ok) {
           this.setData({ updatingStatus: false })
           wx.showToast({
-            title: (result && result.message) || "恢复失败",
+          title: formatToastTitle(result && result.message, "恢复失败"),
             icon: "none"
           })
           return
         }
 
         wx.showToast({
-          title: result.message || "恢复成功",
+        title: formatToastTitle(result.message, "恢复成功"),
           icon: "success"
         })
         this.fetchDetail(id, () => {
@@ -494,7 +572,7 @@ Page({
         wx.hideLoading()
         this.setData({ updatingStatus: false })
         wx.showToast({
-          title: (error && (error.errMsg || error.message)) || "恢复失败",
+          title: "恢复失败",
           icon: "none"
         })
       }
@@ -506,7 +584,18 @@ Page({
       delta: 1,
       fail: () => {
         wx.redirectTo({
-          url: "/pages/vehicle-manage/vehicle-manage"
+          url: "/pages/vehicle-manage/vehicle-manage",
+          fail: () => {
+            wx.reLaunch({
+              url: "/pages/vehicle-manage/vehicle-manage",
+              fail: () => {
+                wx.showToast({
+                  title: "返回车辆管理失败",
+                  icon: "none"
+                })
+              }
+            })
+          }
         })
       }
     })
@@ -523,7 +612,32 @@ Page({
 
     wx.previewImage({
       current: fileId,
-      urls
+      urls,
+      fail: () => {
+        wx.showToast({
+          title: "图片预览失败",
+          icon: "none"
+        })
+      }
+    })
+  },
+
+  handleManagedImageError(event) {
+    const fileId = String(event.currentTarget.dataset.fileId || "").trim()
+    const detail = this.data.detail || {}
+    const imageItems = Array.isArray(detail.imageItems) ? detail.imageItems : []
+
+    if (!fileId || !imageItems.some((item) => item.fileId === fileId)) {
+      return
+    }
+
+    this.setData({
+      detail: {
+        ...detail,
+        imageItems: imageItems.map((item) => item.fileId === fileId
+          ? { ...item, imageFailed: true }
+          : item)
+      }
     })
   },
 
@@ -547,17 +661,32 @@ Page({
       sizeType: ["compressed"],
       sourceType: ["album", "camera"],
       success: (chooseRes) => {
-        const tempFilePaths = Array.isArray(chooseRes.tempFilePaths) ? chooseRes.tempFilePaths : []
-        if (!tempFilePaths.length) {
+        const selection = normalizeChosenImages(chooseRes)
+        if (!selection.filePaths.length) {
+          if (selection.rejectedCount) {
+            wx.showToast({
+              title: "仅支持10MB内图片",
+              icon: "none"
+            })
+          }
           return
         }
 
-        this.uploadSelectedFiles(tempFilePaths)
+        this.uploadSelectedFiles(selection.filePaths, selection.rejectedCount)
+      },
+      fail: (error) => {
+        if (isUserCancelError(error)) {
+          return
+        }
+        wx.showToast({
+          title: "选择图片失败，请重试",
+          icon: "none"
+        })
       }
     })
   },
 
-  uploadSelectedFiles(filePaths) {
+  uploadSelectedFiles(filePaths, skippedCount) {
     if (!wx.cloud || typeof wx.cloud.uploadFile !== "function") {
       wx.showToast({
         title: "云上传能力未初始化",
@@ -574,7 +703,8 @@ Page({
     })
 
     wx.showLoading({
-      title: "上传中"
+      title: "上传中…",
+      mask: true
     })
 
     const uploadNext = (index) => {
@@ -582,7 +712,7 @@ Page({
         this.persistImageChange({
           action: "add",
           fileIds: uploadedFileIds
-        }, uploadedFileIds)
+        }, uploadedFileIds, skippedCount)
         return
       }
 
@@ -604,9 +734,9 @@ Page({
           this.setData({
             uploading: false
           })
-          deleteFilesBestEffort(uploadedFileIds)
+          deleteCloudFilesDirectBestEffort(uploadedFileIds)
           wx.showToast({
-            title: (error && (error.errMsg || error.message)) || "图片上传失败",
+            title: "图片上传失败",
             icon: "none"
           })
         }
@@ -637,6 +767,8 @@ Page({
     wx.showModal({
       title: "移除图片",
       content: "确认将该图片从车辆资料中移除？",
+      confirmText: "确认移除",
+      confirmColor: "#d46868",
       success: (modalRes) => {
         if (!modalRes.confirm) {
           return
@@ -650,13 +782,13 @@ Page({
     })
   },
 
-  persistImageChange(payload, cleanupFileIds) {
+  persistImageChange(payload, cleanupFileIds, skippedCount) {
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       wx.hideLoading()
       this.setData({
         uploading: false
       })
-      deleteFilesBestEffort(cleanupFileIds)
+      deleteCloudFilesDirectBestEffort(cleanupFileIds)
       wx.showToast({
         title: "云能力未初始化",
         icon: "none"
@@ -667,7 +799,8 @@ Page({
     const showLoading = payload.action === "add" || payload.action === "remove" || payload.action === "setCover"
     if (showLoading) {
       wx.showLoading({
-        title: payload.action === "setCover" ? "设置中" : payload.action === "remove" ? "处理中" : "上传中"
+        title: payload.action === "setCover" ? "设置中…" : payload.action === "remove" ? "处理中…" : "上传中…",
+        mask: true
       })
     }
 
@@ -685,9 +818,9 @@ Page({
           this.setData({
             uploading: false
           })
-          deleteFilesBestEffort(cleanupFileIds)
+          requestUploadedFileCleanup(this.data.id, cleanupFileIds)
           wx.showToast({
-            title: (result && result.message) || "图片操作失败",
+          title: formatToastTitle(result && result.message, "图片操作失败"),
             icon: "none"
           })
           return
@@ -704,14 +837,18 @@ Page({
           })
         })
 
+        const partialUpload = payload.action === "add" && Number(skippedCount) > 0
         wx.showToast({
           title:
             payload.action === "setCover"
               ? "封面已更新"
               : payload.action === "remove"
                 ? "图片已移除"
-                : "图片已上传",
-          icon: "success"
+                : partialUpload
+                  ? `已上传，跳过 ${skippedCount} 张`
+                  : "图片已上传",
+          icon: partialUpload ? "none" : "success",
+          duration: partialUpload ? 2200 : 1500
         })
       },
       fail: (error) => {
@@ -719,9 +856,9 @@ Page({
         this.setData({
           uploading: false
         })
-        deleteFilesBestEffort(cleanupFileIds)
+        requestUploadedFileCleanup(this.data.id, cleanupFileIds)
         wx.showToast({
-          title: (error && (error.errMsg || error.message)) || "图片操作失败",
+          title: "图片操作失败",
           icon: "none"
         })
       }

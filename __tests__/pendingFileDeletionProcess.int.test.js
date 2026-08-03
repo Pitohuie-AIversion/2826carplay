@@ -1,16 +1,22 @@
 jest.mock("wx-server-sdk")
 
-function createMockDb({ rolesData, queueData }) {
+function createMockDb({ rolesData, queueData, vehicleData = null, vehicleError = null }) {
   const rolesGet = jest.fn().mockResolvedValue({ data: rolesData })
   const queueGet = jest.fn().mockResolvedValue({ data: queueData })
   const queueRemove = jest.fn().mockResolvedValue({ stats: { removed: 1 } })
   const queueUpdate = jest.fn().mockResolvedValue({ stats: { updated: 1 } })
   const auditAdd = jest.fn().mockResolvedValue({ _id: "audit_1" })
+  const vehicleGet = vehicleError
+    ? jest.fn().mockRejectedValue(vehicleError)
+    : jest.fn().mockResolvedValue({ data: vehicleData })
+  const vehicleField = jest.fn(() => ({ get: vehicleGet }))
+  const vehicleDoc = jest.fn(() => ({ field: vehicleField }))
 
   const rolesWhere = jest.fn(() => ({
     limit: jest.fn(() => ({ get: rolesGet }))
   }))
   const queueLimit = jest.fn(() => ({ get: queueGet }))
+  const queueField = jest.fn(() => ({ limit: queueLimit }))
   const queueDoc = jest.fn(() => ({
     remove: queueRemove,
     update: queueUpdate
@@ -25,12 +31,16 @@ function createMockDb({ rolesData, queueData }) {
       }
       if (name === "pending_file_deletions") {
         return {
+          field: queueField,
           limit: queueLimit,
           doc: queueDoc
         }
       }
       if (name === "audit_logs") {
         return { add: auditAdd }
+      }
+      if (name === "vehicles") {
+        return { doc: vehicleDoc }
       }
       throw new Error(`Unexpected collection: ${name}`)
     }),
@@ -41,11 +51,15 @@ function createMockDb({ rolesData, queueData }) {
     db,
     rolesWhere,
     queueGet,
+    queueField,
     queueLimit,
     queueDoc,
     queueRemove,
     queueUpdate,
     auditAdd,
+    vehicleDoc,
+    vehicleField,
+    vehicleGet,
     serverDateValue
   }
 }
@@ -85,10 +99,24 @@ describe("cloudfunctions/pendingFileDeletionProcess integration", () => {
       deleted: 1,
       failed: 0,
       invalid: 1,
+      deferred: 0,
+      preserved: 0,
       hasMore: false,
       message: "存储清理队列已处理"
     })
-    expect(mocks.queueLimit).toHaveBeenCalledWith(5)
+    expect(mocks.queueLimit).toHaveBeenCalledWith(100)
+    expect(mocks.queueField).toHaveBeenCalledWith({
+      _id: true,
+      fileList: true,
+      attemptCount: true,
+      context: true,
+      source: true,
+      notBeforeAt: true
+    })
+    const fieldSpec = mocks.queueField.mock.calls[0][0]
+    expect(fieldSpec).not.toHaveProperty("lastError")
+    expect(fieldSpec).not.toHaveProperty("lastAttemptAt")
+    expect(fieldSpec).not.toHaveProperty("createdAt")
     expect(cloud.deleteFile).toHaveBeenCalledWith({ fileList: ["cloud://img1"] })
     expect(mocks.queueRemove).toHaveBeenCalledTimes(2)
     expect(mocks.auditAdd).toHaveBeenCalledWith({
@@ -99,6 +127,8 @@ describe("cloudfunctions/pendingFileDeletionProcess integration", () => {
         deleted: 1,
         failed: 0,
         invalid: 1,
+        deferred: 0,
+        preserved: 0,
         createdAt: mocks.serverDateValue
       }
     })
@@ -111,7 +141,11 @@ describe("cloudfunctions/pendingFileDeletionProcess integration", () => {
     })
     const mod = await loadFunctionWith({ openid: "admin_openid", mockDb: mocks.db })
     const cloud = require("wx-server-sdk")
-    cloud.deleteFile.mockRejectedValue(new Error("storage unavailable"))
+    cloud.deleteFile.mockRejectedValue(
+      Object.assign(new Error("storage unavailable cloud://env/private/file.jpg"), {
+        code: "STORAGE_UNAVAILABLE"
+      })
+    )
 
     const res = await mod.main()
 
@@ -121,10 +155,11 @@ describe("cloudfunctions/pendingFileDeletionProcess integration", () => {
     expect(mocks.queueUpdate).toHaveBeenCalledWith({
       data: {
         attemptCount: 3,
-        lastError: "storage unavailable",
+        lastError: "云存储删除失败（错误码 STORAGE_UNAVAILABLE）",
         lastAttemptAt: mocks.serverDateValue
       }
     })
+    expect(JSON.stringify(mocks.queueUpdate.mock.calls)).not.toContain("cloud://")
   })
 
   test("部分文件失败时只保留失败文件", async () => {
@@ -153,6 +188,130 @@ describe("cloudfunctions/pendingFileDeletionProcess integration", () => {
         lastAttemptAt: mocks.serverDateValue
       }
     })
+  })
+
+  test("云存储确认文件已不存在时直接完成清理任务", async () => {
+    const mocks = createMockDb({
+      rolesData: [{ role: "admin" }],
+      queueData: [{ _id: "queue_1", fileList: ["cloud://missing.jpg"] }]
+    })
+    const mod = await loadFunctionWith({ openid: "admin_openid", mockDb: mocks.db })
+    const cloud = require("wx-server-sdk")
+    cloud.deleteFile.mockResolvedValue({
+      fileList: [{
+        fileID: "cloud://missing.jpg",
+        status: -1,
+        errMsg: "file not found"
+      }]
+    })
+
+    const res = await mod.main()
+
+    expect(res.deleted).toBe(1)
+    expect(res.failed).toBe(0)
+    expect(mocks.queueRemove).toHaveBeenCalledWith()
+    expect(mocks.queueUpdate).not.toHaveBeenCalled()
+  })
+
+  test("整批删除返回文件不存在错误时同样移除任务", async () => {
+    const mocks = createMockDb({
+      rolesData: [{ role: "admin" }],
+      queueData: [{ _id: "queue_1", fileList: ["cloud://missing.jpg"] }]
+    })
+    const mod = await loadFunctionWith({ openid: "admin_openid", mockDb: mocks.db })
+    const cloud = require("wx-server-sdk")
+    cloud.deleteFile.mockRejectedValue(
+      Object.assign(new Error("file does not exist"), {
+        code: "STORAGE_FILE_NOT_EXIST"
+      })
+    )
+
+    const res = await mod.main()
+
+    expect(res.deleted).toBe(1)
+    expect(res.failed).toBe(0)
+    expect(mocks.queueRemove).toHaveBeenCalledWith()
+    expect(mocks.queueUpdate).not.toHaveBeenCalled()
+  })
+
+  test("未到安全核验时间的上传清理任务不会提前删除", async () => {
+    const mocks = createMockDb({
+      rolesData: [{ role: "admin" }],
+      queueData: [{
+        _id: "queue_1",
+        fileList: ["cloud://orphan.jpg"],
+        context: { vehicleId: "car_1", action: "cleanupUpload" },
+        source: "vehicleImageUploadCleanup",
+        notBeforeAt: new Date(Date.now() + 60 * 1000)
+      }]
+    })
+    const mod = await loadFunctionWith({ openid: "admin_openid", mockDb: mocks.db })
+    const cloud = require("wx-server-sdk")
+
+    const res = await mod.main()
+
+    expect(res.deferred).toBe(1)
+    expect(res.message).toBe("图片仍在安全核验期，请稍后重试")
+    expect(cloud.deleteFile).not.toHaveBeenCalled()
+    expect(mocks.vehicleDoc).not.toHaveBeenCalled()
+    expect(mocks.queueRemove).not.toHaveBeenCalled()
+  })
+
+  test("等待中的图片任务不会阻塞后续已到期任务", async () => {
+    const deferredTasks = Array.from({ length: 5 }, (_, index) => ({
+      _id: `deferred_${index}`,
+      fileList: [`cloud://deferred_${index}.jpg`],
+      context: { vehicleId: "car_1", action: "cleanupUpload" },
+      source: "vehicleImageUploadCleanup",
+      notBeforeAt: new Date(Date.now() + 60 * 1000)
+    }))
+    const mocks = createMockDb({
+      rolesData: [{ role: "admin" }],
+      queueData: [
+        ...deferredTasks,
+        { _id: "ready_1", fileList: ["cloud://ready.jpg"], source: "vehicleDelete" }
+      ]
+    })
+    const mod = await loadFunctionWith({ openid: "admin_openid", mockDb: mocks.db })
+    const cloud = require("wx-server-sdk")
+    cloud.deleteFile.mockResolvedValue({ fileList: [] })
+
+    const res = await mod.main()
+
+    expect(cloud.deleteFile).toHaveBeenCalledTimes(1)
+    expect(cloud.deleteFile).toHaveBeenCalledWith({ fileList: ["cloud://ready.jpg"] })
+    expect(res.processed).toBe(1)
+    expect(res.deleted).toBe(1)
+    expect(res.deferred).toBe(0)
+    expect(res.hasMore).toBe(true)
+    expect(res.message).toBe("存储清理队列已处理")
+  })
+
+  test("核验后只删除未被车辆引用的上传文件", async () => {
+    const referenced = "cloud://env/vehicle-images/car_1/active.jpg"
+    const orphan = "cloud://env/vehicle-images/car_1/orphan.jpg"
+    const mocks = createMockDb({
+      rolesData: [{ role: "admin" }],
+      vehicleData: { imageList: [referenced] },
+      queueData: [{
+        _id: "queue_1",
+        fileList: [referenced, orphan],
+        context: { vehicleId: "car_1", action: "cleanupUpload" },
+        source: "vehicleImageUploadCleanup",
+        notBeforeAt: new Date(Date.now() - 1000)
+      }]
+    })
+    const mod = await loadFunctionWith({ openid: "admin_openid", mockDb: mocks.db })
+    const cloud = require("wx-server-sdk")
+    cloud.deleteFile.mockResolvedValue({ fileList: [] })
+
+    const res = await mod.main()
+
+    expect(cloud.deleteFile).toHaveBeenCalledWith({ fileList: [orphan] })
+    expect(mocks.vehicleField).toHaveBeenCalledWith({ imageList: true })
+    expect(mocks.queueRemove).toHaveBeenCalledWith()
+    expect(res.deleted).toBe(1)
+    expect(res.preserved).toBe(1)
   })
 
   test("非管理员不能处理存储清理队列", async () => {

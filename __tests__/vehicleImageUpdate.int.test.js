@@ -4,6 +4,10 @@ function createMockDb({ rolesData, currentData, updateResult }) {
   const rolesGet = jest.fn().mockResolvedValue({ data: rolesData })
   const currentGet = jest.fn().mockResolvedValue({ data: currentData })
   const update = jest.fn().mockResolvedValue(updateResult)
+  const queueAdd = jest.fn().mockResolvedValue({ _id: "queue_1" })
+  const queueSet = jest.fn().mockResolvedValue({ stats: { created: 1, updated: 1 } })
+  const queueDoc = jest.fn(() => ({ set: queueSet }))
+  const auditAdd = jest.fn().mockResolvedValue({ _id: "audit_1" })
 
   const rolesLimit = jest.fn(() => ({ get: rolesGet }))
   const rolesWhere = jest.fn(() => ({ limit: rolesLimit }))
@@ -24,6 +28,12 @@ function createMockDb({ rolesData, currentData, updateResult }) {
       if (name === "vehicles") {
         return { doc: vehiclesDoc }
       }
+      if (name === "pending_file_deletions") {
+        return { add: queueAdd, doc: queueDoc }
+      }
+      if (name === "audit_logs") {
+        return { add: auditAdd }
+      }
       throw new Error(`Unexpected collection: ${name}`)
     }),
     serverDate
@@ -36,6 +46,10 @@ function createMockDb({ rolesData, currentData, updateResult }) {
     vehiclesDoc,
     currentGet,
     update,
+    queueAdd,
+    queueDoc,
+    queueSet,
+    auditAdd,
     serverDateValue
   }
 }
@@ -227,5 +241,119 @@ describe("cloudfunctions/vehicleImageUpdate integration", () => {
       }
     })
     expect(mocks.update).not.toHaveBeenCalled()
+  })
+
+  test("资料保存失败后登记延迟核验清理且不立即删除文件", async () => {
+    const mocks = createMockDb({
+      rolesData: [{ permissions: ["vehicle_manage"] }],
+      currentData: null,
+      updateResult: { stats: { updated: 0 } }
+    })
+    const vehicleImageUpdate = await loadVehicleImageUpdateWith({
+      openid: "manager_openid",
+      mockDb: mocks.db
+    })
+    const cloud = require("wx-server-sdk")
+    const fileIds = ["cloud://env.bucket/vehicle-images/car_1/orphan.jpg"]
+
+    const res = await vehicleImageUpdate.main({
+      id: "car_1",
+      action: "cleanupUpload",
+      fileIds
+    })
+
+    expect(res).toEqual({
+      ok: true,
+      id: "car_1",
+      action: "cleanupUpload",
+      requestedCount: 1,
+      queuedCount: 1,
+      message: "已提交未入库图片核验清理"
+    })
+    expect(cloud.deleteFile).not.toHaveBeenCalled()
+    expect(mocks.vehiclesDoc).not.toHaveBeenCalled()
+    expect(mocks.queueDoc).toHaveBeenCalledWith(
+      expect.stringMatching(/^pending_image_cleanup_[a-f0-9]{32}$/)
+    )
+    expect(mocks.queueSet).toHaveBeenCalledWith({
+      data: {
+        fileList: [fileIds[0]],
+        context: {
+          vehicleId: "car_1",
+          action: "cleanupUpload"
+        },
+        source: "vehicleImageUploadCleanup",
+        notBeforeAt: expect.any(Date),
+        createdAt: mocks.serverDateValue
+      }
+    })
+    expect(mocks.auditAdd).toHaveBeenCalledWith({
+      data: {
+        openid: "manager_openid",
+        action: "vehicleImageUpdate",
+        vehicleId: "car_1",
+        imageAction: "cleanupUpload",
+        fileIdsCount: 1,
+        createdAt: mocks.serverDateValue
+      }
+    })
+  })
+
+  test("清理动作拒绝其他车辆目录的图片", async () => {
+    const mocks = createMockDb({
+      rolesData: [{ role: "admin" }],
+      currentData: null,
+      updateResult: { stats: { updated: 0 } }
+    })
+    const vehicleImageUpdate = await loadVehicleImageUpdateWith({
+      openid: "admin_openid",
+      mockDb: mocks.db
+    })
+    const fileIds = ["cloud://env.bucket/vehicle-images/car_2/orphan.jpg"]
+
+    const res = await vehicleImageUpdate.main({
+      id: "car_1",
+      action: "cleanupUpload",
+      fileIds
+    })
+
+    expect(res).toEqual({
+      ok: false,
+      code: "VALIDATION_ERROR",
+      message: "图片不属于当前车辆目录",
+      details: {
+        errors: [{ field: "fileIds", message: "只能清理当前车辆目录下的云图片" }]
+      }
+    })
+    expect(mocks.queueDoc).not.toHaveBeenCalled()
+  })
+
+  test("重复提交同一图片时复用确定性清理任务编号", async () => {
+    const mocks = createMockDb({
+      rolesData: [{ role: "admin" }],
+      currentData: null,
+      updateResult: { stats: { updated: 0 } }
+    })
+    const vehicleImageUpdate = await loadVehicleImageUpdateWith({
+      openid: "admin_openid",
+      mockDb: mocks.db
+    })
+    const event = {
+      id: "car_1",
+      action: "cleanupUpload",
+      fileIds: ["cloud://env.bucket/vehicle-images/car_1/1700000000000_0.jpg"]
+    }
+
+    await vehicleImageUpdate.main(event)
+    await vehicleImageUpdate.main(event)
+
+    const taskIds = mocks.queueDoc.mock.calls.map((call) => call[0])
+    expect(taskIds).toHaveLength(2)
+    expect(new Set(taskIds).size).toBe(1)
+    expect(mocks.queueSet).toHaveBeenCalledTimes(2)
+    const notBeforeTimes = mocks.queueSet.mock.calls.map(
+      (call) => call[0].data.notBeforeAt.getTime()
+    )
+    expect(new Set(notBeforeTimes)).toEqual(new Set([1700000030000]))
   })
 })

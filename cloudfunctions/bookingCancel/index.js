@@ -4,6 +4,11 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
 const CANCELLABLE_STATUSES = ["pending", "contacted"]
+const BOOKING_CANCEL_FIELDS = {
+  openid: true,
+  vehicleId: true,
+  status: true
+}
 
 function createError(code, message, details) {
   const result = {
@@ -88,7 +93,11 @@ exports.main = async (event) => {
       })
     }
 
-    const currentRes = await db.collection("bookings").doc(input.id).get()
+    const currentRes = await db
+      .collection("bookings")
+      .doc(input.id)
+      .field(BOOKING_CANCEL_FIELDS)
+      .get()
     const current = currentRes && currentRes.data ? currentRes.data : null
 
     if (!current) {
@@ -137,21 +146,23 @@ exports.main = async (event) => {
       message: "预约已取消"
     }
   } catch (error) {
+    const errorMessage = String(
+      error && (error.message || error.errMsg) ? error.message || error.errMsg : error
+    ).slice(0, 300)
     await writeErrorLogBestEffort({
       function: "bookingCancel",
-      openid,
       bookingId: input.id,
       stage: "main",
-      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
-      stack: error && error.stack ? error.stack : "",
+      authenticated: Boolean(openid),
+      errorMessage,
       occurredAt: new Date().toISOString()
     })
 
     console.error({
       function: "bookingCancel",
-      openid,
+      authenticated: Boolean(openid),
       id: input.id,
-      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
+      errorMessage,
       stack: error && error.stack ? error.stack : "",
       createdAt: new Date().toISOString()
     })

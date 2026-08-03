@@ -1,5 +1,7 @@
 const vehicleUtils = require("../../shared/vehicle")
+const { buildVehicleFormProgress } = require("../../shared/vehicleFormProgress")
 const { requirePagePermission } = require("../../shared/pageAuth")
+const { formatToastTitle } = require("../../shared/uiFeedback")
 
 const VEHICLE_TYPE_LABEL_MAP = {
   sedan: "轿车",
@@ -62,6 +64,7 @@ Page({
     isSubmitting: false,
     publicDescriptionLength: 0,
     noteLength: 0,
+    formProgress: buildVehicleFormProgress({}),
     pageAuthorized: false,
     vehicleTypeLabels: buildLabels(vehicleUtils.VEHICLE_TYPES, VEHICLE_TYPE_LABEL_MAP),
     statusLabels: buildLabels(vehicleUtils.VEHICLE_STATUSES, STATUS_LABEL_MAP),
@@ -119,7 +122,18 @@ Page({
         delta: 1,
         fail: () => {
           wx.redirectTo({
-            url: "/pages/mine/mine"
+            url: "/pages/mine/mine",
+            fail: () => {
+              wx.reLaunch({
+                url: "/pages/mine/mine",
+                fail: () => {
+                  wx.showToast({
+                    title: "返回我的页面失败",
+                    icon: "none"
+                  })
+                }
+              })
+            }
           })
         }
       })
@@ -130,7 +144,13 @@ Page({
       url: "/pages/mine/mine",
       fail: () => {
         wx.reLaunch({
-          url: "/pages/mine/mine"
+          url: "/pages/mine/mine",
+          fail: () => {
+            wx.showToast({
+              title: "返回我的页面失败",
+              icon: "none"
+            })
+          }
         })
       }
     })
@@ -167,7 +187,8 @@ Page({
     value = value.replace(/[^0-9A-Z\u4e00-\u9fa5]/g, "").slice(0, 8)
 
     this.setData({
-      "form.plateNumber": value
+      "form.plateNumber": value,
+      formProgress: buildVehicleFormProgress({ ...this.data.form, plateNumber: value })
     })
   },
 
@@ -204,7 +225,8 @@ Page({
     }
 
     const nextData = {
-      [`form.${field}`]: value
+      [`form.${field}`]: value,
+      formProgress: buildVehicleFormProgress({ ...this.data.form, [field]: value })
     }
     if (field === "publicDescription") {
       nextData.publicDescriptionLength = String(value || "").length
@@ -224,7 +246,8 @@ Page({
     this.setData({
       vehicleTypeIndex: index,
       vehicleTypeLabel: label,
-      "form.vehicleType": value
+      "form.vehicleType": value,
+      formProgress: buildVehicleFormProgress({ ...this.data.form, vehicleType: value })
     })
   },
 
@@ -236,7 +259,8 @@ Page({
     this.setData({
       statusIndex: index,
       statusLabel: label,
-      "form.status": value
+      "form.status": value,
+      formProgress: buildVehicleFormProgress({ ...this.data.form, status: value })
     })
   },
 
@@ -244,7 +268,8 @@ Page({
     const value = event.detail.value
 
     this.setData({
-      "form.registerDate": value
+      "form.registerDate": value,
+      formProgress: buildVehicleFormProgress({ ...this.data.form, registerDate: value })
     })
   },
 
@@ -294,7 +319,7 @@ Page({
     const check = vehicleUtils.validateVehicle(this.data.form)
     if (!check.ok) {
       wx.showToast({
-        title: this.getValidationMessage(check),
+        title: formatToastTitle(this.getValidationMessage(check), "车辆信息有误"),
         icon: "none"
       })
       return
@@ -327,6 +352,7 @@ Page({
             title: "新增成功",
             content: "车辆已创建，是否现在上传车辆图片？",
             confirmText: "去上传",
+            confirmColor: "#528fff",
             cancelText: "稍后",
             success: (modalRes) => {
               if (modalRes.confirm) {
@@ -362,7 +388,7 @@ Page({
       },
       fail: (error) => {
         wx.showToast({
-          title: (error && (error.errMsg || error.message)) || "新增失败",
+          title: "新增失败",
           icon: "none"
         })
 

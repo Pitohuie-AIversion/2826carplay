@@ -1,7 +1,7 @@
 .vehicle-form-page {
   position: relative;
   min-height: 100vh;
-  padding: 38rpx 24rpx 70rpx;
+  padding: 38rpx calc(24rpx + env(safe-area-inset-right)) calc(70rpx + env(safe-area-inset-bottom)) calc(24rpx + env(safe-area-inset-left));
   overflow: hidden;
   background: linear-gradient(180deg, #141a25 0%, #0b0d10 600rpx);
   box-sizing: border-box;
@@ -124,7 +124,26 @@
   border: 1rpx solid rgba(86, 145, 240, 0.28);
   border-radius: 50%;
   color: #75a8ff;
-  font-size: 20rpx;
+}
+
+.vehicle-form-page .tip-info-icon {
+  position: relative;
+  width: 4rpx;
+  height: 14rpx;
+  margin-top: 5rpx;
+  border-radius: 3rpx;
+  background: currentColor;
+}
+
+.vehicle-form-page .tip-info-icon::before {
+  position: absolute;
+  top: -8rpx;
+  left: 0;
+  width: 4rpx;
+  height: 4rpx;
+  border-radius: 50%;
+  background: currentColor;
+  content: "";
 }
 
 .vehicle-form-page .tip-title,
@@ -228,6 +247,23 @@
   font-size: 23rpx;
   line-height: 1.5;
   box-sizing: border-box;
+  transition: border-color 150ms ease, background 150ms ease, box-shadow 150ms ease;
+}
+
+.vehicle-form-page .form-input:focus,
+.vehicle-form-page .form-textarea:focus,
+.vehicle-form-page .field-input:focus,
+.vehicle-form-page .field-textarea:focus {
+  border-color: rgba(84, 143, 255, 0.55);
+  background: #121720;
+  box-shadow: 0 0 0 5rpx rgba(84, 143, 255, 0.08);
+}
+
+.vehicle-form-page .vehicle-picker-pressed {
+  border-color: rgba(84, 143, 255, 0.38);
+  background: #121720;
+  opacity: 0.82;
+  transform: scale(0.985);
 }
 
 .vehicle-form-page .form-picker,
@@ -243,14 +279,34 @@
   color: #edf0f4;
 }
 
+.vehicle-form-page .vehicle-form-control-complete {
+  border-color: rgba(84, 143, 255, 0.24);
+  background: #111722;
+}
+
 .vehicle-form-page .picker-field-placeholder {
   color: #626c79;
 }
 
 .vehicle-form-page .picker-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 24rpx;
+  height: 24rpx;
   margin-left: 8rpx;
   color: #5c6674;
-  font-size: 22rpx;
+}
+
+.vehicle-form-page .picker-chevron {
+  width: 9rpx;
+  height: 9rpx;
+  margin-bottom: 5rpx;
+  border-right: 2rpx solid currentColor;
+  border-bottom: 2rpx solid currentColor;
+  box-sizing: border-box;
+  transform: rotate(45deg);
 }
 
 .vehicle-form-page .form-textarea,
@@ -304,6 +360,138 @@
 .vehicle-form-page .secondary-button::after,
 .vehicle-form-page .submit-button::after {
   border: 0;
+}
+
+.vehicle-form-page .vehicle-form-action-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  line-height: 1;
+}
+
+.vehicle-form-page .vehicle-action-native-icon {
+  position: relative;
+  flex-shrink: 0;
+  width: 26rpx;
+  height: 26rpx;
+  margin-right: 11rpx;
+  color: currentColor;
+  box-sizing: border-box;
+}
+
+.vehicle-form-page .vehicle-create-native-icon,
+.vehicle-form-page .vehicle-save-native-icon {
+  border: 2rpx solid currentColor;
+  border-radius: 50%;
+}
+
+.vehicle-form-page .vehicle-create-native-icon::before,
+.vehicle-form-page .vehicle-create-native-icon::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  border-radius: 999rpx;
+  background: currentColor;
+  content: "";
+  transform: translate(-50%, -50%);
+}
+
+.vehicle-form-page .vehicle-create-native-icon::before {
+  width: 12rpx;
+  height: 2rpx;
+}
+
+.vehicle-form-page .vehicle-create-native-icon::after {
+  width: 2rpx;
+  height: 12rpx;
+}
+
+.vehicle-form-page .vehicle-save-native-icon::after {
+  position: absolute;
+  top: 4rpx;
+  left: 8rpx;
+  width: 6rpx;
+  height: 11rpx;
+  border-right: 2rpx solid currentColor;
+  border-bottom: 2rpx solid currentColor;
+  content: "";
+  transform: rotate(45deg);
+}
+
+.vehicle-form-page .vehicle-image-native-icon {
+  overflow: hidden;
+  width: 28rpx;
+  height: 23rpx;
+  border: 2rpx solid currentColor;
+  border-radius: 4rpx;
+}
+
+.vehicle-form-page .vehicle-image-native-icon::after {
+  position: absolute;
+  bottom: -4rpx;
+  left: 4rpx;
+  width: 14rpx;
+  height: 14rpx;
+  border-top: 2rpx solid currentColor;
+  border-left: 2rpx solid currentColor;
+  content: "";
+  transform: rotate(45deg);
+}
+
+.vehicle-form-page .vehicle-image-native-sun {
+  position: absolute;
+  top: 4rpx;
+  right: 4rpx;
+  width: 5rpx;
+  height: 5rpx;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.vehicle-form-page .vehicle-retry-native-icon {
+  width: 25rpx;
+  height: 25rpx;
+  border: 2rpx solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+}
+
+.vehicle-form-page .vehicle-retry-native-icon::after {
+  position: absolute;
+  top: -5rpx;
+  right: -2rpx;
+  width: 0;
+  height: 0;
+  border-top: 5rpx solid transparent;
+  border-bottom: 5rpx solid transparent;
+  border-left: 7rpx solid currentColor;
+  content: "";
+  transform: rotate(25deg);
+}
+
+.vehicle-form-page .vehicle-back-native-icon::before {
+  position: absolute;
+  top: 12rpx;
+  left: 3rpx;
+  width: 21rpx;
+  height: 2rpx;
+  border-radius: 999rpx;
+  background: currentColor;
+  content: "";
+}
+
+.vehicle-form-page .vehicle-back-native-icon::after {
+  position: absolute;
+  top: 8rpx;
+  left: 3rpx;
+  width: 8rpx;
+  height: 8rpx;
+  border-bottom: 2rpx solid currentColor;
+  border-left: 2rpx solid currentColor;
+  content: "";
+  transform: rotate(45deg);
 }
 
 .vehicle-form-page .vehicle-form-button-pressed {
@@ -459,4 +647,314 @@
   100% {
     background-position: -70% 0;
   }
+}
+
+.vehicle-form-page .vehicle-form-progress {
+  position: relative;
+  z-index: 1;
+  margin-top: 22rpx;
+  padding-top: 19rpx;
+  border-top: 1rpx solid rgba(255, 255, 255, 0.065);
+}
+
+.vehicle-form-page .vehicle-form-progress-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.vehicle-form-page .vehicle-form-progress-title,
+.vehicle-form-page .vehicle-form-progress-value {
+  color: #77869b;
+  font-size: 18rpx;
+  font-weight: 550;
+  line-height: 1.4;
+}
+
+.vehicle-form-page .vehicle-form-progress-value {
+  color: #8eacd8;
+  font-weight: 700;
+}
+
+.vehicle-form-page .vehicle-form-progress-track {
+  height: 7rpx;
+  margin-top: 12rpx;
+  overflow: hidden;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.065);
+}
+
+.vehicle-form-page .vehicle-form-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #437fdc, #79aef8);
+  box-shadow: 0 0 16rpx rgba(77, 139, 231, 0.38);
+  transition: width 0.22s ease;
+}
+
+.vehicle-form-page .vehicle-form-progress-hint {
+  display: flex;
+  align-items: center;
+  margin-top: 11rpx;
+  color: #66758a;
+  font-size: 17rpx;
+  line-height: 1.5;
+}
+
+.vehicle-form-page .vehicle-form-progress-icon {
+  position: relative;
+  flex-shrink: 0;
+  width: 16rpx;
+  height: 16rpx;
+  margin-right: 8rpx;
+  border: 2rpx solid #64758b;
+  border-radius: 50%;
+  box-sizing: border-box;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.vehicle-form-page .vehicle-form-state-button-pressed {
+  opacity: 0.72;
+  transform: scale(0.985);
+}
+
+.vehicle-form-page .vehicle-form-progress-icon::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4rpx;
+  height: 4rpx;
+  border-radius: 50%;
+  background: #64758b;
+  content: "";
+  transform: translate(-50%, -50%);
+}
+
+.vehicle-form-page .vehicle-form-progress-ready .vehicle-form-progress-title,
+.vehicle-form-page .vehicle-form-progress-ready .vehicle-form-progress-value,
+.vehicle-form-page .vehicle-form-progress-ready .vehicle-form-progress-hint {
+  color: #70bc95;
+}
+
+.vehicle-form-page .vehicle-form-progress-ready .vehicle-form-progress-fill {
+  background: linear-gradient(90deg, #3c9c70, #70cd9b);
+  box-shadow: 0 0 16rpx rgba(83, 190, 137, 0.34);
+}
+
+.vehicle-form-page .vehicle-form-progress-ready .vehicle-form-progress-icon {
+  border-color: #62c28f;
+  background: #62c28f;
+}
+
+.vehicle-form-page .vehicle-form-progress-ready .vehicle-form-progress-icon::after {
+  display: none;
+}
+
+.vehicle-form-page .vehicle-form-progress-check {
+  position: absolute;
+  top: 1rpx;
+  left: 4rpx;
+  width: 4rpx;
+  height: 8rpx;
+  border-right: 2rpx solid transparent;
+  border-bottom: 2rpx solid transparent;
+  transform: rotate(45deg);
+}
+
+.vehicle-form-page .vehicle-form-progress-ready .vehicle-form-progress-check {
+  border-color: #ffffff;
+}
+
+.vehicle-form-page .section-heading-main {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.vehicle-form-page .vehicle-section-glyph {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 58rpx;
+  height: 58rpx;
+  margin-right: 16rpx;
+  border: 1rpx solid rgba(102, 153, 232, 0.19);
+  border-radius: 18rpx;
+  background: rgba(70, 119, 194, 0.1);
+  color: #7caaf0;
+}
+
+.vehicle-form-page .vehicle-section-glyph-icon {
+  position: relative;
+  box-sizing: border-box;
+}
+
+.vehicle-form-page .vehicle-section-glyph-identity .vehicle-section-glyph-icon {
+  width: 32rpx;
+  height: 17rpx;
+  margin-top: 7rpx;
+  border: 3rpx solid currentColor;
+  border-radius: 7rpx 7rpx 5rpx 5rpx;
+}
+
+.vehicle-form-page .vehicle-section-glyph-identity .vehicle-section-glyph-icon::before {
+  position: absolute;
+  top: -10rpx;
+  left: 5rpx;
+  width: 16rpx;
+  height: 11rpx;
+  border: 3rpx solid currentColor;
+  border-bottom: 0;
+  border-radius: 7rpx 7rpx 0 0;
+  box-sizing: border-box;
+  content: "";
+}
+
+.vehicle-form-page .vehicle-section-glyph-identity .vehicle-section-glyph-icon::after {
+  position: absolute;
+  bottom: -7rpx;
+  left: 3rpx;
+  width: 6rpx;
+  height: 6rpx;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 16rpx 0 currentColor;
+  content: "";
+}
+
+.vehicle-form-page .vehicle-section-glyph-rental .vehicle-section-glyph-icon {
+  width: 31rpx;
+  height: 27rpx;
+  overflow: hidden;
+  border: 3rpx solid currentColor;
+  border-radius: 5rpx;
+}
+
+.vehicle-form-page .vehicle-section-glyph-rental .vehicle-section-glyph-icon::before {
+  position: absolute;
+  right: 4rpx;
+  bottom: -7rpx;
+  width: 18rpx;
+  height: 18rpx;
+  border-top: 3rpx solid currentColor;
+  border-left: 3rpx solid currentColor;
+  content: "";
+  transform: rotate(45deg);
+}
+
+.vehicle-form-page .vehicle-section-glyph-rental .vehicle-section-glyph-icon::after {
+  position: absolute;
+  top: 4rpx;
+  left: 5rpx;
+  width: 5rpx;
+  height: 5rpx;
+  border-radius: 50%;
+  background: currentColor;
+  content: "";
+}
+
+.vehicle-form-page .vehicle-section-glyph-archive .vehicle-section-glyph-icon {
+  width: 27rpx;
+  height: 31rpx;
+  border: 3rpx solid currentColor;
+  border-radius: 4rpx;
+}
+
+.vehicle-form-page .vehicle-section-glyph-archive .vehicle-section-glyph-icon::before,
+.vehicle-form-page .vehicle-section-glyph-archive .vehicle-section-glyph-icon::after {
+  position: absolute;
+  left: 5rpx;
+  height: 2rpx;
+  border-radius: 999rpx;
+  background: currentColor;
+  content: "";
+}
+
+.vehicle-form-page .vehicle-section-glyph-archive .vehicle-section-glyph-icon::before {
+  top: 8rpx;
+  width: 11rpx;
+}
+
+.vehicle-form-page .vehicle-section-glyph-archive .vehicle-section-glyph-icon::after {
+  top: 16rpx;
+  width: 8rpx;
+}
+
+.vehicle-form-page .vehicle-submit-dock {
+  position: sticky;
+  z-index: 8;
+  bottom: calc(env(safe-area-inset-bottom) + 12rpx);
+  margin-top: 8rpx;
+  padding: 20rpx;
+  border: 1rpx solid rgba(91, 143, 224, 0.2);
+  border-radius: 25rpx;
+  background: rgba(20, 25, 33, 0.97);
+  box-shadow: 0 22rpx 54rpx rgba(0, 0, 0, 0.35);
+  box-sizing: border-box;
+}
+
+.vehicle-form-page .vehicle-submit-state {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16rpx;
+  color: #758296;
+  font-size: 18rpx;
+  line-height: 1.5;
+}
+
+.vehicle-form-page .vehicle-submit-state-icon {
+  position: relative;
+  flex-shrink: 0;
+  width: 20rpx;
+  height: 20rpx;
+  margin-right: 9rpx;
+  border: 2rpx solid #65758b;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+
+.vehicle-form-page .vehicle-submit-state-icon::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4rpx;
+  height: 4rpx;
+  border-radius: 50%;
+  background: #65758b;
+  content: "";
+  transform: translate(-50%, -50%);
+}
+
+.vehicle-form-page .vehicle-submit-state-ready {
+  color: #70bc95;
+}
+
+.vehicle-form-page .vehicle-submit-state-ready .vehicle-submit-state-icon {
+  border-color: #62c28f;
+  background: #62c28f;
+}
+
+.vehicle-form-page .vehicle-submit-state-ready .vehicle-submit-state-icon::after {
+  display: none;
+}
+
+.vehicle-form-page .vehicle-submit-state-check {
+  position: absolute;
+  top: 2rpx;
+  left: 6rpx;
+  width: 4rpx;
+  height: 8rpx;
+  border-right: 2rpx solid transparent;
+  border-bottom: 2rpx solid transparent;
+  transform: rotate(45deg);
+}
+
+.vehicle-form-page .vehicle-submit-state-ready .vehicle-submit-state-check {
+  border-color: #ffffff;
+}
+
+.vehicle-form-page .vehicle-submit-dock .action-row {
+  margin-top: 0;
 }

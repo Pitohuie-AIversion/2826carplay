@@ -7,7 +7,8 @@ function createMockDb({ rolesData, eventData, removeResults = {} }) {
   }))
   const eventGet = jest.fn().mockResolvedValue({ data: eventData })
   const eventLimit = jest.fn(() => ({ get: eventGet }))
-  const eventWhere = jest.fn(() => ({ limit: eventLimit }))
+  const eventField = jest.fn(() => ({ limit: eventLimit }))
+  const eventWhere = jest.fn(() => ({ field: eventField, limit: eventLimit }))
   const eventRemove = jest.fn((id) => {
     const result = removeResults[id]
     if (result instanceof Error) {
@@ -54,6 +55,7 @@ function createMockDb({ rolesData, eventData, removeResults = {} }) {
     db,
     rolesWhere,
     eventGet,
+    eventField,
     eventLimit,
     eventWhere,
     eventRemove,
@@ -111,11 +113,11 @@ describe("cloudfunctions/analyticsCleanup integration", () => {
     })
     expect(mocks.lt).toHaveBeenCalledWith(cutoff)
     expect(mocks.eventWhere).toHaveBeenCalledWith({
-      createdAt: {
-        __op: "lt",
-        value: cutoff
-      }
+      createdAt: expect.objectContaining({
+        __op: "lt"
+      })
     })
+    expect(mocks.eventField).toHaveBeenCalledWith({ _id: true })
     expect(mocks.eventLimit).toHaveBeenCalledWith(100)
     expect(mocks.auditAdd).toHaveBeenCalledWith({
       data: {

@@ -7,12 +7,84 @@
       {
         "type": "folder",
         "value": "log"
+      },
+      {
+        "type": "folder",
+        "value": "__tests__"
+      },
+      {
+        "type": "folder",
+        "value": "security-rules"
+      },
+      {
+        "type": "folder",
+        "value": "jijing_garage_project_docs_v2"
+      },
+      {
+        "type": "folder",
+        "value": "node_modules"
+      },
+      {
+        "type": "folder",
+        "value": "scripts"
+      },
+      {
+        "type": "folder",
+        "value": "assets/cars"
+      },
+      {
+        "type": "file",
+        "value": "README.md"
+      },
+      {
+        "type": "file",
+        "value": "DEPLOY_CHECKLIST.md"
+      },
+      {
+        "type": "file",
+        "value": "cloudbaserc.json"
+      },
+      {
+        "type": "file",
+        "value": "jest.config.js"
+      },
+      {
+        "type": "file",
+        "value": "package.json"
+      },
+      {
+        "type": "file",
+        "value": "package-lock.json"
+      },
+      {
+        "type": "file",
+        "value": ".trae_preview_info.json"
+      },
+      {
+        "type": "file",
+        "value": ".trae_preview.txt"
+      },
+      {
+        "type": "file",
+        "value": ".trae_preview.jpg"
+      },
+      {
+        "type": "file",
+        "value": "data/cars.js"
+      },
+      {
+        "type": "file",
+        "value": "ganlan_garage_project_docs_v2.zip"
+      },
+      {
+        "type": "file",
+        "value": "vehicleImageUpdate.zip"
       }
     ],
     "include": []
   },
   "setting": {
-    "urlCheck": false,
+    "urlCheck": true,
     "es6": true,
     "enhance": true,
     "postcss": true,

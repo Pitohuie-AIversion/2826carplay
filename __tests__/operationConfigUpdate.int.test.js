@@ -9,13 +9,20 @@ function createMockDb({ rolesData, configData }) {
     }))
   }))
 
-  const configWhere = jest.fn((filter) => ({
-    limit: jest.fn((limitValue) => ({
-      get: jest.fn().mockResolvedValue({
-        data: configData.filter((item) => item.key === filter.key).slice(0, limitValue)
-      })
+  const configGetFor = (filter, limitValue) => ({
+    data: configData.filter((item) => item.key === filter.key).slice(0, limitValue)
+  })
+  const configField = jest.fn((fields, filter) => ({ fields, filter }))
+  const configWhere = jest.fn((filter) => {
+    const configLimit = jest.fn((limitValue) => ({
+      get: jest.fn().mockResolvedValue(configGetFor(filter, limitValue))
     }))
-  }))
+    const field = jest.fn((fields) => {
+      configField(fields, filter)
+      return { limit: configLimit }
+    })
+    return { field, limit: configLimit }
+  })
 
   const configAdd = jest.fn().mockResolvedValue({ _id: "cfg_1" })
   const configUpdate = jest.fn().mockResolvedValue({ stats: { updated: 1 } })
@@ -41,6 +48,7 @@ function createMockDb({ rolesData, configData }) {
     configAdd,
     configDoc,
     configUpdate,
+    configField,
     serverDateValue
   }
 }
@@ -84,6 +92,10 @@ describe("cloudfunctions/operationConfigUpdate integration", () => {
     expect(res.config.brandName).toBe("超跑车库")
     expect(res.config.cityOptions).toEqual(["杭州", "上海"])
     expect(mocks.configAdd).toHaveBeenCalled()
+    expect(mocks.configField).toHaveBeenCalledWith(
+      { _id: true, value: true },
+      { key: "operation_settings" }
+    )
   })
 
   test("admin 可更新运营配置", async () => {

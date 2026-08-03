@@ -5,6 +5,9 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
 const VEHICLE_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/
+const FAVORITE_VEHICLE_FIELDS = {
+  status: true
+}
 
 function createError(code, message) {
   return {
@@ -47,7 +50,11 @@ exports.main = async (event) => {
 
     let vehicle = null
     try {
-      const vehicleRes = await db.collection("vehicles").doc(vehicleId).get()
+      const vehicleRes = await db
+        .collection("vehicles")
+        .doc(vehicleId)
+        .field(FAVORITE_VEHICLE_FIELDS)
+        .get()
       vehicle = vehicleRes && vehicleRes.data ? vehicleRes.data : null
     } catch (error) {
       vehicle = null
@@ -74,7 +81,7 @@ exports.main = async (event) => {
   } catch (error) {
     console.error({
       function: "favoriteSet",
-      openid,
+      authenticated: Boolean(openid),
       vehicleId,
       errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
       stack: error && error.stack ? error.stack : "",

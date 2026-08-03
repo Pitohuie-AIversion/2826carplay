@@ -1,4 +1,4 @@
-<view class="vehicle-detail-page management-page">
+<view wx:if="{{pageAuthorized}}" class="vehicle-detail-page management-page">
   <view class="page-glow"></view>
   <view class="hero-card ui-card ui-card-gradient">
     <view class="hero-top">
@@ -7,11 +7,11 @@
         <view class="hero-title">车辆详情管理</view>
         <view class="hero-desc">查看车辆档案、状态与图片素材</view>
       </view>
-      <image class="hero-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+      <image class="hero-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
     </view>
   </view>
 
-  <view class="loading-card ui-card" wx:if="{{loading}}">
+  <view class="loading-card ui-card" wx:if="{{loading}}" aria-hidden="true">
     <view class="vehicle-detail-skeleton-head">
       <view>
         <view class="vehicle-detail-skeleton-plate manage-skeleton-pulse"></view>
@@ -34,15 +34,27 @@
 
   <view wx:elif="{{detail}}" class="detail-wrap">
     <view class="summary-card ui-card">
-      <view>
+      <view class="summary-copy">
         <view class="plate-number">{{detail.plateNumber}}</view>
         <view class="brand-model">{{detail.brandModel}}</view>
+        <view class="summary-meta-row">
+          <view class="summary-meta-item"><view class="summary-image-icon" aria-hidden="true"></view><text>{{detail.imageCount}} 张图片</text></view>
+          <view class="summary-meta-divider"></view>
+          <view class="summary-meta-item">更新 {{detail.updatedAtText}}</view>
+        </view>
       </view>
       <view class="vehicle-status ui-status {{detail.statusClass}}">{{detail.statusText}}</view>
     </view>
 
     <view class="section-card ui-card">
-      <view class="section-title">状态操作</view>
+      <view class="detail-section-heading">
+        <view class="detail-section-heading-main">
+          <view class="detail-section-glyph detail-section-glyph-status" aria-hidden="true"><view class="detail-section-glyph-icon"></view></view>
+          <view><view class="detail-section-kicker">STATUS CONTROL</view><view class="section-title">状态操作</view></view>
+        </view>
+        <view class="detail-section-index">01</view>
+      </view>
+      <view class="detail-section-desc">切换车辆当前运营状态，前台可预约能力会随状态同步更新。</view>
       <view wx:if="{{detail.status !== 'retired'}}">
         <view class="status-op-row">
           <button
@@ -53,19 +65,30 @@
             data-status="{{op.value}}"
             bindtap="handleUpdateStatus"
             disabled="{{updatingStatus}}"
+            hover-class="{{updatingStatus ? 'none' : 'status-op-btn-pressed'}}"
+            aria-pressed="{{detail.status === op.value}}"
           >
-            {{op.label}}
+            <view class="status-op-content"><view class="status-op-dot status-op-dot-{{op.value}}"></view><text>{{op.label}}</text><view wx:if="{{detail.status === op.value}}" class="status-op-check" aria-hidden="true"></view></view>
           </button>
         </view>
-        <button class="retire-inline-btn ui-btn ui-btn-danger" bindtap="handleRetire" disabled="{{updatingStatus}}">停用车辆</button>
+        <view class="danger-zone">
+          <view class="danger-zone-copy"><view class="danger-zone-title">停用车辆</view><view class="danger-zone-desc">停用后车辆不再对客户开放，可稍后恢复。</view></view>
+          <button class="retire-inline-btn ui-btn ui-btn-danger" bindtap="handleRetire" disabled="{{updatingStatus}}"><view class="danger-button-content"><view class="retire-native-icon" aria-hidden="true"></view><text>确认停用</text></view></button>
+        </view>
       </view>
       <view wx:else>
-        <button class="restore-inline-btn ui-btn ui-btn-primary" bindtap="handleRestore" disabled="{{updatingStatus}}">恢复启用</button>
+        <button class="restore-inline-btn ui-btn ui-btn-primary" bindtap="handleRestore" disabled="{{updatingStatus}}"><view class="danger-button-content"><view class="restore-native-icon" aria-hidden="true"></view><text>恢复启用</text></view></button>
       </view>
     </view>
 
     <view class="section-card ui-card">
-      <view class="section-title">基础信息</view>
+      <view class="detail-section-heading">
+        <view class="detail-section-heading-main">
+          <view class="detail-section-glyph detail-section-glyph-profile" aria-hidden="true"><view class="detail-section-glyph-icon"></view></view>
+          <view><view class="detail-section-kicker">VEHICLE PROFILE</view><view class="section-title">基础信息</view></view>
+        </view>
+        <view class="detail-section-index">02</view>
+      </view>
       <view class="info-grid">
         <view class="info-item">
           <view class="info-item-inner">
@@ -76,7 +99,7 @@
         <view class="info-item">
           <view class="info-item-inner">
             <view class="info-label">注册日期</view>
-            <view class="info-value">{{detail.registerDate || "--"}}</view>
+            <view class="info-value">{{detail.registerDate || "—"}}</view>
           </view>
         </view>
         <view class="info-item">
@@ -125,7 +148,13 @@
     </view>
 
     <view class="section-card ui-card">
-      <view class="section-title">管理信息</view>
+      <view class="detail-section-heading">
+        <view class="detail-section-heading-main">
+          <view class="detail-section-glyph detail-section-glyph-admin" aria-hidden="true"><view class="detail-section-glyph-icon"></view></view>
+          <view><view class="detail-section-kicker">ADMIN RECORD</view><view class="section-title">管理信息</view></view>
+        </view>
+        <view class="detail-section-index">03</view>
+      </view>
       <view class="info-grid">
         <view class="info-item">
           <view class="info-item-inner">
@@ -155,63 +184,80 @@
     </view>
 
     <view class="section-card ui-card">
-      <view class="section-title">公开说明</view>
+      <view class="note-heading"><view><view class="detail-section-kicker">PUBLIC CONTENT</view><view class="section-title">公开说明</view></view><view class="visibility-chip visibility-chip-public"><view class="visibility-eye-icon" aria-hidden="true"></view><text>前台可见</text></view></view>
       <view class="note-box">{{detail.publicDescriptionText}}</view>
     </view>
 
     <view class="section-card ui-card">
-      <view class="section-title">内部备注</view>
+      <view class="note-heading"><view><view class="detail-section-kicker">PRIVATE NOTE</view><view class="section-title">内部备注</view></view><view class="visibility-chip visibility-chip-private"><view class="visibility-lock-icon" aria-hidden="true"><view class="visibility-lock-shackle"></view></view><text>仅后台可见</text></view></view>
       <view class="note-box">{{detail.noteText}}</view>
     </view>
 
     <view class="section-card ui-card">
       <view class="image-header">
-        <view>
-          <view class="section-title">车辆图片</view>
-          <view class="image-desc">已上传 {{detail.imageCount}} / 9 张，可设置封面。</view>
+        <view class="detail-section-heading-main">
+          <view class="detail-section-glyph detail-section-glyph-images" aria-hidden="true"><view class="detail-section-glyph-icon"></view></view>
+          <view>
+            <view class="detail-section-kicker">MEDIA LIBRARY</view>
+            <view class="section-title">车辆图片</view>
+            <view class="image-desc">已上传 {{detail.imageCount}} / 9 张，可设置封面。</view>
+          </view>
         </view>
         <button class="upload-button ui-btn ui-btn-primary" bindtap="handleUploadImages" loading="{{uploading}}" disabled="{{uploading}}">
-          {{uploading ? "上传中" : "上传图片"}}
+          <view class="upload-button-content"><view wx:if="{{!uploading}}" class="upload-native-icon" aria-hidden="true"></view><text>{{uploading ? "上传中…" : "上传图片"}}</text></view>
         </button>
       </view>
 
       <view wx:if="{{detail.imageItems.length}}" class="image-list">
         <view wx:for="{{detail.imageItems}}" wx:key="fileId" class="image-card">
-          <image class="vehicle-image" src="{{item.fileId}}" mode="aspectFill" lazy-load="{{true}}" fade-in="{{true}}" bindtap="handlePreviewImage" data-file-id="{{item.fileId}}" />
-          <view class="image-badge" wx:if="{{item.isCover}}">封面</view>
+          <image wx:if="{{!item.imageFailed}}" class="vehicle-image" src="{{item.fileId}}" mode="aspectFill" lazy-load="{{true}}" fade-in="{{true}}" binderror="handleManagedImageError" bindtap="handlePreviewImage" data-file-id="{{item.fileId}}" hover-class="vehicle-image-pressed" aria-role="button" aria-label="预览第 {{index + 1}} 张车辆图片" />
+          <view wx:else class="vehicle-image vehicle-image-fallback">
+            <view class="vehicle-image-fallback-mark" aria-hidden="true">
+              <image class="vehicle-image-fallback-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
+              <view class="vehicle-image-fallback-ring"></view>
+            </view>
+            <view class="vehicle-image-fallback-text">图片无法显示</view>
+          </view>
+          <view class="image-badge" wx:if="{{item.isCover}}"><view class="image-badge-check" aria-hidden="true"></view><text>当前封面</text></view>
           <view class="image-action-row">
             <button
               class="mini-button secondary-mini-button"
-              wx:if="{{!item.isCover}}"
+              wx:if="{{!item.isCover && !item.imageFailed}}"
               data-file-id="{{item.fileId}}"
               bindtap="handleSetCover"
+              hover-class="vehicle-detail-button-pressed"
             >
-              设为封面
+              <view class="mini-button-content"><view class="cover-native-icon" aria-hidden="true"></view><text>设为封面</text></view>
             </button>
-            <view wx:else class="mini-placeholder">当前封面</view>
-            <button class="mini-button danger-mini-button" data-file-id="{{item.fileId}}" bindtap="handleRemoveImage">
-              移除图片
+            <view wx:elif="{{item.imageFailed}}" class="mini-placeholder mini-placeholder-warning"><view class="mini-placeholder-warning-mark" aria-hidden="true"></view><text>文件异常</text></view>
+            <view wx:else class="mini-placeholder"><view class="mini-placeholder-check" aria-hidden="true"></view><text>已设封面</text></view>
+            <button class="mini-button danger-mini-button" data-file-id="{{item.fileId}}" bindtap="handleRemoveImage" hover-class="vehicle-detail-button-pressed">
+              <view class="mini-button-content"><view class="trash-native-icon" aria-hidden="true"></view><text>移除图片</text></view>
             </button>
           </view>
         </view>
       </view>
 
       <view wx:else class="empty-image-box">
-        <view class="loading-text">当前还没有上传车辆图片</view>
+        <view class="empty-image-icon" aria-hidden="true"><view class="empty-image-sun"></view><view class="empty-image-mountain"></view></view>
+        <view class="empty-image-title">还没有车辆图片</view>
+        <view class="empty-image-desc">上传第一张图片后，可将其中一张设置为首页封面。</view>
       </view>
     </view>
 
-    <view class="action-row">
-      <button class="secondary-button ui-btn ui-btn-ghost" bindtap="handleBackList">返回列表</button>
-      <button class="primary-button ui-btn ui-btn-primary" bindtap="handleEdit">编辑车辆</button>
+    <view class="detail-action-dock ui-card">
+      <view class="action-row">
+        <button class="secondary-button ui-btn ui-btn-ghost" bindtap="handleBackList"><view class="detail-action-content"><view class="back-native-icon" aria-hidden="true"></view><text>返回列表</text></view></button>
+        <button class="primary-button ui-btn ui-btn-primary" bindtap="handleEdit"><view class="detail-action-content"><view class="edit-native-icon" aria-hidden="true"></view><text>编辑车辆</text></view></button>
+      </view>
     </view>
   </view>
 
   <view class="loading-card vehicle-detail-empty-card ui-card" wx:else>
-    <image class="vehicle-detail-empty-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+    <image class="vehicle-detail-empty-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
     <view class="vehicle-detail-empty-kicker">FLEET PROFILE</view>
     <view class="vehicle-detail-empty-title">暂无车辆详情</view>
     <view class="vehicle-detail-empty-desc">车辆可能已删除，或当前账号无法读取该车辆档案</view>
-    <button class="vehicle-detail-empty-button ui-btn ui-btn-primary" bindtap="handleBackList">返回车辆列表</button>
+    <button class="vehicle-detail-empty-button ui-btn ui-btn-primary" bindtap="handleBackList"><view class="detail-action-content"><view class="back-native-icon" aria-hidden="true"></view><text>返回车辆列表</text></view></button>
   </view>
 </view>

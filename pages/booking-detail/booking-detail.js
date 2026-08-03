@@ -1,3 +1,6 @@
+const { formatToastTitle } = require("../../shared/uiFeedback")
+const { buildVehicleDisplayIdentity } = require("../../shared/vehicle")
+
 function mapStatusText(status) {
   const value = String(status || "").trim()
   if (value === "contacted") {
@@ -36,6 +39,33 @@ function canEditBooking(status) {
   return value === "pending" || value === "contacted"
 }
 
+function buildStatusGuidance(status) {
+  const value = String(status || "pending").trim() || "pending"
+  const guidanceMap = {
+    pending: {
+      title: "等待顾问联系",
+      desc: "预约已提交，请保持手机畅通；联系前仍可修改本次预约的联系信息。",
+      tone: "pending"
+    },
+    contacted: {
+      title: "正在确认行程",
+      desc: "顾问已联系，请按沟通结果确认车辆档期、价格与取还车安排。",
+      tone: "contacted"
+    },
+    completed: {
+      title: "本次行程已完成",
+      desc: "预约流程已经结束，感谢使用极境车库服务。",
+      tone: "completed"
+    },
+    cancelled: {
+      title: "本次预约已取消",
+      desc: "该预约已结束，如仍有用车需求，可返回车库重新选择车辆。",
+      tone: "cancelled"
+    }
+  }
+  return guidanceMap[value] || guidanceMap.pending
+}
+
 function buildProgressSteps(status) {
   const value = String(status || "pending").trim() || "pending"
   const cancelled = value === "cancelled"
@@ -53,7 +83,9 @@ function buildProgressSteps(status) {
     return {
       key: `${value}-${index}`,
       label,
-      marker: index < activeIndex ? "✓" : `${index + 1}`,
+      marker: `${index + 1}`,
+      showCheck: index < activeIndex,
+      showCancelledMark: cancelled && index === activeIndex,
       stateClass,
       isLast: index === labels.length - 1
     }
@@ -78,13 +110,30 @@ function formatDisplayTime(value) {
   return `${year}-${month}-${day} ${hour}:${minute}`
 }
 
+function formatBookingReference(value) {
+  const id = String(value || "").trim()
+  return id ? `#${id.slice(-8).toUpperCase()}` : "—"
+}
+
+function getJourneySpanText(startDate, endDate) {
+  const start = new Date(`${String(startDate || "")}T00:00:00`)
+  const end = new Date(`${String(endDate || "")}T00:00:00`)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) {
+    return "日期待确认"
+  }
+  const days = Math.round((end.getTime() - start.getTime()) / 86400000)
+  return days === 0 ? "当日取还" : `${days} 天跨度`
+}
+
 function normalizeBooking(item) {
   const booking = item && typeof item === "object" ? item : {}
   const status = String(booking.status || "pending").trim() || "pending"
+  const vehicleIdentity = buildVehicleDisplayIdentity(booking.vehicleName)
   return {
     id: booking.id || "",
     vehicleId: booking.vehicleId || "",
-    vehicleName: booking.vehicleName || "",
+    ...vehicleIdentity,
+    vehicleReference: booking.vehicleReference || vehicleIdentity.vehicleReference,
     userName: booking.userName || "",
     phone: booking.phone || "",
     startDate: booking.startDate || "",
@@ -109,7 +158,10 @@ Page({
     statusClass: "status-pending",
     createdAtText: "",
     updatedAtText: "",
+    bookingReference: "—",
+    journeySpanText: "日期待确认",
     progressSteps: buildProgressSteps("pending"),
+    statusGuidance: buildStatusGuidance("pending"),
     canCancel: false,
     canEdit: false,
     editing: false,
@@ -172,7 +224,10 @@ Page({
       statusClass: mapStatusClass(booking.status),
       createdAtText: formatDisplayTime(booking.createdAt),
       updatedAtText: formatDisplayTime(booking.updatedAt),
+      bookingReference: formatBookingReference(booking.id),
+      journeySpanText: getJourneySpanText(booking.startDate, booking.endDate),
       progressSteps: buildProgressSteps(booking.status),
+      statusGuidance: buildStatusGuidance(booking.status),
       canCancel: canCancelBooking(booking.status),
       canEdit: canEditBooking(booking.status),
       editing: false,
@@ -297,7 +352,7 @@ Page({
 
         if (!current) {
           wx.showToast({
-            title: (result && result.message) || "预约不存在",
+          title: formatToastTitle(result && result.message, "预约不存在"),
             icon: "none"
           })
           this.setData({
@@ -314,7 +369,7 @@ Page({
       },
       fail: (error) => {
         wx.showToast({
-          title: (error && (error.errMsg || error.message)) || "加载失败",
+          title: "加载失败",
           icon: "none"
         })
         this.setData({
@@ -335,6 +390,8 @@ Page({
     wx.showModal({
       title: "取消预约",
       content: "已完成的预约不可取消。确认取消当前预约吗？",
+      confirmText: "确认取消",
+      confirmColor: "#d46868",
       success: (res) => {
         if (!res.confirm) {
           return
@@ -419,7 +476,7 @@ Page({
     const validationMessage = this.validateEditForm()
     if (validationMessage) {
       wx.showToast({
-        title: validationMessage,
+        title: formatToastTitle(validationMessage, "信息格式有误"),
         icon: "none"
       })
       return
@@ -447,7 +504,7 @@ Page({
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
           wx.showToast({
-            title: (result && result.message) || "保存失败",
+          title: formatToastTitle(result && result.message, "保存失败"),
             icon: "none"
           })
           if (result && ["STATUS_CONFLICT", "STATUS_NOT_ALLOWED"].includes(result.code)) {
@@ -465,7 +522,7 @@ Page({
       },
       fail: (error) => {
         wx.showToast({
-          title: (error && (error.errMsg || error.message)) || "保存失败",
+          title: "保存失败",
           icon: "none"
         })
       },
@@ -485,7 +542,7 @@ Page({
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
           wx.showToast({
-            title: (result && result.message) || "取消失败",
+          title: formatToastTitle(result && result.message, "取消失败"),
             icon: "none"
           })
           this.setData({ loading: false })
@@ -500,7 +557,7 @@ Page({
       },
       fail: (error) => {
         wx.showToast({
-          title: (error && (error.errMsg || error.message)) || "取消失败",
+          title: "取消失败",
           icon: "none"
         })
         this.setData({ loading: false })
@@ -512,6 +569,52 @@ Page({
     this.loadDetail()
   },
 
+  handleCopyBookingId() {
+    const id = String((this.data.booking && this.data.booking.id) || "").trim()
+    if (!id || typeof wx.setClipboardData !== "function") {
+      wx.showToast({
+        title: "预约编号复制失败",
+        icon: "none"
+      })
+      return
+    }
+    wx.setClipboardData({
+      data: id,
+      success: () => {
+        wx.showToast({
+          title: "预约编号已复制",
+          icon: "none"
+        })
+      },
+      fail: () => {
+        wx.showToast({
+          title: "预约编号复制失败",
+          icon: "none"
+        })
+      }
+    })
+  },
+
+  handleViewVehicle() {
+    const vehicleId = String((this.data.booking && this.data.booking.vehicleId) || "").trim()
+    if (!vehicleId) {
+      wx.showToast({
+        title: "车辆信息暂不可用",
+        icon: "none"
+      })
+      return
+    }
+    wx.navigateTo({
+      url: `/pages/car-detail/car-detail?carId=${vehicleId}`,
+      fail: () => {
+        wx.showToast({
+          title: "车辆详情打开失败",
+          icon: "none"
+        })
+      }
+    })
+  },
+
   handleBackBookings() {
     const pages = getCurrentPages()
     if (pages.length > 1) {
@@ -519,7 +622,18 @@ Page({
         delta: 1,
         fail: () => {
           wx.redirectTo({
-            url: "/pages/bookings/bookings"
+            url: "/pages/bookings/bookings",
+            fail: () => {
+              wx.reLaunch({
+                url: "/pages/bookings/bookings",
+                fail: () => {
+                  wx.showToast({
+                    title: "返回预约列表失败",
+                    icon: "none"
+                  })
+                }
+              })
+            }
           })
         }
       })
@@ -527,7 +641,18 @@ Page({
     }
 
     wx.redirectTo({
-      url: "/pages/bookings/bookings"
+      url: "/pages/bookings/bookings",
+      fail: () => {
+        wx.reLaunch({
+          url: "/pages/bookings/bookings",
+          fail: () => {
+            wx.showToast({
+              title: "返回预约列表失败",
+              icon: "none"
+            })
+          }
+        })
+      }
     })
   }
 })

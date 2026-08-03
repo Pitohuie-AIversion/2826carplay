@@ -3,12 +3,30 @@ const cloud = require("wx-server-sdk")
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
+const AUTH_ROLE_FIELDS = {
+  role: true,
+  roles: true,
+  permissions: true,
+  isAdmin: true,
+  admin: true
+}
 const DEFAULT_PAGE_SIZE = 20
 const MAX_PAGE_SIZE = 50
 const BATCH_SIZE = 100
 const MAX_RECORDS = 2000
 const REQUEST_TYPES = ["access", "correction", "deletion"]
 const REQUEST_STATUSES = ["pending", "processing", "completed", "rejected", "cancelled"]
+const PRIVACY_REQUEST_LIST_FIELDS = {
+  _id: true,
+  openid: true,
+  type: true,
+  description: true,
+  status: true,
+  resolutionNote: true,
+  dataExportedAt: true,
+  createdAt: true,
+  updatedAt: true
+}
 
 function hasAdminRole(record) {
   return Boolean(
@@ -24,7 +42,12 @@ async function isAdminOpenid(openid) {
   if (!openid) {
     return false
   }
-  const res = await db.collection("roles").where({ openid }).limit(20).get()
+  const res = await db
+    .collection("roles")
+    .where({ openid })
+    .field(AUTH_ROLE_FIELDS)
+    .limit(20)
+    .get()
   const list = res && Array.isArray(res.data) ? res.data : []
   return list.some(hasAdminRole)
 }
@@ -73,7 +96,7 @@ async function readAllByMode(ordered) {
   for (let offset = 0; offset <= MAX_RECORDS; offset += BATCH_SIZE) {
     const remaining = MAX_RECORDS + 1 - list.length
     const limit = Math.min(BATCH_SIZE, remaining)
-    let query = db.collection("privacy_requests")
+    let query = db.collection("privacy_requests").field(PRIVACY_REQUEST_LIST_FIELDS)
     if (ordered) {
       query = query.orderBy("createdAt", "desc")
     }
@@ -130,6 +153,7 @@ exports.main = async (event) => {
         description: String(item.description || ""),
         status: String(item.status || "pending"),
         resolutionNote: String(item.resolutionNote || ""),
+        dataExportedAt: formatTime(item.dataExportedAt),
         createdAt: formatTime(item.createdAt),
         updatedAt: formatTime(item.updatedAt)
       }))
@@ -160,7 +184,7 @@ exports.main = async (event) => {
   } catch (error) {
     console.error({
       function: "privacyRequestList",
-      openid,
+      authenticated: Boolean(openid),
       errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
       stack: error && error.stack ? error.stack : "",
       createdAt: new Date().toISOString()

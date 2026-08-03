@@ -121,7 +121,6 @@ describe("cloudfunctions/vehicleCreate integration", () => {
         openid: "admin_openid",
         action: "vehicleCreate",
         vehicleId: "new_id",
-        plateNumber: "京A12345",
         vehicleType: "sedan",
         brandModel: "Toyota",
         status: "active",

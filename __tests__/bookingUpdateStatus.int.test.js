@@ -14,7 +14,8 @@ function createMockDb({ rolesData, currentData, updateResult, configData = [] })
   const bookingsWhere = jest.fn(() => ({ update }))
   const configGet = jest.fn().mockResolvedValue({ data: configData })
   const configLimit = jest.fn(() => ({ get: configGet }))
-  const configWhere = jest.fn(() => ({ limit: configLimit }))
+  const configField = jest.fn(() => ({ limit: configLimit }))
+  const configWhere = jest.fn(() => ({ field: configField, limit: configLimit }))
   const auditAdd = jest.fn().mockResolvedValue({ _id: "audit_1" })
   const errorLogAdd = jest.fn().mockResolvedValue({ _id: "error_1" })
 
@@ -55,6 +56,7 @@ function createMockDb({ rolesData, currentData, updateResult, configData = [] })
     currentGet,
     update,
     configWhere,
+    configField,
     auditAdd,
     errorLogAdd,
     serverDateValue
@@ -235,6 +237,7 @@ describe("cloudfunctions/bookingUpdateStatus integration", () => {
     expect(res.ok).toBe(true)
     expect(res.notificationStatus).toBe("sent")
     expect(res.notificationReason).toBe("")
+    expect(mocks.configField).toHaveBeenCalledWith({ value: true })
     expect(cloud.openapi.subscribeMessage.send).toHaveBeenCalledWith(
       expect.objectContaining({
         touser: "user_openid",

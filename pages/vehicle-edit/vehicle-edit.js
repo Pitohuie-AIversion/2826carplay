@@ -1,5 +1,7 @@
 const vehicleUtils = require("../../shared/vehicle")
+const { buildVehicleFormProgress } = require("../../shared/vehicleFormProgress")
 const { requirePagePermission } = require("../../shared/pageAuth")
+const { formatToastTitle } = require("../../shared/uiFeedback")
 
 const VEHICLE_TYPE_LABEL_MAP = {
   sedan: "轿车",
@@ -67,6 +69,7 @@ Page({
     isSubmitting: false,
     publicDescriptionLength: 0,
     noteLength: 0,
+    formProgress: buildVehicleFormProgress({}),
     pageAuthorized: false,
     vehicleTypeLabels: buildLabels(vehicleUtils.VEHICLE_TYPES, VEHICLE_TYPE_LABEL_MAP),
     statusLabels: buildLabels(vehicleUtils.VEHICLE_STATUSES, STATUS_LABEL_MAP),
@@ -119,7 +122,7 @@ Page({
     const id = String((options && options.id) || "").trim()
     if (!id) {
       wx.showToast({
-        title: "缺少车辆ID",
+        title: "车辆编号缺失",
         icon: "none"
       })
       this.setData({
@@ -163,7 +166,7 @@ Page({
         const result = res && res.result ? res.result : null
         if (!result || !result.ok || !result.detail) {
           wx.showToast({
-            title: (result && result.message) || "加载失败",
+          title: formatToastTitle(result && result.message, "加载失败"),
             icon: "none"
           })
           this.setData({
@@ -198,6 +201,13 @@ Page({
           statusLabel: STATUS_LABEL_MAP[status] || "",
           transmissionLabel: TRANSMISSION_LABEL_MAP[transmission] || "",
           fuelTypeLabel: FUEL_TYPE_LABEL_MAP[fuelType] || "",
+          formProgress: buildVehicleFormProgress({
+            plateNumber: current.plateNumber,
+            vehicleType,
+            brandModel: current.brandModel,
+            registerDate: current.registerDate,
+            status
+          }),
           form: {
             plateNumber: vehicleUtils.normalizePlateNumber(current.plateNumber),
             vehicleType,
@@ -218,7 +228,7 @@ Page({
       },
       fail: (error) => {
         wx.showToast({
-          title: (error && (error.errMsg || error.message)) || "加载失败",
+          title: "加载失败",
           icon: "none"
         })
         this.setData({
@@ -236,7 +246,8 @@ Page({
     value = value.replace(/[^0-9A-Z\u4e00-\u9fa5]/g, "").slice(0, 8)
 
     this.setData({
-      "form.plateNumber": value
+      "form.plateNumber": value,
+      formProgress: buildVehicleFormProgress({ ...this.data.form, plateNumber: value })
     })
   },
 
@@ -273,7 +284,8 @@ Page({
     }
 
     const nextData = {
-      [`form.${field}`]: value
+      [`form.${field}`]: value,
+      formProgress: buildVehicleFormProgress({ ...this.data.form, [field]: value })
     }
     if (field === "publicDescription") {
       nextData.publicDescriptionLength = String(value || "").length
@@ -293,7 +305,8 @@ Page({
     this.setData({
       vehicleTypeIndex: index,
       vehicleTypeLabel: label,
-      "form.vehicleType": value
+      "form.vehicleType": value,
+      formProgress: buildVehicleFormProgress({ ...this.data.form, vehicleType: value })
     })
   },
 
@@ -305,13 +318,15 @@ Page({
     this.setData({
       statusIndex: index,
       statusLabel: label,
-      "form.status": value
+      "form.status": value,
+      formProgress: buildVehicleFormProgress({ ...this.data.form, status: value })
     })
   },
 
   handleDateChange(event) {
     this.setData({
-      "form.registerDate": event.detail.value
+      "form.registerDate": event.detail.value,
+      formProgress: buildVehicleFormProgress({ ...this.data.form, registerDate: event.detail.value })
     })
   },
 
@@ -345,7 +360,13 @@ Page({
     }
 
     wx.navigateTo({
-      url: `/pages/vehicle-detail-manage/vehicle-detail-manage?id=${this.data.id}`
+      url: `/pages/vehicle-detail-manage/vehicle-detail-manage?id=${this.data.id}`,
+      fail: () => {
+        wx.showToast({
+          title: "车辆详情打开失败",
+          icon: "none"
+        })
+      }
     })
   },
 
@@ -368,7 +389,18 @@ Page({
         delta: 1,
         fail: () => {
           wx.redirectTo({
-            url: "/pages/vehicle-manage/vehicle-manage"
+            url: "/pages/vehicle-manage/vehicle-manage",
+            fail: () => {
+              wx.reLaunch({
+                url: "/pages/vehicle-manage/vehicle-manage",
+                fail: () => {
+                  wx.showToast({
+                    title: "返回车辆管理失败",
+                    icon: "none"
+                  })
+                }
+              })
+            }
           })
         }
       })
@@ -376,7 +408,18 @@ Page({
     }
 
     wx.redirectTo({
-      url: "/pages/vehicle-manage/vehicle-manage"
+      url: "/pages/vehicle-manage/vehicle-manage",
+      fail: () => {
+        wx.reLaunch({
+          url: "/pages/vehicle-manage/vehicle-manage",
+          fail: () => {
+            wx.showToast({
+              title: "返回车辆管理失败",
+              icon: "none"
+            })
+          }
+        })
+      }
     })
   },
 
@@ -402,7 +445,7 @@ Page({
     const check = vehicleUtils.validateVehicle(this.data.form)
     if (!check.ok) {
       wx.showToast({
-        title: this.getValidationMessage(check),
+        title: formatToastTitle(this.getValidationMessage(check), "车辆信息有误"),
         icon: "none"
       })
       return
@@ -441,7 +484,18 @@ Page({
               delta: 1,
               fail: () => {
                 wx.redirectTo({
-                  url: "/pages/vehicle-manage/vehicle-manage"
+                  url: "/pages/vehicle-manage/vehicle-manage",
+                  fail: () => {
+                    wx.reLaunch({
+                      url: "/pages/vehicle-manage/vehicle-manage",
+                      fail: () => {
+                        wx.showToast({
+                          title: "返回车辆管理失败",
+                          icon: "none"
+                        })
+                      }
+                    })
+                  }
                 })
               }
             })
@@ -468,7 +522,7 @@ Page({
       },
       fail: (error) => {
         wx.showToast({
-          title: (error && (error.errMsg || error.message)) || "保存失败",
+          title: "保存失败",
           icon: "none"
         })
 

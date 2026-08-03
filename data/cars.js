@@ -1,5 +1,5 @@
 // Phase 9 note:
-// 当前仍使用本地 mock 数据驱动车辆展示。
+// 早期界面示例数据；当前线上车辆主流程不再读取此文件。
 // 后续如接入云数据库，可保持当前字段不变，将这里替换为云端返回结果的标准化映射层。
 // 建议云端字段继续保持：
 // id, name, nickname, brand, category, priceDay, priceText,

@@ -4,6 +4,31 @@ const vehicleUtils = require("./vehicle")
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
+const AUTH_ROLE_FIELDS = {
+  role: true,
+  roles: true,
+  permissions: true,
+  isAdmin: true,
+  admin: true
+}
+const VEHICLE_MANAGE_LIST_FIELDS = {
+  _id: true,
+  plateNumber: true,
+  vehicleType: true,
+  brandModel: true,
+  registerDate: true,
+  status: true,
+  location: true,
+  transmission: true,
+  fuelType: true,
+  seats: true,
+  priceDay: true,
+  imageList: true,
+  coverImage: true,
+  createdByOpenid: true,
+  createdAt: true,
+  updatedAt: true
+}
 const VEHICLE_BATCH_SIZE = 100
 const MAX_VEHICLE_RECORDS = 2000
 
@@ -60,7 +85,12 @@ async function hasOpenidCapability(openid, capability) {
     return false
   }
 
-  const res = await db.collection("roles").where({ openid }).limit(20).get()
+  const res = await db
+    .collection("roles")
+    .where({ openid })
+    .field(AUTH_ROLE_FIELDS)
+    .limit(20)
+    .get()
   const list = res && Array.isArray(res.data) ? res.data : []
   return list.some((item) => hasCapability(item, capability))
 }
@@ -209,7 +239,7 @@ async function readVehiclesByMode(ordered) {
   for (let offset = 0; offset <= MAX_VEHICLE_RECORDS; offset += VEHICLE_BATCH_SIZE) {
     const remaining = MAX_VEHICLE_RECORDS + 1 - list.length
     const batchSize = Math.min(VEHICLE_BATCH_SIZE, remaining)
-    let query = db.collection("vehicles")
+    let query = db.collection("vehicles").field(VEHICLE_MANAGE_LIST_FIELDS)
     if (ordered) {
       query = query.orderBy("updatedAt", "desc")
     }
@@ -280,11 +310,7 @@ exports.main = async (event) => {
       fuelType: item.fuelType || "",
       seats: item.seats === undefined ? null : item.seats,
       priceDay: item.priceDay === undefined ? null : item.priceDay,
-      vin: item.vin || "",
-      engineNumber: item.engineNumber || "",
-      publicDescription: item.publicDescription || "",
-      note: item.note || "",
-      imageList: Array.isArray(item.imageList) ? item.imageList.filter(Boolean) : [],
+      imageCount: Array.isArray(item.imageList) ? item.imageList.filter(Boolean).length : 0,
       coverImage: item.coverImage || "",
       createdByOpenid: item.createdByOpenid || "",
       createdAt: formatTime(item.createdAt),
@@ -321,15 +347,12 @@ exports.main = async (event) => {
       dashboard: buildDashboardStats(formattedList),
       recentAddedList: buildRecentAddedList(formattedList),
       ...pagination,
-      list: list.map((item) => ({
-        ...item,
-        imageCount: Array.isArray(item.imageList) ? item.imageList.length : 0
-      }))
+      list
     }
   } catch (error) {
     console.error({
       function: "vehicleList",
-      openid,
+      authenticated: Boolean(openid),
       errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
       stack: error && error.stack ? error.stack : "",
       createdAt: new Date().toISOString()

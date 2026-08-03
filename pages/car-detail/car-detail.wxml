@@ -1,4 +1,4 @@
-<view class="detail-loading-page" wx:if="{{loading}}">
+<view class="detail-loading-page" wx:if="{{loading}}" aria-hidden="true">
   <view class="detail-loading-hero skeleton-pulse"></view>
   <view class="detail-loading-card ui-card">
     <view class="detail-loading-kicker skeleton-pulse"></view>
@@ -19,15 +19,21 @@
 
 <view class="detail-page" wx:elif="{{car}}">
   <view class="hero-shell">
-    <swiper wx:if="{{car.hasImages}}" class="hero-swiper" indicator-dots="{{false}}" autoplay="{{false}}" circular="{{true}}" bindchange="handleHeroSwiperChange">
+    <swiper wx:if="{{car.hasImages}}" class="hero-swiper" indicator-dots="{{false}}" autoplay="{{false}}" circular="{{car.imageItems.length > 1}}" bindchange="handleHeroSwiperChange">
       <swiper-item wx:for="{{car.imageItems}}" wx:key="key">
         <view class="hero-image-frame">
           <view wx:if="{{!item.loaded && !item.failed}}" class="hero-image-loading">
-            <view class="hero-image-loading-ring"></view>
+            <view class="hero-image-loading-mark" aria-hidden="true">
+              <image class="hero-image-loading-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
+              <view class="hero-image-loading-ring"></view>
+            </view>
             <view class="hero-image-loading-text">LOADING VEHICLE</view>
           </view>
           <view wx:if="{{item.failed}}" class="hero-image-fallback">
-            <view class="hero-placeholder-brand">{{car.brand}}</view>
+            <view class="hero-placeholder-brand-row">
+              <image class="hero-placeholder-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
+              <view class="hero-placeholder-brand">{{car.brand}}</view>
+            </view>
             <view class="hero-placeholder-name">{{car.name}}</view>
             <view class="hero-placeholder-text">该图片暂时无法显示</view>
           </view>
@@ -41,12 +47,19 @@
             data-index="{{index}}"
             bindload="handleHeroImageLoad"
             binderror="handleHeroImageError"
+            bindtap="handleHeroImageTap"
+            hover-class="hero-image-pressed"
+            aria-role="button"
+            aria-label="预览第 {{index + 1}} 张车辆图片，共 {{car.imageItems.length}} 张"
           />
         </view>
       </swiper-item>
     </swiper>
     <view wx:else class="hero-swiper hero-placeholder">
-      <view class="hero-placeholder-brand">{{car.brand}}</view>
+      <view class="hero-placeholder-brand-row">
+        <image class="hero-placeholder-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
+        <view class="hero-placeholder-brand">{{car.brand}}</view>
+      </view>
       <view class="hero-placeholder-name">{{car.name}}</view>
       <view class="hero-placeholder-text">该车辆暂未上传展示图片</view>
     </view>
@@ -55,10 +68,26 @@
       <view class="signature-line"></view>
       <text>EXTREME GARAGE</text>
     </view>
+    <view wx:if="{{car.imageItems.length > 1}}" class="hero-pagination" aria-hidden="true">
+      <view
+        wx:for="{{car.imageItems}}"
+        wx:key="key"
+        class="hero-pagination-segment {{index === currentImageIndex ? 'hero-pagination-segment-active' : ''}}"
+      ></view>
+    </view>
     <view wx:if="{{car.hasImages}}" class="hero-counter">
       <text class="hero-counter-current">{{currentImageIndex + 1}}</text>
       <text class="hero-counter-divider">/</text>
       <text>{{car.imageItems.length}}</text>
+    </view>
+    <view wx:if="{{car.hasImages}}" class="hero-preview-hint">
+      <view class="hero-preview-icon" aria-hidden="true">
+        <view class="hero-preview-corner hero-preview-corner-top-left"></view>
+        <view class="hero-preview-corner hero-preview-corner-top-right"></view>
+        <view class="hero-preview-corner hero-preview-corner-bottom-left"></view>
+        <view class="hero-preview-corner hero-preview-corner-bottom-right"></view>
+      </view>
+      <text>点击查看大图</text>
     </view>
   </view>
 
@@ -76,8 +105,13 @@
           loading="{{favoriteLoading}}"
           disabled="{{favoriteLoading}}"
           bindtap="handleFavoriteTap"
+          hover-class="favorite-button-pressed"
+          aria-label="{{favoriteLoading ? '正在更新收藏状态' : favorited ? '取消收藏车辆' : '收藏车辆'}}"
         >
-          {{favorited ? '已收藏' : '收藏'}}
+          <view wx:if="{{!favoriteLoading}}" class="favorite-button-icon" aria-hidden="true">
+            <view class="favorite-heart-shape"></view>
+          </view>
+          <text class="favorite-button-text">{{favoriteLoading ? '处理中…' : favorited ? '已收藏' : '收藏'}}</text>
         </button>
       </view>
     </view>
@@ -147,20 +181,53 @@
   <view class="info-card ui-card">
     <view class="section-heading">
       <view class="section-mark"></view>
+      <view class="section-title">预约流程</view>
+    </view>
+    <view class="service-flow">
+      <view class="service-step" wx:for="{{serviceSteps}}" wx:key="key">
+        <view class="service-step-index">{{item.index}}</view>
+        <view class="service-step-title">{{item.title}}</view>
+        <view class="service-step-desc">{{item.desc}}</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="info-card ui-card">
+    <view class="section-heading">
+      <view class="section-mark"></view>
       <view class="section-title">租赁说明</view>
     </view>
     <view wx:for="{{rentalTips}}" wx:key="*this" class="section-text rental-tip">{{item}}</view>
   </view>
 
   <view class="detail-bottom-bar">
-    <button class="action-button ui-btn ui-btn-primary" bindtap="handleBookingTap">{{car.primaryActionText}}</button>
-    <button class="action-button ui-btn ui-btn-ghost action-button-offset" bindtap="handlePhoneCall">电话咨询</button>
+    <view class="bottom-action-meta">
+      <view class="bottom-action-status {{car.statusClass}}">
+        <view class="bottom-action-dot"></view>
+        <text>{{car.statusText}}</text>
+      </view>
+      <view class="bottom-action-hint">{{car.actionHintText}}</view>
+    </view>
+    <view class="bottom-action-buttons">
+      <button class="action-button ui-btn ui-btn-primary" bindtap="handleBookingTap" aria-label="{{car.primaryActionText}}，{{car.actionHintText}}">
+        <view class="detail-action-content"><view class="detail-action-native-icon booking-action-native-icon" aria-hidden="true"></view><text>{{car.primaryActionText}}</text></view>
+      </button>
+      <button class="action-button ui-btn ui-btn-ghost action-button-offset" bindtap="handlePhoneCall" aria-label="电话咨询极境车库顾问">
+        <view class="detail-action-content"><view class="detail-action-native-icon phone-action-native-icon" aria-hidden="true"></view><text>电话咨询</text></view>
+      </button>
+    </view>
   </view>
 </view>
 
 <view class="empty-page ui-card" wx:else>
+  <image class="empty-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
+  <view class="empty-kicker">VEHICLE PROFILE</view>
   <view class="empty-title">车辆详情</view>
   <view class="empty-desc">{{loadError ? loadErrorText : notFoundText}}</view>
-  <button wx:if="{{loadError}}" class="empty-action ui-btn ui-btn-primary" bindtap="handleRetryLoad">重新加载</button>
-  <button wx:else class="empty-action ui-btn ui-btn-primary" bindtap="handleBackGarage">返回车库首页</button>
+  <button wx:if="{{loadError}}" class="empty-action ui-btn ui-btn-primary" bindtap="handleRetryLoad">
+    <view class="detail-action-content"><view class="detail-action-native-icon retry-action-native-icon" aria-hidden="true"></view><text>重新加载</text></view>
+  </button>
+  <button wx:else class="empty-action ui-btn ui-btn-primary" bindtap="handleBackGarage">
+    <view class="detail-action-content"><view class="detail-action-native-icon back-action-native-icon" aria-hidden="true"></view><text>返回车库首页</text></view>
+  </button>
 </view>

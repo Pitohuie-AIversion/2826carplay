@@ -1,12 +1,13 @@
 const { requirePagePermission } = require("../../shared/pageAuth")
+const { formatToastTitle } = require("../../shared/uiFeedback")
 
 function buildMetrics(metrics, conversionRate) {
   const source = metrics && typeof metrics === "object" ? metrics : {}
   return [
-    { key: "detail", label: "详情浏览", value: Number(source.vehicle_detail) || 0, tone: "primary" },
-    { key: "start", label: "发起预约", value: Number(source.booking_start) || 0, tone: "warning" },
-    { key: "submit", label: "提交成功", value: Number(source.booking_submit) || 0, tone: "success" },
-    { key: "conversion", label: "详情转化率", value: `${Number(conversionRate) || 0}%`, tone: "accent" }
+    { key: "detail", label: "详情浏览", value: Number(source.vehicle_detail) || 0, tone: "primary", icon: "eye" },
+    { key: "start", label: "发起预约", value: Number(source.booking_start) || 0, tone: "warning", icon: "calendar" },
+    { key: "submit", label: "提交成功", value: Number(source.booking_submit) || 0, tone: "success", icon: "check" },
+    { key: "conversion", label: "详情转化率", value: `${Number(conversionRate) || 0}%`, tone: "accent", icon: "chart" }
   ]
 }
 
@@ -19,19 +20,25 @@ function buildFunnel(metrics) {
     { key: "submit", label: "提交成功", value: Number(source.booking_submit) || 0 }
   ]
   const max = Math.max(...list.map((item) => item.value), 1)
+  const firstStageValue = list[0].value
   return list.map((item) => ({
     ...item,
-    width: Math.max(Math.round((item.value / max) * 100), item.value ? 8 : 0)
+    width: Math.max(Math.round((item.value / max) * 100), item.value ? 8 : 0),
+    rate: firstStageValue ? Math.min(100, Math.round((item.value / firstStageValue) * 100)) : 0
   }))
 }
 
 function buildTrend(trend) {
   const list = Array.isArray(trend) ? trend : []
   const max = Math.max(...list.map((item) => Number(item.value) || 0), 1)
-  return list.map((item) => ({
-    ...item,
-    width: Math.max(Math.round(((Number(item.value) || 0) / max) * 100), item.value ? 6 : 0)
-  }))
+  return list.map((item) => {
+    const value = Number(item.value) || 0
+    return {
+      ...item,
+      width: Math.max(Math.round((value / max) * 100), value ? 6 : 0),
+      isPeak: value > 0 && value === max
+    }
+  })
 }
 
 Page({
@@ -96,6 +103,8 @@ Page({
     wx.showModal({
       title: "清理过期匿名数据",
       content: "将永久删除 90 天前的匿名行为事件，每次最多 100 条。该操作不会删除预约、车辆或用户资料。确认继续？",
+      confirmText: "确认清理",
+      confirmColor: "#d46868",
       success: (res) => {
         if (res.confirm) {
           this.runCleanup()
@@ -115,7 +124,7 @@ Page({
     }
 
     this.setData({ cleanupLoading: true })
-    wx.showLoading({ title: "清理中" })
+    wx.showLoading({ title: "清理中…", mask: true })
     wx.cloud.callFunction({
       name: "analyticsCleanup",
       data: {
@@ -125,7 +134,7 @@ Page({
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
           wx.showToast({
-            title: (result && result.message) || "清理失败",
+          title: formatToastTitle(result && result.message, "清理失败"),
             icon: "none"
           })
           return
@@ -134,12 +143,14 @@ Page({
         wx.showModal({
           title: "清理完成",
           content: `处理 ${result.processed || 0} 条，成功删除 ${result.deleted || 0} 条，失败 ${result.failed || 0} 条。${result.hasMore ? "可能仍有过期数据，可再次执行清理。" : "已处理完当前过期数据。"}`,
+          confirmText: "知道了",
+          confirmColor: "#528fff",
           showCancel: false
         })
       },
       fail: (error) => {
         wx.showToast({
-          title: (error && (error.errMsg || error.message)) || "清理失败",
+          title: "清理失败",
           icon: "none"
         })
       },

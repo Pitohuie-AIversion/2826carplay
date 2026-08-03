@@ -1,5 +1,6 @@
 const {
   isValidPlateNumber,
+  buildVehicleDisplayIdentity,
   isValidYmdDate,
   validateVehicle,
   normalizePlateNumber,
@@ -47,6 +48,17 @@ describe("shared/vehicle.js plateNumber", () => {
 
   test("normalizePlateNumber uppercases and trims", () => {
     expect(normalizePlateNumber("  京a12345 ")).toBe("京A12345")
+  })
+
+  test("预约展示隐藏完整车牌并保留车型名称", () => {
+    expect(buildVehicleDisplayIdentity("粤A12345")).toEqual({
+      vehicleName: "预约车辆",
+      vehicleReference: "车牌尾号 45"
+    })
+    expect(buildVehicleDisplayIdentity("奥迪 A6")).toEqual({
+      vehicleName: "奥迪 A6",
+      vehicleReference: ""
+    })
   })
 })
 

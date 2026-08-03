@@ -6,6 +6,21 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
 const ALLOWED_PERMISSIONS = ["vehicle_manage", "booking_manage"]
 const OPENID_PATTERN = /^[A-Za-z0-9_-]{6,128}$/
+const AUTH_ROLE_FIELDS = {
+  role: true,
+  roles: true,
+  permissions: true,
+  isAdmin: true,
+  admin: true
+}
+const ROLE_UPSERT_TARGET_FIELDS = {
+  _id: true,
+  role: true,
+  roles: true,
+  permissions: true,
+  isAdmin: true,
+  admin: true
+}
 
 function normalizeStringArray(value) {
   if (!Array.isArray(value)) {
@@ -101,7 +116,12 @@ async function isAdminOpenid(openid) {
     return false
   }
 
-  const res = await db.collection("roles").where({ openid }).limit(20).get()
+  const res = await db
+    .collection("roles")
+    .where({ openid })
+    .field(AUTH_ROLE_FIELDS)
+    .limit(20)
+    .get()
   const list = res && Array.isArray(res.data) ? res.data : []
   return list.some((item) => hasAdminRole(item))
 }
@@ -176,7 +196,12 @@ exports.main = async (event) => {
       }
     }
 
-    const existedRes = await db.collection("roles").where({ openid: input.openid }).limit(20).get()
+    const existedRes = await db
+      .collection("roles")
+      .where({ openid: input.openid })
+      .field(ROLE_UPSERT_TARGET_FIELDS)
+      .limit(20)
+      .get()
     const existedList = existedRes && Array.isArray(existedRes.data) ? existedRes.data : []
     const adminRecord = existedList.find((item) => hasAdminRole(item))
     if (adminRecord) {
@@ -257,22 +282,24 @@ exports.main = async (event) => {
       message: "权限已创建"
     }
   } catch (error) {
+    const errorMessage = String(
+      error && (error.message || error.errMsg) ? error.message || error.errMsg : error
+    ).slice(0, 300)
     console.error({
       function: "roleUpsert",
-      operatorOpenid,
-      targetOpenid: input.openid,
-      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
+      operatorAuthenticated: Boolean(operatorOpenid),
+      targetProvided: Boolean(input.openid),
+      errorMessage,
       stack: error && error.stack ? error.stack : "",
       createdAt: new Date().toISOString()
     })
 
     await writeErrorLogBestEffort({
       function: "roleUpsert",
-      openid: operatorOpenid,
-      targetOpenid: input.openid,
       stage: "main",
-      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
-      stack: error && error.stack ? error.stack : "",
+      operatorAuthenticated: Boolean(operatorOpenid),
+      targetProvided: Boolean(input.openid),
+      errorMessage,
       occurredAt: new Date().toISOString()
     })
 

@@ -58,6 +58,25 @@ function getConflictVehicleIds(bookings) {
   )
 }
 
+function buildDateAriaLabel(input) {
+  const source = input && typeof input === "object" ? input : {}
+  const parts = [String(source.date || "")]
+  if (source.isToday) {
+    parts.push("今天")
+  }
+  if (source.isSelected) {
+    parts.push("已选中")
+  }
+  parts.push(`${Number(source.bookingCount) || 0} 条预约`)
+  if (source.pendingCount) {
+    parts.push(`${Number(source.pendingCount)} 条待联系`)
+  }
+  if (source.hasConflict) {
+    parts.push("存在同车预约重叠")
+  }
+  return parts.join("，")
+}
+
 function buildMonthView(monthKey, bookings, selectedDate) {
   const normalized = normalizeMonthKey(monthKey)
   const [year, month] = normalized.split("-").map(Number)
@@ -104,18 +123,31 @@ function buildMonthView(monthKey, bookings, selectedDate) {
       return startDate <= date && endDate >= date
     })
     const conflictVehicleCount = getConflictVehicleCount(dayBookings)
+    const bookingCount = dayBookings.length
+    const pendingCount = dayBookings.filter((item) => item.status === "pending").length
+    const isToday = date === today
+    const isSelected = date === safeSelectedDate
+    const hasConflict = conflictVehicleCount > 0
     cells.push({
       key: date,
       date,
       day,
       empty: false,
-      isToday: date === today,
-      isSelected: date === safeSelectedDate,
-      bookingCount: dayBookings.length,
-      pendingCount: dayBookings.filter((item) => item.status === "pending").length,
-      hasBookings: dayBookings.length > 0,
-      hasConflict: conflictVehicleCount > 0,
-      conflictVehicleCount
+      isToday,
+      isSelected,
+      bookingCount,
+      pendingCount,
+      hasBookings: bookingCount > 0,
+      hasConflict,
+      conflictVehicleCount,
+      ariaLabel: buildDateAriaLabel({
+        date,
+        isToday,
+        isSelected,
+        bookingCount,
+        pendingCount,
+        hasConflict
+      })
     })
   }
 

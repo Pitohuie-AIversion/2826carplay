@@ -44,6 +44,14 @@ describe("shared/csvFile", () => {
     expect(helper.canShareCsvFile()).toBe(false)
   })
 
+  test("区分用户主动取消与真实文件错误", () => {
+    global.wx = {}
+    const helper = loadModule()
+
+    expect(helper.isUserCancelError({ errMsg: "shareFileMessage:fail cancel" })).toBe(true)
+    expect(helper.isUserCancelError({ message: "openDocument:fail unavailable" })).toBe(false)
+  })
+
   test("只允许删除小程序目录内的 CSV 文件", async () => {
     const unlink = jest.fn(({ success }) => success())
     global.wx = {

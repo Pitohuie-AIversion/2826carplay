@@ -3,6 +3,20 @@ const cloud = require("wx-server-sdk")
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
+const AUTH_ROLE_FIELDS = {
+  role: true,
+  roles: true,
+  permissions: true,
+  isAdmin: true,
+  admin: true
+}
+const VEHICLE_DELETE_FIELDS = {
+  imageList: true,
+  coverImage: true
+}
+const BOOKING_EXISTENCE_FIELDS = {
+  _id: true
+}
 
 function createError(code, message, details) {
   const result = {
@@ -71,7 +85,12 @@ async function hasOpenidCapability(openid, capability) {
     return false
   }
 
-  const res = await db.collection("roles").where({ openid }).limit(20).get()
+  const res = await db
+    .collection("roles")
+    .where({ openid })
+    .field(AUTH_ROLE_FIELDS)
+    .limit(20)
+    .get()
   const list = res && Array.isArray(res.data) ? res.data : []
   return list.some((item) => hasCapability(item, capability))
 }
@@ -92,11 +111,24 @@ function normalizeStringArray(input) {
   return result
 }
 
+function normalizeDeletionContext(context) {
+  const input = context && typeof context === "object" ? context : {}
+  return {
+    vehicleId: String(input.vehicleId || input.id || "").trim().slice(0, 128),
+    action: String(input.action || "deleteVehicle").trim().slice(0, 32)
+  }
+}
+
+function getSafeErrorCode(error) {
+  return String((error && (error.code || error.errCode)) || "").trim().slice(0, 64)
+}
+
 async function deleteFilesBestEffort(fileList, context) {
   const list = normalizeStringArray(fileList)
   if (!list.length) {
     return
   }
+  const safeContext = normalizeDeletionContext(context)
 
   try {
     await cloud.deleteFile({ fileList: list })
@@ -105,9 +137,8 @@ async function deleteFilesBestEffort(fileList, context) {
       function: "vehicleDelete",
       stage: "deleteFile",
       fileCount: list.length,
-      context: context || {},
-      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
-      stack: error && error.stack ? error.stack : "",
+      context: safeContext,
+      errorCode: getSafeErrorCode(error),
       createdAt: new Date().toISOString()
     })
 
@@ -115,7 +146,7 @@ async function deleteFilesBestEffort(fileList, context) {
       await db.collection("pending_file_deletions").add({
         data: {
           fileList: list,
-          context: context || {},
+          context: safeContext,
           source: "vehicleDelete",
           createdAt: db.serverDate()
         }
@@ -187,13 +218,22 @@ exports.main = async (event) => {
       })
     }
 
-    const currentRes = await db.collection("vehicles").doc(id).get()
+    const currentRes = await db
+      .collection("vehicles")
+      .doc(id)
+      .field(VEHICLE_DELETE_FIELDS)
+      .get()
     const current = currentRes && currentRes.data ? currentRes.data : null
     if (!current) {
       return createError("NOT_FOUND", "车辆不存在")
     }
 
-    const bookingRes = await db.collection("bookings").where({ vehicleId: id }).limit(1).get()
+    const bookingRes = await db
+      .collection("bookings")
+      .where({ vehicleId: id })
+      .field(BOOKING_EXISTENCE_FIELDS)
+      .limit(1)
+      .get()
     const bookingList = bookingRes && Array.isArray(bookingRes.data) ? bookingRes.data : []
     if (bookingList.length) {
       return createError("VEHICLE_HAS_BOOKINGS", "车辆存在预约记录，请改为停用车辆")
@@ -203,7 +243,10 @@ exports.main = async (event) => {
 
     const coverImage = String((current && current.coverImage) || "").trim()
     const fileList = normalizeStringArray(current && current.imageList).concat(coverImage ? [coverImage] : [])
-    await deleteFilesBestEffort(fileList, { openid, id })
+    await deleteFilesBestEffort(fileList, {
+      vehicleId: id,
+      action: "deleteVehicle"
+    })
 
     await writeAuditLogBestEffort({
       openid,
@@ -219,19 +262,21 @@ exports.main = async (event) => {
       message: "车辆已删除"
     }
   } catch (error) {
+    const errorMessage = String(
+      error && (error.message || error.errMsg) ? error.message || error.errMsg : error
+    ).slice(0, 300)
     await writeErrorLogBestEffort({
       function: "vehicleDelete",
-      openid,
       id,
-      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
-      stack: error && error.stack ? error.stack : ""
+      authenticated: Boolean(openid),
+      errorMessage
     })
 
     console.error({
       function: "vehicleDelete",
-      openid,
+      authenticated: Boolean(openid),
       id,
-      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
+      errorMessage,
       stack: error && error.stack ? error.stack : "",
       createdAt: new Date().toISOString()
     })

@@ -2,6 +2,7 @@ jest.mock("wx-server-sdk")
 
 function createQuery(records) {
   const query = {}
+  query.field = jest.fn(() => query)
   query.orderBy = jest.fn(() => query)
   query.skip = jest.fn(() => query)
   query.limit = jest.fn(() => query)
@@ -16,10 +17,13 @@ function loadModule({ openid, favoriteRecords, vehicles }) {
   cloud.__setMockContext({ OPENID: openid })
   const favoriteQuery = createQuery(favoriteRecords)
   const favoriteWhere = jest.fn(() => favoriteQuery)
-  const vehicleDoc = jest.fn((id) => ({
+  const vehicleField = jest.fn((id, projection) => ({
     get: jest.fn().mockResolvedValue({
       data: vehicles[id] || null
     })
+  }))
+  const vehicleDoc = jest.fn((id) => ({
+    field: jest.fn((projection) => vehicleField(id, projection))
   }))
   cloud.__setMockDb({
     collection: jest.fn((name) => {
@@ -41,7 +45,8 @@ function loadModule({ openid, favoriteRecords, vehicles }) {
     mod,
     favoriteWhere,
     favoriteQuery,
-    vehicleDoc
+    vehicleDoc,
+    vehicleField
   }
 }
 
@@ -76,6 +81,11 @@ describe("cloudfunctions/favoriteMyList integration", () => {
 
     expect(res.ok).toBe(true)
     expect(mocks.favoriteWhere).toHaveBeenCalledWith({ openid: "user_openid" })
+    expect(mocks.favoriteQuery.field).toHaveBeenCalledWith({
+      _id: true,
+      vehicleId: true,
+      createdAt: true
+    })
     expect(res.list).toHaveLength(1)
     expect(res.list[0]).toEqual(
       expect.objectContaining({
@@ -84,12 +94,25 @@ describe("cloudfunctions/favoriteMyList integration", () => {
         brand: "BMW",
         cover: "cloud://cover",
         status: "available",
-        statusText: "在库"
+        statusText: "可预约"
       })
     )
     expect(JSON.stringify(res.list[0])).not.toContain("浙A12345")
     expect(res.list[0]).not.toHaveProperty("vin")
     expect(res.list[0]).not.toHaveProperty("internalRemark")
+    const projection = mocks.vehicleField.mock.calls[0][1]
+    expect(projection).toEqual(
+      expect.objectContaining({
+        _id: true,
+        brandModel: true,
+        plateNumber: true,
+        status: true
+      })
+    )
+    expect(projection).not.toHaveProperty("vin")
+    expect(projection).not.toHaveProperty("engineNumber")
+    expect(projection).not.toHaveProperty("note")
+    expect(projection).not.toHaveProperty("internalRemark")
   })
 
   test("停用车辆不出现在收藏列表", async () => {

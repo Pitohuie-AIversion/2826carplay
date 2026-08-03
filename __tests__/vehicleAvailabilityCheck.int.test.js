@@ -25,12 +25,13 @@ function loadModule({ openid = "user_openid", vehicle, bookings = [], total = bo
     return chain
   })
   const vehicleGet = jest.fn().mockResolvedValue({ data: vehicle || null })
+  const vehicleField = jest.fn(() => ({ get: vehicleGet }))
 
   cloud.__setMockDb({
     collection: jest.fn((name) => {
       if (name === "vehicles") {
         return {
-          doc: jest.fn(() => ({ get: vehicleGet }))
+          doc: jest.fn(() => ({ field: vehicleField }))
         }
       }
       if (name === "bookings") {
@@ -44,12 +45,12 @@ function loadModule({ openid = "user_openid", vehicle, bookings = [], total = bo
   jest.isolateModules(() => {
     mod = require("../cloudfunctions/vehicleAvailabilityCheck/index")
   })
-  return { mod, bookingWhere, vehicleGet }
+  return { mod, bookingWhere, vehicleGet, vehicleField }
 }
 
 describe("cloudfunctions/vehicleAvailabilityCheck integration", () => {
   test("只返回同期咨询数量，不返回其他用户预约详情", async () => {
-    const { mod, bookingWhere } = loadModule({
+    const { mod, bookingWhere, vehicleField } = loadModule({
       vehicle: { _id: "vehicle_1", status: "idle" },
       bookings: [
         {
@@ -91,6 +92,7 @@ describe("cloudfunctions/vehicleAvailabilityCheck integration", () => {
     })
     expect(JSON.stringify(res)).not.toContain("13800000000")
     expect(JSON.stringify(res)).not.toContain("不应返回")
+    expect(vehicleField).toHaveBeenCalledWith({ status: true })
     expect(bookingWhere).toHaveBeenCalledWith({ vehicleId: "vehicle_1" })
   })
 

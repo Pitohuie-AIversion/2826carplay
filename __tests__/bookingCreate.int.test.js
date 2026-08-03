@@ -8,11 +8,12 @@ function createMockDb({
   idempotentBooking = null
 }) {
   const vehicleGet = jest.fn().mockResolvedValue({ data: vehicleData })
+  const vehicleField = jest.fn(() => ({ get: vehicleGet }))
   const add = jest.fn().mockResolvedValue(addResult)
   const auditAdd = jest.fn().mockResolvedValue({ _id: "audit_1" })
 
   const vehiclesDoc = jest.fn(() => ({
-    get: vehicleGet
+    field: vehicleField
   }))
 
   const bookingsAdd = jest.fn(() => ({
@@ -65,6 +66,7 @@ function createMockDb({
   return {
     db,
     vehiclesDoc,
+    vehicleField,
     vehicleGet,
     add,
     bookingsWhere,
@@ -109,7 +111,8 @@ describe("cloudfunctions/bookingCreate integration", () => {
     const mocks = createMockDb({
       vehicleData: {
         _id: "car_1",
-        name: "MX-5 ND2",
+        brandModel: "MX-5 ND2",
+        plateNumber: "浙A12345",
         status: "idle"
       },
       addResult: { _id: "booking_1" }
@@ -130,6 +133,12 @@ describe("cloudfunctions/bookingCreate integration", () => {
     expect(res.ok).toBe(true)
     expect(res.id).toBe("booking_1")
     expect(mocks.vehiclesDoc).toHaveBeenCalledWith("car_1")
+    expect(mocks.vehicleField).toHaveBeenCalledWith({
+      name: true,
+      brandModel: true,
+      plateNumber: true,
+      status: true
+    })
     expect(mocks.bookingsWhere).toHaveBeenCalledWith({ openid: "user_openid" })
     expect(mocks.add).toHaveBeenCalledWith({
       data: {
@@ -153,13 +162,41 @@ describe("cloudfunctions/bookingCreate integration", () => {
         action: "bookingCreate",
         bookingId: "booking_1",
         vehicleId: "car_1",
-        vehicleName: "MX-5 ND2",
-        startDate: "2026-07-13",
-        endDate: "2026-07-14",
-        city: "杭州",
         createdAt: mocks.serverDateValue
       }
     })
+  })
+
+  test("缺少车型名称时只保存脱敏车牌作为预约车辆名", async () => {
+    const mocks = createMockDb({
+      vehicleData: {
+        _id: "car_1",
+        plateNumber: "浙A12345",
+        status: "idle",
+        vin: "VIN-SECRET",
+        note: "内部备注"
+      },
+      addResult: { _id: "booking_1" }
+    })
+    const bookingCreate = await loadBookingCreateWith({
+      openid: "user_openid",
+      mockDb: mocks.db
+    })
+
+    const res = await bookingCreate.main({
+      vehicleId: "car_1",
+      userName: "张三",
+      phone: "13800000000",
+      startDate: "2026-07-13",
+      endDate: "2026-07-14",
+      city: "杭州"
+    })
+
+    expect(res.ok).toBe(true)
+    expect(mocks.add.mock.calls[0][0].data.vehicleName).toBe("浙A***45")
+    expect(JSON.stringify(mocks.add.mock.calls[0][0])).not.toContain("浙A12345")
+    expect(mocks.vehicleField.mock.calls[0][0]).not.toHaveProperty("vin")
+    expect(mocks.vehicleField.mock.calls[0][0]).not.toHaveProperty("note")
   })
 
   test("缺少 vehicleId 返回 VALIDATION_ERROR", async () => {

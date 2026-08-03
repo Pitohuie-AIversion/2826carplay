@@ -16,12 +16,20 @@ function createMockDb({ roles, counts = {}, errors = {} }) {
   }
 
   const bookingPendingCount = createCount("bookingPending")
+  const bookingCoordinationActiveCount = createCount("bookingCoordinationActive")
+  const bookingCoordinationResolvedCount = createCount("bookingCoordinationResolved")
   const privacyPendingCount = createCount("privacyPending")
   const privacyProcessingCount = createCount("privacyProcessing")
   const storageCleanupPendingCount = createCount("storageCleanupPending")
   const bookingsWhere = jest.fn((filter) => {
     if (filter.status === "pending") {
       return { count: bookingPendingCount }
+    }
+    if (filter.status && filter.status.$in && filter.coordinationStatus === "resolved") {
+      return { count: bookingCoordinationResolvedCount }
+    }
+    if (filter.status && filter.status.$in) {
+      return { count: bookingCoordinationActiveCount }
     }
     throw new Error(`Unexpected bookings filter: ${JSON.stringify(filter)}`)
   })
@@ -51,9 +59,18 @@ function createMockDb({ roles, counts = {}, errors = {} }) {
   })
 
   return {
-    db: { collection },
+    db: {
+      collection,
+      command: {
+        in: (values) => ({
+          $in: values
+        })
+      }
+    },
     collection,
     bookingPendingCount,
+    bookingCoordinationActiveCount,
+    bookingCoordinationResolvedCount,
     privacyPendingCount,
     privacyProcessingCount,
     storageCleanupPendingCount
@@ -80,6 +97,8 @@ describe("cloudfunctions/operationSummaryGet integration", () => {
       roles: [{ openid: "admin_openid", role: "admin" }],
       counts: {
         bookingPending: 8,
+        bookingCoordinationActive: 11,
+        bookingCoordinationResolved: 3,
         privacyPending: 3,
         privacyProcessing: 2,
         storageCleanupPending: 1
@@ -93,6 +112,7 @@ describe("cloudfunctions/operationSummaryGet integration", () => {
       ok: true,
       counts: {
         bookingPending: 8,
+        bookingCoordinationPending: 8,
         privacyPending: 3,
         privacyProcessing: 2,
         storageCleanupPending: 1
@@ -107,6 +127,8 @@ describe("cloudfunctions/operationSummaryGet integration", () => {
       roles: [{ openid: "ops_openid", permissions: ["booking_manage"] }],
       counts: {
         bookingPending: 5,
+        bookingCoordinationActive: 7,
+        bookingCoordinationResolved: 2,
         privacyPending: 9
       }
     })
@@ -116,6 +138,7 @@ describe("cloudfunctions/operationSummaryGet integration", () => {
 
     expect(res.ok).toBe(true)
     expect(res.counts.bookingPending).toBe(5)
+    expect(res.counts.bookingCoordinationPending).toBe(5)
     expect(res.counts.privacyPending).toBe(0)
     expect(mocks.privacyPendingCount).not.toHaveBeenCalled()
     expect(mocks.storageCleanupPendingCount).not.toHaveBeenCalled()
@@ -135,6 +158,7 @@ describe("cloudfunctions/operationSummaryGet integration", () => {
       message: "权限不足"
     })
     expect(mocks.bookingPendingCount).not.toHaveBeenCalled()
+    expect(mocks.bookingCoordinationActiveCount).not.toHaveBeenCalled()
   })
 
   test("单个集合不可用时保留其他待办数量", async () => {
@@ -143,6 +167,8 @@ describe("cloudfunctions/operationSummaryGet integration", () => {
       roles: [{ openid: "admin_openid", role: "admin" }],
       counts: {
         bookingPending: 4,
+        bookingCoordinationActive: 6,
+        bookingCoordinationResolved: 1,
         storageCleanupPending: 2
       },
       errors: {
@@ -157,8 +183,33 @@ describe("cloudfunctions/operationSummaryGet integration", () => {
     expect(res.ok).toBe(true)
     expect(res.partial).toBe(true)
     expect(res.counts.bookingPending).toBe(4)
+    expect(res.counts.bookingCoordinationPending).toBe(5)
     expect(res.counts.storageCleanupPending).toBe(2)
     expect(res.unavailable).toEqual(["privacyPending", "privacyProcessing"])
+    expect(warnSpy).toHaveBeenCalled()
+    warnSpy.mockRestore()
+  })
+
+  test("待协调统计失败时仍保留待联系数量并标记局部不可用", async () => {
+    const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {})
+    const mocks = createMockDb({
+      roles: [{ openid: "ops_openid", permissions: ["booking_manage"] }],
+      counts: {
+        bookingPending: 4
+      },
+      errors: {
+        bookingCoordinationActive: new Error("index unavailable")
+      }
+    })
+    const mod = await loadModule("ops_openid", mocks.db)
+
+    const res = await mod.main()
+
+    expect(res.ok).toBe(true)
+    expect(res.counts.bookingPending).toBe(4)
+    expect(res.counts.bookingCoordinationPending).toBe(0)
+    expect(res.unavailable).toEqual(["bookingCoordinationPending"])
+    expect(res.partial).toBe(true)
     expect(warnSpy).toHaveBeenCalled()
     warnSpy.mockRestore()
   })

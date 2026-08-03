@@ -5,6 +5,9 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
 const BATCH_SIZE = 100
 const MAX_SCAN_RECORDS = 1000
+const AVAILABILITY_VEHICLE_FIELDS = {
+  status: true
+}
 
 function createError(code, message, details) {
   const result = {
@@ -133,7 +136,11 @@ exports.main = async (event) => {
       return createError("VALIDATION_ERROR", "参数校验失败", { errors })
     }
 
-    const vehicleRes = await db.collection("vehicles").doc(input.vehicleId).get()
+    const vehicleRes = await db
+      .collection("vehicles")
+      .doc(input.vehicleId)
+      .field(AVAILABILITY_VEHICLE_FIELDS)
+      .get()
     const vehicle = vehicleRes && vehicleRes.data ? vehicleRes.data : null
     if (!vehicle) {
       return createError("NOT_FOUND", "车辆不存在")

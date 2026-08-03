@@ -9,7 +9,8 @@ function createMockDb({ roles, current, updateResult = { stats: { updated: 1 } }
     }))
   }))
   const privacyGet = jest.fn().mockResolvedValue({ data: current })
-  const privacyDoc = jest.fn(() => ({ get: privacyGet }))
+  const privacyField = jest.fn(() => ({ get: privacyGet }))
+  const privacyDoc = jest.fn(() => ({ field: privacyField, get: privacyGet }))
   const privacyUpdate = jest.fn().mockResolvedValue(updateResult)
   const privacyWhere = jest.fn(() => ({ update: privacyUpdate }))
   const auditAdd = jest.fn().mockResolvedValue({ _id: "audit_1" })
@@ -37,6 +38,7 @@ function createMockDb({ roles, current, updateResult = { stats: { updated: 1 } }
     },
     privacyWhere,
     privacyUpdate,
+    privacyField,
     auditAdd,
     serverDateValue
   }
@@ -75,6 +77,11 @@ describe("cloudfunctions/privacyRequestUpdateStatus integration", () => {
     })
 
     expect(res.ok).toBe(true)
+    expect(mocks.privacyField).toHaveBeenCalledWith({
+      type: true,
+      status: true,
+      dataExportedAt: true
+    })
     expect(mocks.privacyWhere).toHaveBeenCalledWith({
       _id: "p1",
       status: "processing"
@@ -121,13 +128,40 @@ describe("cloudfunctions/privacyRequestUpdateStatus integration", () => {
     expect(mocks.privacyUpdate).not.toHaveBeenCalled()
   })
 
+  test("查询申请未生成个人数据时不可标记为完成", async () => {
+    const mocks = createMockDb({
+      roles: [{ openid: "admin_openid", role: "admin" }],
+      current: {
+        _id: "p_access",
+        type: "access",
+        status: "processing"
+      }
+    })
+    const mod = await loadModule("admin_openid", mocks.db)
+
+    const res = await mod.main({
+      id: "p_access",
+      status: "completed",
+      resolutionNote: "已经反馈用户"
+    })
+
+    expect(res).toEqual({
+      ok: false,
+      code: "DATA_EXPORT_REQUIRED",
+      message: "请先核验并导出完整个人数据，再完成查询申请"
+    })
+    expect(mocks.privacyUpdate).not.toHaveBeenCalled()
+    expect(mocks.auditAdd).not.toHaveBeenCalled()
+  })
+
   test("并发状态变化不会被覆盖", async () => {
     const mocks = createMockDb({
       roles: [{ openid: "admin_openid", role: "admin" }],
       current: {
         _id: "p1",
         type: "access",
-        status: "pending"
+        status: "pending",
+        dataExportedAt: "2026-07-30T08:00:00.000Z"
       },
       updateResult: { stats: { updated: 0 } }
     })

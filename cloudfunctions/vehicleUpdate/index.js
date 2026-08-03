@@ -4,8 +4,36 @@ const vehicleUtils = require("./vehicle")
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
-const AUDIT_VALUE_EXCLUDED_FIELDS = ["vin", "engineNumber", "note"]
-
+const AUTH_ROLE_FIELDS = {
+  role: true,
+  roles: true,
+  permissions: true,
+  isAdmin: true,
+  admin: true
+}
+const VEHICLE_UPDATE_FIELD_NAMES = [
+  "plateNumber",
+  "vehicleType",
+  "brandModel",
+  "registerDate",
+  "status",
+  "location",
+  "transmission",
+  "fuelType",
+  "seats",
+  "priceDay",
+  "publicDescription",
+  "vin",
+  "engineNumber",
+  "note"
+]
+const VEHICLE_UPDATE_CURRENT_FIELDS = VEHICLE_UPDATE_FIELD_NAMES.reduce(
+  (fields, key) => ({ ...fields, [key]: true }),
+  {}
+)
+const VEHICLE_ID_FIELDS = {
+  _id: true
+}
 function normalizeStringArray(value) {
   if (!Array.isArray(value)) {
     return []
@@ -59,7 +87,12 @@ async function hasOpenidCapability(openid, capability) {
     return false
   }
 
-  const res = await db.collection("roles").where({ openid }).limit(20).get()
+  const res = await db
+    .collection("roles")
+    .where({ openid })
+    .field(AUTH_ROLE_FIELDS)
+    .limit(20)
+    .get()
   const list = res && Array.isArray(res.data) ? res.data : []
   return list.some((item) => hasCapability(item, capability))
 }
@@ -154,34 +187,12 @@ function normalizeUpdateInput(event) {
 }
 
 function buildVehicleDiff(current, next) {
-  const fields = [
-    "plateNumber",
-    "vehicleType",
-    "brandModel",
-    "registerDate",
-    "status",
-    "location",
-    "transmission",
-    "fuelType",
-    "seats",
-    "priceDay",
-    "publicDescription",
-    "vin",
-    "engineNumber",
-    "note"
-  ]
-
-  const changedKeys = fields.filter(
+  const changedKeys = VEHICLE_UPDATE_FIELD_NAMES.filter(
     (key) =>
       Object.prototype.hasOwnProperty.call(next || {}, key) &&
       JSON.stringify(current && current[key]) !== JSON.stringify(next && next[key])
   )
-  const valueLogKeys = changedKeys.filter((key) => !AUDIT_VALUE_EXCLUDED_FIELDS.includes(key))
-  return {
-    changedKeys,
-    before: valueLogKeys.reduce((acc, key) => ({ ...acc, [key]: current ? current[key] : undefined }), {}),
-    after: valueLogKeys.reduce((acc, key) => ({ ...acc, [key]: next ? next[key] : undefined }), {})
-  }
+  return changedKeys
 }
 
 exports.main = async (event) => {
@@ -202,7 +213,11 @@ exports.main = async (event) => {
       })
     }
 
-    const currentRes = await db.collection("vehicles").doc(input.id).get()
+    const currentRes = await db
+      .collection("vehicles")
+      .doc(input.id)
+      .field(VEHICLE_UPDATE_CURRENT_FIELDS)
+      .get()
     const current = currentRes && currentRes.data ? currentRes.data : null
     if (!current) {
       return vehicleUtils.createError("NOT_FOUND", "车辆不存在")
@@ -216,7 +231,12 @@ exports.main = async (event) => {
     const payload = check.value
     plateNumber = payload.plateNumber
 
-    const existsRes = await db.collection("vehicles").where({ plateNumber }).limit(5).get()
+    const existsRes = await db
+      .collection("vehicles")
+      .where({ plateNumber })
+      .field(VEHICLE_ID_FIELDS)
+      .limit(5)
+      .get()
     const existsList = existsRes && Array.isArray(existsRes.data) ? existsRes.data : []
     const duplicate = existsList.find((item) => item && item._id !== input.id)
     if (duplicate) {
@@ -230,15 +250,12 @@ exports.main = async (event) => {
       }
     })
 
-    const diff = buildVehicleDiff(current, payload)
+    const changedKeys = buildVehicleDiff(current, payload)
     await writeAuditLogBestEffort({
       openid,
       action: "vehicleUpdate",
       vehicleId: input.id,
-      plateNumber,
-      changedKeys: diff.changedKeys,
-      before: diff.before,
-      after: diff.after
+      changedKeys
     })
 
     return { ok: true, id: input.id }
@@ -247,23 +264,23 @@ exports.main = async (event) => {
       return vehicleUtils.createError("DUPLICATE_PLATE", "车牌号已存在", { plateNumber })
     }
 
+    const errorMessage = String(
+      error && (error.message || error.errMsg) ? error.message || error.errMsg : error
+    ).slice(0, 300)
     await writeErrorLogBestEffort({
       function: "vehicleUpdate",
-      openid,
       vehicleId: input.id,
-      plateNumber,
       stage: "main",
-      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
-      stack: error && error.stack ? error.stack : "",
+      authenticated: Boolean(openid),
+      errorMessage,
       occurredAt: new Date().toISOString()
     })
 
     console.error({
       function: "vehicleUpdate",
-      openid,
       id: input.id,
-      plateNumber,
-      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
+      authenticated: Boolean(openid),
+      errorMessage,
       stack: error && error.stack ? error.stack : "",
       createdAt: new Date().toISOString()
     })

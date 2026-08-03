@@ -91,7 +91,6 @@ describe("cloudfunctions/vehicleRetire integration", () => {
         openid: "admin_openid",
         action: "vehicleRetire",
         vehicleId: "car_1",
-        plateNumber: "",
         fromStatus: "active",
         toStatus: "retired",
         createdAt: mocks.serverDateValue

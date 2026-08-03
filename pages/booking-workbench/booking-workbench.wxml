@@ -1,4 +1,4 @@
-<view class="workbench-page management-page">
+<view wx:if="{{pageAuthorized}}" class="workbench-page management-page">
   <view class="page-glow"></view>
 
   <view class="hero-card ui-card ui-card-gradient">
@@ -8,48 +8,74 @@
         <view class="hero-title">待协调工作台</view>
         <view class="hero-desc">集中处理优先、候补与超时预约</view>
       </view>
-      <image class="hero-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+      <image class="hero-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
     </view>
     <view class="hero-foot">
       <view class="live-dot"></view>
-      <view class="hero-foot-text">超过 24 小时仍待协调会标记为超时</view>
-      <view class="refresh-text">{{refreshing ? '刷新中…' : '下拉刷新'}}</view>
+      <view class="hero-foot-copy">
+        <view class="hero-foot-text">超过 24 小时仍待协调会标记为超时</view>
+        <view class="sync-time">{{lastSyncedText ? '最近同步 ' + lastSyncedText : '尚未完成首次同步'}}</view>
+      </view>
+      <view
+        class="refresh-control {{loading || refreshing ? 'refresh-control-loading' : ''}}"
+        bindtap="handleManualRefresh"
+        hover-class="{{loading || refreshing ? 'none' : 'workbench-inline-pressed'}}"
+        aria-role="button"
+        aria-disabled="{{loading || refreshing}}"
+        aria-label="{{loading || refreshing ? '正在同步工作台' : '刷新工作台数据'}}"
+      >
+        <view class="refresh-icon"></view>
+        <text>{{loading || refreshing ? '同步中…' : '刷新'}}</text>
+      </view>
     </view>
   </view>
 
-  <view wx:if="{{loading}}" class="state-card ui-card">
-    <view class="state-loader"></view>
-    <view>
-      <view class="state-title">正在整理待协调队列</view>
-      <view class="state-desc">优先级、等待时间与协调进度正在汇总</view>
+  <view wx:if="{{loading}}" class="workbench-skeleton" aria-hidden="true">
+    <view class="workbench-skeleton-summary-grid">
+      <view class="workbench-skeleton-summary ui-card" wx:for="{{[1, 2, 3, 4]}}" wx:key="*this"><view class="workbench-skeleton-summary-icon manage-skeleton-pulse"></view><view class="workbench-skeleton-summary-value manage-skeleton-pulse"></view><view class="workbench-skeleton-summary-label manage-skeleton-pulse"></view></view>
+    </view>
+    <view class="workbench-skeleton-stage ui-card">
+      <view class="workbench-skeleton-heading"><view><view class="workbench-skeleton-kicker manage-skeleton-pulse"></view><view class="workbench-skeleton-title manage-skeleton-pulse"></view></view><view class="workbench-skeleton-hint manage-skeleton-pulse"></view></view>
+      <view class="workbench-skeleton-stage-row"><view class="workbench-skeleton-stage-item" wx:for="{{[1, 2, 3]}}" wx:key="*this"><view class="workbench-skeleton-stage-value manage-skeleton-pulse"></view><view class="workbench-skeleton-stage-label manage-skeleton-pulse"></view></view></view>
+    </view>
+    <view class="workbench-skeleton-queue ui-card">
+      <view class="workbench-skeleton-search manage-skeleton-pulse"></view>
+      <view class="workbench-skeleton-heading workbench-skeleton-queue-heading"><view><view class="workbench-skeleton-kicker manage-skeleton-pulse"></view><view class="workbench-skeleton-title manage-skeleton-pulse"></view></view><view class="workbench-skeleton-count manage-skeleton-pulse"></view></view>
+      <view class="workbench-skeleton-filters"><view class="workbench-skeleton-filter manage-skeleton-pulse" wx:for="{{[1, 2, 3, 4]}}" wx:key="*this"></view></view>
+      <view class="workbench-skeleton-booking"><view class="workbench-skeleton-booking-icon manage-skeleton-pulse"></view><view class="workbench-skeleton-booking-copy"><view class="workbench-skeleton-line workbench-skeleton-line-title manage-skeleton-pulse"></view><view class="workbench-skeleton-line manage-skeleton-pulse"></view><view class="workbench-skeleton-line workbench-skeleton-line-short manage-skeleton-pulse"></view></view><view class="workbench-skeleton-status manage-skeleton-pulse"></view></view>
     </view>
   </view>
 
   <view wx:elif="{{loadError && !allBookings.length}}" class="state-card ui-card">
+    <view class="state-error-icon" aria-hidden="true"><view class="state-error-mark"></view></view>
     <view>
       <view class="state-title">暂时无法加载工作台</view>
       <view class="state-desc">{{loadError}}</view>
-      <button class="retry-button ui-btn ui-btn-ghost" bindtap="handleRetry">重新加载</button>
+      <button class="retry-button ui-btn ui-btn-ghost action-with-icon" bindtap="handleRetry"><view class="retry-native-icon" aria-hidden="true"></view><text>重新加载</text></button>
     </view>
   </view>
 
   <block wx:else>
-    <view wx:if="{{loadError}}" class="inline-error">{{loadError}}</view>
+    <view wx:if="{{loadError}}" class="inline-error"><view class="inline-error-native-icon" aria-hidden="true"><view class="inline-error-native-mark"></view></view><text>{{loadError}}</text></view>
 
     <view class="summary-grid">
-      <view class="summary-card summary-card-main ui-card" data-mode="todo" bindtap="handleSummaryTap">
+      <view class="summary-card ui-card {{selectedMode === 'todo' ? 'summary-card-active summary-card-active-primary' : ''}}" data-mode="todo" bindtap="handleSummaryTap" hover-class="summary-card-pressed" aria-role="button" aria-pressed="{{selectedMode === 'todo'}}" aria-label="筛选全部待办，共 {{summary.todo}} 条">
+        <view class="summary-native-icon summary-native-icon-todo" aria-hidden="true"><view class="summary-todo-line summary-todo-line-top"></view><view class="summary-todo-line"></view></view>
         <view class="summary-value">{{summary.todo}}</view>
         <view class="summary-label">全部待办</view>
       </view>
-      <view class="summary-card ui-card" data-mode="priority" bindtap="handleSummaryTap">
+      <view class="summary-card ui-card {{selectedMode === 'priority' ? 'summary-card-active summary-card-active-warning' : ''}}" data-mode="priority" bindtap="handleSummaryTap" hover-class="summary-card-pressed" aria-role="button" aria-pressed="{{selectedMode === 'priority'}}" aria-label="筛选优先预约，共 {{summary.priority}} 条">
+        <view class="summary-native-icon summary-native-icon-priority" aria-hidden="true"><view class="summary-priority-mark"></view></view>
         <view class="summary-value summary-warning">{{summary.priority}}</view>
         <view class="summary-label">优先预约</view>
       </view>
-      <view class="summary-card ui-card" data-mode="overdue" bindtap="handleSummaryTap">
+      <view class="summary-card ui-card {{selectedMode === 'overdue' ? 'summary-card-active summary-card-active-danger' : ''}}" data-mode="overdue" bindtap="handleSummaryTap" hover-class="summary-card-pressed" aria-role="button" aria-pressed="{{selectedMode === 'overdue'}}" aria-label="筛选超时未处理预约，共 {{summary.overdue}} 条">
+        <view class="summary-native-icon summary-native-icon-overdue" aria-hidden="true"><view class="summary-clock-hand"></view></view>
         <view class="summary-value summary-danger">{{summary.overdue}}</view>
         <view class="summary-label">超时未处理</view>
       </view>
-      <view class="summary-card ui-card" data-mode="standby" bindtap="handleSummaryTap">
+      <view class="summary-card ui-card {{selectedMode === 'standby' ? 'summary-card-active summary-card-active-muted' : ''}}" data-mode="standby" bindtap="handleSummaryTap" hover-class="summary-card-pressed" aria-role="button" aria-pressed="{{selectedMode === 'standby'}}" aria-label="筛选候补预约，共 {{summary.standby}} 条">
+        <view class="summary-native-icon summary-native-icon-standby" aria-hidden="true"><view class="summary-pause-line"></view></view>
         <view class="summary-value summary-muted">{{summary.standby}}</view>
         <view class="summary-label">候补预约</view>
       </view>
@@ -68,6 +94,10 @@
           class="stage-item {{selectedMode === 'pending' ? 'stage-item-active stage-item-pending' : ''}}"
           data-mode="pending"
           bindtap="handleSummaryTap"
+          hover-class="stage-item-pressed"
+          aria-role="button"
+          aria-pressed="{{selectedMode === 'pending'}}"
+          aria-label="筛选待启动预约，共 {{summary.pending}} 条"
         >
           <view class="stage-value">{{summary.pending}}</view>
           <view class="stage-label">待启动</view>
@@ -80,6 +110,10 @@
           class="stage-item {{selectedMode === 'coordinating' ? 'stage-item-active stage-item-progress' : ''}}"
           data-mode="coordinating"
           bindtap="handleSummaryTap"
+          hover-class="stage-item-pressed"
+          aria-role="button"
+          aria-pressed="{{selectedMode === 'coordinating'}}"
+          aria-label="筛选协调中预约，共 {{summary.coordinating}} 条"
         >
           <view class="stage-value stage-value-progress">{{summary.coordinating}}</view>
           <view class="stage-label">协调中</view>
@@ -89,7 +123,9 @@
           <view class="stage-arrow"></view>
         </view>
         <view class="stage-item stage-item-finished">
-          <view class="stage-value stage-value-finished">✓</view>
+          <view class="stage-value stage-value-finished" aria-hidden="true">
+            <view class="stage-finished-check-icon"></view>
+          </view>
           <view class="stage-label">完成后移出</view>
         </view>
       </view>
@@ -97,17 +133,24 @@
 
     <view class="queue-card ui-card">
       <view class="search-box">
-        <view class="search-symbol"></view>
+        <view class="search-symbol" aria-hidden="true"></view>
         <input
           class="search-input"
           value="{{keyword}}"
           maxlength="40"
           confirm-type="search"
-          placeholder="搜索车辆、客户、手机号、城市或预约编号"
+          placeholder="搜索车辆、客户、手机号、城市、编号或备注"
+          aria-label="待协调预约搜索关键词"
           placeholder-class="search-placeholder"
           bindinput="handleKeywordInput"
         />
-        <view wx:if="{{keyword}}" class="search-clear" bindtap="handleClearKeyword">清除</view>
+        <button
+          wx:if="{{keyword}}"
+          class="search-clear"
+          bindtap="handleClearKeyword"
+          hover-class="search-clear-pressed"
+          aria-label="清空待协调预约搜索关键词"
+        ><view class="search-clear-icon" aria-hidden="true"></view></button>
       </view>
       <view wx:if="{{keyword}}" class="search-caption">
         <text>本地筛选 {{queue.length}} / {{queueTotal}} 条</text>
@@ -119,29 +162,93 @@
           <view class="section-eyebrow">ACTION QUEUE</view>
           <view class="section-title">处理队列</view>
         </view>
-        <view class="section-count">{{queue.length}} 条</view>
+        <view class="section-meta">
+          <view class="section-count">{{queue.length}} 条</view>
+          <view wx:if="{{viewCustomized}}" class="reset-view" aria-role="button" aria-label="清除工作台筛选与排序" bindtap="handleResetView" hover-class="reset-view-pressed"><view class="reset-view-native-icon" aria-hidden="true"></view><text>重置视图</text></view>
+        </view>
       </view>
 
-      <scroll-view class="filter-scroll" scroll-x enhanced show-scrollbar="{{false}}">
-        <view class="filter-row">
-          <view
-            wx:for="{{filterOptions}}"
-            wx:key="key"
-            class="filter-chip {{selectedMode === item.key ? 'filter-chip-active' : ''}}"
-            data-mode="{{item.key}}"
-            bindtap="handleFilterTap"
-          >{{item.label}} {{item.count}}</view>
+      <view class="filter-scroll-shell ui-scroll-shell">
+        <scroll-view class="filter-scroll" scroll-x scroll-with-animation scroll-into-view="workbench-filter-{{selectedMode}}" enhanced show-scrollbar="{{false}}" aria-label="待办队列筛选，可横向滑动">
+          <view class="filter-row">
+            <view
+              id="workbench-filter-{{item.key}}"
+              wx:for="{{filterOptions}}"
+              wx:key="key"
+              class="filter-chip {{selectedMode === item.key ? 'filter-chip-active' : ''}}"
+              data-mode="{{item.key}}"
+              bindtap="handleFilterTap"
+              hover-class="filter-chip-pressed"
+              aria-role="button"
+              aria-pressed="{{selectedMode === item.key}}"
+            >{{item.label}} {{item.count}}</view>
+          </view>
+        </scroll-view>
+        <view wx:if="{{filterOptions.length > 3}}" class="ui-scroll-cue" aria-hidden="true"></view>
+      </view>
+
+      <view class="sort-toolbar">
+        <view class="sort-heading">
+          <view class="sort-label">队列排序</view>
+          <view class="sort-hint">{{sortHint}}</view>
         </view>
-      </scroll-view>
+        <view class="sort-options">
+          <view
+            wx:for="{{sortOptions}}"
+            wx:key="key"
+            class="sort-chip {{selectedSort === item.key ? 'sort-chip-active' : ''}}"
+            data-sort="{{item.key}}"
+            bindtap="handleSortTap"
+            hover-class="sort-chip-pressed"
+            aria-role="button"
+            aria-pressed="{{selectedSort === item.key}}"
+          >{{item.label}}</view>
+        </view>
+      </view>
 
       <view wx:if="{{queue.length}}" class="queue-list">
         <view class="queue-item" wx:for="{{queue}}" wx:key="id">
           <view class="queue-top">
-            <view class="queue-vehicle">{{item.vehicleName}}</view>
-            <view class="status-pill {{item.statusClass}}">{{item.statusLabel}}</view>
+            <view class="queue-vehicle-row">
+              <view class="queue-vehicle-icon" aria-hidden="true"><view class="queue-vehicle-window"></view><view class="queue-vehicle-wheel queue-vehicle-wheel-left"></view><view class="queue-vehicle-wheel queue-vehicle-wheel-right"></view></view>
+              <view class="queue-vehicle">{{item.vehicleName}}</view>
+            </view>
+            <view
+              class="status-pill {{item.statusClass}} {{item.status === 'pending' ? 'status-pill-actionable' : ''}}"
+              data-id="{{item.id}}"
+              data-status="{{item.status}}"
+              bindtap="handleMarkContacted"
+              hover-class="{{item.status === 'pending' ? 'status-pill-pressed' : 'none'}}"
+              aria-role="{{item.status === 'pending' ? 'button' : ''}}"
+              aria-label="{{item.status === 'pending' ? '将预约标记为已联系' : item.statusLabel}}"
+            >
+              <view class="status-pill-dot"></view>
+              <text>{{statusUpdatingId === item.id ? '更新中…' : item.statusLabel}}</text>
+              <view wx:if="{{item.status === 'pending' && statusUpdatingId !== item.id}}" class="status-action-chevron" aria-hidden="true"></view>
+            </view>
           </view>
-          <view class="queue-contact">{{item.userName}} · {{item.city}}</view>
-          <view class="queue-date">{{item.startDate}} → {{item.endDate}}</view>
+          <view class="queue-contact-row">
+            <view class="queue-contact"><view class="contact-native-icon" aria-hidden="true"></view><text>{{item.userName}} · {{item.city}}</text></view>
+            <view
+              class="phone-chip {{item.phoneAvailable ? '' : 'phone-chip-invalid'}}"
+              data-phone="{{item.phone}}"
+              bindtap="handleCopyPhone"
+              hover-class="{{item.phoneAvailable ? 'workbench-inline-pressed' : 'none'}}"
+              aria-role="button"
+              aria-disabled="{{!item.phoneAvailable}}"
+              aria-label="{{item.phoneAvailable ? '复制手机号 ' + item.phoneDisplay : '手机号 ' + item.phoneDisplay + ' 需要检查'}}"
+            >
+              <view class="phone-copy-native-icon" aria-hidden="true"></view>
+              <text>{{item.phoneDisplay}}</text>
+              <text class="phone-copy-label">{{item.phoneAvailable ? '复制' : '检查'}}</text>
+            </view>
+          </view>
+          <view class="queue-date">
+            <view class="date-native-icon" aria-hidden="true"></view>
+            <text>{{item.startDate}}</text>
+            <view class="date-route" aria-hidden="true"><view class="date-route-line"></view><view class="date-route-chevron"></view></view>
+            <text>{{item.endDate}}</text>
+          </view>
           <view class="badge-row">
             <text
               wx:for="{{item.badges}}"
@@ -151,30 +258,86 @@
             >{{badge.text}}</text>
             <text class="waiting-text">{{item.waitingText}}</text>
           </view>
+          <view wx:if="{{editingRemarkId === item.id}}" class="remark-editor">
+            <textarea
+              class="remark-textarea"
+              value="{{remarkDraft}}"
+              maxlength="200"
+              placeholder="记录沟通结果、客户偏好或后续安排"
+              aria-label="协调内部备注"
+              placeholder-class="remark-placeholder"
+              bindinput="handleRemarkInput"
+            ></textarea>
+            <view class="remark-editor-foot">
+              <view class="remark-count">{{remarkDraft.length}} / 200</view>
+              <view class="remark-editor-actions">
+                <button class="remark-button action-with-icon" disabled="{{savingRemark}}" bindtap="handleCancelRemark" hover-class="{{savingRemark ? 'none' : 'workbench-button-pressed'}}"><view class="remark-cancel-native-icon" aria-hidden="true"></view><text>取消</text></button>
+                <button class="remark-button remark-button-save action-with-icon" disabled="{{savingRemark}}" bindtap="handleSaveRemark" hover-class="{{savingRemark ? 'none' : 'workbench-button-pressed'}}"><view wx:if="{{!savingRemark}}" class="remark-save-native-icon" aria-hidden="true"><view class="remark-save-line"></view></view><text>{{savingRemark ? '保存中…' : '保存备注'}}</text></button>
+              </view>
+            </view>
+          </view>
+          <view
+            wx:elif="{{item.adminRemark}}"
+            class="remark-preview"
+            data-id="{{item.id}}"
+            data-remark="{{item.adminRemark}}"
+            bindtap="handleOpenRemark"
+            hover-class="workbench-inline-pressed"
+            aria-role="button"
+            aria-label="编辑 {{item.userName}} 的内部备注"
+          >
+            <view class="remark-preview-native-icon" aria-hidden="true"><view class="remark-preview-line"></view></view>
+            <view class="remark-preview-label">内部备注</view>
+            <view class="remark-preview-text">{{item.adminRemark}}</view>
+            <view class="remark-edit"><view class="remark-edit-native-icon" aria-hidden="true"></view><text>编辑</text></view>
+          </view>
+          <view
+            wx:else
+            class="remark-add"
+            data-id="{{item.id}}"
+            data-remark=""
+            bindtap="handleOpenRemark"
+            hover-class="workbench-inline-pressed"
+            aria-role="button"
+            aria-label="为 {{item.userName}} 添加内部备注"
+          ><view class="remark-add-native-icon" aria-hidden="true"><view class="remark-add-line"></view></view><text>添加内部备注</text></view>
           <button
             wx:if="{{item.coordinationStatus === 'pending' || item.coordinationStatus === 'coordinating'}}"
             class="coordination-action {{item.coordinationStatus === 'coordinating' ? 'coordination-action-resolve' : ''}}"
             data-id="{{item.id}}"
             data-schedule-priority="{{item.schedulePriority}}"
             data-coordination-status="{{item.coordinationStatus}}"
-            disabled="{{updatingId !== ''}}"
+            disabled="{{updatingId !== '' || savingRemark || statusUpdatingId !== ''}}"
             bindtap="handleQuickCoordination"
-          >{{updatingId === item.id ? '处理中…' : (item.coordinationStatus === 'coordinating' ? '标记已协调' : '开始协调')}}</button>
+            hover-class="{{updatingId !== '' || savingRemark || statusUpdatingId !== '' ? 'none' : 'workbench-button-pressed'}}"
+          ><view wx:if="{{updatingId !== item.id}}" class="coordination-native-icon {{item.coordinationStatus === 'coordinating' ? 'coordination-native-icon-complete' : ''}}" aria-hidden="true"><view class="coordination-native-mark"></view></view><text>{{updatingId === item.id ? '处理中…' : (item.coordinationStatus === 'coordinating' ? '标记已协调' : '开始协调')}}</text></button>
           <view class="queue-actions">
-            <button class="queue-action queue-action-primary" data-phone="{{item.phone}}" bindtap="handleCallPhone">拨打电话</button>
-            <button class="queue-action" data-id="{{item.id}}" bindtap="handleViewDetail">进入处理</button>
+            <button class="queue-action queue-action-primary action-with-icon" data-phone="{{item.phone}}" bindtap="handleCallPhone" hover-class="workbench-button-pressed"><view class="queue-call-native-icon" aria-hidden="true"></view><text>拨打电话</text></button>
+            <button
+              class="queue-action queue-action-priority action-with-icon"
+              data-id="{{item.id}}"
+              data-schedule-priority="{{item.schedulePriority}}"
+              data-coordination-status="{{item.coordinationStatus}}"
+              disabled="{{updatingId !== '' || savingRemark || statusUpdatingId !== ''}}"
+              bindtap="handlePriorityTap"
+              hover-class="{{updatingId !== '' || savingRemark || statusUpdatingId !== '' ? 'none' : 'workbench-button-pressed'}}"
+            ><view wx:if="{{updatingId !== item.id}}" class="queue-priority-native-icon" aria-hidden="true"><view class="queue-priority-mark"></view></view><text>{{updatingId === item.id ? '更新中…' : '级别 · ' + item.priorityLabel}}</text></button>
+            <button class="queue-action action-with-icon" data-id="{{item.id}}" bindtap="handleViewDetail" hover-class="workbench-button-pressed"><view class="queue-detail-native-icon" aria-hidden="true"><view class="queue-detail-dot"></view></view><text>进入处理</text></button>
           </view>
         </view>
       </view>
 
       <view wx:else class="queue-empty">
-        <view class="queue-empty-mark">{{keyword ? '0' : '✓'}}</view>
+        <view class="queue-empty-mark {{keyword ? 'queue-empty-mark-search' : ''}}" aria-hidden="true">
+          <view wx:if="{{keyword}}" class="queue-empty-search-icon"></view>
+          <view wx:else class="queue-empty-check-icon"></view>
+        </view>
         <view class="queue-empty-title">{{keyword ? '未找到匹配预约' : '当前筛选下没有待办'}}</view>
         <view class="queue-empty-desc">{{keyword ? '可更换关键词，或清除搜索查看当前分类的全部记录。' : '可切换其他分类，或前往预约管理查看全部记录。'}}</view>
       </view>
     </view>
 
-    <button class="manage-button ui-btn ui-btn-ghost" bindtap="handleOpenBookingManage">前往预约管理</button>
-    <view wx:if="{{truncated}}" class="scope-tip">预约超过 2000 条，工作台只汇总当前已读取范围，请缩小筛选或分批处理。</view>
+    <button class="manage-button ui-btn ui-btn-ghost action-with-icon" bindtap="handleOpenBookingManage"><view class="manage-native-icon" aria-hidden="true"><view class="manage-native-line manage-native-line-top"></view><view class="manage-native-line"></view></view><text>前往预约管理</text></button>
+    <view wx:if="{{truncated}}" class="scope-tip scope-tip-with-icon"><view class="scope-native-icon" aria-hidden="true"><view class="scope-alert-mark"></view></view><view>预约超过 2000 条，工作台只汇总当前已读取范围，请缩小筛选或分批处理。</view></view>
   </block>
 </view>

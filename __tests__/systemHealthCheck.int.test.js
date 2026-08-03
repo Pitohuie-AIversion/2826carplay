@@ -18,7 +18,8 @@ function createMockDb({
   unavailable = [],
   config = null,
   counts = {},
-  countErrors = []
+  countErrors = [],
+  qualityData = {}
 }) {
   const collectionReads = {}
   REQUIRED_COLLECTIONS.forEach((name) => {
@@ -37,12 +38,16 @@ function createMockDb({
       })
     }))
   }))
+  const configGet = jest.fn().mockResolvedValue({ data: config ? [config] : [] })
+  const configField = jest.fn(() => ({
+    limit: jest.fn(() => ({ get: configGet }))
+  }))
   const configWhere = jest.fn(() => ({
-    limit: jest.fn(() => ({
-      get: jest.fn().mockResolvedValue({ data: config ? [config] : [] })
-    }))
+    field: configField,
+    limit: jest.fn(() => ({ get: configGet }))
   }))
   const collectionCounts = {}
+  const collectionFields = {}
   REQUIRED_COLLECTIONS.forEach((name) => {
     collectionCounts[name] = countErrors.includes(name)
       ? jest.fn().mockRejectedValue(new Error("count failed"))
@@ -50,11 +55,27 @@ function createMockDb({
   })
 
   const collection = jest.fn((name) => {
+    const records = Array.isArray(qualityData[name])
+      ? qualityData[name]
+      : name === "roles"
+        ? roles
+        : []
+    collectionFields[name] = collectionFields[name] || jest.fn(() => ({
+      limit: jest.fn(() => ({ get: collectionReads[name] })),
+      skip: jest.fn((offset) => ({
+        limit: jest.fn((limit) => ({
+          get: jest
+            .fn()
+            .mockResolvedValue({ data: records.slice(offset, offset + limit) })
+        }))
+      }))
+    }))
     const base = {
       count: collectionCounts[name],
       limit: jest.fn(() => ({
         get: collectionReads[name]
-      }))
+      })),
+      field: collectionFields[name]
     }
     if (name === "roles") {
       base.where = rolesWhere
@@ -70,7 +91,9 @@ function createMockDb({
     collection,
     collectionReads,
     collectionCounts,
-    configWhere
+    collectionFields,
+    configWhere,
+    configField
   }
 }
 
@@ -113,8 +136,8 @@ describe("cloudfunctions/systemHealthCheck integration", () => {
 
     expect(res.ok).toBe(true)
     expect(res.summary).toEqual({
-      total: 18,
-      passed: 18,
+      total: 20,
+      passed: 20,
       warnings: 0,
       failed: 0,
       ready: true
@@ -124,7 +147,9 @@ describe("cloudfunctions/systemHealthCheck integration", () => {
     )
     REQUIRED_COLLECTIONS.forEach((name) => {
       expect(mocks.collectionReads[name]).toHaveBeenCalledTimes(1)
+      expect(mocks.collectionFields[name]).toHaveBeenCalledWith({ _id: true })
     })
+    expect(mocks.configField).toHaveBeenCalledWith({ value: true })
   })
 
   test("缺少集合时标记为阻塞项但保留其他检查结果", async () => {
@@ -223,6 +248,86 @@ describe("cloudfunctions/systemHealthCheck integration", () => {
       message: "记录数量读取失败，请到云控制台确认数据规模"
     })
     warnSpy.mockRestore()
+  })
+
+  test("历史车牌或权限账号存在缺失和重复时标记为阻塞项且不返回原值", async () => {
+    const mocks = createMockDb({
+      roles: [
+        { _id: "role_admin", openid: "admin_openid", role: "admin" },
+        { _id: "role_1", openid: "duplicate_openid", role: "operator" },
+        { _id: "role_2", openid: "duplicate_openid", role: "member" },
+        { _id: "role_3", openid: "", role: "member" }
+      ],
+      config: {
+        key: "operation_settings",
+        value: { bookingStatusTemplateId: "template_123456" }
+      },
+      counts: {
+        vehicles: 4,
+        roles: 4
+      },
+      qualityData: {
+        vehicles: [
+          { _id: "vehicle_1", plateNumber: "京A12345" },
+          { _id: "vehicle_2", plateNumber: "京a12345" },
+          { _id: "vehicle_3", plateNumber: "" },
+          { _id: "vehicle_4", plateNumber: "沪B12345" }
+        ]
+      }
+    })
+    const mod = await loadModule("admin_openid", mocks.db)
+
+    const res = await mod.main()
+
+    expect(res.ok).toBe(true)
+    expect(res.summary.ready).toBe(false)
+    expect(res.summary.failed).toBe(2)
+    expect(res.checks.find((item) => item.key === "vehicle_plate_uniqueness")).toMatchObject({
+      status: "fail",
+      missingCount: 1,
+      duplicateGroups: 1,
+      duplicateRecords: 2
+    })
+    expect(res.checks.find((item) => item.key === "role_openid_uniqueness")).toMatchObject({
+      status: "fail",
+      missingCount: 1,
+      duplicateGroups: 1,
+      duplicateRecords: 2
+    })
+    expect(JSON.stringify(res.checks)).not.toContain("京A12345")
+    expect(JSON.stringify(res.checks)).not.toContain("duplicate_openid")
+  })
+
+  test("历史数据超过安全扫描上限时提醒在控制台全量核验", async () => {
+    const qualityData = {
+      vehicles: Array.from({ length: 2000 }, (_, index) => ({
+        _id: `vehicle_${index}`,
+        plateNumber: `测试${index}`
+      }))
+    }
+    const mocks = createMockDb({
+      roles: [{ openid: "admin_openid", role: "admin" }],
+      config: {
+        key: "operation_settings",
+        value: { bookingStatusTemplateId: "template_123456" }
+      },
+      counts: {
+        vehicles: 2001,
+        roles: 1
+      },
+      qualityData
+    })
+    const mod = await loadModule("admin_openid", mocks.db)
+
+    const res = await mod.main()
+
+    expect(res.ok).toBe(true)
+    expect(res.summary.ready).toBe(true)
+    expect(res.checks.find((item) => item.key === "vehicle_plate_uniqueness")).toMatchObject({
+      status: "warning",
+      count: 2000,
+      total: 2001
+    })
   })
 
   test("普通用户无法执行上线检查", async () => {

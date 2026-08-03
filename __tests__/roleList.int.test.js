@@ -9,12 +9,22 @@ function createMockDb({ rolesData }) {
       get: jest.fn().mockResolvedValue({ data: rolesData.slice(offset, offset + limitValue) })
     }))
   }))
+  const authField = jest.fn()
   const rolesWhere = jest.fn((filter) => ({
-    limit: jest.fn((limitValue) => ({
-      get: jest.fn().mockResolvedValue({
-        data: rolesData.filter((item) => item.openid === filter.openid).slice(0, limitValue)
-      })
-    }))
+    field: jest.fn((fields) => {
+      authField(fields)
+      return {
+        limit: jest.fn((limitValue) => ({
+          get: jest.fn().mockResolvedValue({
+            data: rolesData.filter((item) => item.openid === filter.openid).slice(0, limitValue)
+          })
+        }))
+      }
+    })
+  }))
+  const listField = jest.fn(() => ({
+    limit: rolesLimit,
+    skip: rolesSkip
   }))
 
   const db = {
@@ -22,8 +32,7 @@ function createMockDb({ rolesData }) {
       if (name === "roles") {
         return {
           where: rolesWhere,
-          limit: rolesLimit,
-          skip: rolesSkip
+          field: listField
         }
       }
       throw new Error(`Unexpected collection: ${name}`)
@@ -33,6 +42,8 @@ function createMockDb({ rolesData }) {
   return {
     db,
     rolesWhere,
+    authField,
+    listField,
     rolesLimit,
     rolesSkip
   }
@@ -91,6 +102,12 @@ describe("cloudfunctions/roleList integration", () => {
         permissions: ["vehicle_manage"]
       })
     ])
+    expect(mocks.authField.mock.calls[0][0]).not.toHaveProperty("openid")
+    expect(mocks.listField.mock.calls[0][0]).toEqual(
+      expect.objectContaining({ _id: true, openid: true, permissions: true })
+    )
+    expect(mocks.listField.mock.calls[0][0]).not.toHaveProperty("createdByOpenid")
+    expect(mocks.listField.mock.calls[0][0]).not.toHaveProperty("updatedByOpenid")
   })
 
   test("非 admin 返回 FORBIDDEN", async () => {

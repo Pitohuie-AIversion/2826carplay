@@ -4,7 +4,8 @@ function createMockDb({ vehicle, setResult = {}, removeResult = { stats: { remov
   const vehicleGet = vehicle
     ? jest.fn().mockResolvedValue({ data: vehicle })
     : jest.fn().mockRejectedValue(new Error("document not found"))
-  const vehicleDoc = jest.fn(() => ({ get: vehicleGet }))
+  const vehicleField = jest.fn(() => ({ get: vehicleGet }))
+  const vehicleDoc = jest.fn(() => ({ field: vehicleField }))
   const favoriteSet = jest.fn().mockResolvedValue(setResult)
   const favoriteRemove = jest.fn().mockResolvedValue(removeResult)
   const favoriteDoc = jest.fn(() => ({
@@ -27,6 +28,7 @@ function createMockDb({ vehicle, setResult = {}, removeResult = { stats: { remov
   return {
     db,
     vehicleDoc,
+    vehicleField,
     favoriteDoc,
     favoriteSet,
     favoriteRemove,
@@ -63,6 +65,7 @@ describe("cloudfunctions/favoriteSet integration", () => {
       message: "已加入收藏"
     })
     expect(mocks.vehicleDoc).toHaveBeenCalledWith("vehicle_1")
+    expect(mocks.vehicleField).toHaveBeenCalledWith({ status: true })
     expect(mocks.favoriteDoc).toHaveBeenCalledWith(expect.stringMatching(/^favorite_[a-f0-9]{24}$/))
     expect(mocks.favoriteSet).toHaveBeenCalledWith({
       data: {

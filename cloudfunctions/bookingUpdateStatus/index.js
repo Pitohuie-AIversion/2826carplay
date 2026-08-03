@@ -3,6 +3,22 @@ const cloud = require("wx-server-sdk")
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
+const AUTH_ROLE_FIELDS = {
+  role: true,
+  roles: true,
+  permissions: true,
+  isAdmin: true,
+  admin: true
+}
+const BOOKING_STATUS_UPDATE_FIELDS = {
+  _id: true,
+  openid: true,
+  vehicleName: true,
+  status: true
+}
+const STATUS_TEMPLATE_CONFIG_FIELDS = {
+  value: true
+}
 
 const CONFIG_KEY = "operation_settings"
 const BOOKING_STATUSES = ["pending", "contacted", "completed", "cancelled"]
@@ -86,7 +102,12 @@ async function hasOpenidCapability(openid, capability) {
     return false
   }
 
-  const res = await db.collection("roles").where({ openid }).limit(20).get()
+  const res = await db
+    .collection("roles")
+    .where({ openid })
+    .field(AUTH_ROLE_FIELDS)
+    .limit(20)
+    .get()
   const list = res && Array.isArray(res.data) ? res.data : []
   return list.some((item) => hasCapability(item, capability))
 }
@@ -191,7 +212,12 @@ async function readBookingStatusTemplateId() {
   }
 
   try {
-    const res = await db.collection("app_configs").where({ key: CONFIG_KEY }).limit(1).get()
+    const res = await db
+      .collection("app_configs")
+      .where({ key: CONFIG_KEY })
+      .field(STATUS_TEMPLATE_CONFIG_FIELDS)
+      .limit(1)
+      .get()
     const list = res && Array.isArray(res.data) ? res.data : []
     const value = list.length && list[0] && list[0].value ? list[0].value : {}
     return {
@@ -352,7 +378,11 @@ exports.main = async (event) => {
       })
     }
 
-    const currentRes = await db.collection("bookings").doc(input.id).get()
+    const currentRes = await db
+      .collection("bookings")
+      .doc(input.id)
+      .field(BOOKING_STATUS_UPDATE_FIELDS)
+      .get()
     const current = currentRes && currentRes.data ? currentRes.data : null
     if (!current) {
       return createError("NOT_FOUND", "预约不存在")
@@ -411,21 +441,23 @@ exports.main = async (event) => {
       message: "预约状态已更新"
     }
   } catch (error) {
+    const errorMessage = String(
+      error && (error.message || error.errMsg) ? error.message || error.errMsg : error
+    ).slice(0, 300)
     await writeErrorLogBestEffort({
       function: "bookingUpdateStatus",
-      openid,
       id: input.id,
       status: input.status,
-      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
-      stack: error && error.stack ? error.stack : ""
+      authenticated: Boolean(openid),
+      errorMessage
     })
 
     console.error({
       function: "bookingUpdateStatus",
-      openid,
+      authenticated: Boolean(openid),
       id: input.id,
       status: input.status,
-      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
+      errorMessage,
       stack: error && error.stack ? error.stack : "",
       createdAt: new Date().toISOString()
     })

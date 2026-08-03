@@ -1,8 +1,19 @@
 const { requirePagePermission } = require("../../shared/pageAuth")
+const { formatToastTitle } = require("../../shared/uiFeedback")
 
 const PERMISSION_OPTIONS = [
-  { value: "vehicle_manage", label: "车辆管理" },
-  { value: "booking_manage", label: "预约管理" }
+  {
+    value: "vehicle_manage",
+    label: "车辆管理",
+    desc: "维护车辆档案与状态",
+    icon: "car"
+  },
+  {
+    value: "booking_manage",
+    label: "预约管理",
+    desc: "处理预约与协调进度",
+    icon: "calendar"
+  }
 ]
 const OPENID_PATTERN = /^[A-Za-z0-9_-]{6,128}$/
 
@@ -117,7 +128,7 @@ Page({
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
           wx.showToast({
-            title: (result && result.message) || "加载失败",
+          title: formatToastTitle(result && result.message, "加载失败"),
             icon: "none"
           })
           this.setData({
@@ -153,7 +164,7 @@ Page({
       },
       fail: (error) => {
         wx.showToast({
-          title: (error && (error.errMsg || error.message)) || "加载失败",
+          title: "加载失败",
           icon: "none"
         })
         this.setData({
@@ -211,7 +222,7 @@ Page({
 
     if (!OPENID_PATTERN.test(openid)) {
       wx.showToast({
-        title: "OpenID 格式不正确",
+        title: "账号格式有误",
         icon: "none"
       })
       return
@@ -242,7 +253,7 @@ Page({
     const openid = String(this.data.formOpenid || "").trim()
     if (!openid) {
       wx.showToast({
-        title: "请先填写 OpenID",
+        title: "请先填写账号",
         icon: "none"
       })
       return
@@ -258,7 +269,8 @@ Page({
 
     this.setData({ saving: true })
     wx.showLoading({
-      title: "保存中"
+      title: "保存中…",
+      mask: true
     })
 
     wx.cloud.callFunction({
@@ -272,7 +284,7 @@ Page({
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
           wx.showToast({
-            title: (result && result.message) || "保存失败",
+          title: formatToastTitle(result && result.message, "保存失败"),
             icon: "none"
           })
           this.setData({ saving: false })
@@ -280,7 +292,7 @@ Page({
         }
 
         wx.showToast({
-          title: result.message || "保存成功",
+        title: formatToastTitle(result.message, "保存成功"),
           icon: "success"
         })
         this.setData({ saving: false })
@@ -290,7 +302,7 @@ Page({
       fail: (error) => {
         wx.hideLoading()
         wx.showToast({
-          title: (error && (error.errMsg || error.message)) || "保存失败",
+          title: "保存失败",
           icon: "none"
         })
         this.setData({ saving: false })

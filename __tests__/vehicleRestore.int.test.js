@@ -91,7 +91,6 @@ describe("cloudfunctions/vehicleRestore integration", () => {
         openid: "admin_openid",
         action: "vehicleRestore",
         vehicleId: "car_1",
-        plateNumber: "",
         fromStatus: "retired",
         toStatus: "idle",
         createdAt: mocks.serverDateValue

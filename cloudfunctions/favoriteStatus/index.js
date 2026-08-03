@@ -3,6 +3,9 @@ const cloud = require("wx-server-sdk")
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
+const FAVORITE_EXISTENCE_FIELDS = {
+  _id: true
+}
 
 exports.main = async (event) => {
   const wxContext = cloud.getWXContext()
@@ -28,6 +31,7 @@ exports.main = async (event) => {
     const res = await db
       .collection("favorites")
       .where({ openid, vehicleId })
+      .field(FAVORITE_EXISTENCE_FIELDS)
       .limit(1)
       .get()
     const list = res && Array.isArray(res.data) ? res.data : []
@@ -40,7 +44,7 @@ exports.main = async (event) => {
   } catch (error) {
     console.error({
       function: "favoriteStatus",
-      openid,
+      authenticated: Boolean(openid),
       vehicleId,
       errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
       createdAt: new Date().toISOString()

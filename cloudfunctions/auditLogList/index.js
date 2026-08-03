@@ -3,10 +3,58 @@ const cloud = require("wx-server-sdk")
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
+const AUTH_ROLE_FIELDS = {
+  role: true,
+  roles: true,
+  permissions: true,
+  isAdmin: true,
+  admin: true
+}
 const DEFAULT_PAGE_SIZE = 20
 const MAX_PAGE_SIZE = 50
 const LOG_BATCH_SIZE = 100
 const MAX_LOG_RECORDS = 2000
+const AUDIT_LOG_FIELDS = {
+  _id: true,
+  action: true,
+  openid: true,
+  targetOpenid: true,
+  vehicleId: true,
+  brandModel: true,
+  bookingId: true,
+  requestId: true,
+  requestType: true,
+  imageAction: true,
+  tokenProtected: true,
+  toPermissions: true,
+  cutoffDate: true,
+  retentionDays: true,
+  processed: true,
+  deleted: true,
+  failed: true,
+  bookingCount: true,
+  favoriteCount: true,
+  privacyRequestCount: true,
+  partial: true,
+  logType: true,
+  filter: true,
+  total: true,
+  matchedTotal: true,
+  sourceTruncated: true,
+  truncated: true,
+  fromStatus: true,
+  toStatus: true,
+  status: true,
+  schedulePriority: true,
+  coordinationStatus: true,
+  fromPriority: true,
+  toPriority: true,
+  fromCoordinationStatus: true,
+  toCoordinationStatus: true,
+  remarkLength: true,
+  changedKeys: true,
+  createdAt: true
+}
 
 function normalizeText(value, maxLen) {
   const text = String(value || "").trim()
@@ -22,6 +70,16 @@ function normalizeNumber(value, fallback) {
     return fallback
   }
   return num
+}
+
+function normalizeTextArray(value, maxItems, maxLen) {
+  if (!Array.isArray(value)) {
+    return []
+  }
+  return value
+    .map((item) => normalizeText(item, maxLen))
+    .filter(Boolean)
+    .slice(0, maxItems)
 }
 
 function hasAdminRole(record) {
@@ -49,7 +107,12 @@ async function isAdminOpenid(openid) {
     return false
   }
 
-  const res = await db.collection("roles").where({ openid }).limit(20).get()
+  const res = await db
+    .collection("roles")
+    .where({ openid })
+    .field(AUTH_ROLE_FIELDS)
+    .limit(20)
+    .get()
   const list = res && Array.isArray(res.data) ? res.data : []
   return list.some((item) => hasAdminRole(item))
 }
@@ -102,7 +165,11 @@ function toSearchText(item) {
     item.cutoffDate,
     item.changedKeys ? item.changedKeys.join(",") : "",
     item.fromStatus,
-    item.toStatus
+    item.toStatus,
+    item.fromPriority,
+    item.toPriority,
+    item.fromCoordinationStatus,
+    item.toCoordinationStatus
   ]
     .filter(Boolean)
     .join(" ")
@@ -117,7 +184,7 @@ async function readAuditLogsByMode(ordered) {
   for (let offset = 0; offset <= MAX_LOG_RECORDS; offset += LOG_BATCH_SIZE) {
     const remaining = MAX_LOG_RECORDS + 1 - list.length
     const batchSize = Math.min(LOG_BATCH_SIZE, remaining)
-    let query = db.collection("audit_logs")
+    let query = db.collection("audit_logs").field(AUDIT_LOG_FIELDS)
     if (ordered) {
       query = query.orderBy("createdAt", "desc")
     }
@@ -173,16 +240,19 @@ exports.main = async (event) => {
 
     const list = rawList
       .map((item) => ({
-        id: item._id || "",
-        action: String(item.action || "").trim(),
-        openid: String(item.openid || "").trim(),
-        targetOpenid: String(item.targetOpenid || "").trim(),
-        vehicleId: String(item.vehicleId || "").trim(),
-        bookingId: String(item.bookingId || "").trim(),
-        requestId: String(item.requestId || "").trim(),
-        requestType: String(item.requestType || "").trim(),
-        imageAction: String(item.imageAction || "").trim(),
-        cutoffDate: String(item.cutoffDate || "").trim(),
+        id: normalizeText(item._id, 128),
+        action: normalizeText(item.action, 80),
+        openid: normalizeText(item.openid, 128),
+        targetOpenid: normalizeText(item.targetOpenid, 128),
+        vehicleId: normalizeText(item.vehicleId, 128),
+        brandModel: normalizeText(item.brandModel, 100),
+        bookingId: normalizeText(item.bookingId, 128),
+        requestId: normalizeText(item.requestId, 128),
+        requestType: normalizeText(item.requestType, 50),
+        imageAction: normalizeText(item.imageAction, 50),
+        tokenProtected: item.tokenProtected === true,
+        toPermissions: normalizeTextArray(item.toPermissions, 20, 50),
+        cutoffDate: normalizeText(item.cutoffDate, 50),
         retentionDays: Number(item.retentionDays) || 0,
         processed: Number(item.processed) || 0,
         deleted: Number(item.deleted) || 0,
@@ -191,17 +261,23 @@ exports.main = async (event) => {
         favoriteCount: Number(item.favoriteCount) || 0,
         privacyRequestCount: Number(item.privacyRequestCount) || 0,
         partial: item.partial === true,
-        logType: String(item.logType || "").trim(),
-        filter: String(item.filter || "").trim(),
+        logType: normalizeText(item.logType, 50),
+        filter: normalizeText(item.filter, 80),
         total: Number(item.total) || 0,
         matchedTotal: Number(item.matchedTotal) || 0,
         sourceTruncated: item.sourceTruncated === true,
         truncated: item.truncated === true,
-        fromStatus: String(item.fromStatus || "").trim(),
-        toStatus: String(item.toStatus || "").trim(),
-        changedKeys: Array.isArray(item.changedKeys) ? item.changedKeys : [],
-        before: item.before,
-        after: item.after,
+        fromStatus: normalizeText(item.fromStatus, 50),
+        toStatus: normalizeText(item.toStatus, 50),
+        status: normalizeText(item.status, 50),
+        schedulePriority: normalizeText(item.schedulePriority, 50),
+        coordinationStatus: normalizeText(item.coordinationStatus, 50),
+        fromPriority: normalizeText(item.fromPriority, 50),
+        toPriority: normalizeText(item.toPriority, 50),
+        fromCoordinationStatus: normalizeText(item.fromCoordinationStatus, 50),
+        toCoordinationStatus: normalizeText(item.toCoordinationStatus, 50),
+        remarkLength: Math.max(0, Math.floor(normalizeNumber(item.remarkLength, 0))),
+        changedKeys: normalizeTextArray(item.changedKeys, 50, 80),
         createdAt: formatTime(item.createdAt)
       }))
       .filter((item) => {
@@ -230,7 +306,7 @@ exports.main = async (event) => {
   } catch (error) {
     console.error({
       function: "auditLogList",
-      openid,
+      authenticated: Boolean(openid),
       errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
       stack: error && error.stack ? error.stack : "",
       createdAt: new Date().toISOString()

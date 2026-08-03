@@ -3,6 +3,16 @@ const cloud = require("wx-server-sdk")
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
+const AUTH_ROLE_FIELDS = {
+  role: true,
+  roles: true,
+  permissions: true,
+  isAdmin: true,
+  admin: true
+}
+const BOOKING_EXISTENCE_FIELDS = {
+  _id: true
+}
 const MAX_REMARK_LENGTH = 200
 
 function createError(code, message, details) {
@@ -72,7 +82,12 @@ async function hasOpenidCapability(openid, capability) {
     return false
   }
 
-  const res = await db.collection("roles").where({ openid }).limit(20).get()
+  const res = await db
+    .collection("roles")
+    .where({ openid })
+    .field(AUTH_ROLE_FIELDS)
+    .limit(20)
+    .get()
   const list = res && Array.isArray(res.data) ? res.data : []
   return list.some((item) => hasCapability(item, capability))
 }
@@ -159,7 +174,11 @@ exports.main = async (event) => {
       })
     }
 
-    const currentRes = await db.collection("bookings").doc(input.id).get()
+    const currentRes = await db
+      .collection("bookings")
+      .doc(input.id)
+      .field(BOOKING_EXISTENCE_FIELDS)
+      .get()
     const current = currentRes && currentRes.data ? currentRes.data : null
     if (!current) {
       return createError("NOT_FOUND", "预约不存在")
@@ -187,21 +206,23 @@ exports.main = async (event) => {
       message: "管理员备注已保存"
     }
   } catch (error) {
+    const errorMessage = String(
+      error && (error.message || error.errMsg) ? error.message || error.errMsg : error
+    ).slice(0, 300)
     await writeErrorLogBestEffort({
       function: "bookingUpdateAdminRemark",
-      openid,
       bookingId: input.id,
       stage: "main",
-      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
-      stack: error && error.stack ? error.stack : "",
+      authenticated: Boolean(openid),
+      errorMessage,
       occurredAt: new Date().toISOString()
     })
 
     console.error({
       function: "bookingUpdateAdminRemark",
-      openid,
+      authenticated: Boolean(openid),
       id: input.id,
-      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
+      errorMessage,
       stack: error && error.stack ? error.stack : "",
       createdAt: new Date().toISOString()
     })

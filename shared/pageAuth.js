@@ -92,7 +92,7 @@ function requirePagePermission(page, options) {
     },
     fail: (error) => {
       wx.showToast({
-        title: (error && (error.errMsg || error.message)) || failMessage,
+        title: failMessage,
         icon: "none"
       })
       setTimeout(redirectToMine, 700)

@@ -25,6 +25,10 @@ function createMockDb({ rolesData, bookingData, bookingsError = null, orderedErr
     }))
   }))
   const bookingsOrderBy = jest.fn(() => ({ skip: bookingsOrderedSkip }))
+  const bookingsField = jest.fn(() => ({
+    skip: bookingsSkip,
+    orderBy: bookingsOrderBy
+  }))
 
   const db = {
     collection: jest.fn((name) => {
@@ -34,7 +38,8 @@ function createMockDb({ rolesData, bookingData, bookingsError = null, orderedErr
       if (name === "bookings") {
         return {
           skip: bookingsSkip,
-          orderBy: bookingsOrderBy
+          orderBy: bookingsOrderBy,
+          field: bookingsField
         }
       }
       if (name === "audit_logs") {
@@ -54,6 +59,7 @@ function createMockDb({ rolesData, bookingData, bookingsError = null, orderedErr
     bookingsSkip,
     bookingsOrderedSkip,
     bookingsOrderBy,
+    bookingsField,
     auditAdd,
     errorAdd
   }
@@ -104,6 +110,16 @@ describe("cloudfunctions/bookingExportCsv integration", () => {
     expect(res.csvText).toContain("张三")
     expect(res.csvText).toContain("已联系")
     expect(mocks.rolesWhere).toHaveBeenCalledWith({ openid: "admin_openid" })
+    const fieldSpec = mocks.bookingsField.mock.calls[0][0]
+    expect(fieldSpec).toEqual(expect.objectContaining({
+      _id: true,
+      vehicleName: true,
+      phone: true,
+      adminRemark: true,
+      createdAt: true
+    }))
+    expect(fieldSpec).not.toHaveProperty("openid")
+    expect(fieldSpec).not.toHaveProperty("dataExportedBy")
     expect(mocks.auditAdd).toHaveBeenCalledWith({
       data: expect.objectContaining({
         openid: "admin_openid",

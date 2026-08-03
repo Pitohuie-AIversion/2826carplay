@@ -2,8 +2,11 @@ jest.mock("wx-server-sdk")
 
 function createMockDb({ currentData }) {
   const currentGet = jest.fn().mockResolvedValue({ data: currentData })
-  const vehiclesDoc = jest.fn(() => ({
+  const vehiclesField = jest.fn(() => ({
     get: currentGet
+  }))
+  const vehiclesDoc = jest.fn(() => ({
+    field: vehiclesField
   }))
 
   const db = {
@@ -17,7 +20,8 @@ function createMockDb({ currentData }) {
 
   return {
     db,
-    vehiclesDoc
+    vehiclesDoc,
+    vehiclesField
   }
 }
 
@@ -72,6 +76,18 @@ describe("cloudfunctions/vehiclePublicDetail integration", () => {
     expect(res.car.description).toBe("公开车辆亮点")
     expect(JSON.stringify(res.car)).not.toContain("内部维修记录不得公开")
     expect(mocks.vehiclesDoc).toHaveBeenCalledWith("car_1")
+    expect(mocks.vehiclesField).toHaveBeenCalledWith(
+      expect.objectContaining({
+        _id: true,
+        plateNumber: true,
+        publicDescription: true,
+        imageList: true
+      })
+    )
+    const projection = mocks.vehiclesField.mock.calls[0][0]
+    expect(projection).not.toHaveProperty("vin")
+    expect(projection).not.toHaveProperty("engineNumber")
+    expect(projection).not.toHaveProperty("note")
   })
 
   test("缺少 id 返回 VALIDATION_ERROR", async () => {

@@ -8,53 +8,151 @@
         <view class="hero-title">我的收藏</view>
         <view class="hero-desc">保存心仪车型，随时回到极境车库继续了解</view>
       </view>
-      <image class="hero-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+      <image class="hero-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
     </view>
   </view>
 
-  <view wx:if="{{initialLoading && !list.length}}" class="loading-list">
-    <view class="loading-card skeleton-pulse" wx:for="{{[1, 2]}}" wx:key="*this"></view>
+  <view
+    wx:if="{{initialLoading && !list.length}}"
+    class="loading-list"
+    aria-hidden="true"
+  >
+    <view
+      class="favorite-skeleton-item {{index ? 'favorite-skeleton-item-muted' : ''}}"
+      wx:for="{{[1, 2]}}"
+      wx:key="*this"
+    >
+      <view class="favorite-skeleton-card">
+        <view class="favorite-skeleton-top">
+          <view>
+            <view class="favorite-skeleton-edition favorite-skeleton-pulse"></view>
+            <view class="favorite-skeleton-nickname favorite-skeleton-pulse"></view>
+          </view>
+          <view class="favorite-skeleton-status favorite-skeleton-pulse"></view>
+        </view>
+        <view class="favorite-skeleton-bottom">
+          <view class="favorite-skeleton-meta">
+            <view class="favorite-skeleton-name favorite-skeleton-pulse"></view>
+            <view class="favorite-skeleton-tags">
+              <view class="favorite-skeleton-tag favorite-skeleton-pulse"></view>
+              <view class="favorite-skeleton-tag favorite-skeleton-tag-short favorite-skeleton-pulse"></view>
+            </view>
+          </view>
+          <view class="favorite-skeleton-price">
+            <view class="favorite-skeleton-price-label favorite-skeleton-pulse"></view>
+            <view class="favorite-skeleton-price-value favorite-skeleton-pulse"></view>
+          </view>
+        </view>
+      </view>
+      <view class="favorite-skeleton-action favorite-skeleton-pulse"></view>
+    </view>
   </view>
 
   <view wx:elif="{{loadError && !list.length}}" class="empty-card ui-card">
-    <image class="empty-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+    <image class="empty-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
     <view class="empty-kicker">COLLECTION UNAVAILABLE</view>
     <view class="empty-title">暂时无法加载收藏</view>
     <view class="empty-desc">{{loadError}}</view>
-    <button class="empty-button ui-btn ui-btn-primary" bindtap="handleRetry">重新加载</button>
+    <button class="empty-button ui-btn ui-btn-primary" bindtap="handleRetry">
+      <view class="favorite-action-content"><view class="favorite-action-native-icon favorite-retry-native-icon" aria-hidden="true"></view><text>重新加载</text></view>
+    </button>
   </view>
 
-  <view wx:elif="{{list.length}}" class="favorite-list">
-    <view class="favorite-item" wx:for="{{list}}" wx:key="id">
-      <car-card car="{{item}}" bind:cardtap="handleCarTap" />
-      <view class="favorite-action-row">
+  <view wx:elif="{{list.length}}" class="favorite-content">
+    <view class="collection-overview ui-card">
+      <view class="collection-summary">
+        <view>
+          <view class="summary-kicker">COLLECTION STATUS</view>
+          <view class="summary-title">{{hasMore ? '当前已加载' : '已收藏'}} {{favoriteSummary.total}} 辆</view>
+        </view>
+        <view class="summary-available">
+          <text class="summary-available-value">{{favoriteSummary.available}}</text>
+          <text class="summary-available-label">可预约</text>
+        </view>
+      </view>
+      <view class="status-filter" aria-role="group" aria-label="收藏车辆状态筛选">
         <button
-          class="remove-button"
-          data-id="{{item.id}}"
-          loading="{{removingId === item.id}}"
-          disabled="{{removingId}}"
-          catchtap="handleRemove"
+          class="filter-button {{!availableOnly ? 'filter-button-active' : ''}}"
+          data-mode="all"
+          bindtap="handleFilterTap"
+          hover-class="filter-button-pressed"
+          aria-pressed="{{!availableOnly}}"
+          aria-label="全部收藏，{{favoriteSummary.total}} 辆"
         >
-          取消收藏
+          <view class="filter-button-content">
+            <text>全部收藏</text>
+            <text class="filter-count {{!availableOnly ? 'filter-count-active' : ''}}">{{favoriteSummary.total}}</text>
+          </view>
+        </button>
+        <button
+          class="filter-button {{availableOnly ? 'filter-button-active' : ''}}"
+          data-mode="available"
+          bindtap="handleFilterTap"
+          hover-class="filter-button-pressed"
+          aria-pressed="{{availableOnly}}"
+          aria-label="只看可预约，{{favoriteSummary.available}} 辆"
+        >
+          <view class="filter-button-content">
+            <text>只看可预约</text>
+            <text class="filter-count {{availableOnly ? 'filter-count-active' : ''}}">{{favoriteSummary.available}}</text>
+          </view>
         </button>
       </view>
     </view>
-    <button
-      wx:if="{{hasMore}}"
-      class="load-more-button ui-btn ui-btn-ghost"
-      loading="{{loading}}"
-      disabled="{{loading}}"
-      bindtap="handleLoadMore"
-    >
-      加载更多
-    </button>
-    <view wx:else class="list-end">已加载全部收藏</view>
+
+    <view wx:if="{{visibleList.length}}" class="favorite-list">
+      <view class="favorite-item" wx:for="{{visibleList}}" wx:key="id">
+        <car-card car="{{item}}" bind:cardtap="handleCarTap" />
+        <view class="favorite-action-row">
+          <button
+            class="remove-button"
+            data-id="{{item.id}}"
+            loading="{{removingId === item.id}}"
+            disabled="{{removingId}}"
+            catchtap="handleRemove"
+            hover-class="{{removingId ? 'none' : 'remove-button-pressed'}}"
+            aria-label="{{removingId === item.id ? '正在取消收藏车辆 ' + item.name : '取消收藏车辆 ' + item.name}}"
+          >
+            <view class="favorite-action-content"><view wx:if="{{removingId !== item.id}}" class="favorite-action-native-icon remove-favorite-native-icon" aria-hidden="true"><view class="remove-favorite-heart"></view><view class="remove-favorite-minus"></view></view><text>{{removingId === item.id ? '正在取消' : '取消收藏'}}</text></view>
+          </button>
+        </view>
+      </view>
+    </view>
+
+    <view wx:else class="filter-empty ui-card">
+      <view class="filter-empty-icon" aria-hidden="true">
+        <view class="filter-empty-line filter-empty-line-top"></view>
+        <view class="filter-empty-line filter-empty-line-bottom"></view>
+      </view>
+      <view class="filter-empty-title">收藏中暂无可预约车辆</view>
+      <view class="filter-empty-desc">其他收藏仍会保留，车辆恢复可预约后会自动出现在这里。</view>
+      <button class="filter-empty-button ui-btn ui-btn-ghost" bindtap="handleShowAll">
+        <view class="favorite-action-content"><view class="favorite-action-native-icon favorite-list-native-icon" aria-hidden="true"></view><text>查看全部收藏</text></view>
+      </button>
+    </view>
+
+    <view class="favorite-list-footer">
+      <button
+        wx:if="{{hasMore}}"
+        class="load-more-button ui-btn ui-btn-ghost"
+        loading="{{loading}}"
+        disabled="{{loading}}"
+        bindtap="handleLoadMore"
+      >
+        <view class="favorite-action-content"><view wx:if="{{!loading}}" class="favorite-action-native-icon favorite-more-native-icon" aria-hidden="true"></view><text>{{loading ? '正在加载' : '加载更多收藏'}}</text></view>
+      </button>
+      <view wx:else class="list-end"><view class="favorite-complete-native-icon" aria-hidden="true"></view><text>已加载全部收藏</text></view>
+    </view>
   </view>
 
   <view wx:else class="empty-card ui-card">
-    <image class="empty-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+    <image class="empty-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
     <view class="empty-kicker">YOUR GARAGE AWAITS</view>
     <view class="empty-title">还没有收藏车辆</view>
     <view class="empty-desc">进入车辆详情，点击“收藏”即可把喜欢的车型保存到这里。</view>
+    <button class="empty-button ui-btn ui-btn-primary" bindtap="handleBrowseGarage">
+      <view class="favorite-action-content"><view class="favorite-action-native-icon favorite-garage-native-icon" aria-hidden="true"><view class="favorite-garage-door"></view></view><text>浏览极境车库</text></view>
+    </button>
   </view>
+  <core-nav active-key="favorites" />
 </view>

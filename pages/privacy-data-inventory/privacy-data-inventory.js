@@ -1,4 +1,13 @@
 const { requirePagePermission } = require("../../shared/pageAuth")
+const { formatToastTitle } = require("../../shared/uiFeedback")
+const {
+  canShareCsvFile,
+  isUserCancelError,
+  openCsvFile,
+  removeCsvFile,
+  saveCsvFile,
+  shareCsvFile
+} = require("../../shared/csvFile")
 
 const REQUEST_TYPE_LABELS = {
   access: "查询信息",
@@ -14,6 +23,29 @@ const REQUEST_STATUS_LABELS = {
   cancelled: "已撤回"
 }
 
+const REQUEST_TYPE_META = {
+  access: {
+    className: "request-type-access",
+    iconClass: "request-type-icon-access"
+  },
+  correction: {
+    className: "request-type-correction",
+    iconClass: "request-type-icon-correction"
+  },
+  deletion: {
+    className: "request-type-deletion",
+    iconClass: "request-type-icon-deletion"
+  }
+}
+
+const REQUEST_STATUS_CLASS = {
+  pending: "request-status-pending",
+  processing: "request-status-processing",
+  completed: "request-status-completed",
+  rejected: "request-status-rejected",
+  cancelled: "request-status-cancelled"
+}
+
 const BOOKING_STATUS_LABELS = {
   pending: "待联系",
   contacted: "已联系",
@@ -23,11 +55,11 @@ const BOOKING_STATUS_LABELS = {
 
 function formatDisplayTime(value) {
   if (!value) {
-    return "--"
+    return "—"
   }
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) {
-    return "--"
+    return "—"
   }
   const pad = (number) => String(number).padStart(2, "0")
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(
@@ -45,6 +77,24 @@ function normalizeCategory(category, mapper) {
   }
 }
 
+function decorateCategory(key, category, unavailable, truncated, iconClass) {
+  const isUnavailable = unavailable.includes(key)
+  const isTruncated = truncated.includes(key) || Boolean(category.truncated)
+  return {
+    ...category,
+    iconClass,
+    isUnavailable,
+    isTruncated,
+    isComplete: !isUnavailable && !isTruncated,
+    stateLabel: isUnavailable ? "暂不可用" : isTruncated ? "展示受限" : "核验完整",
+    stateClass: isUnavailable
+      ? "metric-state-unavailable"
+      : isTruncated
+        ? "metric-state-truncated"
+        : "metric-state-complete"
+  }
+}
+
 function buildViewData(result) {
   const request = result && result.request ? result.request : {}
   const categories = result && result.categories ? result.categories : {}
@@ -55,8 +105,59 @@ function buildViewData(result) {
     favorites: "收藏数据",
     privacyRequests: "隐私申请"
   }
+  const bookings = decorateCategory(
+    "bookings",
+    normalizeCategory(categories.bookings, (item) => ({
+      ...item,
+      statusLabel: BOOKING_STATUS_LABELS[item.status] || "状态未知",
+      createdAtText: formatDisplayTime(item.createdAt),
+      dateText:
+        item.startDate && item.endDate
+          ? `${item.startDate} 至 ${item.endDate}`
+          : item.startDate || item.endDate || "—"
+    })),
+    unavailable,
+    truncated,
+    "metric-native-icon-booking"
+  )
+  const favorites = decorateCategory(
+    "favorites",
+    normalizeCategory(categories.favorites, (item) => ({
+      ...item,
+      createdAtText: formatDisplayTime(item.createdAt)
+    })),
+    unavailable,
+    truncated,
+    "metric-native-icon-favorite"
+  )
+  const privacyRequests = decorateCategory(
+    "privacyRequests",
+    normalizeCategory(categories.privacyRequests, (item) => ({
+      ...item,
+      typeLabel: REQUEST_TYPE_LABELS[item.type] || "隐私申请",
+      statusLabel: REQUEST_STATUS_LABELS[item.status] || "状态未知",
+      createdAtText: formatDisplayTime(item.createdAt)
+    })),
+    unavailable,
+    truncated,
+    "metric-native-icon-privacy"
+  )
+  const categoryList = [bookings, favorites, privacyRequests]
+  const verifiedCategoryCount = categoryList.filter((item) => item.isComplete).length
+  const totalRecordCount = categoryList.reduce((total, item) => total + item.count, 0)
+  const requestTypeMeta = REQUEST_TYPE_META[request.type] || {
+    className: "request-type-default",
+    iconClass: "request-type-icon-default"
+  }
+
   return {
     partial: Boolean(result && result.partial),
+    verifiedCategoryCount,
+    inventoryProgress: Math.round((verifiedCategoryCount / categoryList.length) * 100),
+    inventoryStatusLabel: verifiedCategoryCount === categoryList.length ? "核验完整" : "需要继续核验",
+    inventoryStatusClass:
+      verifiedCategoryCount === categoryList.length ? "inventory-status-complete" : "inventory-status-partial",
+    totalRecordCount,
     unavailable,
     truncated,
     unavailableText: unavailable
@@ -76,27 +177,14 @@ function buildViewData(result) {
       ...request,
       typeLabel: REQUEST_TYPE_LABELS[request.type] || "隐私申请",
       statusLabel: REQUEST_STATUS_LABELS[request.status] || "状态未知",
+      typeClass: requestTypeMeta.className,
+      typeIconClass: requestTypeMeta.iconClass,
+      statusClass: REQUEST_STATUS_CLASS[request.status] || "request-status-unknown",
       createdAtText: formatDisplayTime(request.createdAt)
     },
-    bookings: normalizeCategory(categories.bookings, (item) => ({
-      ...item,
-      statusLabel: BOOKING_STATUS_LABELS[item.status] || "状态未知",
-      createdAtText: formatDisplayTime(item.createdAt),
-      dateText:
-        item.startDate && item.endDate
-          ? `${item.startDate} 至 ${item.endDate}`
-          : item.startDate || item.endDate || "--"
-    })),
-    favorites: normalizeCategory(categories.favorites, (item) => ({
-      ...item,
-      createdAtText: formatDisplayTime(item.createdAt)
-    })),
-    privacyRequests: normalizeCategory(categories.privacyRequests, (item) => ({
-      ...item,
-      typeLabel: REQUEST_TYPE_LABELS[item.type] || "隐私申请",
-      statusLabel: REQUEST_STATUS_LABELS[item.status] || "状态未知",
-      createdAtText: formatDisplayTime(item.createdAt)
-    }))
+    bookings,
+    favorites,
+    privacyRequests
   }
 }
 
@@ -107,11 +195,20 @@ Page({
     loading: true,
     refreshing: false,
     loadError: "",
+    exporting: false,
+    exportFilePath: "",
+    exportFileName: "",
+    canShareExport: true,
     partial: false,
     unavailable: [],
     truncated: [],
     unavailableText: "",
     issueText: "",
+    verifiedCategoryCount: 0,
+    inventoryProgress: 0,
+    inventoryStatusLabel: "等待核验",
+    inventoryStatusClass: "inventory-status-pending",
+    totalRecordCount: 0,
     request: {},
     bookings: { count: 0, truncated: false, list: [] },
     favorites: { count: 0, truncated: false, list: [] },
@@ -120,7 +217,10 @@ Page({
 
   onLoad(options) {
     const requestId = String((options && options.id) || "").trim()
-    this.setData({ requestId })
+    this.setData({
+      requestId,
+      canShareExport: canShareCsvFile()
+    })
     requirePagePermission(this, {
       required: "canManageRoles",
       noPermissionMessage: "无权核验隐私申请数据",
@@ -156,9 +256,28 @@ Page({
 
   handleCopyOpenid() {
     const openid = String(this.data.request.openid || "")
-    if (openid) {
-      wx.setClipboardData({ data: openid })
+    if (!openid) {
+      wx.showToast({
+        title: "申请账号不可用",
+        icon: "none"
+      })
+      return
     }
+    wx.setClipboardData({
+      data: openid,
+      success: () => {
+        wx.showToast({
+          title: "申请账号已复制",
+          icon: "none"
+        })
+      },
+      fail: () => {
+        wx.showToast({
+          title: "申请账号复制失败",
+          icon: "none"
+        })
+      }
+    })
   },
 
   handleBookingTap(event) {
@@ -173,6 +292,157 @@ Page({
           title: "预约详情打开失败",
           icon: "none"
         })
+      }
+    })
+  },
+
+  handleExport() {
+    if (this.data.loading || this.data.refreshing || this.data.exporting) {
+      return
+    }
+    if (this.data.request.type !== "access") {
+      wx.showToast({
+        title: "仅查询信息申请可导出",
+        icon: "none"
+      })
+      return
+    }
+    if (this.data.partial) {
+      wx.showToast({
+        title: "数据未就绪",
+        icon: "none"
+      })
+      return
+    }
+    if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
+      wx.showToast({
+        title: "云能力未初始化",
+        icon: "none"
+      })
+      return
+    }
+
+    wx.showModal({
+      title: "导出个人数据",
+      content: "文件包含用户 OpenID、姓名、手机号和申请内容，请仅用于本次隐私申请并妥善保管。",
+      confirmText: "确认导出",
+      confirmColor: "#528fff",
+      success: (modalResult) => {
+        if (!modalResult.confirm) {
+          return
+        }
+        this.setData({ exporting: true })
+        wx.cloud.callFunction({
+          name: "privacyRequestDataInventory",
+          data: {
+            requestId: this.data.requestId,
+            mode: "export"
+          },
+          success: (res) => {
+            const result = res && res.result ? res.result : null
+            if (!result || !result.ok || !result.csvText) {
+              wx.showToast({
+              title: formatToastTitle(result && result.message, "导出失败"),
+                icon: "none"
+              })
+              this.setData({ exporting: false })
+              return
+            }
+            saveCsvFile({
+              fileName: result.fileName,
+              fallbackFileName: `privacy-data-${this.data.requestId}.csv`,
+              csvText: result.csvText
+            })
+              .then(({ filePath, fileName }) => {
+                const previousFilePath = this.data.exportFilePath
+                this.setData({
+                  exporting: false,
+                  exportFilePath: filePath,
+                  exportFileName: fileName
+                })
+                if (previousFilePath && previousFilePath !== filePath) {
+                  removeCsvFile(previousFilePath).catch(() => {})
+                }
+                wx.showToast({
+                title: "个人数据已生成",
+                  icon: "none"
+                })
+              })
+              .catch((error) => {
+                this.setData({ exporting: false })
+                wx.showToast({
+                  title: "保存失败",
+                  icon: "none"
+                })
+              })
+          },
+          fail: (error) => {
+            this.setData({ exporting: false })
+            wx.showToast({
+              title: "导出失败",
+              icon: "none"
+            })
+          }
+        })
+      }
+    })
+  },
+
+  handleShareExportedFile() {
+    if (!this.data.exportFilePath || !this.data.exportFileName) {
+      return
+    }
+    shareCsvFile(this.data.exportFilePath, this.data.exportFileName).catch((error) => {
+      if (isUserCancelError(error)) {
+        return
+      }
+      this.handleOpenExportedFile()
+    })
+  },
+
+  handleOpenExportedFile() {
+    if (!this.data.exportFilePath) {
+      return
+    }
+    openCsvFile(this.data.exportFilePath).catch(() => {
+      wx.showToast({
+        title: "文件已生成",
+        icon: "none"
+      })
+    })
+  },
+
+  handleDeleteExportedFile() {
+    const filePath = String(this.data.exportFilePath || "")
+    if (!filePath) {
+      return
+    }
+    wx.showModal({
+      title: "删除本地个人数据",
+      content: "将从当前设备删除这份 CSV，删除后无法恢复。云端用户数据和隐私申请不会受到影响。",
+      confirmText: "确认删除",
+      confirmColor: "#d46868",
+      success: (res) => {
+        if (!res.confirm) {
+          return
+        }
+        removeCsvFile(filePath)
+          .then(() => {
+            this.setData({
+              exportFilePath: "",
+              exportFileName: ""
+            })
+            wx.showToast({
+              title: "本地文件已删除",
+              icon: "none"
+            })
+          })
+          .catch((error) => {
+            wx.showToast({
+              title: "删除失败",
+              icon: "none"
+            })
+          })
       }
     })
   },

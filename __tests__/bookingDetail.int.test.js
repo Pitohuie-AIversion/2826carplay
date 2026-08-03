@@ -6,11 +6,17 @@ function createMockDb({ rolesData, bookingData, conflictBookings = [], conflictQ
 
   const rolesLimit = jest.fn(() => ({ get: rolesGet }))
   const rolesWhere = jest.fn(() => ({ limit: rolesLimit }))
-  const bookingsDoc = jest.fn(() => ({ get: bookingGet }))
+  const detailField = jest.fn(() => ({ get: bookingGet }))
+  const bookingsDoc = jest.fn(() => ({ field: detailField }))
+  const conflictField = jest.fn()
   const bookingsWhere = jest.fn(() => {
     let offset = 0
     let limit = 100
     const chain = {
+      field: jest.fn((fields) => {
+        conflictField(fields)
+        return chain
+      }),
       skip: jest.fn((value) => {
         offset = value
         return chain
@@ -50,7 +56,9 @@ function createMockDb({ rolesData, bookingData, conflictBookings = [], conflictQ
     db,
     rolesWhere,
     bookingsDoc,
-    bookingsWhere
+    bookingsWhere,
+    detailField,
+    conflictField
   }
 }
 
@@ -125,6 +133,33 @@ describe("cloudfunctions/bookingDetail integration", () => {
     expect(mocks.rolesWhere).toHaveBeenCalledWith({ openid: "admin_openid" })
     expect(mocks.bookingsDoc).toHaveBeenCalledWith("booking_1")
     expect(mocks.bookingsWhere).toHaveBeenCalledWith({ vehicleId: "vehicle_1" })
+    const detailFields = mocks.detailField.mock.calls[0][0]
+    expect(detailFields).toEqual(
+      expect.objectContaining({
+        _id: true,
+        openid: true,
+        phone: true,
+        note: true,
+        adminRemark: true,
+        coordinationUpdatedAt: true
+      })
+    )
+    expect(detailFields).not.toHaveProperty("subscribeMessageAccepted")
+    expect(detailFields).not.toHaveProperty("futureInternalField")
+    const conflictFields = mocks.conflictField.mock.calls[0][0]
+    expect(conflictFields).toEqual(
+      expect.objectContaining({
+        _id: true,
+        vehicleId: true,
+        phone: true,
+        startDate: true,
+        endDate: true,
+        status: true
+      })
+    )
+    expect(conflictFields).not.toHaveProperty("openid")
+    expect(conflictFields).not.toHaveProperty("note")
+    expect(conflictFields).not.toHaveProperty("adminRemark")
   })
 
   test("缺少 id 返回 VALIDATION_ERROR", async () => {

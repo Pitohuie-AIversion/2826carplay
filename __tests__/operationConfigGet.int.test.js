@@ -3,7 +3,8 @@ jest.mock("wx-server-sdk")
 function createMockDb({ configData }) {
   const configGet = jest.fn().mockResolvedValue({ data: configData })
   const configLimit = jest.fn(() => ({ get: configGet }))
-  const configWhere = jest.fn(() => ({ limit: configLimit }))
+  const configField = jest.fn(() => ({ limit: configLimit }))
+  const configWhere = jest.fn(() => ({ field: configField, limit: configLimit }))
 
   const db = {
     collection: jest.fn((name) => {
@@ -17,6 +18,7 @@ function createMockDb({ configData }) {
   return {
     db,
     configWhere,
+    configField,
     configLimit
   }
 }
@@ -69,6 +71,7 @@ describe("cloudfunctions/operationConfigGet integration", () => {
       bookingStatusTemplateId: "",
       bookingPrivacyTip: "仅用于本次预约沟通。"
     })
+    expect(mocks.configField).toHaveBeenCalledWith({ value: true })
   })
 
   test("配置缺失时返回默认值", async () => {
@@ -82,6 +85,25 @@ describe("cloudfunctions/operationConfigGet integration", () => {
     expect(res.ok).toBe(true)
     expect(res.config.brandName).toBe("极境车库")
     expect(res.config.servicePhone).toBe("15715710090")
+    expect(res.config.garagePageSubtitle).toBe("甄选座驾，为每一次出发预留专属席位")
     expect(res.config.cityOptions).toEqual(["杭州", "上海"])
+  })
+
+  test("读取遗留后台说明时自动升级为面向用户的品牌文案", async () => {
+    const mocks = createMockDb({
+      configData: [
+        {
+          key: "operation_settings",
+          value: {
+            garagePageSubtitle: "后台车辆资料已接入首页展示，上传封面后会同步展示到车库首页"
+          }
+        }
+      ]
+    })
+
+    const mod = await loadOperationConfigGetWith({ mockDb: mocks.db })
+    const res = await mod.main()
+
+    expect(res.config.garagePageSubtitle).toBe("甄选座驾，为每一次出发预留专属席位")
   })
 })

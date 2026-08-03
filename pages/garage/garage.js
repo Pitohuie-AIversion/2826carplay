@@ -1,6 +1,9 @@
 const { trackEvent } = require("../../shared/analytics")
 const mockCategories = require("../../data/categories")
 
+const DEFAULT_GARAGE_SUBTITLE = "甄选座驾，为每一次出发预留专属席位"
+const LEGACY_GARAGE_SUBTITLE = "后台车辆资料已接入首页展示，上传封面后会同步展示到车库首页"
+
 const CATEGORY_LABEL_MAP = {
   all: "全部",
   luxury_sedan: "豪华轿车",
@@ -35,13 +38,22 @@ function normalizeGarageStatus(status) {
 function getStatusText(status, fallbackText) {
   const normalizedStatus = normalizeGarageStatus(status)
   const statusTextMap = {
-    idle: "闲置",
-    active: "在用",
-    maintenance: "维修中",
+    idle: "可预约",
+    active: "使用中",
+    maintenance: "维护中",
     reserved: "已预约"
   }
 
-  return statusTextMap[normalizedStatus] || fallbackText || "闲置"
+  return statusTextMap[normalizedStatus] || fallbackText || "可预约"
+}
+
+function normalizeGarageSubtitle(value, fallback) {
+  const subtitle = String(value || "").trim()
+  if (!subtitle || subtitle === LEGACY_GARAGE_SUBTITLE) {
+    return fallback || DEFAULT_GARAGE_SUBTITLE
+  }
+
+  return subtitle
 }
 
 function attachStatusClass(car) {
@@ -134,10 +146,30 @@ function buildCategorySummary(categoryId, categories, filteredCars) {
   }
 }
 
+function matchesCarSearch(car, keyword) {
+  const query = String(keyword || "").trim().toLowerCase()
+  if (!query) {
+    return true
+  }
+  const source = car && typeof car === "object" ? car : {}
+  const tags = Array.isArray(source.tags) ? source.tags : []
+  const searchText = [
+    source.name,
+    source.nickname,
+    source.brand,
+    source.category,
+    CATEGORY_LABEL_MAP[source.category],
+    ...tags
+  ]
+    .map((value) => String(value || "").toLowerCase())
+    .join(" ")
+  return searchText.includes(query)
+}
+
 Page({
   data: {
     pageTitle: "极境车库",
-    pageSubtitle: "后台车辆资料已接入首页展示，上传封面后会同步展示到车库首页",
+    pageSubtitle: DEFAULT_GARAGE_SUBTITLE,
     emptyText: "当前分类暂无车辆，更多车型即将入库",
     loadError: false,
     loadErrorText: "车辆列表加载失败，请稍后重试",
@@ -148,6 +180,9 @@ Page({
     },
     servicePhone: "15715710090",
     currentCategory: "all",
+    availableOnly: false,
+    searchKeyword: "",
+    searchResultCount: 0,
     categories: [],
     cars: [],
     filteredCars: [],
@@ -201,7 +236,7 @@ Page({
 
         this.setData({
           pageTitle: result.config.garagePageTitle || this.data.pageTitle,
-          pageSubtitle: result.config.garagePageSubtitle || this.data.pageSubtitle,
+          pageSubtitle: normalizeGarageSubtitle(result.config.garagePageSubtitle, this.data.pageSubtitle),
           servicePhone: result.config.servicePhone || this.data.servicePhone
         })
       },
@@ -252,7 +287,7 @@ Page({
             loadingCars: false
           })
           wx.showToast({
-            title: (error && (error.errMsg || error.message)) || "加载更多失败",
+            title: "加载更多失败",
             icon: "none"
           })
           return
@@ -314,18 +349,40 @@ Page({
     this.filterCars(nextCategory)
   },
 
-  filterCars(categoryId) {
+  filterCars(categoryId, availableOnlyInput, searchKeywordInput) {
     const nextCategory = categoryId || "all"
-    const filteredCars =
+    const availableOnly =
+      typeof availableOnlyInput === "boolean" ? availableOnlyInput : this.data.availableOnly
+    const searchKeyword =
+      typeof searchKeywordInput === "string" ? searchKeywordInput : this.data.searchKeyword
+    const categoryCars =
       nextCategory === "all"
         ? this.data.cars.slice()
         : this.data.cars.filter((car) => car.category === nextCategory)
+    const statusCars = availableOnly
+      ? categoryCars.filter((car) => normalizeGarageStatus(car.status) === "idle")
+      : categoryCars
+    const filteredCars = statusCars.filter((car) => matchesCarSearch(car, searchKeyword))
 
     this.setData({
       currentCategory: nextCategory,
+      availableOnly,
+      searchKeyword,
+      searchResultCount: filteredCars.length,
       filteredCars,
-      categorySummary: buildCategorySummary(nextCategory, this.data.categories, filteredCars)
+      categorySummary: buildCategorySummary(nextCategory, this.data.categories, categoryCars)
     })
+  },
+
+  handleSearchInput(event) {
+    const keyword = String((event.detail && event.detail.value) || "")
+    this.filterCars(this.data.currentCategory, this.data.availableOnly, keyword)
+  },
+
+  handleClearSearch() {
+    if (this.data.searchKeyword) {
+      this.filterCars(this.data.currentCategory, this.data.availableOnly, "")
+    }
   },
 
   handleCategoryTap(event) {
@@ -336,6 +393,21 @@ Page({
     }
 
     this.filterCars(categoryId)
+  },
+
+  handleAvailabilityFilterTap(event) {
+    const mode = String(event.currentTarget.dataset.mode || "")
+    const availableOnly = mode === "available"
+    if (availableOnly === this.data.availableOnly) {
+      return
+    }
+    this.filterCars(this.data.currentCategory, availableOnly)
+  },
+
+  handleShowAllStatuses() {
+    if (this.data.availableOnly) {
+      this.filterCars(this.data.currentCategory, false)
+    }
   },
 
   handleLoadMore() {
@@ -355,25 +427,41 @@ Page({
     }
 
     wx.navigateTo({
-      url: `/pages/car-detail/car-detail?carId=${carId}`
-    })
-  },
-
-  handlePhoneCall() {
-    wx.makePhoneCall({
-      phoneNumber: this.data.servicePhone,
+      url: `/pages/car-detail/car-detail?carId=${carId}`,
       fail: () => {
         wx.showToast({
-          title: `请联系客服：${this.data.servicePhone}`,
+          title: "车辆详情打开失败",
           icon: "none"
         })
       }
     })
   },
 
-  handleMineTap() {
-    wx.navigateTo({
-      url: "/pages/mine/mine"
+  handlePhoneCall() {
+    const phone = String(this.data.servicePhone || "").trim()
+    if (!phone) {
+      wx.showToast({
+        title: "客服电话暂不可用",
+        icon: "none"
+      })
+      return
+    }
+
+    wx.makePhoneCall({
+      phoneNumber: phone,
+      fail: (error) => {
+        const message = error && (error.errMsg || error.message)
+        if (message && String(message).includes("cancel")) {
+          return
+        }
+        wx.showModal({
+          title: "拨号失败",
+          content: `请联系客服：${phone}`,
+          confirmText: "知道了",
+          confirmColor: "#528fff",
+          showCancel: false
+        })
+      }
     })
   },
 

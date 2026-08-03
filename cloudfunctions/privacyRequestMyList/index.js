@@ -6,6 +6,15 @@ const db = cloud.database()
 const DEFAULT_PAGE_SIZE = 20
 const MAX_PAGE_SIZE = 50
 const FALLBACK_MAX_RECORDS = 500
+const PRIVACY_REQUEST_MY_FIELDS = {
+  _id: true,
+  type: true,
+  description: true,
+  status: true,
+  resolutionNote: true,
+  createdAt: true,
+  updatedAt: true
+}
 
 function normalizeNumber(value, fallback) {
   const num = Number(value)
@@ -48,6 +57,7 @@ async function queryWithIndex(openid, page, pageSize) {
   const res = await db
     .collection("privacy_requests")
     .where({ openid })
+    .field(PRIVACY_REQUEST_MY_FIELDS)
     .orderBy("createdAt", "desc")
     .skip(page * pageSize)
     .limit(pageSize + 1)
@@ -64,6 +74,7 @@ async function queryWithoutIndex(openid, page, pageSize) {
   const res = await db
     .collection("privacy_requests")
     .where({ openid })
+    .field(PRIVACY_REQUEST_MY_FIELDS)
     .limit(FALLBACK_MAX_RECORDS + 1)
     .get()
   const rawList = res && Array.isArray(res.data) ? res.data : []
@@ -126,7 +137,7 @@ exports.main = async (event) => {
   } catch (error) {
     console.error({
       function: "privacyRequestMyList",
-      openid,
+      authenticated: Boolean(openid),
       errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
       stack: error && error.stack ? error.stack : "",
       createdAt: new Date().toISOString()

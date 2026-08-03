@@ -25,6 +25,11 @@ function createMockDb({ rolesData, auditData, orderedError = null }) {
     }))
   }))
   const auditOrderBy = jest.fn(() => ({ skip: auditOrderedSkip }))
+  const auditField = jest.fn(() => ({
+    limit: auditLimit,
+    skip: auditSkip,
+    orderBy: auditOrderBy
+  }))
 
   const db = {
     collection: jest.fn((name) => {
@@ -32,7 +37,12 @@ function createMockDb({ rolesData, auditData, orderedError = null }) {
         return { where: rolesWhere }
       }
       if (name === "audit_logs") {
-        return { limit: auditLimit, skip: auditSkip, orderBy: auditOrderBy }
+        return {
+          limit: auditLimit,
+          skip: auditSkip,
+          orderBy: auditOrderBy,
+          field: auditField
+        }
       }
       throw new Error(`Unexpected collection: ${name}`)
     })
@@ -43,7 +53,8 @@ function createMockDb({ rolesData, auditData, orderedError = null }) {
     auditLimit,
     auditSkip,
     auditOrderBy,
-    auditOrderedSkip
+    auditOrderedSkip,
+    auditField
   }
 }
 
@@ -79,6 +90,16 @@ describe("cloudfunctions/auditLogList integration", () => {
     expect(res.total).toBe(2)
     expect(res.list).toHaveLength(1)
     expect(res.hasMore).toBe(true)
+    const fieldSpec = mocks.auditField.mock.calls[0][0]
+    expect(fieldSpec).toEqual(expect.objectContaining({
+      _id: true,
+      action: true,
+      changedKeys: true,
+      createdAt: true
+    }))
+    expect(fieldSpec).not.toHaveProperty("before")
+    expect(fieldSpec).not.toHaveProperty("after")
+    expect(fieldSpec).not.toHaveProperty("adminRemark")
   })
 
   test("action 可筛选", async () => {
@@ -232,6 +253,50 @@ describe("cloudfunctions/auditLogList integration", () => {
         truncated: true
       })
     )
+  })
+
+  test("返回页面展示需要的安全摘要字段但不返回备注正文", async () => {
+    const mocks = createMockDb({
+      rolesData: [{ openid: "admin_openid", role: "admin" }],
+      auditData: [
+        {
+          _id: "a_coordination",
+          action: "bookingUpdateCoordination",
+          openid: "admin_openid",
+          bookingId: "booking_1",
+          fromPriority: "normal",
+          toPriority: "priority",
+          fromCoordinationStatus: "pending",
+          toCoordinationStatus: "coordinating",
+          remarkLength: 18,
+          adminRemark: "不得返回的内部备注",
+          before: { bookingPrivacyTip: "不得返回的历史隐私文案" },
+          after: { bookingStatusTemplateId: "private-template-id" },
+          createdAt: "2026-07-30T08:00:00.000Z"
+        }
+      ]
+    })
+    const mod = await loadAuditLogListWith({
+      openid: "admin_openid",
+      mockDb: mocks.db
+    })
+
+    const res = await mod.main({ action: "bookingUpdateCoordination" })
+
+    expect(res.ok).toBe(true)
+    expect(res.list[0]).toEqual(
+      expect.objectContaining({
+        bookingId: "booking_1",
+        fromPriority: "normal",
+        toPriority: "priority",
+        fromCoordinationStatus: "pending",
+        toCoordinationStatus: "coordinating",
+        remarkLength: 18
+      })
+    )
+    expect(res.list[0]).not.toHaveProperty("adminRemark")
+    expect(res.list[0]).not.toHaveProperty("before")
+    expect(res.list[0]).not.toHaveProperty("after")
   })
 
   test("非 admin 返回 FORBIDDEN", async () => {

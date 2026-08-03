@@ -1,4 +1,4 @@
-<view class="config-page management-page">
+<view wx:if="{{pageAuthorized}}" class="config-page management-page">
   <view class="page-glow"></view>
   <view class="hero-card ui-card ui-card-gradient">
     <view class="hero-top">
@@ -7,11 +7,16 @@
         <view class="hero-title">运营配置</view>
         <view class="hero-desc">管理品牌、首页内容与预约服务文案</view>
       </view>
-      <image class="hero-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+      <image class="hero-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
+    </view>
+    <view class="hero-status">
+      <view class="hero-status-dot"></view>
+      <text>保存后将同步首页、我的页面与预约服务</text>
+      <view class="hero-status-count">4 GROUPS</view>
     </view>
   </view>
 
-  <view wx:if="{{loading && !hasLoadedConfig}}" class="config-skeleton">
+  <view wx:if="{{loading && !hasLoadedConfig}}" class="config-skeleton" aria-hidden="true">
     <view class="config-skeleton-card ui-card">
       <view class="config-skeleton-heading">
         <view>
@@ -49,97 +54,116 @@
   </view>
 
   <view wx:elif="{{loadFailed}}" class="config-state ui-card">
-    <image class="config-state-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+    <image class="config-state-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
     <view class="config-state-kicker">CONFIGURATION UNAVAILABLE</view>
     <view class="config-state-title">配置加载失败</view>
     <view class="config-state-desc">{{loadErrorText}}</view>
     <view class="config-state-note">线上配置未成功读取前不会展示默认表单，避免误覆盖现有内容。</view>
-    <button class="config-state-button ui-btn ui-btn-primary" bindtap="handleRetryLoad">重新加载配置</button>
+    <button class="config-state-button ui-btn ui-btn-primary" bindtap="handleRetryLoad">
+      <view class="action-btn-content"><view class="config-action-native-icon config-retry-native-icon" aria-hidden="true"></view><text>重新加载配置</text></view>
+    </button>
   </view>
 
   <block wx:else>
   <view class="form-card ui-card">
     <view class="section-heading">
-      <view>
-        <view class="section-eyebrow">BRAND PROFILE</view>
-        <view class="section-heading-title">基础信息</view>
+      <view class="section-heading-main">
+        <view class="section-glyph section-glyph-brand" aria-hidden="true"><view class="section-glyph-icon"></view></view>
+        <view>
+          <view class="section-eyebrow">BRAND PROFILE</view>
+          <view class="section-heading-title">基础信息</view>
+        </view>
       </view>
       <view class="section-index">01</view>
     </view>
 
     <view class="form-item">
       <view class="form-label">品牌名称</view>
-      <input class="form-input ui-input" value="{{form.brandName}}" data-field="brandName" bindinput="handleInput" />
+      <input class="form-input ui-input" value="{{form.brandName}}" data-field="brandName" bindinput="handleInput" maxlength="20" confirm-type="done" placeholder="例如 极境车库" aria-label="品牌名称" />
     </view>
 
     <view class="form-item">
       <view class="form-label">客服电话</view>
-      <input class="form-input ui-input" maxlength="20" value="{{form.servicePhone}}" data-field="servicePhone" bindinput="handleInput" />
+      <input class="form-input ui-input" maxlength="20" value="{{form.servicePhone}}" data-field="servicePhone" bindinput="handleInput" confirm-type="done" placeholder="请输入客服电话" aria-label="客服电话" />
       <view class="form-tip">支持手机号、带区号座机或以 + 开头的国际号码。</view>
     </view>
 
     <view class="form-item">
       <view class="form-label">我的页简介</view>
-      <textarea class="form-textarea ui-input" value="{{form.mineUserDesc}}" data-field="mineUserDesc" bindinput="handleInput" maxlength="80" />
+      <textarea class="form-textarea ui-input" value="{{form.mineUserDesc}}" data-field="mineUserDesc" bindinput="handleInput" maxlength="80" placeholder="填写个人中心品牌简介" aria-label="我的页简介" />
+      <view class="field-meta"><view class="form-tip">显示在个人中心品牌信息区域。</view><view class="field-counter">{{form.mineUserDesc.length}} / 80</view></view>
     </view>
   </view>
 
   <view class="form-card ui-card">
     <view class="section-heading">
-      <view>
-        <view class="section-eyebrow">HOMEPAGE</view>
-        <view class="section-heading-title">首页展示</view>
+      <view class="section-heading-main">
+        <view class="section-glyph section-glyph-home" aria-hidden="true"><view class="section-glyph-icon"></view></view>
+        <view>
+          <view class="section-eyebrow">HOMEPAGE</view>
+          <view class="section-heading-title">首页展示</view>
+        </view>
       </view>
       <view class="section-index">02</view>
     </view>
 
     <view class="form-item">
       <view class="form-label">首页标题</view>
-      <input class="form-input ui-input" value="{{form.garagePageTitle}}" data-field="garagePageTitle" bindinput="handleInput" />
+      <input class="form-input ui-input" value="{{form.garagePageTitle}}" data-field="garagePageTitle" bindinput="handleInput" maxlength="20" confirm-type="done" placeholder="例如 探索极境座驾" aria-label="首页标题" />
     </view>
 
     <view class="form-item">
       <view class="form-label">首页副标题</view>
-      <textarea class="form-textarea ui-input" value="{{form.garagePageSubtitle}}" data-field="garagePageSubtitle" bindinput="handleInput" maxlength="80" />
+      <textarea class="form-textarea ui-input" value="{{form.garagePageSubtitle}}" data-field="garagePageSubtitle" bindinput="handleInput" maxlength="80" placeholder="填写首页品牌说明" aria-label="首页副标题" />
+      <view class="field-meta"><view class="form-tip">建议用一句话说明车库定位或当前服务状态。</view><view class="field-counter">{{form.garagePageSubtitle.length}} / 80</view></view>
     </view>
 
     <view class="form-item">
       <view class="form-label">城市列表</view>
-      <textarea class="form-textarea ui-input" value="{{form.cityOptionsText}}" data-field="cityOptionsText" bindinput="handleInput" maxlength="300" />
-      <view class="form-tip">每行一个城市，预约页会展示为可选列表。</view>
+      <textarea class="form-textarea ui-input" value="{{form.cityOptionsText}}" data-field="cityOptionsText" bindinput="handleInput" maxlength="300" placeholder="每行填写一个城市" aria-label="城市列表" />
+      <view class="field-meta"><view class="form-tip">每行一个城市，预约页会展示为可选列表。</view><view class="field-counter">{{form.cityOptionsText.length}} / 300</view></view>
     </view>
   </view>
 
   <view class="form-card ui-card">
     <view class="section-heading">
-      <view>
-        <view class="section-eyebrow">CONTENT</view>
-        <view class="section-heading-title">内容页面</view>
+      <view class="section-heading-main">
+        <view class="section-glyph section-glyph-content" aria-hidden="true"><view class="section-glyph-icon"></view></view>
+        <view>
+          <view class="section-eyebrow">CONTENT</view>
+          <view class="section-heading-title">内容页面</view>
+        </view>
       </view>
       <view class="section-index">03</view>
     </view>
     <view class="form-item">
       <view class="form-label">常见问题</view>
-      <textarea class="form-textarea form-textarea-lg ui-input" value="{{form.faqContent}}" data-field="faqContent" bindinput="handleInput" maxlength="1000" />
+      <textarea class="form-textarea form-textarea-lg ui-input" value="{{form.faqContent}}" data-field="faqContent" bindinput="handleInput" maxlength="1000" placeholder="填写常见问题内容" aria-label="常见问题内容" />
+      <view class="field-meta"><view class="form-tip">按主题分段，便于用户快速定位答案。</view><view class="field-counter">{{form.faqContent.length}} / 1000</view></view>
     </view>
 
     <view class="form-item">
       <view class="form-label">平台规则</view>
-      <textarea class="form-textarea form-textarea-lg ui-input" value="{{form.rulesContent}}" data-field="rulesContent" bindinput="handleInput" maxlength="1000" />
+      <textarea class="form-textarea form-textarea-lg ui-input" value="{{form.rulesContent}}" data-field="rulesContent" bindinput="handleInput" maxlength="1000" placeholder="填写平台规则内容" aria-label="平台规则内容" />
+      <view class="field-meta"><view class="form-tip">修改后会同步服务指南中的平台规则。</view><view class="field-counter">{{form.rulesContent.length}} / 1000</view></view>
     </view>
   </view>
 
   <view class="form-card ui-card">
     <view class="section-heading">
-      <view>
-        <view class="section-eyebrow">RESERVATION</view>
-        <view class="section-heading-title">预约说明</view>
+      <view class="section-heading-main">
+        <view class="section-glyph section-glyph-reservation" aria-hidden="true"><view class="section-glyph-icon"></view></view>
+        <view>
+          <view class="section-eyebrow">RESERVATION</view>
+          <view class="section-heading-title">预约说明</view>
+        </view>
       </view>
       <view class="section-index">04</view>
     </view>
     <view class="form-item">
       <view class="form-label">预约说明文案</view>
-      <textarea class="form-textarea form-textarea-lg ui-input" value="{{form.bookingPrivacyTip}}" data-field="bookingPrivacyTip" bindinput="handleInput" maxlength="300" />
+      <textarea class="form-textarea form-textarea-lg ui-input" value="{{form.bookingPrivacyTip}}" data-field="bookingPrivacyTip" bindinput="handleInput" maxlength="300" placeholder="填写预约联系与隐私说明" aria-label="预约说明文案" />
+      <view class="field-meta"><view class="form-tip">提交前展示，请清晰说明联系用途与用户权利。</view><view class="field-counter">{{form.bookingPrivacyTip.length}} / 300</view></view>
     </view>
     <view class="form-item">
       <view class="form-label">预约状态订阅模板 ID</view>
@@ -149,15 +173,34 @@
         data-field="bookingStatusTemplateId"
         bindinput="handleInput"
         maxlength="128"
+        confirm-type="done"
         placeholder="留空时关闭状态订阅通知"
+        aria-label="预约状态订阅模板 ID"
       />
+      <view class="template-state {{form.bookingStatusTemplateId ? 'template-state-active' : ''}}">
+        <view class="template-state-icon" aria-hidden="true"><view class="template-state-check"></view></view>
+        <view>{{form.bookingStatusTemplateId ? '已填写订阅模板 ID' : '当前未启用状态订阅通知'}}</view>
+      </view>
       <view class="form-tip">模板需包含：车辆名称 thing1、预约状态 phrase2、服务说明 thing3、更新时间 time4。</view>
     </view>
   </view>
 
-  <view class="action-row">
-    <button class="action-btn ui-btn ui-btn-primary" loading="{{saving}}" disabled="{{loadFailed || !hasLoadedConfig}}" bindtap="handleSubmit">保存配置</button>
-    <button class="action-btn ui-btn ui-btn-ghost action-btn-offset" disabled="{{loadFailed || !hasLoadedConfig}}" bindtap="handleReset">恢复默认</button>
+  <view class="action-dock ui-card">
+    <view class="save-state">
+      <view class="save-state-mark {{isDirty ? 'save-state-mark-dirty' : ''}}" aria-hidden="true"><view class="save-state-check"></view></view>
+      <view class="save-state-copy">
+        <view class="save-state-title">{{saving ? '正在保存配置' : isDirty ? '有未保存的修改' : '已与线上配置同步'}}</view>
+        <view class="save-state-desc">{{isDirty ? '保存后各页面才会使用本次调整' : '继续编辑任意字段即可创建新修改'}}</view>
+      </view>
+    </view>
+    <view class="action-row">
+      <button class="action-btn action-btn-save ui-btn ui-btn-primary" loading="{{saving}}" disabled="{{saving || loadFailed || !hasLoadedConfig}}" bindtap="handleSubmit">
+        <view class="action-btn-content"><view wx:if="{{!saving}}" class="save-native-icon" aria-hidden="true"></view><text>{{saving ? '正在保存' : '保存配置'}}</text></view>
+      </button>
+      <button class="action-btn ui-btn ui-btn-ghost action-btn-offset" disabled="{{saving || loadFailed || !hasLoadedConfig}}" bindtap="handleReset">
+        <view class="action-btn-content"><view class="config-action-native-icon config-reset-native-icon" aria-hidden="true"></view><text>恢复默认</text></view>
+      </button>
+    </view>
   </view>
   </block>
 </view>

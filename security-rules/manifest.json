@@ -1,0 +1,27 @@
+{
+  "database": {
+    "ruleFile": "database-deny-client.json",
+    "collections": [
+      "analytics_events",
+      "app_configs",
+      "audit_logs",
+      "bookings",
+      "error_logs",
+      "favorites",
+      "pending_file_deletions",
+      "privacy_requests",
+      "roles",
+      "vehicles"
+    ]
+  },
+  "storage": {
+    "ruleFile": "storage.json",
+    "publicReadPrefix": "vehicle-images/",
+    "maxUploadBytes": 10485760,
+    "allowedImageExtensions": ["jpg", "jpeg", "png", "webp"]
+  },
+  "functions": {
+    "ruleFile": "functions.json",
+    "requiresAuthenticatedNonAnonymousUser": true
+  }
+}

@@ -1,5 +1,6 @@
 {
   "navigationBarTitleText": "个人信息申请",
   "enablePullDownRefresh": true,
-  "backgroundColor": "#101010"
+  "backgroundColor": "#101010",
+  "backgroundTextStyle": "light"
 }

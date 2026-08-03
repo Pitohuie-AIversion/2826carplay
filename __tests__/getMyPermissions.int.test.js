@@ -3,7 +3,8 @@ jest.mock("wx-server-sdk")
 function createMockDb({ rolesData }) {
   const rolesGet = jest.fn().mockResolvedValue({ data: rolesData })
   const rolesLimit = jest.fn(() => ({ get: rolesGet }))
-  const rolesWhere = jest.fn(() => ({ limit: rolesLimit }))
+  const rolesField = jest.fn(() => ({ limit: rolesLimit }))
+  const rolesWhere = jest.fn(() => ({ field: rolesField }))
 
   const db = {
     collection: jest.fn((name) => {
@@ -17,6 +18,7 @@ function createMockDb({ rolesData }) {
   return {
     db,
     rolesWhere,
+    rolesField,
     rolesLimit
   }
 }
@@ -51,7 +53,6 @@ describe("cloudfunctions/getMyPermissions integration", () => {
 
     expect(res).toEqual({
       ok: true,
-      openid: "admin_openid",
       isAdmin: true,
       permissions: ["admin", "vehicle_manage", "booking_manage"],
       canManageRoles: true,
@@ -61,6 +62,14 @@ describe("cloudfunctions/getMyPermissions integration", () => {
       canManageVehicles: true,
       canManageBookings: true
     })
+    expect(mocks.rolesField).toHaveBeenCalledWith({
+      role: true,
+      roles: true,
+      permissions: true,
+      isAdmin: true,
+      admin: true
+    })
+    expect(res).not.toHaveProperty("openid")
   })
 
   test("scoped role 返回对应能力", async () => {

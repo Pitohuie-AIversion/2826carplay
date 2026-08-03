@@ -5,6 +5,14 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
 const EDITABLE_STATUSES = ["pending", "contacted"]
 const EDITABLE_FIELDS = ["userName", "phone", "city", "note"]
+const BOOKING_CONTACT_UPDATE_FIELDS = {
+  openid: true,
+  status: true,
+  userName: true,
+  phone: true,
+  city: true,
+  note: true
+}
 
 function createError(code, message, details) {
   const result = {
@@ -120,7 +128,11 @@ exports.main = async (event) => {
       return createError("VALIDATION_ERROR", "参数校验失败", { errors })
     }
 
-    const currentRes = await db.collection("bookings").doc(input.id).get()
+    const currentRes = await db
+      .collection("bookings")
+      .doc(input.id)
+      .field(BOOKING_CONTACT_UPDATE_FIELDS)
+      .get()
     const current = currentRes && currentRes.data ? currentRes.data : null
     if (!current) {
       return createError("NOT_FOUND", "预约不存在")
@@ -180,19 +192,21 @@ exports.main = async (event) => {
       message: "联系信息已更新"
     }
   } catch (error) {
+    const errorMessage = String(
+      error && (error.message || error.errMsg) ? error.message || error.errMsg : error
+    ).slice(0, 300)
     await writeErrorLogBestEffort({
       function: "bookingUpdateMyContact",
-      openid,
       bookingId: input.id,
-      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
-      stack: error && error.stack ? error.stack : ""
+      authenticated: Boolean(openid),
+      errorMessage
     })
 
     console.error({
       function: "bookingUpdateMyContact",
-      openid,
+      authenticated: Boolean(openid),
       bookingId: input.id,
-      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
+      errorMessage,
       stack: error && error.stack ? error.stack : "",
       createdAt: new Date().toISOString()
     })

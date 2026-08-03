@@ -21,6 +21,12 @@ function createMockDb({ rolesData, vehiclesData, orderedError = null }) {
     }))
   }))
   const vehiclesOrderBy = jest.fn(() => ({ skip: vehiclesOrderedSkip }))
+  const vehiclesQuery = {
+    limit: vehiclesLimit,
+    skip: vehiclesSkip,
+    orderBy: vehiclesOrderBy
+  }
+  const vehiclesField = jest.fn(() => vehiclesQuery)
 
   const db = {
     collection: jest.fn((name) => {
@@ -30,9 +36,8 @@ function createMockDb({ rolesData, vehiclesData, orderedError = null }) {
 
       if (name === "vehicles") {
         return {
-          limit: vehiclesLimit,
-          skip: vehiclesSkip,
-          orderBy: vehiclesOrderBy
+          ...vehiclesQuery,
+          field: vehiclesField
         }
       }
 
@@ -45,6 +50,7 @@ function createMockDb({ rolesData, vehiclesData, orderedError = null }) {
     rolesWhere,
     rolesLimit,
     rolesGet,
+    vehiclesField,
     vehiclesLimit,
     vehiclesSkip,
     vehiclesOrderBy,
@@ -85,6 +91,12 @@ describe("cloudfunctions/vehicleList integration", () => {
           fuelType: "gasoline",
           seats: 5,
           priceDay: 1299,
+          vin: "VIN-MUST-NOT-BE-LISTED",
+          engineNumber: "ENGINE-MUST-NOT-BE-LISTED",
+          publicDescription: "详情页字段",
+          note: "内部备注不得进入列表",
+          imageList: ["cloud://img1", "cloud://img2"],
+          coverImage: "cloud://img1",
           createdByOpenid: "admin_1",
           createdAt: new Date(now - 2 * 24 * 60 * 60 * 1000).toISOString(),
           updatedAt: "2026-07-08T10:00:00.000Z"
@@ -144,6 +156,31 @@ describe("cloudfunctions/vehicleList integration", () => {
     expect(res.list[0].plateNumber).toBe("京A12345")
     expect(res.list[0].location).toBe("杭州")
     expect(res.list[0].priceDay).toBe(1299)
+    expect(res.list[0].imageCount).toBe(2)
+    expect(res.list[0].coverImage).toBe("cloud://img1")
+    expect(res.list[0]).not.toHaveProperty("imageList")
+    expect(res.list[0]).not.toHaveProperty("vin")
+    expect(res.list[0]).not.toHaveProperty("engineNumber")
+    expect(res.list[0]).not.toHaveProperty("publicDescription")
+    expect(res.list[0]).not.toHaveProperty("note")
+    expect(mocks.vehiclesField).toHaveBeenCalledWith({
+      _id: true,
+      plateNumber: true,
+      vehicleType: true,
+      brandModel: true,
+      registerDate: true,
+      status: true,
+      location: true,
+      transmission: true,
+      fuelType: true,
+      seats: true,
+      priceDay: true,
+      imageList: true,
+      coverImage: true,
+      createdByOpenid: true,
+      createdAt: true,
+      updatedAt: true
+    })
     expect(mocks.rolesWhere).toHaveBeenCalledWith({ openid: "admin_openid" })
     expect(mocks.rolesLimit).toHaveBeenCalledWith(20)
     expect(mocks.vehiclesOrderBy).toHaveBeenCalledWith("updatedAt", "desc")

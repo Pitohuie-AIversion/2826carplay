@@ -3,6 +3,18 @@ const cloud = require("wx-server-sdk")
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
+const AUTH_ROLE_FIELDS = {
+  role: true,
+  roles: true,
+  permissions: true,
+  isAdmin: true,
+  admin: true
+}
+const BOOKING_COORDINATION_FIELDS = {
+  status: true,
+  schedulePriority: true,
+  coordinationStatus: true
+}
 const PRIORITY_VALUES = ["priority", "normal", "standby"]
 const COORDINATION_VALUES = ["pending", "coordinating", "resolved"]
 const EDITABLE_BOOKING_STATUSES = ["pending", "contacted"]
@@ -47,7 +59,12 @@ async function canManage(openid) {
   if (!openid) {
     return false
   }
-  const res = await db.collection("roles").where({ openid }).limit(20).get()
+  const res = await db
+    .collection("roles")
+    .where({ openid })
+    .field(AUTH_ROLE_FIELDS)
+    .limit(20)
+    .get()
   const list = res && Array.isArray(res.data) ? res.data : []
   return list.some(hasAccess)
 }
@@ -119,7 +136,7 @@ exports.main = async (event) => {
     }
 
     const bookingRef = db.collection("bookings").doc(input.id)
-    const currentRes = await bookingRef.get()
+    const currentRes = await bookingRef.field(BOOKING_COORDINATION_FIELDS).get()
     const current = currentRes && currentRes.data ? currentRes.data : null
     if (!current) {
       return createError("NOT_FOUND", "预约不存在")
@@ -180,12 +197,15 @@ exports.main = async (event) => {
       message: "协调安排已更新"
     }
   } catch (error) {
+    const errorMessage = String(
+      error && (error.message || error.errMsg) ? error.message || error.errMsg : error
+    ).slice(0, 300)
     await writeErrorLogBestEffort({
       function: "bookingUpdateCoordination",
-      openid,
       bookingId: input.id,
       stage: "main",
-      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
+      authenticated: Boolean(openid),
+      errorMessage,
       occurredAt: new Date().toISOString()
     })
     return createError("INTERNAL_ERROR", "协调安排更新失败，请稍后重试")

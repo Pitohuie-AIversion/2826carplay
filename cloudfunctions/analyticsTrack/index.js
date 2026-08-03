@@ -1,8 +1,13 @@
 const cloud = require("wx-server-sdk")
+const crypto = require("crypto")
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
+const DEDUP_WINDOW_MS = 5 * 1000
+const MAX_RECENT_EVENT_KEYS = 1000
+const INSTANCE_DEDUP_SECRET = crypto.randomBytes(32)
+const recentEventWrites = new Map()
 const ALLOWED_EVENTS = [
   "garage_view",
   "vehicle_detail",
@@ -11,6 +16,65 @@ const ALLOWED_EVENTS = [
   "favorite_add"
 ]
 const VEHICLE_EVENTS = ALLOWED_EVENTS.filter((item) => item !== "garage_view")
+
+function buildEventDocumentId(openid, eventType, now) {
+  const windowId = Math.floor(now / DEDUP_WINDOW_MS)
+  const digest = crypto
+    .createHmac("sha256", INSTANCE_DEDUP_SECRET)
+    .update(`${openid}|${eventType}|${windowId}`)
+    .digest("hex")
+    .slice(0, 32)
+  return `analytics_${digest}`
+}
+
+function pruneRecentEventWrites(now) {
+  recentEventWrites.forEach((item, key) => {
+    if (!item || item.expiresAt <= now) {
+      recentEventWrites.delete(key)
+    }
+  })
+
+  while (recentEventWrites.size >= MAX_RECENT_EVENT_KEYS) {
+    const oldestKey = recentEventWrites.keys().next().value
+    if (!oldestKey) {
+      break
+    }
+    recentEventWrites.delete(oldestKey)
+  }
+}
+
+async function writeAnonymousEvent(openid, eventType, vehicleId) {
+  const now = Date.now()
+  pruneRecentEventWrites(now)
+  const documentId = buildEventDocumentId(openid, eventType, now)
+  const existed = recentEventWrites.get(documentId)
+  if (existed) {
+    await existed.promise
+    return
+  }
+
+  const writePromise = db.collection("analytics_events").doc(documentId).set({
+    data: {
+      eventType,
+      vehicleId: eventType === "garage_view" ? "" : vehicleId,
+      createdAt: db.serverDate()
+    }
+  })
+  recentEventWrites.set(documentId, {
+    expiresAt: now + DEDUP_WINDOW_MS,
+    promise: writePromise
+  })
+
+  try {
+    await writePromise
+  } catch (error) {
+    const current = recentEventWrites.get(documentId)
+    if (current && current.promise === writePromise) {
+      recentEventWrites.delete(documentId)
+    }
+    throw error
+  }
+}
 
 exports.main = async (event) => {
   const wxContext = cloud.getWXContext()
@@ -42,13 +106,7 @@ exports.main = async (event) => {
       }
     }
 
-    await db.collection("analytics_events").add({
-      data: {
-        eventType,
-        vehicleId: eventType === "garage_view" ? "" : vehicleId,
-        createdAt: db.serverDate()
-      }
-    })
+    await writeAnonymousEvent(openid, eventType, vehicleId)
 
     return {
       ok: true

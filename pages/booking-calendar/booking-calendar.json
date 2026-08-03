@@ -1,5 +1,6 @@
 {
   "navigationBarTitleText": "预约日历",
   "enablePullDownRefresh": true,
-  "backgroundColor": "#101010"
+  "backgroundColor": "#101010",
+  "backgroundTextStyle": "light"
 }

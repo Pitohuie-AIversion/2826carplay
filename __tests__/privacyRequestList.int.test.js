@@ -14,6 +14,10 @@ function createMockDb({ roles, records }) {
     }))
   }))
   const privacyOrderBy = jest.fn(() => ({ skip: privacySkip }))
+  const privacyField = jest.fn(() => ({
+    orderBy: privacyOrderBy,
+    skip: privacySkip
+  }))
 
   return {
     db: {
@@ -23,14 +27,14 @@ function createMockDb({ roles, records }) {
         }
         if (name === "privacy_requests") {
           return {
-            orderBy: privacyOrderBy,
-            skip: privacySkip
+            field: privacyField
           }
         }
         throw new Error(`Unexpected collection: ${name}`)
       })
     },
-    privacyOrderBy
+    privacyOrderBy,
+    privacyField
   }
 }
 
@@ -67,6 +71,7 @@ describe("cloudfunctions/privacyRequestList integration", () => {
           type: "access",
           status: "completed",
           description: "查询资料",
+          dataExportedAt: "2026-07-21T08:00:00.000Z",
           createdAt: "2026-07-21T00:00:00.000Z"
         }
       ]
@@ -79,6 +84,41 @@ describe("cloudfunctions/privacyRequestList integration", () => {
     expect(res.total).toBe(1)
     expect(res.list[0].id).toBe("p1")
     expect(mocks.privacyOrderBy).toHaveBeenCalledWith("createdAt", "desc")
+  })
+
+  test("查询申请列表返回个人数据生成时间但不返回操作管理员", async () => {
+    const mocks = createMockDb({
+      roles: [{ openid: "admin_openid", role: "admin" }],
+      records: [
+        {
+          _id: "p_exported",
+          openid: "user_1",
+          type: "access",
+          status: "processing",
+          dataExportedAt: "2026-07-30T08:00:00.000Z",
+          dataExportedBy: "admin_secret"
+        }
+      ]
+    })
+    const mod = await loadModule("admin_openid", mocks.db)
+
+    const res = await mod.main({ type: "access" })
+
+    expect(res.list[0].dataExportedAt).toBe("2026-07-30T08:00:00.000Z")
+    expect(res.list[0].dataExportedBy).toBeUndefined()
+    expect(JSON.stringify(res.list[0])).not.toContain("admin_secret")
+    const fields = mocks.privacyField.mock.calls[0][0]
+    expect(fields).toEqual(
+      expect.objectContaining({
+        _id: true,
+        openid: true,
+        description: true,
+        resolutionNote: true,
+        dataExportedAt: true
+      })
+    )
+    expect(fields.dataExportedBy).toBeUndefined()
+    expect(fields.handledBy).toBeUndefined()
   })
 
   test("管理员可按 OpenID 搜索", async () => {

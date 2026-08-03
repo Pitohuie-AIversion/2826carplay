@@ -3,6 +3,21 @@ const cloud = require("wx-server-sdk")
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
+const AUTH_ROLE_FIELDS = {
+  role: true,
+  roles: true,
+  permissions: true,
+  isAdmin: true,
+  admin: true
+}
+const ANALYTICS_VEHICLE_FIELDS = {
+  brandModel: true
+}
+const ANALYTICS_EVENT_FIELDS = {
+  eventType: true,
+  vehicleId: true,
+  createdAt: true
+}
 const MAX_EVENTS = 5000
 const EVENT_BATCH_SIZE = 100
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -45,7 +60,12 @@ async function canView(openid) {
   if (!openid) {
     return false
   }
-  const res = await db.collection("roles").where({ openid }).limit(20).get()
+  const res = await db
+    .collection("roles")
+    .where({ openid })
+    .field(AUTH_ROLE_FIELDS)
+    .limit(20)
+    .get()
   const list = res && Array.isArray(res.data) ? res.data : []
   return list.some(hasAccess)
 }
@@ -84,7 +104,7 @@ async function readEventsByMode(ordered) {
   for (let offset = 0; offset <= MAX_EVENTS; offset += EVENT_BATCH_SIZE) {
     const remaining = MAX_EVENTS + 1 - list.length
     const batchSize = Math.min(EVENT_BATCH_SIZE, remaining)
-    let query = db.collection("analytics_events")
+    let query = db.collection("analytics_events").field(ANALYTICS_EVENT_FIELDS)
     if (ordered) {
       query = query.orderBy("createdAt", "desc")
     }
@@ -111,7 +131,11 @@ async function readEvents() {
 
 async function readVehicleName(vehicleId) {
   try {
-    const res = await db.collection("vehicles").doc(vehicleId).get()
+    const res = await db
+      .collection("vehicles")
+      .doc(vehicleId)
+      .field(ANALYTICS_VEHICLE_FIELDS)
+      .get()
     const vehicle = res && res.data ? res.data : null
     return vehicle ? String(vehicle.brandModel || "").trim() || "未命名车辆" : "已下架车辆"
   } catch (error) {
@@ -218,7 +242,7 @@ exports.main = async (event) => {
   } catch (error) {
     console.error({
       function: "analyticsOverview",
-      openid,
+      authenticated: Boolean(openid),
       errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
       stack: error && error.stack ? error.stack : "",
       createdAt: new Date().toISOString()

@@ -3,7 +3,8 @@ jest.mock("wx-server-sdk")
 function createMockDb({ existing = [], addId = "privacy_1" } = {}) {
   const existingGet = jest.fn().mockResolvedValue({ data: existing })
   const existingLimit = jest.fn(() => ({ get: existingGet }))
-  const privacyWhere = jest.fn(() => ({ limit: existingLimit }))
+  const existingField = jest.fn(() => ({ limit: existingLimit }))
+  const privacyWhere = jest.fn(() => ({ field: existingField, limit: existingLimit }))
   const privacyAdd = jest.fn().mockResolvedValue({ _id: addId })
   const auditAdd = jest.fn().mockResolvedValue({ _id: "audit_1" })
   const serverDateValue = { __type: "serverDate" }
@@ -28,6 +29,7 @@ function createMockDb({ existing = [], addId = "privacy_1" } = {}) {
   return {
     db,
     privacyWhere,
+    existingField,
     privacyAdd,
     auditAdd,
     serverDateValue
@@ -65,6 +67,12 @@ describe("cloudfunctions/privacyRequestCreate integration", () => {
       message: "隐私申请已提交"
     })
     expect(mocks.privacyWhere).toHaveBeenCalledWith({ openid: "user_openid" })
+    expect(mocks.existingField).toHaveBeenCalledWith({
+      _id: true,
+      type: true,
+      status: true,
+      createdAt: true
+    })
     expect(mocks.privacyAdd).toHaveBeenCalledWith({
       data: {
         openid: "user_openid",

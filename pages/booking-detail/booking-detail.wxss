@@ -1,7 +1,7 @@
 .detail-page {
   position: relative;
   min-height: 100vh;
-  padding: 38rpx 24rpx 70rpx;
+  padding: 38rpx calc(24rpx + env(safe-area-inset-right)) calc(70rpx + env(safe-area-inset-bottom)) calc(24rpx + env(safe-area-inset-left));
   overflow: hidden;
   color: #f7f8fa;
   background: linear-gradient(180deg, #141a25 0%, #0b0d10 620rpx);
@@ -22,6 +22,7 @@
 .receipt-card,
 .info-card,
 .note-card,
+.detail-actions-card,
 .actions {
   position: relative;
   z-index: 1;
@@ -86,9 +87,21 @@
 }
 
 .booking-status {
+  display: flex;
+  align-items: center;
   flex-shrink: 0;
   margin-left: 16rpx;
   border: 1rpx solid rgba(255, 255, 255, 0.12);
+}
+
+.booking-status-dot {
+  flex-shrink: 0;
+  width: 8rpx;
+  height: 8rpx;
+  margin-right: 8rpx;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 10rpx currentColor;
 }
 
 .receipt-divider {
@@ -129,6 +142,15 @@
   word-break: break-word;
 }
 
+.booking-vehicle-reference {
+  position: relative;
+  z-index: 1;
+  margin-top: 2rpx;
+  color: #8290a3;
+  font-size: 20rpx;
+  line-height: 1.4;
+}
+
 .journey-panel {
   position: relative;
   z-index: 1;
@@ -167,8 +189,15 @@
 .journey-route {
   display: flex;
   align-items: center;
+  flex-direction: column;
   flex: 1;
-  margin: 20rpx 18rpx 0;
+  margin: 9rpx 18rpx 0;
+}
+
+.route-track {
+  display: flex;
+  align-items: center;
+  width: 100%;
 }
 
 .route-dot {
@@ -185,9 +214,29 @@
 }
 
 .route-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18rpx;
+  height: 18rpx;
   color: #667c9f;
-  font-size: 22rpx;
-  line-height: 1;
+}
+
+.route-chevron {
+  width: 8rpx;
+  height: 8rpx;
+  border-right: 2rpx solid currentColor;
+  border-bottom: 2rpx solid currentColor;
+  box-sizing: border-box;
+  transform: rotate(-45deg);
+}
+
+.route-span {
+  margin-top: 8rpx;
+  color: #65768d;
+  font-size: 15rpx;
+  line-height: 1.3;
+  white-space: nowrap;
 }
 
 .receipt-footer {
@@ -210,18 +259,93 @@
 }
 
 .code-value {
-  margin-top: 5rpx;
-  color: #8994a3;
+  color: #c1d2e9;
   font-family: monospace;
-  font-size: 17rpx;
+  font-size: 19rpx;
+  font-weight: 650;
   line-height: 1.4;
-  word-break: break-all;
+  letter-spacing: 0.8rpx;
+}
+
+.code-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-top: 5rpx;
+  padding: 5rpx 5rpx 5rpx 12rpx;
+  border: 1rpx solid rgba(105, 154, 235, 0.14);
+  border-radius: 999rpx;
+  background: rgba(61, 104, 171, 0.07);
+}
+
+.copy-code-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  min-width: 70rpx;
+  height: 42rpx;
+  margin: 0 0 0 10rpx;
+  padding: 0 12rpx;
+  border: 0;
+  border-radius: 999rpx;
+  background: rgba(84, 143, 255, 0.13);
+  color: #8eb8fa;
+  font-size: 15rpx;
+  line-height: 1;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.copy-code-btn-pressed {
+  opacity: 0.72;
+  transform: scale(0.97);
+}
+
+.copy-code-btn::after {
+  border: 0;
 }
 
 .info-card,
-.note-card {
+.note-card,
+.detail-actions-card {
   margin-top: 20rpx;
   padding: 28rpx;
+}
+
+.detail-actions-card {
+  border-color: rgba(84, 143, 255, 0.12);
+  background:
+    radial-gradient(circle at 92% 0%, rgba(69, 126, 218, 0.09), transparent 42%),
+    rgba(20, 24, 30, 0.96);
+}
+
+.detail-action-buttons {
+  display: flex;
+  margin-top: 22rpx;
+}
+
+.detail-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  height: 78rpx;
+  margin: 0 12rpx 0 0;
+  border-radius: 18rpx;
+  font-size: 21rpx;
+  line-height: 1;
+}
+
+.detail-action-btn-last {
+  margin-right: 0;
+}
+
+.detail-action-note {
+  margin-top: 14rpx;
+  color: #626e7d;
+  font-size: 17rpx;
+  line-height: 1.55;
+  text-align: center;
 }
 
 .section-title {
@@ -245,6 +369,9 @@
 }
 
 .edit-contact-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 108rpx;
   min-width: 108rpx;
   height: 58rpx;
@@ -252,7 +379,7 @@
   padding: 0;
   border-radius: 15rpx;
   font-size: 20rpx;
-  line-height: 58rpx;
+  line-height: 1;
 }
 
 .info-grid {
@@ -336,11 +463,14 @@
 
 .edit-save-btn,
 .edit-cancel-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex: 1;
   height: 80rpx;
   border-radius: 18rpx;
   font-size: 22rpx;
-  line-height: 80rpx;
+  line-height: 1;
 }
 
 .edit-cancel-btn {
@@ -352,7 +482,156 @@
   color: #66717f;
   font-size: 19rpx;
   line-height: 1.6;
-  text-align: center;
+  text-align: left;
+}
+
+.action-with-icon,
+.tip-with-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tip-with-icon {
+  align-items: flex-start;
+}
+
+.copy-native-icon {
+  position: relative;
+  flex-shrink: 0;
+  width: 13rpx;
+  height: 13rpx;
+  margin-right: 6rpx;
+  border: 2rpx solid currentColor;
+  border-radius: 3rpx;
+  box-sizing: border-box;
+}
+
+.copy-native-icon::after {
+  position: absolute;
+  top: -5rpx;
+  left: 3rpx;
+  width: 11rpx;
+  height: 11rpx;
+  border-top: 2rpx solid currentColor;
+  border-right: 2rpx solid currentColor;
+  border-radius: 0 3rpx 0 0;
+  content: "";
+}
+
+.edit-native-icon {
+  width: 15rpx;
+  height: 5rpx;
+  margin-right: 7rpx;
+  border: 2rpx solid currentColor;
+  border-radius: 4rpx 0 0 4rpx;
+  box-sizing: border-box;
+  transform: rotate(-42deg);
+}
+
+.save-native-icon,
+.booking-list-native-icon,
+.note-native-icon {
+  position: relative;
+  flex-shrink: 0;
+  width: 20rpx;
+  height: 22rpx;
+  margin-right: 8rpx;
+  border: 2rpx solid currentColor;
+  border-radius: 4rpx;
+  box-sizing: border-box;
+}
+
+.save-native-line,
+.save-native-icon::after,
+.booking-list-native-line,
+.booking-list-native-icon::after,
+.note-native-line,
+.note-native-icon::after {
+  position: absolute;
+  left: 4rpx;
+  width: 9rpx;
+  height: 2rpx;
+  border-radius: 2rpx;
+  background: currentColor;
+  content: "";
+}
+
+.save-native-line,
+.booking-list-native-line-top,
+.note-native-line {
+  top: 5rpx;
+}
+
+.save-native-icon::after,
+.booking-list-native-line,
+.note-native-icon::after {
+  top: 12rpx;
+}
+
+.cancel-edit-native-icon {
+  position: relative;
+  width: 17rpx;
+  height: 17rpx;
+  margin-right: 7rpx;
+}
+
+.cancel-edit-native-icon::before,
+.cancel-edit-native-icon::after {
+  position: absolute;
+  top: 7rpx;
+  left: 1rpx;
+  width: 15rpx;
+  height: 2rpx;
+  border-radius: 2rpx;
+  background: currentColor;
+  content: "";
+}
+
+.cancel-edit-native-icon::before {
+  transform: rotate(45deg);
+}
+
+.cancel-edit-native-icon::after {
+  transform: rotate(-45deg);
+}
+
+.tip-info-native-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 28rpx;
+  height: 28rpx;
+  margin: 0 9rpx 0 0;
+  border: 1rpx solid currentColor;
+  border-radius: 50%;
+  color: #637995;
+  box-sizing: border-box;
+}
+
+.tip-info-native-icon-danger {
+  color: #a56c6c;
+}
+
+.tip-info-mark {
+  position: relative;
+  width: 3rpx;
+  height: 8rpx;
+  margin-top: 5rpx;
+  border-radius: 2rpx;
+  background: currentColor;
+}
+
+.tip-info-mark::before {
+  position: absolute;
+  top: -6rpx;
+  left: 0;
+  width: 3rpx;
+  height: 3rpx;
+  border-radius: 50%;
+  background: currentColor;
+  content: "";
 }
 
 .timeline {
@@ -438,6 +717,24 @@
   box-sizing: border-box;
 }
 
+.progress-node-check {
+  width: 8rpx;
+  height: 15rpx;
+  margin-top: -4rpx;
+  border-right: 2rpx solid currentColor;
+  border-bottom: 2rpx solid currentColor;
+  box-sizing: border-box;
+  transform: rotate(45deg);
+}
+
+.progress-node-cancel {
+  width: 15rpx;
+  height: 2rpx;
+  border-radius: 2rpx;
+  background: currentColor;
+  transform: rotate(-45deg);
+}
+
 .progress-connector {
   flex: 1;
   height: 2rpx;
@@ -479,6 +776,93 @@
 
 .progress-cancelled .progress-label {
   color: #efb0b0;
+}
+
+.status-guidance {
+  display: flex;
+  align-items: flex-start;
+  margin-top: 24rpx;
+  padding: 19rpx 20rpx;
+  border: 1rpx solid rgba(84, 143, 255, 0.13);
+  border-radius: 18rpx;
+  background: rgba(84, 143, 255, 0.05);
+}
+
+.status-guidance-mark {
+  flex-shrink: 0;
+  width: 8rpx;
+  height: 46rpx;
+  margin: 4rpx 16rpx 0 0;
+  border-radius: 999rpx;
+  background: #5d96f4;
+}
+
+.status-guidance-native-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 35rpx;
+  height: 35rpx;
+  margin: 2rpx 15rpx 0 0;
+  border: 2rpx solid #5d96f4;
+  border-radius: 50%;
+  color: #5d96f4;
+  box-sizing: border-box;
+}
+
+.status-guidance-icon-mark {
+  width: 4rpx;
+  height: 9rpx;
+  border-radius: 2rpx;
+  background: currentColor;
+  box-shadow: 0 12rpx 0 -1rpx currentColor;
+}
+
+.status-guidance-title {
+  color: #cbdaf0;
+  font-size: 21rpx;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.status-guidance-desc {
+  margin-top: 6rpx;
+  color: #758498;
+  font-size: 18rpx;
+  line-height: 1.58;
+}
+
+.status-guidance-contacted {
+  border-color: rgba(74, 184, 134, 0.15);
+  background: rgba(74, 184, 134, 0.05);
+}
+
+.status-guidance-contacted .status-guidance-mark {
+  background: #59c894;
+}
+
+.status-guidance-contacted .status-guidance-native-icon {
+  border-color: #59c894;
+  color: #59c894;
+}
+
+.status-guidance-completed,
+.status-guidance-cancelled {
+  border-color: rgba(139, 148, 161, 0.12);
+  background: rgba(139, 148, 161, 0.04);
+}
+
+.status-guidance-completed .status-guidance-mark,
+.status-guidance-cancelled .status-guidance-mark {
+  background: #788493;
+}
+
+.status-guidance-completed .status-guidance-native-icon,
+.status-guidance-cancelled .status-guidance-native-icon {
+  border-color: #788493;
+  color: #788493;
 }
 
 .timeline-meta {
@@ -536,6 +920,40 @@
   padding-right: 18rpx;
 }
 
+.subscription-native-icon {
+  position: relative;
+  flex-shrink: 0;
+  width: 30rpx;
+  height: 27rpx;
+  margin-right: 13rpx;
+  border: 2rpx solid #6f9ce1;
+  border-bottom: 0;
+  border-radius: 15rpx 15rpx 5rpx 5rpx;
+  color: #6f9ce1;
+  box-sizing: border-box;
+}
+
+.subscription-native-icon::after {
+  position: absolute;
+  right: -3rpx;
+  bottom: 0;
+  left: -3rpx;
+  height: 2rpx;
+  border-radius: 2rpx;
+  background: currentColor;
+  content: "";
+}
+
+.subscription-bell-clapper {
+  position: absolute;
+  bottom: -7rpx;
+  left: 11rpx;
+  width: 6rpx;
+  height: 6rpx;
+  border-radius: 50%;
+  background: currentColor;
+}
+
 .subscription-title {
   color: #c8d8ef;
   font-size: 22rpx;
@@ -551,13 +969,85 @@
 }
 
 .subscription-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex: 0 0 152rpx;
   width: 152rpx;
   height: 68rpx;
   padding: 0 10rpx;
   border-radius: 16rpx;
   font-size: 20rpx;
-  line-height: 68rpx;
+  line-height: 1;
+}
+
+.subscription-action-native-icon {
+  position: relative;
+  width: 18rpx;
+  height: 16rpx;
+  margin-right: 7rpx;
+  border: 2rpx solid currentColor;
+  border-bottom: 0;
+  border-radius: 9rpx 9rpx 3rpx 3rpx;
+  box-sizing: border-box;
+}
+
+.subscription-action-native-icon::after {
+  position: absolute;
+  right: -2rpx;
+  bottom: -2rpx;
+  left: -2rpx;
+  height: 2rpx;
+  background: currentColor;
+  content: "";
+}
+
+.section-title-with-icon {
+  display: flex;
+  align-items: center;
+}
+
+.note-native-icon {
+  color: #7588a5;
+}
+
+.vehicle-native-icon {
+  position: relative;
+  flex-shrink: 0;
+  width: 28rpx;
+  height: 20rpx;
+  margin-right: 9rpx;
+  border: 2rpx solid currentColor;
+  border-radius: 6rpx;
+  box-sizing: border-box;
+}
+
+.vehicle-native-window {
+  position: absolute;
+  top: 4rpx;
+  left: 6rpx;
+  width: 13rpx;
+  height: 4rpx;
+  border-top: 2rpx solid currentColor;
+}
+
+.vehicle-native-wheel {
+  position: absolute;
+  bottom: -5rpx;
+  width: 6rpx;
+  height: 6rpx;
+  border: 2rpx solid #151a21;
+  border-radius: 50%;
+  background: currentColor;
+  box-sizing: border-box;
+}
+
+.vehicle-native-wheel-left {
+  left: 4rpx;
+}
+
+.vehicle-native-wheel-right {
+  right: 4rpx;
 }
 
 .note-content {
@@ -581,17 +1071,42 @@
   color: #66717f;
   font-size: 19rpx;
   line-height: 1.5;
-  text-align: center;
+  text-align: left;
 }
 
 .cancel-btn,
 .retry-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 100%;
   height: 86rpx;
   border-radius: 20rpx;
   font-size: 24rpx;
-  line-height: 86rpx;
+  line-height: 1;
   box-sizing: border-box;
+}
+
+.cancel-booking-native-icon {
+  position: relative;
+  width: 21rpx;
+  height: 21rpx;
+  margin-right: 9rpx;
+  border: 2rpx solid currentColor;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+
+.cancel-booking-native-icon::after {
+  position: absolute;
+  top: 8rpx;
+  left: 4rpx;
+  width: 10rpx;
+  height: 2rpx;
+  border-radius: 2rpx;
+  background: currentColor;
+  content: "";
+  transform: rotate(-45deg);
 }
 
 .state-page {
@@ -634,13 +1149,49 @@
 }
 
 .back-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 100%;
   height: 86rpx;
   margin-top: 14rpx;
   border-radius: 20rpx;
   font-size: 24rpx;
-  line-height: 86rpx;
+  line-height: 1;
   box-sizing: border-box;
+}
+
+.retry-native-icon {
+  position: relative;
+  width: 23rpx;
+  height: 23rpx;
+  margin-right: 9rpx;
+  border: 2rpx solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+
+.retry-native-icon::after {
+  position: absolute;
+  top: -4rpx;
+  right: -1rpx;
+  width: 7rpx;
+  height: 7rpx;
+  border-top: 2rpx solid currentColor;
+  border-right: 2rpx solid currentColor;
+  content: "";
+  transform: rotate(20deg);
+}
+
+.back-native-icon {
+  width: 12rpx;
+  height: 12rpx;
+  margin-right: 9rpx;
+  border-bottom: 2rpx solid currentColor;
+  border-left: 2rpx solid currentColor;
+  box-sizing: border-box;
+  transform: rotate(45deg);
 }
 
 .detail-skeleton-page {

@@ -1,5 +1,6 @@
 const vehicleUtils = require("../../shared/vehicle")
 const { requirePagePermission } = require("../../shared/pageAuth")
+const { formatToastTitle } = require("../../shared/uiFeedback")
 
 const STATUS_OPTIONS = [
   { value: "all", label: "全部" },
@@ -133,7 +134,38 @@ function formatPriceDayText(priceDay) {
     return `￥${priceDay} / 24小时`
   }
 
-  return "--"
+  return "—"
+}
+
+function buildMediaHealth(item) {
+  const source = item && typeof item === "object" ? item : {}
+  const imageCount = Math.max(0, Number(source.imageCount) || 0)
+  const hasCover = Boolean(source.coverImage)
+
+  if (!hasCover) {
+    return {
+      imageCount,
+      mediaStatusText: "待补封面",
+      mediaStatusClass: "media-health-missing",
+      mediaProgress: 0
+    }
+  }
+
+  if (imageCount < 3) {
+    return {
+      imageCount,
+      mediaStatusText: "基础素材",
+      mediaStatusClass: "media-health-basic",
+      mediaProgress: Math.round((imageCount / 3) * 100)
+    }
+  }
+
+  return {
+    imageCount,
+    mediaStatusText: "素材充足",
+    mediaStatusClass: "media-health-ready",
+    mediaProgress: 100
+  }
 }
 
 function buildRecentAddedViewModel(list) {
@@ -144,11 +176,11 @@ function buildRecentAddedViewModel(list) {
   return list.map((item) => ({
     id: item.id || "",
     plateNumber: vehicleUtils.normalizePlateNumber(item.plateNumber),
-    brandModel: item.brandModel || "--",
+    brandModel: item.brandModel || "—",
     status: item.status || "",
     statusText: STATUS_LABEL_MAP[item.status] || item.status || "未知",
     statusClass: STATUS_CLASS_MAP[item.status] || "status-idle",
-    locationText: item.location ? String(item.location).trim() : "--",
+    locationText: item.location ? String(item.location).trim() : "—",
     createdAtText: formatDisplayTime(item.createdAt)
   }))
 }
@@ -206,6 +238,13 @@ Page({
     })
   },
 
+  handleClearKeyword() {
+    if (!this.data.keyword) {
+      return
+    }
+    this.setData({ keyword: "" }, () => this.fetchList())
+  },
+
   handleKeywordConfirm() {
     this.fetchList()
   },
@@ -243,7 +282,13 @@ Page({
 
   handleGoCreate() {
     wx.navigateTo({
-      url: "/pages/vehicle-create/vehicle-create"
+      url: "/pages/vehicle-create/vehicle-create",
+      fail: () => {
+        wx.showToast({
+          title: "新建页面打开失败",
+          icon: "none"
+        })
+      }
     })
   },
 
@@ -252,14 +297,20 @@ Page({
 
     if (!id) {
       wx.showToast({
-        title: "缺少车辆ID",
+        title: "车辆编号缺失",
         icon: "none"
       })
       return
     }
 
     wx.navigateTo({
-      url: `/pages/vehicle-edit/vehicle-edit?id=${id}`
+      url: `/pages/vehicle-edit/vehicle-edit?id=${id}`,
+      fail: () => {
+        wx.showToast({
+          title: "编辑页面打开失败",
+          icon: "none"
+        })
+      }
     })
   },
 
@@ -268,15 +319,43 @@ Page({
 
     if (!id) {
       wx.showToast({
-        title: "缺少车辆ID",
+        title: "车辆编号缺失",
         icon: "none"
       })
       return
     }
 
     wx.navigateTo({
-      url: `/pages/vehicle-detail-manage/vehicle-detail-manage?id=${id}`
+      url: `/pages/vehicle-detail-manage/vehicle-detail-manage?id=${id}`,
+      fail: () => {
+        wx.showToast({
+          title: "车辆详情打开失败",
+          icon: "none"
+        })
+      }
     })
+  },
+
+  handleCoverImageError(event) {
+    const index = Number(event.currentTarget.dataset.index)
+    const list = Array.isArray(this.data.list) ? this.data.list : []
+
+    if (!Number.isInteger(index) || index < 0 || index >= list.length) {
+      return
+    }
+
+    const nextList = list.map((item, itemIndex) => itemIndex === index
+      ? {
+          ...item,
+          coverImage: "",
+          coverLoadFailed: true,
+          mediaStatusText: "封面不可用",
+          mediaStatusClass: "media-health-missing",
+          mediaProgress: 0
+        }
+      : item)
+
+    this.setData({ list: nextList })
   },
 
   handleUpdateStatus(event) {
@@ -302,6 +381,8 @@ Page({
     wx.showModal({
       title: "更新状态",
       content: `确认将车辆 ${plateNumber || id} 状态更新为「${statusText}」？`,
+      confirmText: "确认更新",
+      confirmColor: "#528fff",
       success: (modalRes) => {
         if (!modalRes.confirm) {
           return
@@ -318,7 +399,7 @@ Page({
 
     if (!id) {
       wx.showToast({
-        title: "缺少车辆ID",
+        title: "车辆编号缺失",
         icon: "none"
       })
       return
@@ -327,6 +408,8 @@ Page({
     wx.showModal({
       title: "停用车辆",
       content: `确认将车辆 ${plateNumber || id} 标记为停用？`,
+      confirmText: "确认停用",
+      confirmColor: "#d46868",
       success: (modalRes) => {
         if (!modalRes.confirm) {
           return
@@ -343,7 +426,7 @@ Page({
 
     if (!id) {
       wx.showToast({
-        title: "缺少车辆ID",
+        title: "车辆编号缺失",
         icon: "none"
       })
       return
@@ -352,6 +435,8 @@ Page({
     wx.showModal({
       title: "恢复启用",
       content: `确认将车辆 ${plateNumber || id} 恢复为可管理状态？`,
+      confirmText: "确认恢复",
+      confirmColor: "#528fff",
       success: (modalRes) => {
         if (!modalRes.confirm) {
           return
@@ -368,7 +453,7 @@ Page({
 
     if (!id) {
       wx.showToast({
-        title: "缺少车辆ID",
+        title: "车辆编号缺失",
         icon: "none"
       })
       return
@@ -377,7 +462,8 @@ Page({
     wx.showModal({
       title: "删除车辆",
       content: `确认删除车辆 ${plateNumber || id}？仅无预约历史的车辆可删除；有预约历史请改为停用。删除后不可恢复。`,
-      confirmColor: "#eb5757",
+      confirmText: "确认删除",
+      confirmColor: "#d46868",
       success: (modalRes) => {
         if (!modalRes.confirm) {
           return
@@ -398,7 +484,8 @@ Page({
     }
 
     wx.showLoading({
-      title: "更新中"
+      title: "更新中…",
+      mask: true
     })
 
     wx.cloud.callFunction({
@@ -409,14 +496,14 @@ Page({
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
           wx.showToast({
-            title: (result && result.message) || "更新失败",
+          title: formatToastTitle(result && result.message, "更新失败"),
             icon: "none"
           })
           return
         }
 
         wx.showToast({
-          title: result.message || "状态已更新",
+        title: formatToastTitle(result.message, "状态已更新"),
           icon: "success"
         })
         this.fetchList()
@@ -424,7 +511,7 @@ Page({
       fail: (error) => {
         wx.hideLoading()
         wx.showToast({
-          title: (error && (error.errMsg || error.message)) || "更新失败",
+          title: "更新失败",
           icon: "none"
         })
       }
@@ -441,7 +528,8 @@ Page({
     }
 
     wx.showLoading({
-      title: "停用中"
+      title: "停用中…",
+      mask: true
     })
 
     wx.cloud.callFunction({
@@ -453,14 +541,14 @@ Page({
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
           wx.showToast({
-            title: (result && result.message) || "停用失败",
+          title: formatToastTitle(result && result.message, "停用失败"),
             icon: "none"
           })
           return
         }
 
         wx.showToast({
-          title: result.message || "停用成功",
+        title: formatToastTitle(result.message, "停用成功"),
           icon: "success"
         })
 
@@ -469,7 +557,7 @@ Page({
       fail: (error) => {
         wx.hideLoading()
         wx.showToast({
-          title: (error && (error.errMsg || error.message)) || "停用失败",
+          title: "停用失败",
           icon: "none"
         })
       }
@@ -486,7 +574,8 @@ Page({
     }
 
     wx.showLoading({
-      title: "恢复中"
+      title: "恢复中…",
+      mask: true
     })
 
     wx.cloud.callFunction({
@@ -498,14 +587,14 @@ Page({
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
           wx.showToast({
-            title: (result && result.message) || "恢复失败",
+          title: formatToastTitle(result && result.message, "恢复失败"),
             icon: "none"
           })
           return
         }
 
         wx.showToast({
-          title: result.message || "恢复成功",
+        title: formatToastTitle(result.message, "恢复成功"),
           icon: "success"
         })
 
@@ -514,7 +603,7 @@ Page({
       fail: (error) => {
         wx.hideLoading()
         wx.showToast({
-          title: (error && (error.errMsg || error.message)) || "恢复失败",
+          title: "恢复失败",
           icon: "none"
         })
       }
@@ -531,7 +620,8 @@ Page({
     }
 
     wx.showLoading({
-      title: "删除中"
+      title: "删除中…",
+      mask: true
     })
 
     wx.cloud.callFunction({
@@ -543,14 +633,14 @@ Page({
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
           wx.showToast({
-            title: (result && result.message) || "删除失败",
+          title: formatToastTitle(result && result.message, "删除失败"),
             icon: "none"
           })
           return
         }
 
         wx.showToast({
-          title: result.message || "删除成功",
+        title: formatToastTitle(result.message, "删除成功"),
           icon: "success"
         })
 
@@ -559,7 +649,7 @@ Page({
       fail: (error) => {
         wx.hideLoading()
         wx.showToast({
-          title: (error && (error.errMsg || error.message)) || "删除失败",
+          title: "删除失败",
           icon: "none"
         })
       }
@@ -603,7 +693,7 @@ Page({
 
         if (!result || !result.ok) {
           wx.showToast({
-            title: (result && result.message) || "查询失败",
+          title: formatToastTitle(result && result.message, "查询失败"),
             icon: "none"
           })
 
@@ -625,12 +715,13 @@ Page({
               statusClass: STATUS_CLASS_MAP[item.status] || "status-idle",
               vehicleTypeText: VEHICLE_TYPE_LABEL_MAP[item.vehicleType] || item.vehicleType || "未知",
               updatedAtText: formatDisplayTime(item.updatedAt || item.createdAt),
-              locationText: item.location ? String(item.location).trim() : "--",
+              locationText: item.location ? String(item.location).trim() : "—",
               priceDayText: formatPriceDayText(item.priceDay),
               transmissionText:
-                TRANSMISSION_LABEL_MAP[item.transmission] || (item.transmission ? String(item.transmission) : "--"),
-              fuelTypeText: FUEL_TYPE_LABEL_MAP[item.fuelType] || (item.fuelType ? String(item.fuelType) : "--"),
-              seatsText: Number.isInteger(item.seats) && item.seats > 0 ? `${item.seats} 座` : "--"
+                TRANSMISSION_LABEL_MAP[item.transmission] || (item.transmission ? String(item.transmission) : "—"),
+              fuelTypeText: FUEL_TYPE_LABEL_MAP[item.fuelType] || (item.fuelType ? String(item.fuelType) : "—"),
+              seatsText: Number.isInteger(item.seats) && item.seats > 0 ? `${item.seats} 座` : "—",
+              ...buildMediaHealth(item)
             }))
           : []
 
@@ -654,7 +745,7 @@ Page({
       },
       fail: (error) => {
         wx.showToast({
-          title: (error && (error.errMsg || error.message)) || "查询失败",
+          title: "查询失败",
           icon: "none"
         })
 

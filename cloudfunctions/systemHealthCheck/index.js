@@ -3,6 +3,19 @@ const cloud = require("wx-server-sdk")
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
+const AUTH_ROLE_FIELDS = {
+  role: true,
+  roles: true,
+  permissions: true,
+  isAdmin: true,
+  admin: true
+}
+const COLLECTION_PROBE_FIELDS = {
+  _id: true
+}
+const OPERATION_CONFIG_FIELDS = {
+  value: true
+}
 const CONFIG_KEY = "operation_settings"
 const REQUIRED_COLLECTIONS = [
   { key: "vehicles", label: "车辆数据" },
@@ -60,6 +73,26 @@ const VOLUME_CHECKS = [
     recommendation: "请在数据分析页执行匿名数据清理"
   }
 ]
+const DATA_QUALITY_BATCH_SIZE = 100
+const DATA_QUALITY_SCAN_LIMIT = 2000
+const DATA_QUALITY_CHECKS = [
+  {
+    key: "vehicle_plate_uniqueness",
+    collection: "vehicles",
+    field: "plateNumber",
+    label: "车牌号数据质量",
+    normalize: (value) => String(value || "").trim().toUpperCase(),
+    recommendation: "请先清理缺失或重复车牌，再创建 vehicles.plateNumber 唯一索引"
+  },
+  {
+    key: "role_openid_uniqueness",
+    collection: "roles",
+    field: "openid",
+    label: "权限账号数据质量",
+    normalize: (value) => String(value || "").trim(),
+    recommendation: "请先合并缺失或重复权限记录，再创建 roles.openid 唯一索引"
+  }
+]
 
 function hasAdminRole(record) {
   return Boolean(
@@ -72,7 +105,12 @@ function hasAdminRole(record) {
 }
 
 async function requireAdmin(openid) {
-  const res = await db.collection("roles").where({ openid }).limit(20).get()
+  const res = await db
+    .collection("roles")
+    .where({ openid })
+    .field(AUTH_ROLE_FIELDS)
+    .limit(20)
+    .get()
   const list = res && Array.isArray(res.data) ? res.data : []
   return list.some(hasAdminRole)
 }
@@ -88,7 +126,7 @@ function sanitizeErrorMessage(error) {
 
 async function inspectCollection(item) {
   try {
-    await db.collection(item.key).limit(1).get()
+    await db.collection(item.key).field(COLLECTION_PROBE_FIELDS).limit(1).get()
     return {
       key: `collection_${item.key}`,
       category: "database",
@@ -165,11 +203,133 @@ async function inspectVolume(item, collectionAvailable) {
   }
 }
 
+async function readQualityRecords(item, total) {
+  const scanCount = Math.min(total, DATA_QUALITY_SCAN_LIMIT)
+  const list = []
+
+  for (let offset = 0; offset < scanCount; offset += DATA_QUALITY_BATCH_SIZE) {
+    const batchSize = Math.min(DATA_QUALITY_BATCH_SIZE, scanCount - offset)
+    const res = await db
+      .collection(item.collection)
+      .field({
+        [item.field]: true
+      })
+      .skip(offset)
+      .limit(batchSize)
+      .get()
+    const batch = res && Array.isArray(res.data) ? res.data : []
+    list.push(...batch)
+    if (batch.length < batchSize) {
+      break
+    }
+  }
+
+  return list
+}
+
+async function inspectDataQuality(item, collectionAvailable) {
+  if (!collectionAvailable) {
+    return {
+      key: item.key,
+      category: "data_quality",
+      label: item.label,
+      status: "warning",
+      message: "对应集合不可用，暂时无法检查历史数据"
+    }
+  }
+
+  try {
+    const countResult = await db.collection(item.collection).count()
+    const total = normalizeCount(countResult)
+    const records = await readQualityRecords(item, total)
+    const valueCounts = new Map()
+    let missingCount = 0
+
+    records.forEach((record) => {
+      const value = item.normalize(record && record[item.field])
+      if (!value) {
+        missingCount += 1
+        return
+      }
+      valueCounts.set(value, (valueCounts.get(value) || 0) + 1)
+    })
+
+    let duplicateGroups = 0
+    let duplicateRecords = 0
+    valueCounts.forEach((count) => {
+      if (count > 1) {
+        duplicateGroups += 1
+        duplicateRecords += count
+      }
+    })
+
+    if (missingCount || duplicateGroups) {
+      return {
+        key: item.key,
+        category: "data_quality",
+        label: item.label,
+        status: "fail",
+        count: records.length,
+        total,
+        missingCount,
+        duplicateGroups,
+        duplicateRecords,
+        message: `已检查 ${records.length} 条，发现 ${missingCount} 条缺失、${duplicateGroups} 组重复（涉及 ${duplicateRecords} 条）；${item.recommendation}`
+      }
+    }
+
+    if (total > DATA_QUALITY_SCAN_LIMIT) {
+      return {
+        key: item.key,
+        category: "data_quality",
+        label: item.label,
+        status: "warning",
+        count: records.length,
+        total,
+        missingCount: 0,
+        duplicateGroups: 0,
+        duplicateRecords: 0,
+        message: `共 ${total} 条，本次只读抽查前 ${records.length} 条未发现缺失或重复；请在云控制台完成全量核验`
+      }
+    }
+
+    return {
+      key: item.key,
+      category: "data_quality",
+      label: item.label,
+      status: "pass",
+      count: records.length,
+      total,
+      missingCount: 0,
+      duplicateGroups: 0,
+      duplicateRecords: 0,
+      message: `已检查 ${records.length} 条，未发现缺失或重复`
+    }
+  } catch (error) {
+    console.warn({
+      function: "systemHealthCheck",
+      stage: "dataQuality",
+      collection: item.collection,
+      errorMessage:
+        error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
+      createdAt: new Date().toISOString()
+    })
+    return {
+      key: item.key,
+      category: "data_quality",
+      label: item.label,
+      status: "warning",
+      message: "历史数据检查失败，请到云控制台确认唯一字段没有缺失或重复"
+    }
+  }
+}
+
 async function readOperationConfig() {
   try {
     const res = await db
       .collection("app_configs")
       .where({ key: CONFIG_KEY })
+      .field(OPERATION_CONFIG_FIELDS)
       .limit(1)
       .get()
     const list = res && Array.isArray(res.data) ? res.data : []
@@ -231,6 +391,11 @@ exports.main = async () => {
     const volumeChecks = await Promise.all(
       VOLUME_CHECKS.map((item) => inspectVolume(item, collectionAvailability[item.key]))
     )
+    const dataQualityChecks = await Promise.all(
+      DATA_QUALITY_CHECKS.map((item) =>
+        inspectDataQuality(item, collectionAvailability[item.collection])
+      )
+    )
     const configCollection = collectionChecks.find(
       (item) => item.key === "collection_app_configs"
     )
@@ -247,7 +412,7 @@ exports.main = async () => {
         String(configValue.bookingStatusTemplateId || "").trim()
     )
 
-    const checks = collectionChecks.concat(volumeChecks, [
+    const checks = collectionChecks.concat(volumeChecks, dataQualityChecks, [
       {
         key: "operation_settings",
         category: "configuration",
@@ -277,7 +442,7 @@ exports.main = async () => {
   } catch (error) {
     console.error({
       function: "systemHealthCheck",
-      openid,
+      authenticated: Boolean(openid),
       errorMessage:
         error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
       stack: error && error.stack ? error.stack : "",

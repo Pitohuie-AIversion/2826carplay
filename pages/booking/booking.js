@@ -1,4 +1,5 @@
 const { trackEvent } = require("../../shared/analytics")
+const { formatToastTitle } = require("../../shared/uiFeedback")
 
 function formatDate(date) {
   const year = date.getFullYear()
@@ -14,6 +15,104 @@ function createBookingRequestId() {
   return `${timestamp}-${random}`
 }
 
+function buildFormProgress(form, privacyAgreed) {
+  const source = form && typeof form === "object" ? form : {}
+  const checks = [
+    { key: "userName", label: "填写姓名", complete: Boolean(String(source.userName || "").trim()) },
+    {
+      key: "phone",
+      label: "填写正确手机号",
+      complete: /^1\d{10}$/.test(String(source.phone || "").trim())
+    },
+    {
+      key: "startDate",
+      label: "选择取车日期",
+      complete: Boolean(String(source.startDate || "").trim())
+    },
+    {
+      key: "endDate",
+      label: "选择有效还车日期",
+      complete: Boolean(
+        source.startDate &&
+          source.endDate &&
+          String(source.endDate) >= String(source.startDate)
+      )
+    },
+    { key: "privacy", label: "阅读并同意隐私政策", complete: Boolean(privacyAgreed) }
+  ]
+  const completed = checks.filter((item) => item.complete).length
+  const nextCheck = checks.find((item) => !item.complete)
+  const contactComplete = checks[0].complete && checks[1].complete
+  const datesComplete = checks[2].complete && checks[3].complete
+  const privacyComplete = checks[4].complete
+  const ready = completed === checks.length
+
+  return {
+    completed,
+    total: checks.length,
+    percent: Math.round((completed / checks.length) * 100),
+    ready,
+    userNameComplete: checks[0].complete,
+    phoneComplete: checks[1].complete,
+    startDateComplete: checks[2].complete,
+    endDateComplete: checks[3].complete,
+    privacyComplete,
+    nextLabel: nextCheck ? nextCheck.label : "可以提交预约",
+    submitHint: ready ? "信息已完整，可以提交预约" : `还需完成：${nextCheck.label}`,
+    contactStepClass: contactComplete ? "form-step-complete" : "form-step-current",
+    dateStepClass: datesComplete
+      ? "form-step-complete"
+      : contactComplete
+        ? "form-step-current"
+        : "form-step-upcoming",
+    privacyStepClass: privacyComplete
+      ? "form-step-complete"
+      : contactComplete && datesComplete
+        ? "form-step-current"
+        : "form-step-upcoming"
+  }
+}
+
+function formatBookingDate(value) {
+  const text = String(value || "").trim()
+  const match = text.match(/^\d{4}-(\d{2})-(\d{2})$/)
+  return match ? `${match[1]}月${match[2]}日` : "—"
+}
+
+function maskPhone(value) {
+  const phone = String(value || "").trim()
+  return /^1\d{10}$/.test(phone)
+    ? `${phone.slice(0, 3)}****${phone.slice(-4)}`
+    : phone || "—"
+}
+
+function getDateSpanText(startDate, endDate) {
+  const start = new Date(`${String(startDate || "")}T00:00:00`)
+  const end = new Date(`${String(endDate || "")}T00:00:00`)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) {
+    return "待选择日期"
+  }
+  const days = Math.round((end.getTime() - start.getTime()) / 86400000)
+  return days === 0 ? "当日取还" : `${days} 天跨度`
+}
+
+function buildBookingSummary(form, carName) {
+  const source = form && typeof form === "object" ? form : {}
+  const hasDates = Boolean(source.startDate && source.endDate && source.endDate >= source.startDate)
+
+  return {
+    carName: String(carName || "").trim() || "—",
+    dateText: hasDates
+      ? `${formatBookingDate(source.startDate)} → ${formatBookingDate(source.endDate)}`
+      : "待选择日期",
+    durationText: getDateSpanText(source.startDate, source.endDate),
+    contactText: String(source.userName || "").trim()
+      ? `${String(source.userName).trim()} · ${maskPhone(source.phone)}`
+      : maskPhone(source.phone),
+    cityText: String(source.city || "").trim() || "待顾问确认"
+  }
+}
+
 Page({
   data: {
     carId: "",
@@ -27,8 +126,13 @@ Page({
     submitText: "预约信息已提交，客服将尽快联系您",
     submitButtonText: "提交预约",
     isSubmitting: false,
+    submitSuccess: false,
+    submittedBookingId: "",
+    submittedSummary: null,
     submitRequestId: "",
     privacyAgreed: false,
+    formProgress: buildFormProgress(null, false),
+    bookingSummary: buildBookingSummary(null, ""),
     cityOptions: [],
     cityIndex: -1,
     pickerCityIndex: 0,
@@ -159,11 +263,17 @@ Page({
   },
 
   applyCar(car) {
+    const carName = car ? car.name || "" : ""
+    const nextForm = {
+      ...this.data.form,
+      city: car ? car.location || "" : ""
+    }
     this.setData({
       loadingCar: false,
       loadError: false,
-      carName: car ? car.name || "" : "",
-      "form.city": car ? car.location || "" : ""
+      carName,
+      "form.city": nextForm.city,
+      bookingSummary: buildBookingSummary(nextForm, carName)
     })
 
     this.syncCitySelection()
@@ -179,10 +289,15 @@ Page({
     const cityIndex = cityOptions.indexOf(currentCity)
 
     if (!currentCity && cityOptions.length) {
+      const nextForm = {
+        ...this.data.form,
+        city: cityOptions[0]
+      }
       this.setData({
         cityIndex: 0,
         pickerCityIndex: 0,
-        "form.city": cityOptions[0]
+        "form.city": cityOptions[0],
+        bookingSummary: buildBookingSummary(nextForm, this.data.carName)
       })
       return
     }
@@ -205,9 +320,15 @@ Page({
       value = String(value || "").replace(/\D/g, "").slice(0, 11)
     }
 
+    const nextForm = {
+      ...this.data.form,
+      [field]: value
+    }
     this.setData({
       [`form.${field}`]: value,
-      submitRequestId: ""
+      submitRequestId: "",
+      formProgress: buildFormProgress(nextForm, this.data.privacyAgreed),
+      bookingSummary: buildBookingSummary(nextForm, this.data.carName)
     })
   },
 
@@ -220,6 +341,10 @@ Page({
     }
 
     if (field === "startDate") {
+      const nextForm = {
+        ...this.data.form,
+        startDate: value
+      }
       const nextData = {
         "form.startDate": value,
         endMinDate: value,
@@ -228,16 +353,25 @@ Page({
 
       if (this.data.form.endDate && this.data.form.endDate < value) {
         nextData["form.endDate"] = ""
+        nextForm.endDate = ""
       }
 
+      nextData.formProgress = buildFormProgress(nextForm, this.data.privacyAgreed)
+      nextData.bookingSummary = buildBookingSummary(nextForm, this.data.carName)
       this.setData(nextData)
       this.checkVehicleAvailability()
       return
     }
 
+    const nextForm = {
+      ...this.data.form,
+      [field]: value
+    }
     this.setData({
       [`form.${field}`]: value,
-      submitRequestId: ""
+      submitRequestId: "",
+      formProgress: buildFormProgress(nextForm, this.data.privacyAgreed),
+      bookingSummary: buildBookingSummary(nextForm, this.data.carName)
     })
     this.checkVehicleAvailability()
   },
@@ -333,11 +467,16 @@ Page({
       return
     }
 
+    const nextForm = {
+      ...this.data.form,
+      city: cityOptions[index]
+    }
     this.setData({
       cityIndex: index,
       pickerCityIndex: index,
       "form.city": cityOptions[index],
-      submitRequestId: ""
+      submitRequestId: "",
+      bookingSummary: buildBookingSummary(nextForm, this.data.carName)
     })
   },
 
@@ -381,8 +520,10 @@ Page({
 
   handlePrivacyAgreementChange(event) {
     const values = event && event.detail && Array.isArray(event.detail.value) ? event.detail.value : []
+    const privacyAgreed = values.includes("agreed")
     this.setData({
-      privacyAgreed: values.includes("agreed")
+      privacyAgreed,
+      formProgress: buildFormProgress(this.data.form, privacyAgreed)
     })
   },
 
@@ -434,18 +575,17 @@ Page({
 
     if (errorMessage) {
       wx.showToast({
-        title: errorMessage,
+        title: formatToastTitle(errorMessage, "预约信息有误"),
         icon: "none"
       })
       return
     }
 
-    const defaultCity = this.data.form.city
     const requestId = this.data.submitRequestId || createBookingRequestId()
 
     this.setData({
       isSubmitting: true,
-      submitButtonText: "提交中",
+      submitButtonText: "正在提交",
       submitRequestId: requestId
     })
 
@@ -479,7 +619,7 @@ Page({
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
           wx.showToast({
-            title: (result && result.message) || "预约提交失败",
+          title: formatToastTitle(result && result.message, "预约提交失败"),
             icon: "none"
           })
           this.setData({
@@ -489,37 +629,23 @@ Page({
           return
         }
 
-        wx.showToast({
-          title: this.data.submitText,
-          icon: "none",
-          duration: 2500
-        })
         trackEvent("booking_submit", this.data.carId)
-
-        setTimeout(() => {
-          this.setData({
-            isSubmitting: false,
-            submitButtonText: "提交预约",
-            submitRequestId: "",
-            privacyAgreed: false,
-            form: {
-              userName: "",
-              phone: "",
-              startDate: "",
-              endDate: "",
-              city: defaultCity,
-              note: ""
-            },
-            endMinDate: this.data.today,
-            availabilityState: "idle",
-            availabilityText: "选好取还车日期后，将自动查看同期咨询情况",
-            availabilityConflictCount: 0
-          })
-        }, 2500)
+        this.setData({
+          isSubmitting: false,
+          submitButtonText: "提交预约",
+          submitSuccess: true,
+          submittedBookingId: String(result.id || "").trim(),
+          submittedSummary: {
+            ...this.data.bookingSummary
+          }
+        })
+        wx.setNavigationBarTitle({
+          title: "预约已提交"
+        })
       },
       fail: (error) => {
         wx.showToast({
-          title: (error && (error.errMsg || error.message)) || "预约提交失败",
+          title: "预约提交失败",
           icon: "none"
         })
         this.setData({
@@ -531,6 +657,38 @@ Page({
     })
   },
 
+  handleViewSubmittedBooking() {
+    const id = String(this.data.submittedBookingId || "").trim()
+    wx.navigateTo({
+      url: id
+        ? `/pages/booking-detail/booking-detail?id=${id}`
+        : "/pages/bookings/bookings",
+      fail: () => {
+        wx.showToast({
+          title: "预约记录打开失败",
+          icon: "none"
+        })
+      }
+    })
+  },
+
+  handleContinueBrowse() {
+    wx.redirectTo({
+      url: "/pages/garage/garage",
+      fail: () => {
+        wx.reLaunch({
+          url: "/pages/garage/garage",
+          fail: () => {
+            wx.showToast({
+              title: "返回车库失败",
+              icon: "none"
+            })
+          }
+        })
+      }
+    })
+  },
+
   handleBackGarage() {
     const pages = getCurrentPages()
 
@@ -539,7 +697,18 @@ Page({
         delta: 1,
         fail: () => {
           wx.redirectTo({
-            url: "/pages/garage/garage"
+            url: "/pages/garage/garage",
+            fail: () => {
+              wx.reLaunch({
+                url: "/pages/garage/garage",
+                fail: () => {
+                  wx.showToast({
+                    title: "返回车库失败",
+                    icon: "none"
+                  })
+                }
+              })
+            }
           })
         }
       })
@@ -550,7 +719,13 @@ Page({
       url: "/pages/garage/garage",
       fail: () => {
         wx.reLaunch({
-          url: "/pages/garage/garage"
+          url: "/pages/garage/garage",
+          fail: () => {
+            wx.showToast({
+              title: "返回车库失败",
+              icon: "none"
+            })
+          }
         })
       }
     })

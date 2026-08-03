@@ -42,11 +42,11 @@ function callCloud(name, data) {
 
 function formatShortTime(value) {
   if (!value) {
-    return "--"
+    return "—"
   }
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) {
-    return "--"
+    return "—"
   }
   const month = `${date.getMonth() + 1}`.padStart(2, "0")
   const day = `${date.getDate()}`.padStart(2, "0")
@@ -59,20 +59,20 @@ function buildVehicleMetrics(result) {
   const stats = result && result.stats ? result.stats : {}
   const dashboard = result && result.dashboard ? result.dashboard : {}
   return [
-    { key: "total", label: "车辆总数", value: Number(stats.total) || 0, tone: "neutral" },
-    { key: "idle", label: "可预约", value: Number(dashboard.idle) || 0, tone: "success" },
-    { key: "active", label: "使用中", value: Number(dashboard.active) || 0, tone: "primary" },
-    { key: "maintenance", label: "维护中", value: Number(dashboard.maintenance) || 0, tone: "warning" }
+    { key: "total", label: "车辆总数", value: Number(stats.total) || 0, tone: "neutral", iconClass: "metric-icon-fleet" },
+    { key: "idle", label: "可预约", value: Number(dashboard.idle) || 0, tone: "success", iconClass: "metric-icon-idle" },
+    { key: "active", label: "使用中", value: Number(dashboard.active) || 0, tone: "primary", iconClass: "metric-icon-active" },
+    { key: "maintenance", label: "维护中", value: Number(dashboard.maintenance) || 0, tone: "warning", iconClass: "metric-icon-maintenance" }
   ]
 }
 
 function buildBookingMetrics(result) {
   const dashboard = result && result.dashboard ? result.dashboard : {}
   return [
-    { key: "total", label: "预约总数", value: Number(dashboard.total) || 0, tone: "neutral" },
-    { key: "pending", label: "待联系", value: Number(dashboard.pending) || 0, tone: "warning" },
-    { key: "contacted", label: "跟进中", value: Number(dashboard.contacted) || 0, tone: "primary" },
-    { key: "recent", label: "近 7 天", value: Number(dashboard.recentCreated7d) || 0, tone: "success" }
+    { key: "total", label: "预约总数", value: Number(dashboard.total) || 0, tone: "neutral", iconClass: "metric-icon-calendar" },
+    { key: "pending", label: "待联系", value: Number(dashboard.pending) || 0, tone: "warning", iconClass: "metric-icon-contact" },
+    { key: "contacted", label: "跟进中", value: Number(dashboard.contacted) || 0, tone: "primary", iconClass: "metric-icon-progress" },
+    { key: "recent", label: "近 7 天", value: Number(dashboard.recentCreated7d) || 0, tone: "success", iconClass: "metric-icon-recent" }
   ]
 }
 
@@ -84,6 +84,8 @@ function buildRecentBookings(result) {
     meta: `${item.userName || "未填写姓名"} · ${item.city || "未填写城市"}`,
     statusLabel: BOOKING_STATUS_LABELS[item.status] || "待处理",
     statusClass: `status-${item.status || "pending"}`,
+    itemClass: "recent-booking",
+    iconClass: "recent-native-icon-booking",
     timeText: formatShortTime(item.createdAt)
   }))
 }
@@ -96,6 +98,8 @@ function buildRecentVehicles(result) {
     meta: item.plateNumber || "未填写车牌",
     statusLabel: VEHICLE_STATUS_LABELS[item.status] || "状态未知",
     statusClass: `vehicle-${item.status || "idle"}`,
+    itemClass: "recent-vehicle",
+    iconClass: "recent-native-icon-vehicle",
     timeText: formatShortTime(item.createdAt)
   }))
 }
@@ -119,7 +123,17 @@ Page({
     storageCleanupPendingCount: 0,
     recentBookings: [],
     recentVehicles: [],
-    alerts: []
+    alerts: [],
+    pendingActionCount: 0,
+    attentionAreaCount: 0,
+    loadedSourceCount: 0,
+    requestedSourceCount: 0,
+    syncProgress: 0,
+    syncStateLabel: "等待同步",
+    syncStateClass: "sync-state-pending",
+    operationStateLabel: "等待汇总",
+    operationStateClass: "operation-state-pending",
+    lastSyncedText: ""
   },
 
   onLoad() {
@@ -150,7 +164,7 @@ Page({
   },
 
   handleRefresh() {
-    if (!this.data.loading) {
+    if (!this.data.loading && !this.data.refreshing) {
       this.loadOverview({ refreshing: true })
     }
   },
@@ -188,7 +202,11 @@ Page({
     this.setData({
       loading: !input.refreshing,
       refreshing: Boolean(input.refreshing),
-      loadError: ""
+      loadError: "",
+      requestedSourceCount:
+        Number(this.data.canManageVehicles) +
+        Number(this.data.canManageBookings) +
+        Number(this.data.canManageBookings || this.data.canManageRoles)
     })
 
     const vehicleTask = this.data.canManageVehicles
@@ -221,6 +239,18 @@ Page({
             : bookingLoaded && bookingResult.dashboard
               ? Number(bookingResult.dashboard.pending) || 0
               : 0
+        const hasCoordinationCount = Object.prototype.hasOwnProperty.call(
+          summaryCounts,
+          "bookingCoordinationPending"
+        )
+        const coordinationCountAvailable =
+          hasCoordinationCount
+            ? !unavailableMetrics.includes("bookingCoordinationPending")
+            : bookingCountAvailable
+        const pendingCoordination =
+          hasCoordinationCount
+            ? Number(summaryCounts.bookingCoordinationPending) || 0
+            : pendingBookings
         const maintenanceVehicles =
           vehicleLoaded && vehicleResult.dashboard ? Number(vehicleResult.dashboard.maintenance) || 0 : 0
         const privacyCountAvailable =
@@ -238,13 +268,18 @@ Page({
           : 0
         const alerts = []
 
-        if (this.data.canManageBookings && (bookingCountAvailable || bookingLoaded)) {
+        if (
+          this.data.canManageBookings &&
+          (coordinationCountAvailable || (!hasCoordinationCount && bookingLoaded))
+        ) {
           alerts.push({
             key: "booking",
-            title: `${pendingBookings} 条预约待联系`,
-            desc: pendingBookings ? "建议优先联系并更新跟进状态" : "当前没有待联系预约",
-            value: pendingBookings,
-            tone: pendingBookings ? "warning" : "success",
+            title: `${pendingCoordination} 条预约待协调`,
+            desc: pendingCoordination
+              ? "建议进入工作台按优先级和用车日期处理"
+              : "当前没有待协调预约",
+            value: pendingCoordination,
+            tone: pendingCoordination ? "warning" : "success",
             url: "/pages/booking-workbench/booking-workbench"
           })
         } else if (this.data.canManageBookings) {
@@ -309,6 +344,28 @@ Page({
           })
         }
 
+        const requestedSourceCount =
+          Number(this.data.canManageVehicles) +
+          Number(this.data.canManageBookings) +
+          Number(this.data.canManageBookings || this.data.canManageRoles)
+        const loadedSourceCount =
+          Number(vehicleLoaded) + Number(bookingLoaded) + Number(summaryLoaded)
+        const actionableAlerts = alerts.filter(
+          (item) => item.tone !== "neutral" && Number(item.value) > 0
+        )
+        const pendingActionCount = actionableAlerts.reduce(
+          (total, item) => total + Number(item.value || 0),
+          0
+        )
+        const syncProgress = requestedSourceCount
+          ? Math.round((loadedSourceCount / requestedSourceCount) * 100)
+          : 0
+        const alertViews = alerts.map((item) => ({
+          ...item,
+          iconClass: `alert-native-icon-${item.key}`,
+          actionLabel: Number(item.value) > 0 ? "立即处理" : "查看详情"
+        }))
+
         this.setData({
           loading: false,
           refreshing: false,
@@ -323,7 +380,20 @@ Page({
           storageCleanupPendingCount,
           recentBookings: bookingLoaded ? buildRecentBookings(bookingResult) : [],
           recentVehicles: vehicleLoaded ? buildRecentVehicles(vehicleResult) : [],
-          alerts
+          alerts: alertViews,
+          pendingActionCount,
+          attentionAreaCount: actionableAlerts.length,
+          loadedSourceCount,
+          requestedSourceCount,
+          syncProgress,
+          syncStateLabel:
+            loadedSourceCount === requestedSourceCount ? "数据源已同步" : "部分数据可用",
+          syncStateClass:
+            loadedSourceCount === requestedSourceCount ? "sync-state-complete" : "sync-state-partial",
+          operationStateLabel: pendingActionCount ? "有待办需要处理" : "当前运营平稳",
+          operationStateClass: pendingActionCount ? "operation-state-attention" : "operation-state-clear",
+          lastSyncedText:
+            loadedSourceCount > 0 ? formatShortTime(Date.now()) : this.data.lastSyncedText
         })
       })
       .catch(() => {

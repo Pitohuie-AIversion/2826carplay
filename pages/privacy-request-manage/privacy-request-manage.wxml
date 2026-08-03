@@ -1,4 +1,4 @@
-<view class="privacy-manage-page management-page">
+<view wx:if="{{pageAuthorized}}" class="privacy-manage-page management-page">
   <view class="page-glow"></view>
   <view class="hero-card ui-card ui-card-gradient">
     <view class="hero-top">
@@ -7,7 +7,7 @@
         <view class="hero-title">隐私申请处理</view>
         <view class="hero-desc">处理用户个人信息查询、更正与删除申请</view>
       </view>
-      <image class="hero-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+      <image class="hero-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
     </view>
   </view>
 
@@ -19,45 +19,109 @@
       </view>
       <view class="section-index">01</view>
     </view>
-    <input
-      class="keyword-input ui-input"
-      placeholder="搜索 OpenID 或申请 ID"
-      value="{{keyword}}"
-      bindinput="handleKeywordInput"
-      confirm-type="search"
-      bindconfirm="handleSearch"
-    />
-    <scroll-view class="filter-scroll" scroll-x enable-flex show-scrollbar="{{false}}">
-      <view class="chip-list">
-        <view
-          wx:for="{{statusOptions}}"
-          wx:key="value"
-          class="filter-chip ui-pill {{currentStatus === item.value ? 'ui-pill-active' : ''}}"
-          data-value="{{item.value}}"
-          bindtap="handleStatusTap"
-        >
-          {{item.label}}
+    <view class="management-search">
+      <view class="management-search-icon" aria-hidden="true"></view>
+      <input
+        class="keyword-input management-search-input ui-input"
+        placeholder="搜索 OpenID 或申请 ID"
+        aria-label="隐私申请搜索关键词"
+        value="{{keyword}}"
+        bindinput="handleKeywordInput"
+        maxlength="40"
+        confirm-type="search"
+        bindconfirm="handleSearch"
+      />
+      <button
+        wx:if="{{keyword}}"
+        class="management-search-clear"
+        bindtap="handleClearKeyword"
+        hover-class="management-search-clear-pressed"
+        aria-label="清空搜索关键词"
+      ><view class="management-search-clear-icon" aria-hidden="true"></view></button>
+    </view>
+    <view class="filter-group-label"><view class="filter-group-icon filter-group-status-icon" aria-hidden="true"></view><view>处理状态</view></view>
+    <view class="filter-scroll-shell filter-scroll-shell-first ui-scroll-shell">
+      <scroll-view class="filter-scroll" scroll-x scroll-with-animation scroll-into-view="privacy-status-{{currentStatus}}" enhanced enable-flex show-scrollbar="{{false}}" aria-label="处理状态筛选，可横向滑动">
+        <view class="chip-list">
+          <view
+            id="privacy-status-{{item.value}}"
+            wx:for="{{statusOptions}}"
+            wx:key="value"
+            class="filter-chip ui-pill {{currentStatus === item.value ? 'ui-pill-active' : ''}}"
+            data-value="{{item.value}}"
+            bindtap="handleStatusTap"
+            hover-class="ui-pill-pressed"
+            aria-role="button"
+            aria-pressed="{{currentStatus === item.value}}"
+          >
+            {{item.label}}
+          </view>
         </view>
-      </view>
-    </scroll-view>
-    <scroll-view class="filter-scroll" scroll-x enable-flex show-scrollbar="{{false}}">
-      <view class="chip-list">
-        <view
-          wx:for="{{typeOptions}}"
-          wx:key="value"
-          class="filter-chip ui-pill {{currentType === item.value ? 'ui-pill-active' : ''}}"
-          data-value="{{item.value}}"
-          bindtap="handleTypeTap"
-        >
-          {{item.label}}
+      </scroll-view>
+      <view wx:if="{{statusOptions.length > 3}}" class="ui-scroll-cue" aria-hidden="true"></view>
+    </view>
+    <view class="filter-group-label"><view class="filter-group-icon filter-group-type-icon" aria-hidden="true"></view><view>申请类型</view></view>
+    <view class="filter-scroll-shell ui-scroll-shell">
+      <scroll-view class="filter-scroll" scroll-x scroll-with-animation scroll-into-view="privacy-type-{{currentType}}" enhanced enable-flex show-scrollbar="{{false}}" aria-label="申请类型筛选，可横向滑动">
+        <view class="chip-list">
+          <view
+            id="privacy-type-{{item.value}}"
+            wx:for="{{typeOptions}}"
+            wx:key="value"
+            class="filter-chip ui-pill {{currentType === item.value ? 'ui-pill-active' : ''}}"
+            data-value="{{item.value}}"
+            bindtap="handleTypeTap"
+            hover-class="ui-pill-pressed"
+            aria-role="button"
+            aria-pressed="{{currentType === item.value}}"
+          >
+            {{item.label}}
+          </view>
         </view>
-      </view>
-    </scroll-view>
-    <button class="search-btn ui-btn ui-btn-primary" bindtap="handleSearch">查询</button>
-    <view class="result-count">当前筛选结果 {{total}}{{truncated ? '+' : ''}} 条</view>
+      </scroll-view>
+      <view wx:if="{{typeOptions.length > 3}}" class="ui-scroll-cue" aria-hidden="true"></view>
+    </view>
+    <button class="search-btn ui-btn ui-btn-primary" bindtap="handleSearch"><view class="search-native-icon" aria-hidden="true"></view>查询</button>
+    <view class="filter-result-bar">
+      <view class="filter-result-state"><view class="filter-result-dot"></view><view>当前队列</view></view>
+      <view class="filter-result-value">{{currentStatusLabel}} · {{currentTypeLabel}} · {{total}}{{truncated ? '+' : ''}} 条</view>
+    </view>
   </view>
 
-  <view wx:if="{{(initialLoading || loading) && !list.length}}" class="loading-card ui-card">正在加载申请…</view>
+  <view
+    wx:if="{{(initialLoading || loading) && !list.length}}"
+    class="manage-request-skeleton"
+    aria-hidden="true"
+  >
+    <view class="manage-request-skeleton-heading">
+      <view>
+        <view class="manage-request-skeleton-kicker manage-skeleton-pulse"></view>
+        <view class="manage-request-skeleton-title manage-skeleton-pulse"></view>
+      </view>
+      <view class="manage-request-skeleton-count manage-skeleton-pulse"></view>
+    </view>
+    <view
+      class="manage-request-skeleton-card ui-card {{index ? 'manage-request-skeleton-card-muted' : ''}}"
+      wx:for="{{[1, 2]}}"
+      wx:key="*this"
+    >
+      <view class="manage-request-skeleton-head">
+        <view>
+          <view class="manage-request-skeleton-type manage-skeleton-pulse"></view>
+          <view class="manage-request-skeleton-time manage-skeleton-pulse"></view>
+        </view>
+        <view class="manage-request-skeleton-status manage-skeleton-pulse"></view>
+      </view>
+      <view class="manage-request-skeleton-identity manage-skeleton-pulse"></view>
+      <view class="manage-request-skeleton-label manage-skeleton-pulse"></view>
+      <view class="manage-request-skeleton-line manage-skeleton-pulse"></view>
+      <view class="manage-request-skeleton-line manage-request-skeleton-line-short manage-skeleton-pulse"></view>
+      <view class="manage-request-skeleton-actions">
+        <view class="manage-request-skeleton-action manage-skeleton-pulse"></view>
+        <view class="manage-request-skeleton-action manage-skeleton-pulse"></view>
+      </view>
+    </view>
+  </view>
 
   <view wx:elif="{{list.length}}" class="request-list">
     <view class="list-heading">
@@ -68,23 +132,39 @@
       <view class="list-count">{{total}}{{truncated ? '+' : ''}} 条</view>
     </view>
 
-    <view class="request-card ui-card" wx:for="{{list}}" wx:key="id">
+    <view class="request-card ui-card {{item.cardStatusClass}}" wx:for="{{list}}" wx:key="id">
       <view class="request-head">
-        <view>
-          <view class="request-type">{{item.typeLabel}}</view>
-          <view class="request-time">{{item.createdAtText || '--'}}</view>
+        <view class="request-title-wrap">
+          <view class="request-type-icon-wrap {{item.typeClass}}"><view class="request-type-icon {{item.typeIconClass}}" aria-hidden="true"></view></view>
+          <view class="request-title-copy">
+            <view class="request-type">{{item.typeLabel}}</view>
+            <view class="request-time"><view class="time-native-icon" aria-hidden="true"></view>{{item.createdAtText || '—'}}</view>
+          </view>
         </view>
-        <view class="status-pill {{item.statusClass}}">{{item.statusLabel}}</view>
+        <view class="status-pill {{item.statusClass}}"><view class="status-dot"></view>{{item.statusLabel}}</view>
+      </view>
+      <view class="request-journey {{item.journeyClass}}" aria-role="group" aria-label="申请处理进度，{{item.journeyHint}}">
+        <view class="request-journey-track" aria-hidden="true"><view class="request-journey-progress" style="width: {{item.journeyProgress}}%;"></view></view>
+        <view class="request-journey-steps">
+          <view class="request-journey-step {{item.journeyStage >= 1 ? 'request-journey-step-active' : ''}}"><view class="request-journey-node"></view><view>已提交</view></view>
+          <view class="request-journey-step request-journey-step-center {{item.journeyStage >= 2 ? 'request-journey-step-active' : ''}}"><view class="request-journey-node"></view><view>处理中</view></view>
+          <view class="request-journey-step request-journey-step-right {{item.journeyStage >= 3 ? 'request-journey-step-active' : ''}}"><view class="request-journey-node"></view><view>已结束</view></view>
+        </view>
+        <view class="request-journey-hint">{{item.journeyHint}}</view>
       </view>
       <view class="identity-row">
-        <view class="identity-text">{{item.openid || '--'}}</view>
-        <button class="copy-btn ui-btn ui-btn-ghost" data-openid="{{item.openid}}" bindtap="handleCopyOpenid">复制</button>
+        <view class="identity-native-icon" aria-hidden="true"></view>
+        <view class="identity-copy"><view class="identity-label">申请账号</view><view class="identity-text">{{item.openid || '—'}}</view></view>
+        <button class="copy-btn ui-btn ui-btn-ghost" data-openid="{{item.openid}}" bindtap="handleCopyOpenid"><view class="copy-native-icon" aria-hidden="true"></view>复制</button>
       </view>
-      <view class="field-label">申请说明</view>
-      <view class="field-content">{{item.description || '--'}}</view>
+      <view class="content-panel request-description-panel"><view class="content-panel-heading"><view class="description-native-icon" aria-hidden="true"></view><view class="field-label">申请说明</view></view><view class="field-content">{{item.description || '—'}}</view></view>
       <view wx:if="{{item.resolutionNote}}" class="resolution-box">
-        <view class="field-label">处理反馈</view>
+        <view class="content-panel-heading"><view class="resolution-native-icon" aria-hidden="true"></view><view class="field-label">处理反馈</view></view>
         <view class="field-content">{{item.resolutionNote}}</view>
+      </view>
+      <view wx:if="{{item.type === 'access'}}" class="delivery-state {{item.dataExportedAt ? 'delivery-state-ready' : ''}}">
+        <view class="delivery-native-icon {{item.dataExportedAt ? 'delivery-native-icon-ready' : ''}}" aria-hidden="true"></view>
+        <view class="delivery-state-copy"><view class="delivery-state-label">{{item.dataExportedAt ? '个人数据已生成' : '个人数据尚未生成'}}</view><view class="delivery-state-desc">{{item.dataExportedAt ? item.dataExportedAtText + '，可完成申请' : '请先进入相关数据清单完成核验和导出，再将申请标记为完成。'}}</view></view>
       </view>
       <view class="request-actions">
         <button
@@ -92,7 +172,7 @@
           data-id="{{item.id}}"
           bindtap="handleInventoryTap"
         >
-          核验相关数据
+          <view class="inventory-native-icon" aria-hidden="true"></view>核验相关数据
         </button>
         <button
           wx:if="{{item.canHandle}}"
@@ -102,7 +182,7 @@
           data-id="{{item.id}}"
           bindtap="handleRequestAction"
         >
-          处理申请
+          <view wx:if="{{updatingId !== item.id}}" class="handle-native-icon" aria-hidden="true"></view><text>{{updatingId === item.id ? '处理中…' : '处理申请'}}</text>
         </button>
       </view>
     </view>
@@ -114,15 +194,16 @@
       disabled="{{loading}}"
       bindtap="handleLoadMore"
     >
-      加载更多
+      <view wx:if="{{!loading}}" class="load-more-native-icon" aria-hidden="true"></view><text>{{loading ? '正在加载' : '加载更多'}}</text>
     </button>
     <view wx:else class="list-end">已加载全部申请</view>
   </view>
 
   <view wx:else class="empty-card ui-card">
-    <image class="manage-empty-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+    <image class="manage-empty-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
     <view class="manage-empty-kicker">NO PRIVACY REQUESTS</view>
     <view class="empty-title">暂无匹配申请</view>
     <view class="empty-desc">调整状态、类型或关键词后重试。</view>
+    <button wx:if="{{keyword || currentType !== 'all' || currentStatus !== 'pending'}}" class="empty-reset-btn ui-btn ui-btn-ghost" bindtap="handleResetFilters"><view class="reset-native-icon" aria-hidden="true"></view>重置筛选</button>
   </view>
 </view>

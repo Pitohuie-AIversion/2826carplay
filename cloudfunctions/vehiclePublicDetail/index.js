@@ -3,6 +3,24 @@ const cloud = require("wx-server-sdk")
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
+const PUBLIC_VEHICLE_FIELDS = {
+  _id: true,
+  plateNumber: true,
+  vehicleType: true,
+  brandModel: true,
+  registerDate: true,
+  status: true,
+  location: true,
+  transmission: true,
+  fuelType: true,
+  seats: true,
+  priceDay: true,
+  publicDescription: true,
+  imageList: true,
+  coverImage: true,
+  updatedAt: true,
+  createdAt: true
+}
 
 const VEHICLE_TYPE_LABEL_MAP = {
   sedan: "轿车",
@@ -270,7 +288,11 @@ exports.main = async (event) => {
       })
     }
 
-    const res = await db.collection("vehicles").doc(input.id).get()
+    const res = await db
+      .collection("vehicles")
+      .doc(input.id)
+      .field(PUBLIC_VEHICLE_FIELDS)
+      .get()
     const current = res && res.data ? res.data : null
     if (!current) {
       return createError("NOT_FOUND", "车辆不存在")

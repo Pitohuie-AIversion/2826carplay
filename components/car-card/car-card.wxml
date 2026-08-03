@@ -1,5 +1,17 @@
-<view class="car-card" bindtap="handleTap" hover-class="car-card-pressed">
+<view
+  class="car-card"
+  bindtap="handleTap"
+  hover-class="car-card-pressed"
+  hover-start-time="20"
+  hover-stay-time="80"
+  aria-role="button"
+  aria-label="查看{{car.name}}详情，{{car.statusText}}，{{car.priceText}}"
+>
   <view wx:if="{{!car.cover || imageFailed}}" class="car-cover car-cover-placeholder">
+    <view class="car-cover-placeholder-brand" aria-hidden="true">
+      <image class="car-cover-placeholder-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
+      <view class="car-cover-placeholder-kicker">GARAGE ARCHIVE</view>
+    </view>
     <view class="car-cover-placeholder-title">{{car.brand || car.name}}</view>
     <view class="car-cover-placeholder-desc">{{imageFailed ? '图片暂时无法显示' : car.coverPlaceholderText || '待上传车辆封面'}}</view>
   </view>
@@ -10,11 +22,15 @@
     mode="aspectFill"
     lazy-load="{{true}}"
     fade-in="{{false}}"
+    aria-label="{{car.name}}车辆图片"
     bindload="handleImageLoad"
     binderror="handleImageError"
   />
   <view wx:if="{{car.cover && imageLoading && !imageFailed}}" class="car-image-loading">
-    <view class="car-image-loading-emblem"></view>
+    <view class="car-image-loading-mark" aria-hidden="true">
+      <image class="car-image-loading-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
+      <view class="car-image-loading-ring"></view>
+    </view>
     <view class="car-image-loading-line car-image-loading-line-primary"></view>
     <view class="car-image-loading-line car-image-loading-line-secondary"></view>
   </view>
@@ -23,14 +39,14 @@
     <view class="car-top">
       <view class="car-identity">
         <view class="car-edition">EXTREME SELECTION</view>
-        <view class="car-nickname">{{car.nickname}}</view>
+        <view class="car-nickname">{{car.name}}</view>
       </view>
       <view class="car-status ui-status {{car.statusClass}}">{{car.statusText}}</view>
     </view>
 
     <view class="car-bottom">
       <view class="car-meta">
-        <view class="car-name">{{car.name}}</view>
+        <view class="car-name">{{car.nickname || car.name}}</view>
         <view class="car-tags">
           <text wx:for="{{car.tags}}" wx:key="*this" class="car-tag">{{item}}</text>
         </view>
@@ -40,6 +56,8 @@
         <view class="car-price">{{car.priceText}}</view>
       </view>
     </view>
-    <view class="card-corner">↗</view>
+    <view class="card-corner" aria-hidden="true">
+      <view class="card-corner-arrow"></view>
+    </view>
   </view>
 </view>

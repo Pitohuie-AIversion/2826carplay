@@ -7,7 +7,9 @@ function createMockDb({ rolesData, currentData }) {
   const rolesLimit = jest.fn(() => ({ get: rolesGet }))
   const rolesWhere = jest.fn(() => ({ limit: rolesLimit }))
 
+  const vehicleField = jest.fn(() => ({ get: currentGet }))
   const vehiclesDoc = jest.fn(() => ({
+    field: vehicleField,
     get: currentGet
   }))
 
@@ -28,6 +30,7 @@ function createMockDb({ rolesData, currentData }) {
     rolesWhere,
     rolesLimit,
     vehiclesDoc,
+    vehicleField,
     currentGet
   }
 }
@@ -71,7 +74,8 @@ describe("cloudfunctions/vehicleDetail integration", () => {
         coverImage: "cloud://img2",
         createdByOpenid: "admin_openid",
         createdAt: "2026-07-08T08:00:00.000Z",
-        updatedAt: "2026-07-08T10:00:00.000Z"
+        updatedAt: "2026-07-08T10:00:00.000Z",
+        futureSecret: "不得自动进入详情"
       }
     })
 
@@ -104,6 +108,29 @@ describe("cloudfunctions/vehicleDetail integration", () => {
     })
     expect(mocks.rolesWhere).toHaveBeenCalledWith({ openid: "admin_openid" })
     expect(mocks.vehiclesDoc).toHaveBeenCalledWith("car_1")
+    expect(mocks.vehicleField).toHaveBeenCalledWith({
+      _id: true,
+      plateNumber: true,
+      vehicleType: true,
+      brandModel: true,
+      registerDate: true,
+      status: true,
+      location: true,
+      transmission: true,
+      fuelType: true,
+      seats: true,
+      priceDay: true,
+      vin: true,
+      engineNumber: true,
+      publicDescription: true,
+      note: true,
+      imageList: true,
+      coverImage: true,
+      createdByOpenid: true,
+      createdAt: true,
+      updatedAt: true
+    })
+    expect(res.detail).not.toHaveProperty("futureSecret")
   })
 
   test("缺少 id 返回 VALIDATION_ERROR", async () => {

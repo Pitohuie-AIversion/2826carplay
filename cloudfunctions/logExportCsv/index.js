@@ -3,9 +3,42 @@ const cloud = require("wx-server-sdk")
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
+const AUTH_ROLE_FIELDS = {
+  role: true,
+  roles: true,
+  permissions: true,
+  isAdmin: true,
+  admin: true
+}
 const BATCH_SIZE = 100
 const MAX_SCAN_RECORDS = 2000
 const MAX_EXPORT_RECORDS = 500
+const AUDIT_EXPORT_FIELDS = {
+  _id: true,
+  action: true,
+  openid: true,
+  targetOpenid: true,
+  vehicleId: true,
+  bookingId: true,
+  requestId: true,
+  requestType: true,
+  fromStatus: true,
+  toStatus: true,
+  changedKeys: true,
+  createdAt: true
+}
+const ERROR_EXPORT_FIELDS = {
+  _id: true,
+  function: true,
+  stage: true,
+  vehicleId: true,
+  bookingId: true,
+  targetStatus: true,
+  errorCode: true,
+  errorMessage: true,
+  occurredAt: true,
+  createdAt: true
+}
 
 function createError(code, message) {
   return {
@@ -29,7 +62,12 @@ async function isAdminOpenid(openid) {
   if (!openid) {
     return false
   }
-  const res = await db.collection("roles").where({ openid }).limit(20).get()
+  const res = await db
+    .collection("roles")
+    .where({ openid })
+    .field(AUTH_ROLE_FIELDS)
+    .limit(20)
+    .get()
   const list = res && Array.isArray(res.data) ? res.data : []
   return list.some(hasAdminRole)
 }
@@ -73,7 +111,8 @@ async function readLogsByMode(collectionName, ordered) {
   for (let offset = 0; offset <= MAX_SCAN_RECORDS; offset += BATCH_SIZE) {
     const remaining = MAX_SCAN_RECORDS + 1 - list.length
     const limit = Math.min(BATCH_SIZE, remaining)
-    let query = db.collection(collectionName)
+    const fields = collectionName === "audit_logs" ? AUDIT_EXPORT_FIELDS : ERROR_EXPORT_FIELDS
+    let query = db.collection(collectionName).field(fields)
     if (ordered) {
       query = query.orderBy("createdAt", "desc")
     }
@@ -110,17 +149,20 @@ async function readLogs(collectionName) {
 
 function normalizeAuditLog(item) {
   return {
-    action: String((item && item.action) || "").trim(),
-    openid: String((item && item.openid) || "").trim(),
-    targetOpenid: String((item && item.targetOpenid) || "").trim(),
-    vehicleId: String((item && item.vehicleId) || "").trim(),
-    bookingId: String((item && item.bookingId) || "").trim(),
-    requestId: String((item && item.requestId) || "").trim(),
-    requestType: String((item && item.requestType) || "").trim(),
-    fromStatus: String((item && item.fromStatus) || "").trim(),
-    toStatus: String((item && item.toStatus) || "").trim(),
+    action: normalizeText(item && item.action, 80),
+    openid: normalizeText(item && item.openid, 128),
+    targetOpenid: normalizeText(item && item.targetOpenid, 128),
+    vehicleId: normalizeText(item && item.vehicleId, 128),
+    bookingId: normalizeText(item && item.bookingId, 128),
+    requestId: normalizeText(item && item.requestId, 128),
+    requestType: normalizeText(item && item.requestType, 50),
+    fromStatus: normalizeText(item && item.fromStatus, 50),
+    toStatus: normalizeText(item && item.toStatus, 50),
     changedKeys: Array.isArray(item && item.changedKeys)
-      ? item.changedKeys.map((value) => String(value || "").trim()).filter(Boolean)
+      ? item.changedKeys
+          .map((value) => normalizeText(value, 80))
+          .filter(Boolean)
+          .slice(0, 50)
       : [],
     createdAt: formatTime(item && item.createdAt)
   }
@@ -128,15 +170,13 @@ function normalizeAuditLog(item) {
 
 function normalizeErrorLog(item) {
   return {
-    function: String((item && item.function) || "").trim(),
-    stage: String((item && item.stage) || "").trim(),
-    openid: String((item && item.openid) || "").trim(),
-    targetOpenid: String((item && item.targetOpenid) || "").trim(),
-    vehicleId: String((item && item.vehicleId) || "").trim(),
-    bookingId: String((item && item.bookingId) || "").trim(),
-    targetStatus: String((item && item.targetStatus) || "").trim(),
-    errorCode: String((item && item.errorCode) || "").trim(),
-    errorMessage: String((item && item.errorMessage) || "").trim(),
+    function: normalizeText(item && item.function, 80),
+    stage: normalizeText(item && item.stage, 80),
+    vehicleId: normalizeText(item && item.vehicleId, 128),
+    bookingId: normalizeText(item && item.bookingId, 128),
+    targetStatus: normalizeText(item && item.targetStatus, 50),
+    errorCode: normalizeText(item && item.errorCode, 80),
+    errorMessage: normalizeText(item && item.errorMessage, 1000),
     occurredAt: formatTime(item && item.occurredAt),
     createdAt: formatTime(item && item.createdAt)
   }
@@ -164,8 +204,6 @@ function errorSearchText(item) {
   return [
     item.function,
     item.stage,
-    item.openid,
-    item.targetOpenid,
     item.vehicleId,
     item.bookingId,
     item.targetStatus,
@@ -275,8 +313,6 @@ exports.main = async (event) => {
           "时间",
           "云函数",
           "阶段",
-          "操作者OpenID",
-          "目标OpenID",
           "车辆ID",
           "预约ID",
           "目标状态",
@@ -302,8 +338,6 @@ exports.main = async (event) => {
             item.createdAt || item.occurredAt,
             item.function,
             item.stage,
-            item.openid,
-            item.targetOpenid,
             item.vehicleId,
             item.bookingId,
             item.targetStatus,
@@ -339,7 +373,7 @@ exports.main = async (event) => {
   } catch (error) {
     console.error({
       function: "logExportCsv",
-      openid,
+      authenticated: Boolean(openid),
       logType: input.logType,
       errorMessage:
         error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),

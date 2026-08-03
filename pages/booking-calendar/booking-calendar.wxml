@@ -1,4 +1,4 @@
-<view class="calendar-page management-page">
+<view wx:if="{{pageAuthorized}}" class="calendar-page management-page">
   <view class="page-glow"></view>
 
   <view class="hero-card ui-card ui-card-gradient">
@@ -8,46 +8,137 @@
         <view class="hero-title">预约日历</view>
         <view class="hero-desc">按月查看车辆预约与顾问待跟进安排</view>
       </view>
-      <image class="hero-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+      <image class="hero-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
     </view>
   </view>
 
-  <view wx:if="{{loading}}" class="state-card ui-card">正在整理预约档期…</view>
+  <view wx:if="{{loading}}" class="calendar-skeleton" aria-hidden="true">
+    <view class="summary-grid">
+      <view class="summary-card calendar-skeleton-summary ui-card" wx:for="{{[1, 2, 3]}}" wx:key="*this">
+        <view class="calendar-skeleton-summary-value manage-skeleton-pulse"></view>
+        <view class="calendar-skeleton-summary-label manage-skeleton-pulse"></view>
+      </view>
+    </view>
+    <view class="calendar-card calendar-skeleton-card ui-card">
+      <view class="month-switcher">
+        <view class="calendar-skeleton-month-button manage-skeleton-pulse"></view>
+        <view class="calendar-skeleton-month-copy">
+          <view class="calendar-skeleton-month-kicker manage-skeleton-pulse"></view>
+          <view class="calendar-skeleton-month-title manage-skeleton-pulse"></view>
+        </view>
+        <view class="calendar-skeleton-month-button manage-skeleton-pulse"></view>
+      </view>
+      <view class="weekday-row calendar-skeleton-weekdays">
+        <view class="weekday-item" wx:for="{{[1, 2, 3, 4, 5, 6, 7]}}" wx:key="*this">
+          <view class="calendar-skeleton-weekday manage-skeleton-pulse"></view>
+        </view>
+      </view>
+      <view class="date-grid calendar-skeleton-grid">
+        <view
+          class="date-cell calendar-skeleton-date {{index > 34 ? 'calendar-skeleton-date-muted' : ''}}"
+          wx:for="{{[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42]}}"
+          wx:key="*this"
+        >
+          <view class="calendar-skeleton-date-number manage-skeleton-pulse"></view>
+        </view>
+      </view>
+      <view class="calendar-skeleton-legend">
+        <view class="calendar-skeleton-legend-item manage-skeleton-pulse"></view>
+        <view class="calendar-skeleton-legend-item manage-skeleton-pulse"></view>
+        <view class="calendar-skeleton-legend-item manage-skeleton-pulse"></view>
+      </view>
+    </view>
+    <view class="day-card calendar-skeleton-day ui-card">
+      <view class="calendar-skeleton-day-heading">
+        <view>
+          <view class="calendar-skeleton-day-kicker manage-skeleton-pulse"></view>
+          <view class="calendar-skeleton-day-title manage-skeleton-pulse"></view>
+        </view>
+        <view class="calendar-skeleton-day-index manage-skeleton-pulse"></view>
+      </view>
+      <view class="calendar-skeleton-booking-row">
+        <view class="calendar-skeleton-booking-copy">
+          <view class="calendar-skeleton-booking-title manage-skeleton-pulse"></view>
+          <view class="calendar-skeleton-booking-line manage-skeleton-pulse"></view>
+        </view>
+        <view class="calendar-skeleton-booking-status manage-skeleton-pulse"></view>
+      </view>
+    </view>
+  </view>
 
   <view wx:elif="{{loadError}}" class="state-card ui-card">
+    <view class="state-native-icon" aria-hidden="true"><view class="state-alert-mark"></view></view>
     <view class="state-title">暂时无法加载日历</view>
     <view class="state-desc">{{loadError}}</view>
-    <button class="retry-button ui-btn ui-btn-ghost" bindtap="handleRetry">重新加载</button>
+    <button class="retry-button ui-btn ui-btn-ghost action-with-icon" bindtap="handleRetry">
+      <view class="retry-native-icon" aria-hidden="true"></view>
+      <text>重新加载</text>
+    </button>
   </view>
 
   <block wx:else>
     <view class="summary-grid">
       <view class="summary-card ui-card">
+        <view class="summary-native-icon summary-native-icon-calendar" aria-hidden="true"><view class="summary-calendar-grid"></view></view>
         <view class="summary-value">{{summary.bookingCount}}</view>
         <view class="summary-label">本月预约</view>
       </view>
       <view class="summary-card ui-card">
+        <view class="summary-native-icon summary-native-icon-contact" aria-hidden="true"><view class="summary-contact-handle"></view></view>
         <view class="summary-value summary-warning">{{summary.pendingCount}}</view>
         <view class="summary-label">待联系</view>
       </view>
       <view class="summary-card ui-card">
+        <view class="summary-native-icon summary-native-icon-vehicle" aria-hidden="true">
+          <view class="summary-vehicle-window"></view>
+          <view class="summary-vehicle-wheel summary-vehicle-wheel-left"></view>
+          <view class="summary-vehicle-wheel summary-vehicle-wheel-right"></view>
+        </view>
         <view class="summary-value summary-primary">{{summary.vehicleCount}}</view>
         <view class="summary-label">涉及车辆</view>
       </view>
     </view>
     <view wx:if="{{summary.conflictDayCount}}" class="conflict-overview">
-      <view class="conflict-overview-mark">!</view>
+      <view class="conflict-overview-mark" aria-hidden="true">
+        <view class="conflict-alert-icon"></view>
+      </view>
       <view>本月有 {{summary.conflictDayCount}} 天出现同车预约重叠，请优先人工核对。</view>
     </view>
 
     <view class="calendar-card ui-card">
       <view class="month-switcher">
-        <view class="month-button" bindtap="handlePreviousMonth">‹</view>
-        <view>
-          <view class="month-kicker">MONTHLY SCHEDULE</view>
-          <view class="month-title">{{monthTitle}}</view>
+        <view
+          class="month-button"
+          bindtap="handlePreviousMonth"
+          hover-class="month-button-pressed"
+          aria-role="button"
+          aria-label="查看上个月"
+        >
+          <view class="month-chevron month-chevron-left" aria-hidden="true"></view>
         </view>
-        <view class="month-button" bindtap="handleNextMonth">›</view>
+        <view class="month-copy">
+          <view class="month-kicker">MONTHLY SCHEDULE</view>
+          <view class="month-title-row">
+            <view class="month-title">{{monthTitle}}</view>
+            <view
+              wx:if="{{!isCurrentMonth}}"
+              class="month-current-button"
+              bindtap="handleCurrentMonth"
+              hover-class="month-current-button-pressed"
+              aria-role="button"
+              aria-label="返回本月"
+            ><view class="month-current-icon" aria-hidden="true"></view><text>本月</text></view>
+          </view>
+        </view>
+        <view
+          class="month-button"
+          bindtap="handleNextMonth"
+          hover-class="month-button-pressed"
+          aria-role="button"
+          aria-label="查看下个月"
+        >
+          <view class="month-chevron month-chevron-right" aria-hidden="true"></view>
+        </view>
       </view>
 
       <view class="weekday-row">
@@ -60,6 +151,11 @@
           class="date-cell {{item.empty ? 'date-cell-empty' : ''}} {{item.isSelected ? 'date-cell-selected' : ''}} {{item.isToday ? 'date-cell-today' : ''}} {{item.hasConflict ? 'date-cell-conflict' : ''}}"
           data-date="{{item.date}}"
           bindtap="handleDateTap"
+          hover-class="{{item.empty ? 'none' : 'date-cell-pressed'}}"
+          aria-role="button"
+          aria-disabled="{{item.empty}}"
+          aria-pressed="{{item.isSelected}}"
+          aria-label="{{item.empty ? '空白日期' : item.ariaLabel}}"
         >
           <view wx:if="{{!item.empty}}" class="date-number">{{item.day}}</view>
           <view wx:if="{{item.hasBookings}}" class="date-count">{{item.bookingCount}}</view>
@@ -67,6 +163,8 @@
         </view>
       </view>
       <view class="calendar-legend">
+        <view><text class="legend-swatch legend-today"></text>今天</view>
+        <view><text class="legend-swatch legend-selected"></text>已选</view>
         <view><text class="legend-dot legend-booking"></text>有预约</view>
         <view><text class="legend-dot legend-pending"></text>含待联系</view>
         <view><text class="legend-dot legend-conflict"></text>同车重叠</view>
@@ -82,7 +180,8 @@
         <view class="section-index">02</view>
       </view>
       <view wx:if="{{selectedConflictCount}}" class="day-conflict-tip">
-        当天有 {{selectedConflictCount}} 辆车存在预约重叠，点击记录核对详情。
+        <view class="day-conflict-icon" aria-hidden="true"><view class="conflict-alert-icon"></view></view>
+        <view>当天有 {{selectedConflictCount}} 辆车存在预约重叠，点击记录核对详情。</view>
       </view>
       <view wx:if="{{selectedBookings.length}}" class="booking-list">
         <view
@@ -91,25 +190,53 @@
           wx:key="id"
           data-id="{{item.id}}"
           bindtap="handleBookingTap"
+          hover-class="booking-item-pressed"
+          aria-role="button"
+          aria-label="查看 {{item.vehicleName || '车辆预约'}}，{{item.startDate}} 至 {{item.endDate}}，{{item.statusLabel}}"
         >
           <view class="booking-main">
             <view class="booking-vehicle-row">
+              <view class="booking-vehicle-icon" aria-hidden="true">
+                <view class="booking-vehicle-window"></view>
+                <view class="booking-vehicle-wheel booking-vehicle-wheel-left"></view>
+                <view class="booking-vehicle-wheel booking-vehicle-wheel-right"></view>
+              </view>
               <view class="booking-vehicle">{{item.vehicleName || '车辆预约'}}</view>
               <view wx:if="{{item.hasConflict}}" class="booking-conflict-chip">同车冲突</view>
             </view>
-            <view class="booking-meta">点击查看预约详情</view>
-            <view class="booking-range">{{item.startDate}} → {{item.endDate}}</view>
+            <view class="booking-meta">
+              <view class="booking-document-icon" aria-hidden="true"><view class="booking-document-line"></view></view>
+              <text>点击查看预约详情</text>
+            </view>
+            <view class="booking-range">
+              <view class="booking-calendar-icon" aria-hidden="true"></view>
+              <text>{{item.startDate}}</text>
+              <view class="booking-route" aria-hidden="true"><view class="booking-route-line"></view><view class="booking-route-chevron"></view></view>
+              <text>{{item.endDate}}</text>
+            </view>
           </view>
           <view class="booking-side">
-            <view class="status-pill {{item.statusClass}}">{{item.statusLabel}}</view>
-            <view class="booking-arrow">›</view>
+            <view class="status-pill {{item.statusClass}}"><view class="status-pill-dot"></view><text>{{item.statusLabel}}</text></view>
+            <view class="booking-arrow" aria-hidden="true">
+              <view class="booking-chevron"></view>
+            </view>
           </view>
         </view>
       </view>
-      <view wx:else class="inline-empty">当天没有未取消的预约安排</view>
+      <view wx:else class="inline-empty">
+        <view class="inline-empty-icon" aria-hidden="true"><view class="inline-empty-calendar-line"></view></view>
+        <view class="inline-empty-title">当天暂无安排</view>
+        <view class="inline-empty-desc">没有未取消的预约记录，可切换其他日期查看。</view>
+      </view>
     </view>
 
-    <view wx:if="{{truncated}}" class="scope-tip">预约超过 2000 条，当前日历只展示最近载入的记录。</view>
-    <view class="mode-tip">日历用于人工排期参考，不会自动锁定车辆或替代顾问确认。</view>
+    <view wx:if="{{truncated}}" class="scope-tip tip-with-icon">
+      <view class="tip-native-icon tip-native-icon-alert" aria-hidden="true"><view class="tip-alert-mark"></view></view>
+      <view>预约超过 2000 条，当前日历只展示最近载入的记录。</view>
+    </view>
+    <view class="mode-tip tip-with-icon">
+      <view class="tip-native-icon tip-native-icon-info" aria-hidden="true"><view class="tip-info-mark"></view></view>
+      <view>日历用于人工排期参考，不会自动锁定车辆或替代顾问确认。</view>
+    </view>
   </block>
 </view>

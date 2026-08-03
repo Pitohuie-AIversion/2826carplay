@@ -1,5 +1,7 @@
 const { requirePagePermission } = require("../../shared/pageAuth")
-const { buildMonthView, shiftMonth } = require("../../shared/bookingCalendar")
+const { buildMonthView, normalizeMonthKey, shiftMonth } = require("../../shared/bookingCalendar")
+
+const CURRENT_MONTH_KEY = normalizeMonthKey("")
 
 const STATUS_LABELS = {
   pending: "待联系",
@@ -22,6 +24,8 @@ Page({
     loading: true,
     loadError: "",
     monthKey: "",
+    currentMonthKey: CURRENT_MONTH_KEY,
+    isCurrentMonth: true,
     monthTitle: "",
     selectedDate: "",
     weekdayLabels: ["日", "一", "二", "三", "四", "五", "六"],
@@ -39,9 +43,7 @@ Page({
   },
 
   onLoad() {
-    const now = new Date()
-    const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
-    this.setData({ monthKey })
+    this.setData({ monthKey: this.data.currentMonthKey, isCurrentMonth: true })
     requirePagePermission(this, {
       required: "canManageBookings",
       noPermissionMessage: "无权查看预约日历",
@@ -65,9 +67,25 @@ Page({
     this.changeMonth(1)
   },
 
+  handleCurrentMonth() {
+    if (this.data.monthKey === this.data.currentMonthKey) {
+      return
+    }
+    this.setData({
+      monthKey: this.data.currentMonthKey,
+      selectedDate: "",
+      isCurrentMonth: true
+    })
+    this.fetchBookings()
+  },
+
   changeMonth(offset) {
     const monthKey = shiftMonth(this.data.monthKey, offset)
-    this.setData({ monthKey, selectedDate: "" })
+    this.setData({
+      monthKey,
+      selectedDate: "",
+      isCurrentMonth: monthKey === this.data.currentMonthKey
+    })
     this.fetchBookings()
   },
 
@@ -86,7 +104,13 @@ Page({
       return
     }
     wx.navigateTo({
-      url: `/pages/booking-manage-detail/booking-manage-detail?id=${id}`
+      url: `/pages/booking-manage-detail/booking-manage-detail?id=${id}`,
+      fail: () => {
+        wx.showToast({
+          title: "预约详情打开失败",
+          icon: "none"
+        })
+      }
     })
   },
 
@@ -102,6 +126,7 @@ Page({
     )
     this.setData({
       monthKey: view.monthKey,
+      isCurrentMonth: view.monthKey === this.data.currentMonthKey,
       monthTitle: view.monthTitle,
       selectedDate: view.selectedDate,
       calendarCells: view.cells,

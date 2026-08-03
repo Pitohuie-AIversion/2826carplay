@@ -1,4 +1,4 @@
-<view class="health-page management-page">
+<view wx:if="{{pageAuthorized}}" class="health-page management-page">
   <view class="page-glow"></view>
 
   <view class="hero-card ui-card ui-card-gradient">
@@ -8,75 +8,123 @@
         <view class="hero-title">上线检查</view>
         <view class="hero-desc">只读检查当前云环境的数据与关键配置</view>
       </view>
-      <image class="hero-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+      <image class="hero-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
     </view>
     <view class="hero-foot">
-      <view class="live-dot"></view>
+      <view class="live-dot live-dot-{{summary.level}}"></view>
       <view class="hero-foot-text">最近检查：{{checkedAtText}}</view>
-      <view class="refresh-link" bindtap="handleRefresh">{{refreshing ? '检查中…' : '重新检查'}}</view>
+      <view class="refresh-link {{loading || refreshing ? 'refresh-link-disabled' : ''}}" bindtap="handleRefresh" hover-class="{{loading || refreshing ? 'none' : 'refresh-link-pressed'}}" aria-role="button" aria-disabled="{{loading || refreshing}}" aria-label="{{loading || refreshing ? '正在执行上线检查' : '重新执行上线检查'}}">
+        <view class="refresh-native-icon {{loading || refreshing ? 'refresh-native-icon-spinning' : ''}}" aria-hidden="true"></view>{{loading || refreshing ? '检查中…' : '重新检查'}}
+      </view>
     </view>
   </view>
 
-  <view wx:if="{{loading}}" class="state-card ui-card">
-    <view class="state-loader"></view>
-    <view>
-      <view class="state-title">正在检查当前云环境</view>
-      <view class="state-desc">不会新增、修改或删除任何业务数据</view>
+  <view wx:if="{{loading}}" class="health-skeleton" aria-hidden="true">
+    <view class="health-skeleton-summary ui-card">
+      <view class="health-skeleton-summary-mark manage-skeleton-pulse"></view>
+      <view class="health-skeleton-summary-copy"><view class="health-skeleton-summary-title manage-skeleton-pulse"></view><view class="health-skeleton-line manage-skeleton-pulse"></view></view>
+    </view>
+    <view class="health-skeleton-completion ui-card">
+      <view class="health-skeleton-completion-top"><view><view class="health-skeleton-title manage-skeleton-pulse"></view><view class="health-skeleton-meta manage-skeleton-pulse"></view></view><view class="health-skeleton-percent manage-skeleton-pulse"></view></view>
+      <view class="health-skeleton-track manage-skeleton-pulse"></view>
+      <view class="health-skeleton-stats"><view class="health-skeleton-stat" wx:for="{{[1, 2, 3, 4]}}" wx:key="*this"><view class="health-skeleton-stat-icon manage-skeleton-pulse"></view><view class="health-skeleton-stat-value manage-skeleton-pulse"></view><view class="health-skeleton-stat-label manage-skeleton-pulse"></view></view></view>
+    </view>
+    <view class="health-skeleton-section ui-card">
+      <view class="health-skeleton-heading"><view><view class="health-skeleton-kicker manage-skeleton-pulse"></view><view class="health-skeleton-title manage-skeleton-pulse"></view></view><view class="health-skeleton-index manage-skeleton-pulse"></view></view>
+      <view class="health-skeleton-check" wx:for="{{[1, 2, 3]}}" wx:key="*this"><view class="health-skeleton-check-icon manage-skeleton-pulse"></view><view class="health-skeleton-check-copy"><view class="health-skeleton-check-title manage-skeleton-pulse"></view><view class="health-skeleton-line manage-skeleton-pulse"></view></view><view class="health-skeleton-check-status manage-skeleton-pulse"></view></view>
     </view>
   </view>
 
   <view wx:elif="{{loadError}}" class="error-card ui-card">
+    <view class="error-native-icon" aria-hidden="true"></view>
     <view class="error-copy">
       <view class="error-title">检查未完成</view>
       <view class="error-desc">{{loadError}}</view>
     </view>
-    <button class="retry-button ui-btn ui-btn-ghost" bindtap="handleRefresh">重试</button>
+    <button class="retry-button ui-btn ui-btn-ghost" bindtap="handleRefresh"><view class="retry-native-icon" aria-hidden="true"></view>重试</button>
   </view>
 
   <block wx:else>
-    <view class="summary-card ui-card {{summary.ready ? 'summary-ready' : 'summary-blocked'}}">
-      <view class="summary-mark">{{summary.ready ? '✓' : '!'}}</view>
+    <view class="summary-card ui-card summary-{{summary.level}}">
+      <view class="summary-mark" aria-hidden="true">
+        <view class="summary-state-icon summary-state-icon-{{summary.level}}"></view>
+      </view>
       <view class="summary-copy">
-        <view class="summary-title">{{summary.ready ? '技术检查未发现阻塞项' : '仍有阻塞项需要修复'}}</view>
-        <view class="summary-desc">
-          正常 {{summary.passed}} 项 · 待确认 {{summary.warnings}} 项 · 需修复 {{summary.failed}} 项
+        <view class="summary-title">{{summary.title}}</view>
+        <view class="summary-desc">{{summary.desc}}</view>
+      </view>
+    </view>
+
+    <view class="completion-card ui-card" aria-role="group" aria-label="上线准备完成度 {{summary.completionPercent}}%，自动正常 {{summary.passed}} / {{summary.total}}，人工确认 {{manualCompletedCount}} / {{manualChecks.length}}">
+      <view class="completion-top">
+        <view>
+          <view class="completion-title">上线准备完成度</view>
+          <view class="completion-meta">
+            自动正常 {{summary.passed}}/{{summary.total}} · 人工确认 {{manualCompletedCount}}/{{manualChecks.length}}
+          </view>
         </view>
+        <view class="completion-value">{{summary.completionPercent}}%</view>
+      </view>
+      <view class="completion-track" aria-hidden="true">
+        <view class="completion-bar completion-bar-{{summary.level}}" style="width: {{summary.completionPercent}}%;"></view>
+      </view>
+      <view class="completion-breakdown">
+        <view class="completion-stat completion-stat-pass"><view class="completion-stat-icon completion-stat-icon-pass" aria-hidden="true"></view><view class="completion-stat-value">{{summary.passed}}</view><view class="completion-stat-label">自动正常</view></view>
+        <view class="completion-stat completion-stat-warning"><view class="completion-stat-icon completion-stat-icon-warning" aria-hidden="true"></view><view class="completion-stat-value">{{summary.warnings}}</view><view class="completion-stat-label">待确认</view></view>
+        <view class="completion-stat completion-stat-fail"><view class="completion-stat-icon completion-stat-icon-fail" aria-hidden="true"></view><view class="completion-stat-value">{{summary.failed}}</view><view class="completion-stat-label">需修复</view></view>
+        <view class="completion-stat completion-stat-manual"><view class="completion-stat-icon completion-stat-icon-manual" aria-hidden="true"></view><view class="completion-stat-value">{{manualCompletedCount}}/{{manualChecks.length}}</view><view class="completion-stat-label">人工确认</view></view>
       </view>
     </view>
 
     <view class="section-card ui-card">
       <view class="section-heading">
-        <view>
-          <view class="section-eyebrow">AUTOMATED CHECKS</view>
-          <view class="section-title">自动检查结果</view>
+        <view class="section-heading-icon-wrap">
+          <view class="section-native-icon automated-section-native-icon" aria-hidden="true"></view>
+          <view><view class="section-eyebrow">AUTOMATED CHECKS</view><view class="section-title">自动检查结果</view></view>
         </view>
         <view class="section-index">{{summary.total}}</view>
       </view>
 
       <view class="check-list">
         <view class="check-item" wx:for="{{checks}}" wx:key="key">
-          <view class="check-indicator {{item.statusClass}}"></view>
+          <view class="check-kind-icon-wrap {{item.statusClass}}"><view class="check-kind-icon {{item.iconClass}}" aria-hidden="true"></view></view>
           <view class="check-copy">
+            <view class="check-group">{{item.groupLabel}}</view>
             <view class="check-label">{{item.label}}</view>
             <view class="check-message">{{item.message}}</view>
           </view>
-          <view class="check-status {{item.statusClass}}">{{item.statusLabel}}</view>
+          <view class="check-status {{item.statusClass}}"><view class="check-status-native-icon check-status-native-icon-{{item.status}}" aria-hidden="true"></view>{{item.statusLabel}}</view>
         </view>
       </view>
     </view>
 
     <view class="section-card ui-card">
       <view class="section-heading">
-        <view>
-          <view class="section-eyebrow">MANUAL REVIEW</view>
-          <view class="section-title">仍需人工确认</view>
+        <view class="section-heading-icon-wrap">
+          <view class="section-native-icon manual-section-native-icon" aria-hidden="true"></view>
+          <view><view class="section-eyebrow">MANUAL REVIEW</view><view class="section-title">仍需人工确认</view></view>
         </view>
-        <view class="section-index">{{manualChecks.length}}</view>
+        <view class="section-index">{{manualCompletedCount}}/{{manualChecks.length}}</view>
       </view>
-      <view class="manual-note">云函数无法自动读取索引、安全规则和微信公众平台审核状态，请按下列项目逐项确认。</view>
-      <view class="manual-item" wx:for="{{manualChecks}}" wx:key="*this">
-        <view class="manual-index">{{index + 1}}</view>
-        <view class="manual-text">{{item}}</view>
+      <view class="manual-note"><view class="manual-note-native-icon" aria-hidden="true"></view><view>云函数无法自动读取索引、安全规则和微信公众平台审核状态。点击下列项目逐项确认，进度仅保存在当前设备当天。</view></view>
+      <view
+        class="manual-item {{item.checked ? 'manual-item-checked' : ''}}"
+        wx:for="{{manualChecks}}"
+        wx:key="key"
+        data-key="{{item.key}}"
+        bindtap="handleManualToggle"
+        hover-class="manual-item-pressed"
+        aria-role="checkbox"
+        aria-checked="{{item.checked}}"
+        aria-label="{{item.label}}，{{item.checked ? '已确认' : '待确认'}}"
+      >
+        <view class="manual-index">
+          <view wx:if="{{item.checked}}" class="manual-check-icon" aria-hidden="true"></view>
+          <text wx:else>{{index + 1}}</text>
+        </view>
+        <view class="manual-kind-icon-wrap"><view class="manual-kind-icon {{item.iconClass}}" aria-hidden="true"></view></view>
+        <view class="manual-text">{{item.label}}</view>
+        <view class="manual-status">{{item.checked ? '已确认' : '待确认'}}</view>
       </view>
     </view>
   </block>

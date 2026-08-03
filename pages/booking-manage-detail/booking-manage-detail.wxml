@@ -1,14 +1,14 @@
-<view class="detail-page management-page">
+<view wx:if="{{pageAuthorized}}" class="detail-page management-page">
   <view class="page-glow"></view>
   <block wx:if="{{booking.id}}">
   <view class="header-card hero-card ui-card">
     <view class="hero-top">
       <view class="hero-copy">
         <view class="page-kicker">RESERVATION PROFILE</view>
-        <view class="booking-name">{{booking.vehicleName || "--"}}</view>
+        <view class="booking-name">{{booking.vehicleName || "—"}}</view>
         <view class="hero-desc">顾问跟进与预约资料管理</view>
       </view>
-      <view class="booking-status ui-status ui-status-lg {{statusClass}}">{{statusText}}</view>
+      <view class="booking-status ui-status ui-status-lg {{statusClass}}"><view class="booking-status-dot"></view><text>{{statusText}}</text></view>
     </view>
   </view>
 
@@ -16,45 +16,45 @@
     <view class="info-grid">
       <view class="info-item">
         <view class="info-label">预约编号</view>
-        <view class="info-value">{{booking.id || "--"}}</view>
+        <view class="info-value">{{booking.id || "—"}}</view>
       </view>
       <view class="info-item">
         <view class="info-label">车辆 ID</view>
-        <view class="info-value">{{booking.vehicleId || "--"}}</view>
+        <view class="info-value">{{booking.vehicleId || "—"}}</view>
       </view>
       <view class="info-item">
         <view class="info-label">联系人</view>
-        <view class="info-value">{{booking.userName || "--"}}</view>
+        <view class="info-value">{{booking.userName || "—"}}</view>
       </view>
       <view class="info-item">
         <view class="info-label">手机号</view>
-        <view class="info-value">{{booking.phone || "--"}}</view>
+        <view class="info-value">{{booking.phone || "—"}}</view>
       </view>
       <view class="info-item info-item-full">
         <view class="info-label">预约日期</view>
-        <view class="info-value">{{booking.startDate || "--"}} - {{booking.endDate || "--"}}</view>
+        <view class="info-value info-date-range"><view class="info-date-native-icon" aria-hidden="true"></view><text>{{booking.startDate || "—"}}</text><view class="info-date-route" aria-hidden="true"><view class="info-date-route-line"></view><view class="info-date-route-chevron"></view></view><text>{{booking.endDate || "—"}}</text></view>
       </view>
       <view class="info-item">
         <view class="info-label">取车城市</view>
-        <view class="info-value">{{booking.city || "--"}}</view>
+        <view class="info-value">{{booking.city || "—"}}</view>
       </view>
       <view class="info-item">
         <view class="info-label">提交时间</view>
-        <view class="info-value">{{createdAtText || "--"}}</view>
+        <view class="info-value">{{createdAtText || "—"}}</view>
       </view>
       <view class="info-item">
         <view class="info-label">最后更新</view>
-        <view class="info-value">{{updatedAtText || "--"}}</view>
+        <view class="info-value">{{updatedAtText || "—"}}</view>
       </view>
       <view class="info-item info-item-full">
         <view class="info-label">用户 OpenID</view>
-        <view class="info-value">{{booking.openid || "--"}}</view>
+        <view class="info-value">{{booking.openid || "—"}}</view>
       </view>
     </view>
     <view class="quick-contact">
-      <button class="quick-contact-btn quick-contact-primary ui-btn ui-btn-primary" bindtap="handleCallPhone">拨打电话</button>
-      <button class="quick-contact-btn ui-btn ui-btn-ghost" data-field="phone" bindtap="handleCopyContact">复制手机号</button>
-      <button class="quick-contact-btn quick-contact-btn-last ui-btn ui-btn-ghost" data-field="openid" bindtap="handleCopyContact">复制 OpenID</button>
+      <button class="quick-contact-btn quick-contact-primary ui-btn ui-btn-primary action-with-icon" bindtap="handleCallPhone"><view class="call-native-icon" aria-hidden="true"></view><text>拨打电话</text></button>
+      <button class="quick-contact-btn ui-btn ui-btn-ghost action-with-icon" data-field="phone" bindtap="handleCopyContact"><view class="copy-native-icon" aria-hidden="true"></view><text>复制手机号</text></button>
+      <button class="quick-contact-btn quick-contact-btn-last ui-btn ui-btn-ghost action-with-icon" data-field="openid" bindtap="handleCopyContact"><view class="identity-native-icon" aria-hidden="true"><view class="identity-native-dot"></view></view><text>复制 OpenID</text></button>
     </view>
   </view>
 
@@ -76,6 +76,8 @@
           data-value="priority"
           disabled="{{coordinationLoading || !coordinationEditable}}"
           bindtap="handleUpdateCoordination"
+          hover-class="{{coordinationLoading || !coordinationEditable ? 'none' : 'coordination-option-pressed'}}"
+          aria-pressed="{{booking.schedulePriority === 'priority'}}"
         >优先</button>
         <button
           class="coordination-option {{booking.schedulePriority === 'normal' ? 'coordination-option-normal coordination-option-active' : ''}}"
@@ -83,6 +85,8 @@
           data-value="normal"
           disabled="{{coordinationLoading || !coordinationEditable}}"
           bindtap="handleUpdateCoordination"
+          hover-class="{{coordinationLoading || !coordinationEditable ? 'none' : 'coordination-option-pressed'}}"
+          aria-pressed="{{booking.schedulePriority === 'normal'}}"
         >常规</button>
         <button
           class="coordination-option {{booking.schedulePriority === 'standby' ? 'coordination-option-standby coordination-option-active' : ''}}"
@@ -90,6 +94,8 @@
           data-value="standby"
           disabled="{{coordinationLoading || !coordinationEditable}}"
           bindtap="handleUpdateCoordination"
+          hover-class="{{coordinationLoading || !coordinationEditable ? 'none' : 'coordination-option-pressed'}}"
+          aria-pressed="{{booking.schedulePriority === 'standby'}}"
         >候补</button>
       </view>
     </view>
@@ -103,6 +109,8 @@
           data-value="pending"
           disabled="{{coordinationLoading || !coordinationEditable}}"
           bindtap="handleUpdateCoordination"
+          hover-class="{{coordinationLoading || !coordinationEditable ? 'none' : 'coordination-option-pressed'}}"
+          aria-pressed="{{booking.coordinationStatus === 'pending'}}"
         >待协调</button>
         <button
           class="coordination-option {{booking.coordinationStatus === 'coordinating' ? 'coordination-option-coordinating coordination-option-active' : ''}}"
@@ -110,6 +118,8 @@
           data-value="coordinating"
           disabled="{{coordinationLoading || !coordinationEditable}}"
           bindtap="handleUpdateCoordination"
+          hover-class="{{coordinationLoading || !coordinationEditable ? 'none' : 'coordination-option-pressed'}}"
+          aria-pressed="{{booking.coordinationStatus === 'coordinating'}}"
         >协调中</button>
         <button
           class="coordination-option {{booking.coordinationStatus === 'resolved' ? 'coordination-option-resolved coordination-option-active' : ''}}"
@@ -117,15 +127,17 @@
           data-value="resolved"
           disabled="{{coordinationLoading || !coordinationEditable}}"
           bindtap="handleUpdateCoordination"
+          hover-class="{{coordinationLoading || !coordinationEditable ? 'none' : 'coordination-option-pressed'}}"
+          aria-pressed="{{booking.coordinationStatus === 'resolved'}}"
         >已协调</button>
       </view>
     </view>
 
     <view wx:if="{{coordinationEditable}}" class="coordination-help">
-      点选后立即保存；具体联系结果可继续记录在管理员备注中。
+      <view class="help-native-icon" aria-hidden="true"><view class="help-info-mark"></view></view><view>点选后立即保存；具体联系结果可继续记录在管理员备注中。</view>
     </view>
     <view wx:else class="coordination-help">
-      当前预约已结束，协调安排仅供历史查看。
+      <view class="help-native-icon" aria-hidden="true"><view class="help-info-mark"></view></view><view>当前预约已结束，协调安排仅供历史查看。</view>
     </view>
   </view>
 
@@ -140,49 +152,53 @@
       </view>
     </view>
 
-    <view wx:if="{{conflictsUnavailable}}" class="conflict-state">
-      冲突信息暂时无法加载，主预约仍可继续处理。
+    <view wx:if="{{conflictsUnavailable}}" class="conflict-state conflict-message">
+      <view class="conflict-message-icon conflict-message-icon-warning" aria-hidden="true"><view class="conflict-alert-mark"></view></view><view>冲突信息暂时无法加载，主预约仍可继续处理。</view>
     </view>
-    <view wx:elif="{{conflictCheckSkipped}}" class="conflict-state">
-      当前预约已取消或日期不完整，不参与档期冲突检查。
+    <view wx:elif="{{conflictCheckSkipped}}" class="conflict-state conflict-message">
+      <view class="conflict-message-icon" aria-hidden="true"><view class="help-info-mark"></view></view><view>当前预约已取消或日期不完整，不参与档期冲突检查。</view>
     </view>
     <block wx:elif="{{conflicts.length}}">
-      <view class="conflict-tip">以下预约与当前车辆、日期存在重叠，请联系客户人工协调。</view>
+      <view class="conflict-tip conflict-message"><view class="conflict-message-icon conflict-message-icon-warning" aria-hidden="true"><view class="conflict-alert-mark"></view></view><view>以下预约与当前车辆、日期存在重叠，请联系客户人工协调。</view></view>
       <view class="conflict-list">
         <view class="conflict-item" wx:for="{{conflicts}}" wx:key="id">
           <view class="conflict-item-top">
             <view class="conflict-contact">{{item.userName || '未填写姓名'}}</view>
             <view class="conflict-status ui-status {{item.statusClass}}">{{item.statusText}}</view>
           </view>
-          <view class="conflict-date">{{item.startDate || '--'}} → {{item.endDate || '--'}}</view>
+          <view class="conflict-date"><view class="conflict-date-native-icon" aria-hidden="true"></view><text>{{item.startDate || '—'}}</text><view class="conflict-date-route" aria-hidden="true"><view class="conflict-date-route-line"></view><view class="conflict-date-route-chevron"></view></view><text>{{item.endDate || '—'}}</text></view>
           <view class="conflict-plan">
             <text class="conflict-plan-pill {{item.priorityClass}}">{{item.schedulePriorityText}}</text>
             <text class="conflict-plan-pill {{item.coordinationClass}}">{{item.coordinationStatusText}}</text>
           </view>
-          <view class="conflict-meta">{{item.phone || '未填写手机号'}} · {{item.city || '未填写城市'}}</view>
+          <view class="conflict-meta"><view class="conflict-contact-native-icon" aria-hidden="true"></view><text>{{item.phone || '未填写手机号'}} · {{item.city || '未填写城市'}}</text></view>
           <view class="conflict-actions">
             <button
               class="conflict-action conflict-action-primary"
               data-phone="{{item.phone}}"
               catchtap="handleConflictCall"
-            >拨打电话</button>
+              hover-class="manage-detail-button-pressed"
+            ><view class="call-native-icon" aria-hidden="true"></view><text>拨打电话</text></button>
             <button
               class="conflict-action"
               data-id="{{item.id}}"
               catchtap="handleConflictTap"
-            >查看预约</button>
+              hover-class="manage-detail-button-pressed"
+            ><view class="detail-native-icon" aria-hidden="true"><view class="detail-native-dot"></view></view><text>查看预约</text></button>
           </view>
         </view>
       </view>
-      <view wx:if="{{conflictsTruncated}}" class="conflict-more">
-        重叠记录较多，当前展示前 {{conflicts.length}} 条，请结合预约日历继续核对。
+      <view wx:if="{{conflictsTruncated}}" class="conflict-more conflict-message">
+        <view class="conflict-message-icon" aria-hidden="true"><view class="help-info-mark"></view></view><view>重叠记录较多，当前展示前 {{conflicts.length}} 条，请结合预约日历继续核对。</view>
       </view>
     </block>
-    <view wx:elif="{{conflictsTruncated}}" class="conflict-state">
-      当前车辆历史预约较多，已扫描范围内未发现重叠，请结合预约日历继续核对。
+    <view wx:elif="{{conflictsTruncated}}" class="conflict-state conflict-message">
+      <view class="conflict-message-icon" aria-hidden="true"><view class="help-info-mark"></view></view><view>当前车辆历史预约较多，已扫描范围内未发现重叠，请结合预约日历继续核对。</view>
     </view>
     <view wx:else class="conflict-clear">
-      <view class="conflict-clear-mark">✓</view>
+      <view class="conflict-clear-mark" aria-hidden="true">
+        <view class="conflict-check-icon"></view>
+      </view>
       <view>
         <view class="conflict-clear-title">未发现同车重叠</view>
         <view class="conflict-state">当前记录仍以顾问最终确认为准。</view>
@@ -191,37 +207,41 @@
   </view>
 
   <view wx:if="{{booking.note}}" class="note-card ui-card">
-    <view class="note-title">用户备注</view>
+    <view class="note-title note-title-with-icon"><view class="note-native-icon note-native-icon-user" aria-hidden="true"><view class="note-native-line"></view></view><text>用户备注</text></view>
     <view class="note-content">{{booking.note}}</view>
   </view>
 
   <view class="note-card ui-card ui-card-soft">
     <view class="note-head">
-      <view class="note-title">管理员备注</view>
-      <view wx:if="{{adminRemarkUpdatedAtText}}" class="note-time">{{adminRemarkUpdatedAtText}}</view>
+      <view class="note-title note-title-with-icon"><view class="note-native-icon" aria-hidden="true"><view class="note-native-line"></view></view><text>管理员备注</text></view>
+      <view class="note-meta">
+        <view class="note-counter">{{booking.adminRemarkDraft.length || 0}} / 200</view>
+        <view wx:if="{{adminRemarkUpdatedAtText}}" class="note-time">{{adminRemarkUpdatedAtText}}</view>
+      </view>
     </view>
     <textarea
       class="remark-input"
       maxlength="200"
       placeholder="记录联系结果、到店时间、后续计划"
+      aria-label="预约内部备注"
       value="{{booking.adminRemarkDraft}}"
       bindinput="handleRemarkInput"
     />
-    <button class="save-btn ui-btn ui-btn-primary" loading="{{loading}}" disabled="{{loading}}" bindtap="handleSaveRemark">保存备注</button>
+    <button class="save-btn ui-btn ui-btn-primary action-with-icon" loading="{{loading}}" disabled="{{loading}}" bindtap="handleSaveRemark"><view wx:if="{{!loading}}" class="save-native-icon" aria-hidden="true"><view class="save-native-line"></view></view><text>{{loading ? '正在保存' : '保存备注'}}</text></button>
   </view>
 
   <view class="action-card ui-card" wx:if="{{booking.status === 'pending' || booking.status === 'contacted'}}">
-    <view class="action-title">状态操作</view>
-    <view class="action-tip">拨号不会自动改变状态，请在实际沟通完成后再标记“已联系”。</view>
+    <view class="action-title note-title-with-icon"><view class="status-operation-native-icon" aria-hidden="true"><view class="status-operation-dot"></view></view><text>状态操作</text></view>
+    <view class="action-tip"><view class="help-native-icon" aria-hidden="true"><view class="help-info-mark"></view></view><view>拨号不会自动改变状态，请在实际沟通完成后再标记“已联系”。</view></view>
     <view class="status-actions">
-      <button wx:if="{{booking.status === 'pending'}}" class="status-btn status-btn-alt" disabled="{{loading}}" data-status="contacted" bindtap="handleUpdateStatus">标记已联系</button>
-      <button wx:if="{{booking.status === 'contacted'}}" class="status-btn" disabled="{{loading}}" data-status="completed" bindtap="handleUpdateStatus">标记已完成</button>
-      <button class="status-btn status-btn-alt status-btn-danger status-btn-last" disabled="{{loading}}" data-status="cancelled" bindtap="handleUpdateStatus">取消预约</button>
+      <button wx:if="{{booking.status === 'pending'}}" class="status-btn status-btn-alt action-with-icon" disabled="{{loading}}" data-status="contacted" bindtap="handleUpdateStatus" hover-class="{{loading ? 'none' : 'manage-detail-button-pressed'}}"><view class="status-contact-native-icon" aria-hidden="true"></view><text>标记已联系</text></button>
+      <button wx:if="{{booking.status === 'contacted'}}" class="status-btn action-with-icon" disabled="{{loading}}" data-status="completed" bindtap="handleUpdateStatus" hover-class="{{loading ? 'none' : 'manage-detail-button-pressed'}}"><view class="status-complete-native-icon" aria-hidden="true"></view><text>标记已完成</text></button>
+      <button class="status-btn status-btn-alt status-btn-danger status-btn-last action-with-icon" disabled="{{loading}}" data-status="cancelled" bindtap="handleUpdateStatus" hover-class="{{loading ? 'none' : 'manage-detail-button-pressed'}}"><view class="status-cancel-native-icon" aria-hidden="true"></view><text>取消预约</text></button>
     </view>
   </view>
   </block>
 
-  <view wx:elif="{{initialLoading || loading}}" class="manage-detail-skeleton">
+  <view wx:elif="{{initialLoading || loading}}" class="manage-detail-skeleton" aria-hidden="true">
     <view class="manage-detail-skeleton-hero ui-card">
       <view>
         <view class="manage-detail-skeleton-kicker manage-skeleton-pulse"></view>
@@ -246,11 +266,11 @@
   </view>
 
   <view wx:else class="manage-detail-state ui-card">
-    <image class="manage-detail-state-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" />
+    <image class="manage-detail-state-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
     <view class="manage-detail-state-kicker">RESERVATION PROFILE</view>
     <view class="manage-detail-state-title">预约详情</view>
     <view class="manage-detail-state-desc">{{loadFailed ? loadErrorText : '未找到该预约记录'}}</view>
-    <button wx:if="{{loadFailed}}" class="manage-detail-state-btn ui-btn ui-btn-primary" bindtap="handleRetryLoad">重新加载</button>
-    <button class="manage-detail-state-btn ui-btn ui-btn-ghost" bindtap="handleBackManage">返回预约管理</button>
+    <button wx:if="{{loadFailed}}" class="manage-detail-state-btn ui-btn ui-btn-primary action-with-icon" bindtap="handleRetryLoad"><view class="retry-native-icon" aria-hidden="true"></view><text>重新加载</text></button>
+    <button class="manage-detail-state-btn ui-btn ui-btn-ghost action-with-icon" bindtap="handleBackManage"><view class="back-native-icon" aria-hidden="true"></view><text>返回预约管理</text></button>
   </view>
 </view>

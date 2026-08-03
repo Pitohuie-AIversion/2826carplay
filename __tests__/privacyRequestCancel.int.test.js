@@ -2,7 +2,8 @@ jest.mock("wx-server-sdk")
 
 function createMockDb({ current, updateResult = { stats: { updated: 1 } } }) {
   const requestGet = jest.fn().mockResolvedValue({ data: current })
-  const requestDoc = jest.fn(() => ({ get: requestGet }))
+  const requestField = jest.fn(() => ({ get: requestGet }))
+  const requestDoc = jest.fn(() => ({ field: requestField, get: requestGet }))
   const requestUpdate = jest.fn().mockResolvedValue(updateResult)
   const requestWhere = jest.fn(() => ({ update: requestUpdate }))
   const auditAdd = jest.fn().mockResolvedValue({ _id: "audit_1" })
@@ -27,6 +28,7 @@ function createMockDb({ current, updateResult = { stats: { updated: 1 } } }) {
 
   return {
     db,
+    requestField,
     requestWhere,
     requestUpdate,
     auditAdd,
@@ -67,6 +69,11 @@ describe("cloudfunctions/privacyRequestCancel integration", () => {
       id: "privacy_1",
       status: "cancelled",
       message: "隐私申请已撤回"
+    })
+    expect(mocks.requestField).toHaveBeenCalledWith({
+      openid: true,
+      type: true,
+      status: true
     })
     expect(mocks.requestWhere).toHaveBeenCalledWith({
       _id: "privacy_1",

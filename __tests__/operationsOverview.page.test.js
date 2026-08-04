@@ -38,6 +38,7 @@ function flushPromises() {
 
 describe("pages/operations-overview", () => {
   afterEach(() => {
+    jest.useRealTimers()
     delete global.Page
     delete global.wx
   })
@@ -166,6 +167,123 @@ describe("pages/operations-overview", () => {
     expect(page.data.syncProgress).toBe(67)
     expect(page.data.syncStateLabel).toBe("部分数据可用")
     expect(page.data.syncStateClass).toBe("sync-state-partial")
+  })
+
+  test("数据源没有回调时按超时失败收口，不会一直显示骨架屏", async () => {
+    jest.useFakeTimers()
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn()
+      }
+    }
+    const page = createPage(loadPageDefinition(), {
+      canManageVehicles: true,
+      canManageBookings: false,
+      canManageRoles: false
+    })
+
+    page.loadOverview()
+    jest.advanceTimersByTime(15 * 1000)
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(page.data.loading).toBe(false)
+    expect(page.data.loadError).toBe("数据请求超时，请稍后刷新")
+    expect(page.data.loadedSourceCount).toBe(0)
+  })
+
+  test("数据源同步抛错时收口为模块错误", async () => {
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(() => {
+          throw new Error("cloud init failed")
+        })
+      }
+    }
+    const page = createPage(loadPageDefinition(), {
+      canManageVehicles: true,
+      canManageBookings: false,
+      canManageRoles: false
+    })
+
+    expect(() => page.loadOverview()).not.toThrow()
+    await flushPromises()
+
+    expect(page.data.loading).toBe(false)
+    expect(page.data.loadError).toBe("cloud init failed")
+    expect(page.data.vehicleLoaded).toBe(false)
+  })
+
+  test("数据源 fail 回调保留明确错误并执行刷新完成回调", async () => {
+    const done = jest.fn()
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(({ fail }) => {
+          fail({ errMsg: "callFunction:fail network" })
+        })
+      }
+    }
+    const page = createPage(loadPageDefinition(), {
+      canManageVehicles: true,
+      canManageBookings: false,
+      canManageRoles: false
+    })
+
+    page.loadOverview({ refreshing: true, done })
+    await flushPromises()
+
+    expect(page.data.refreshing).toBe(false)
+    expect(page.data.loadError).toBe("callFunction:fail network")
+    expect(done).toHaveBeenCalledTimes(1)
+  })
+
+  test("数据源超时后忽略迟到成功回调", async () => {
+    jest.useFakeTimers()
+    let lateSuccess
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(({ success }) => {
+          lateSuccess = success
+        })
+      }
+    }
+    const page = createPage(loadPageDefinition(), {
+      canManageVehicles: true,
+      canManageBookings: false,
+      canManageRoles: false
+    })
+
+    page.loadOverview()
+    jest.advanceTimersByTime(15 * 1000)
+    await Promise.resolve()
+    await Promise.resolve()
+    lateSuccess({
+      result: {
+        ok: true,
+        stats: { total: 99 },
+        dashboard: { idle: 99 }
+      }
+    })
+    await Promise.resolve()
+
+    expect(page.data.loadError).toBe("数据请求超时，请稍后刷新")
+    expect(page.data.vehicleLoaded).toBe(false)
+    expect(page.data.vehicleMetrics).toEqual([])
+  })
+
+  test("云能力缺失时立即结束加载并调用完成回调", () => {
+    const done = jest.fn()
+    global.wx = {}
+    const page = createPage(loadPageDefinition(), {
+      canManageVehicles: true
+    })
+
+    page.loadOverview({ refreshing: true, done })
+
+    expect(page.data.loading).toBe(false)
+    expect(page.data.refreshing).toBe(false)
+    expect(page.data.loadError).toBe("云能力未初始化")
+    expect(done).toHaveBeenCalledTimes(1)
   })
 
   test("运营总览使用同步进度、业务图标和原生导航箭头", () => {

@@ -259,6 +259,16 @@ function buildMemberRole(result) {
   }
 }
 
+function buildPermissionFailureRole() {
+  return {
+    roleKicker: "VERIFY FAILED",
+    roleLabel: "身份确认失败",
+    roleClass: "profile-role-loading"
+  }
+}
+
+const PERMISSION_LOAD_TIMEOUT_MS = 12 * 1000
+
 Page({
   data: {
     brandName: "极境车库",
@@ -268,6 +278,7 @@ Page({
     envVersion: "release",
     permissionsLoading: true,
     permissionsReady: false,
+    permissionsError: "",
     summaryLoading: false,
     operationPulse: {
       visible: false,
@@ -353,55 +364,90 @@ Page({
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       this.setData({
         permissionsLoading: false,
-        ...buildMemberRole(null)
+        permissionsReady: false,
+        permissionsError: "云能力未初始化，点击重试",
+        ...buildPermissionFailureRole()
       })
       return
     }
 
-    wx.cloud.callFunction({
-      name: "getMyPermissions",
-      success: (res) => {
-        const result = res && res.result ? res.result : null
-        if (!result || !result.ok) {
-          this.setData({
-            permissionsLoading: false,
-            permissionsReady: true,
-            myPermissions: {},
-            ...buildMemberRole(null)
-          })
-          return
-        }
-
-        this.setData({
-          permissionsLoading: false,
-          permissionsReady: true,
-          myPermissions: {
-            canManageBookings: Boolean(result.canManageBookings),
-            canManageRoles: Boolean(result.canManageRoles)
-          },
-          ...buildMemberRole(result),
-          menuItems: buildVisibleMenuItems({
-            envVersion: this.data.envVersion,
-            canManageRoles: Boolean(result.canManageRoles),
-            canManageConfig: Boolean(result.canManageConfig),
-            canViewAuditLogs: Boolean(result.canViewAuditLogs),
-            canViewErrorLogs: Boolean(result.canViewErrorLogs),
-            canManageVehicles: Boolean(result.canManageVehicles),
-            canManageBookings: Boolean(result.canManageBookings)
-          })
-        }, () => {
-          this.loadOperationSummary(result)
-        })
-      },
-      fail: () => {
-        this.setData({
-          permissionsLoading: false,
-          permissionsReady: true,
-          myPermissions: {},
-          ...buildMemberRole(null)
-        })
-      }
+    this.setData({
+      permissionsLoading: true,
+      permissionsError: ""
     })
+
+    let settled = false
+    let timeoutId = null
+    const finish = (callback) => {
+      if (settled) {
+        return
+      }
+      settled = true
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+        timeoutId = null
+      }
+      callback()
+    }
+    const handleFailure = () => {
+      finish(() => {
+        this.setData({
+          permissionsLoading: false,
+          permissionsReady: false,
+          permissionsError: "权限同步失败，点击重试",
+          myPermissions: {},
+          ...buildPermissionFailureRole()
+        })
+      })
+    }
+
+    timeoutId = setTimeout(handleFailure, PERMISSION_LOAD_TIMEOUT_MS)
+
+    try {
+      wx.cloud.callFunction({
+        name: "getMyPermissions",
+        success: (res) => {
+          const result = res && res.result ? res.result : null
+          if (!result || !result.ok) {
+            handleFailure()
+            return
+          }
+
+          finish(() => {
+            this.setData({
+              permissionsLoading: false,
+              permissionsReady: true,
+              permissionsError: "",
+              myPermissions: {
+                canManageBookings: Boolean(result.canManageBookings),
+                canManageRoles: Boolean(result.canManageRoles)
+              },
+              ...buildMemberRole(result),
+              menuItems: buildVisibleMenuItems({
+                envVersion: this.data.envVersion,
+                canManageRoles: Boolean(result.canManageRoles),
+                canManageConfig: Boolean(result.canManageConfig),
+                canViewAuditLogs: Boolean(result.canViewAuditLogs),
+                canViewErrorLogs: Boolean(result.canViewErrorLogs),
+                canManageVehicles: Boolean(result.canManageVehicles),
+                canManageBookings: Boolean(result.canManageBookings)
+              })
+            }, () => {
+              this.loadOperationSummary(result)
+            })
+          })
+        },
+        fail: handleFailure
+      })
+    } catch (error) {
+      handleFailure()
+    }
+  },
+
+  handlePermissionRetry() {
+    if (this.data.permissionsError && !this.data.permissionsLoading) {
+      this.loadMyPermissions()
+    }
   },
 
   loadOperationSummary(permissionResult) {

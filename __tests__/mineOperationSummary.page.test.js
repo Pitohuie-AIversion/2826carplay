@@ -30,6 +30,7 @@ function createPage(definition) {
 
 describe("pages/mine 运营待办角标", () => {
   afterEach(() => {
+    jest.useRealTimers()
     delete global.Page
     delete global.wx
   })
@@ -129,6 +130,119 @@ describe("pages/mine 运营待办角标", () => {
       unavailable: true
     })
     expect(page.data.summaryLoading).toBe(false)
+  })
+
+  test("权限服务失败时不会把管理员误显示为普通会员，并可点击重试", () => {
+    let permissionShouldFail = true
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(({ name, success }) => {
+          if (name !== "getMyPermissions") {
+            return
+          }
+          success({
+            result: permissionShouldFail
+              ? { ok: false, code: "INTERNAL_ERROR" }
+              : {
+                  ok: true,
+                  isAdmin: true,
+                  canManageBookings: true,
+                  canManageRoles: true,
+                  canManageConfig: true,
+                  canViewAuditLogs: true,
+                  canViewErrorLogs: true,
+                  canManageVehicles: true
+                }
+          })
+        })
+      }
+    }
+    const page = createPage(loadPageDefinition())
+
+    page.loadMyPermissions()
+
+    expect(page.data.permissionsReady).toBe(false)
+    expect(page.data.permissionsError).toBe("权限同步失败，点击重试")
+    expect(page.data.roleLabel).toBe("身份确认失败")
+    expect(page.data.roleLabel).not.toBe("私人会员")
+
+    permissionShouldFail = false
+    page.handlePermissionRetry()
+
+    expect(page.data.permissionsReady).toBe(true)
+    expect(page.data.permissionsError).toBe("")
+    expect(page.data.roleLabel).toBe("车库管理员")
+    expect(page.data.menuItems.find((item) => item.key === "roleManage")).toBeTruthy()
+  })
+
+  test("权限 fail 回调进入可重试状态而不是普通会员状态", () => {
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(({ fail }) => fail({ errMsg: "network error" }))
+      }
+    }
+    const page = createPage(loadPageDefinition())
+
+    page.loadMyPermissions()
+
+    expect(page.data.permissionsLoading).toBe(false)
+    expect(page.data.permissionsReady).toBe(false)
+    expect(page.data.permissionsError).toBe("权限同步失败，点击重试")
+    expect(page.data.roleLabel).toBe("身份确认失败")
+  })
+
+  test("权限 SDK 同步抛错时页面保持可操作", () => {
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(() => {
+          throw new Error("cloud init failed")
+        })
+      }
+    }
+    const page = createPage(loadPageDefinition())
+
+    expect(() => page.loadMyPermissions()).not.toThrow()
+    expect(page.data.permissionsLoading).toBe(false)
+    expect(page.data.permissionsError).toBe("权限同步失败，点击重试")
+  })
+
+  test("权限请求超时后忽略迟到的管理员结果", () => {
+    jest.useFakeTimers()
+    let lateSuccess
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(({ success }) => {
+          lateSuccess = success
+        })
+      }
+    }
+    const page = createPage(loadPageDefinition())
+
+    page.loadMyPermissions()
+    jest.advanceTimersByTime(12 * 1000)
+    lateSuccess({
+      result: {
+        ok: true,
+        isAdmin: true,
+        canManageRoles: true
+      }
+    })
+
+    expect(page.data.permissionsReady).toBe(false)
+    expect(page.data.permissionsError).toBe("权限同步失败，点击重试")
+    expect(page.data.roleLabel).toBe("身份确认失败")
+  })
+
+  test("云能力缺失时显示初始化失败并允许后续重试", () => {
+    global.wx = {}
+    const page = createPage(loadPageDefinition())
+
+    page.loadMyPermissions()
+
+    expect(page.data.permissionsLoading).toBe(false)
+    expect(page.data.permissionsReady).toBe(false)
+    expect(page.data.permissionsError).toBe("云能力未初始化，点击重试")
+    expect(page.data.roleLabel).toBe("身份确认失败")
   })
 
   test("运营脉搏使用待办业务图标和原生同步状态", () => {

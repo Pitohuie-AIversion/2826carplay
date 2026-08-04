@@ -3,6 +3,7 @@ const mockCategories = require("../../data/categories")
 
 const DEFAULT_GARAGE_SUBTITLE = "甄选座驾，为每一次出发预留专属席位"
 const LEGACY_GARAGE_SUBTITLE = "后台车辆资料已接入首页展示，上传封面后会同步展示到车库首页"
+const GARAGE_LOAD_TIMEOUT_MS = 15 * 1000
 
 const CATEGORY_LABEL_MAP = {
   all: "全部",
@@ -260,13 +261,63 @@ Page({
       loadingCars: true
     })
 
-    wx.cloud.callFunction({
+    const requestId = Number(this._carsRequestId || 0) + 1
+    this._carsRequestId = requestId
+    let settled = false
+    const finishRequest = () => {
+      if (settled || this._carsRequestId !== requestId) {
+        return false
+      }
+      settled = true
+      if (this._carsLoadTimer) {
+        clearTimeout(this._carsLoadTimer)
+        this._carsLoadTimer = null
+      }
+      return true
+    }
+
+    this._carsLoadTimer = setTimeout(() => {
+      if (!finishRequest()) {
+        return
+      }
+      if (append) {
+        this.setData({ loadingCars: false })
+        wx.showToast({
+          title: "加载超时，请重试",
+          icon: "none"
+        })
+        return
+      }
+      this.setCarsLoadError("加载超时，请检查网络后重试")
+    }, GARAGE_LOAD_TIMEOUT_MS)
+
+    const handleFailure = (error) => {
+      if (!finishRequest()) {
+        return
+      }
+      if (append) {
+        this.setData({
+          loadingCars: false
+        })
+        wx.showToast({
+          title: "加载更多失败",
+          icon: "none"
+        })
+        return
+      }
+      this.setCarsLoadError((error && (error.errMsg || error.message)) || "车辆列表加载失败，请稍后重试")
+    }
+
+    const requestOptions = {
       name: "garageVehicleList",
       data: {
         page: nextPage,
         pageSize: this.data.pageSize
       },
       success: (res) => {
+        if (!finishRequest()) {
+          return
+        }
         const result = res && res.result ? res.result : null
         if (!result || !result.ok || !Array.isArray(result.list)) {
           this.setCarsLoadError((result && result.message) || "车辆列表加载失败，请稍后重试")
@@ -281,20 +332,22 @@ Page({
           hasMore: Boolean(result.hasMore)
         })
       },
-      fail: (error) => {
-        if (append) {
-          this.setData({
-            loadingCars: false
-          })
-          wx.showToast({
-            title: "加载更多失败",
-            icon: "none"
-          })
-          return
-        }
-        this.setCarsLoadError((error && (error.errMsg || error.message)) || "车辆列表加载失败，请稍后重试")
-      }
-    })
+      fail: handleFailure
+    }
+
+    try {
+      wx.cloud.callFunction(requestOptions)
+    } catch (error) {
+      handleFailure(error)
+    }
+  },
+
+  onUnload() {
+    this._carsRequestId = Number(this._carsRequestId || 0) + 1
+    if (this._carsLoadTimer) {
+      clearTimeout(this._carsLoadTimer)
+      this._carsLoadTimer = null
+    }
   },
 
   setCarsLoadError(message) {

@@ -94,4 +94,73 @@ describe("cloudfunctions/getMyPermissions integration", () => {
     expect(res.canManageVehicles).toBe(true)
     expect(res.canManageBookings).toBe(true)
   })
+
+  test.each([
+    [{ roles: ["admin"] }, "roles 数组"],
+    [{ isAdmin: true }, "isAdmin 标记"],
+    [{ admin: true }, "admin 标记"]
+  ])("兼容历史管理员字段：%s（%s）", async (roleRecord) => {
+    const mocks = createMockDb({ rolesData: [roleRecord] })
+    const mod = await loadGetMyPermissionsWith({
+      openid: "legacy_admin_openid",
+      mockDb: mocks.db
+    })
+
+    const res = await mod.main()
+
+    expect(res).toMatchObject({
+      ok: true,
+      isAdmin: true,
+      canManageRoles: true,
+      canManageConfig: true,
+      canViewAuditLogs: true,
+      canViewErrorLogs: true,
+      canManageVehicles: true,
+      canManageBookings: true
+    })
+  })
+
+  test("身份缺失时返回 UNAUTHORIZED 且不读取角色集合", async () => {
+    const mocks = createMockDb({ rolesData: [{ role: "admin" }] })
+    const mod = await loadGetMyPermissionsWith({
+      openid: "",
+      mockDb: mocks.db
+    })
+
+    const res = await mod.main()
+
+    expect(res).toEqual({
+      ok: false,
+      code: "UNAUTHORIZED",
+      message: "未获取到用户身份"
+    })
+    expect(mocks.db.collection).not.toHaveBeenCalled()
+  })
+
+  test("角色查询失败时返回 INTERNAL_ERROR 而不是伪造无权限", async () => {
+    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {})
+    const get = jest.fn().mockRejectedValue(new Error("database unavailable"))
+    const db = {
+      collection: jest.fn(() => ({
+        where: jest.fn(() => ({
+          field: jest.fn(() => ({
+            limit: jest.fn(() => ({ get }))
+          }))
+        }))
+      }))
+    }
+    const mod = await loadGetMyPermissionsWith({
+      openid: "admin_openid",
+      mockDb: db
+    })
+
+    const res = await mod.main()
+
+    expect(res).toEqual({
+      ok: false,
+      code: "INTERNAL_ERROR",
+      message: "获取权限信息失败，请稍后重试"
+    })
+    errorSpy.mockRestore()
+  })
 })

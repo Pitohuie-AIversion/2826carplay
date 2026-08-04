@@ -61,6 +61,7 @@ describe("production security rules", () => {
     expect(storageRule.write).toContain("auth != null")
     expect(storageRule.write).toContain("auth.loginType != 'ANONYMOUS'")
     expect(storageRule.write).toContain("resource.openid == auth.openid")
+    expect(storageRule.write).toContain("resource.openid == auth.uid")
     expect(storageRule.write).toContain("resource.size <= 10485760")
     expect(storageRule.write).toContain("/\\.jpg$/")
     expect(storageRule.write).toContain("/\\.jpeg$/")
@@ -75,16 +76,103 @@ describe("production security rules", () => {
     })
   })
 
-  test("云函数规则默认拒绝未登录和匿名调用", () => {
+  test("云函数规则仅使用受支持的 auth 存在性检查", () => {
     const manifest = readJson("manifest.json")
     const functionRule = readJson(manifest.functions.ruleFile)
 
     expect(functionRule).toEqual({
       "*": {
-        invoke: "auth.loginType != 'ANONYMOUS' && auth != null"
+        invoke: "auth != null"
       }
     })
-    expect(manifest.functions.requiresAuthenticatedNonAnonymousUser).toBe(true)
+    expect(manifest.functions.requiresAuthenticatedUser).toBe(true)
+    expect(manifest.functions.sensitiveFunctionsRequireOpenidInCode).toBe(true)
+    expect(functionRule["*"].invoke).not.toContain("auth.loginType")
+  })
+
+  test("所有产生持久化写入的云函数都从微信上下文获取调用者身份", () => {
+    const cloudFunctionsRoot = path.join(PROJECT_ROOT, "cloudfunctions")
+    const missingContext = fs
+      .readdirSync(cloudFunctionsRoot, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => ({
+        name: entry.name,
+        filePath: path.join(cloudFunctionsRoot, entry.name, "index.js")
+      }))
+      .filter((item) => fs.existsSync(item.filePath))
+      .filter((item) => {
+        const source = fs.readFileSync(item.filePath, "utf8")
+        const writesPersistentData =
+          /\.(?:add|set|update|remove)\s*\(/.test(source) ||
+          /cloud\.(?:deleteFile|uploadFile)\s*\(/.test(source)
+        return writesPersistentData && !/cloud\.getWXContext\s*\(/.test(source)
+      })
+      .map((item) => item.name)
+
+    expect(missingContext).toEqual([])
+  })
+
+  test("所有读取 roles 权限集合的云函数都使用微信调用者身份", () => {
+    const cloudFunctionsRoot = path.join(PROJECT_ROOT, "cloudfunctions")
+    const missingContext = fs
+      .readdirSync(cloudFunctionsRoot, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => ({
+        name: entry.name,
+        filePath: path.join(cloudFunctionsRoot, entry.name, "index.js")
+      }))
+      .filter((item) => fs.existsSync(item.filePath))
+      .filter((item) => {
+        const source = fs.readFileSync(item.filePath, "utf8")
+        return /collection\("roles"\)/.test(source) && !/cloud\.getWXContext\s*\(/.test(source)
+      })
+      .map((item) => item.name)
+
+    expect(missingContext).toEqual([])
+  })
+
+  test("除管理员分配目标外，云函数不信任客户端传入的用户身份", () => {
+    const cloudFunctionsRoot = path.join(PROJECT_ROOT, "cloudfunctions")
+    const clientIdentityConsumers = fs
+      .readdirSync(cloudFunctionsRoot, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => ({
+        name: entry.name,
+        filePath: path.join(cloudFunctionsRoot, entry.name, "index.js")
+      }))
+      .filter((item) => fs.existsSync(item.filePath))
+      .filter((item) => {
+        const source = fs.readFileSync(item.filePath, "utf8")
+        return /(?:event|payload|input)\??\.\s*(?:openid|openId|uid|userId)\b/.test(source)
+      })
+      .map((item) => item.name)
+      .sort()
+
+    expect(clientIdentityConsumers).toEqual(["roleUpsert"])
+    const roleUpsertSource = fs.readFileSync(
+      path.join(cloudFunctionsRoot, "roleUpsert", "index.js"),
+      "utf8"
+    )
+    expect(roleUpsertSource).toContain("const operatorOpenid = wxContext")
+    expect(roleUpsertSource).toContain("isAdminOpenid(operatorOpenid)")
+  })
+
+  test("客户端图片预检与生产存储规则保持一致", () => {
+    const manifest = readJson("manifest.json")
+    const uploadSource = fs.readFileSync(
+      path.join(PROJECT_ROOT, "pages", "vehicle-detail-manage", "vehicle-detail-manage.js"),
+      "utf8"
+    )
+
+    expect(uploadSource).toContain(
+      `const MAX_IMAGE_UPLOAD_BYTES = ${manifest.storage.maxUploadBytes / 1024 / 1024} * 1024 * 1024`
+    )
+    manifest.storage.allowedImageExtensions.forEach((extension) => {
+      expect(uploadSource).toContain(`"${extension}"`)
+    })
+    expect(uploadSource).toContain(
+      "const cloudPath = `vehicle-images/${vehicleId}/${Date.now()}_${index}.${extension}`"
+    )
   })
 
   test("安全规则、测试和开发文档不会进入小程序上传包", () => {

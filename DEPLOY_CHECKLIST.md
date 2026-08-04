@@ -6,10 +6,10 @@
 - 云函数根目录：`cloudfunctions/`
 - 本地部署目标：`Nodejs20.19`；当前环境中的既有函数仍为受支持的 `Nodejs16.13`。CloudBase 不支持原地切换既有函数运行时，迁移必须安排维护窗口并逐个重建验证，禁止在正常营业期间批量删除重建
 - 云函数 SDK：全部固定为 `wx-server-sdk@4.0.2` 并包含锁文件；禁止使用 `^`、`~` 或 `latest` 等浮动版本
-- `npm run check:release` 通过，当前为 `95 suites / 583 tests`
+- `npm run check:release` 通过，当前为 `95 suites / 626 tests`
 - `npm run check:structure` 通过，当前已核对 `26` 个页面与 `49` 个云函数，页面路由、必需文件、云函数目录和部署清单保持一致
 - `npm run check:secrets` 通过，仓库未发现私钥、环境文件或硬编码生产凭据
-- `npm run check:package` 通过，当前源码主包估算约 `1.33 MiB`，距离 `2 MiB` 保守阻断线约 `0.67 MiB`
+- `npm run check:package` 通过，当前源码主包估算约 `1.34 MiB`，距离 `2 MiB` 保守阻断线约 `0.66 MiB`
 
 ## 2. 必须部署的云函数
 
@@ -128,7 +128,7 @@
 
 - 按 `security-rules/manifest.json` 覆盖全部 10 个集合，并为每个集合应用 `security-rules/database-deny-client.json`；数据库统一通过云函数访问
 - 云存储应用 `security-rules/storage.json`：仅公开读取 `vehicle-images/`，仅允许已登录、非匿名的文件创建者写入自身车辆图片，扩展名只允许 JPG、JPEG、PNG、WebP，单文件不超过 10 MB；车辆详情管理页应在上传前执行相同的格式与大小预检
-- 云函数权限控制应用 `security-rules/functions.json`，拒绝未登录和匿名调用；管理员等细分权限继续由云函数内部校验
+- 云函数权限控制应用 `security-rules/functions.json`，用受支持的 `auth != null` 拒绝未登录调用；管理员等细分权限和敏感操作身份继续由云函数根据微信 `OPENID` 在内部校验
 - 安全规则不会随普通云函数上传自动生效；必须在云开发控制台手工配置，等待 1–3 分钟后再真机复核
 - `npm test` 中的安全规则测试必须通过，确认集合清单完整且小程序业务代码没有直接访问数据库
 - `project.config.json` 必须继续排除 `__tests__`、`security-rules`、`node_modules` 和项目文档，防止开发文件占用正式小程序包容量

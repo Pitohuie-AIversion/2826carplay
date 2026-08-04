@@ -791,6 +791,17 @@
   letter-spacing: 0;
 }
 
+.section-count-error {
+  border-color: rgba(220, 142, 105, 0.28);
+  color: #d89a79;
+  letter-spacing: 0;
+}
+
+.section-count-pressed {
+  opacity: 0.78;
+  transform: scale(0.98);
+}
+
 .section-count-value {
   margin-right: 5rpx;
   color: #8caee0;

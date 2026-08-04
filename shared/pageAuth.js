@@ -44,6 +44,8 @@ function resolveAllowed(result, required) {
   return false
 }
 
+const PERMISSION_CHECK_TIMEOUT_MS = 12 * 1000
+
 function requirePagePermission(page, options) {
   const config = options && typeof options === "object" ? options : {}
   const required = config.required
@@ -67,37 +69,82 @@ function requirePagePermission(page, options) {
     pageAuthorized: false
   })
 
-  wx.cloud.callFunction({
-    name: "getMyPermissions",
-    success: (res) => {
-      const result = res && res.result ? res.result : null
-      const allowed = resolveAllowed(result, required)
+  let settled = false
+  let timeoutId = null
 
-      if (!allowed) {
-        wx.showToast({
-          title: noPermissionMessage,
-          icon: "none"
-        })
-        setTimeout(redirectToMine, 700)
-        return
-      }
+  const finish = (callback) => {
+    if (settled) {
+      return
+    }
+    settled = true
+    if (timeoutId) {
+      clearTimeout(timeoutId)
+      timeoutId = null
+    }
+    callback()
+  }
 
-      page.setData({
-        pageAuthorized: true
-      })
-
-      if (typeof config.onAuthorized === "function") {
-        config.onAuthorized(result)
-      }
-    },
-    fail: (error) => {
+  const handleCheckFailure = () => {
+    finish(() => {
       wx.showToast({
         title: failMessage,
         icon: "none"
       })
       setTimeout(redirectToMine, 700)
+    })
+  }
+
+  timeoutId = setTimeout(handleCheckFailure, PERMISSION_CHECK_TIMEOUT_MS)
+
+  try {
+    wx.cloud.callFunction({
+      name: "getMyPermissions",
+      success: (res) => {
+        const result = res && res.result ? res.result : null
+
+        if (!result || !result.ok) {
+          handleCheckFailure()
+          return
+        }
+
+        const allowed = resolveAllowed(result, required)
+
+        if (!allowed) {
+          finish(() => {
+            wx.showToast({
+              title: noPermissionMessage,
+              icon: "none"
+            })
+            setTimeout(redirectToMine, 700)
+          })
+          return
+        }
+
+        finish(() => {
+          page.setData({
+            pageAuthorized: true
+          })
+
+          if (typeof config.onAuthorized === "function") {
+            config.onAuthorized(result)
+          }
+        })
+      },
+      fail: handleCheckFailure
+    })
+  } catch (error) {
+    handleCheckFailure()
+  }
+
+  return () => {
+    if (!settled) {
+      settled = true
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+        timeoutId = null
+      }
     }
-  })
+  }
 }
 
 module.exports = {

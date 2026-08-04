@@ -132,4 +132,176 @@ describe("shared/pageAuth", () => {
       url: "/pages/mine/mine"
     }))
   })
+
+  test("权限服务内部错误不会误报为无权限", () => {
+    wx.cloud.callFunction.mockImplementation(({ success }) => {
+      success({
+        result: {
+          ok: false,
+          code: "INTERNAL_ERROR",
+          message: "获取权限信息失败，请稍后重试"
+        }
+      })
+    })
+    const page = createPage()
+    const { requirePagePermission } = require("../shared/pageAuth")
+
+    requirePagePermission(page, {
+      required: "canManageRoles",
+      noPermissionMessage: "无权访问权限管理",
+      failMessage: "权限校验失败，请稍后重试"
+    })
+    jest.runAllTimers()
+
+    expect(page.data.pageAuthorized).toBe(false)
+    expect(wx.showToast).toHaveBeenCalledWith({
+      title: "权限校验失败，请稍后重试",
+      icon: "none"
+    })
+    expect(wx.showToast).not.toHaveBeenCalledWith(expect.objectContaining({
+      title: "无权访问权限管理"
+    }))
+  })
+
+  test("权限请求超时后退出空白等待且忽略迟到回调", () => {
+    let lateSuccess
+    wx.cloud.callFunction.mockImplementation(({ success }) => {
+      lateSuccess = success
+    })
+    const page = createPage()
+    const onAuthorized = jest.fn()
+    const { requirePagePermission } = require("../shared/pageAuth")
+
+    requirePagePermission(page, {
+      required: "canManageRoles",
+      onAuthorized
+    })
+    jest.advanceTimersByTime(12 * 1000)
+
+    expect(wx.showToast).toHaveBeenCalledWith({
+      title: "权限校验失败，请稍后重试",
+      icon: "none"
+    })
+
+    lateSuccess({ result: { ok: true, canManageRoles: true } })
+    expect(page.data.pageAuthorized).toBe(false)
+    expect(onAuthorized).not.toHaveBeenCalled()
+  })
+
+  test("权限调用同步异常时给出校验失败而不是让页面崩溃", () => {
+    wx.cloud.callFunction.mockImplementation(() => {
+      throw new Error("cloud is not initialized")
+    })
+    const page = createPage()
+    const { requirePagePermission } = require("../shared/pageAuth")
+
+    expect(() => requirePagePermission(page, {
+      required: "canManageRoles"
+    })).not.toThrow()
+
+    expect(wx.showToast).toHaveBeenCalledWith({
+      title: "权限校验失败，请稍后重试",
+      icon: "none"
+    })
+  })
+
+  test("权限调用 fail 回调与内部错误使用相同的服务失败提示", () => {
+    wx.cloud.callFunction.mockImplementation(({ fail }) => {
+      fail({ errMsg: "callFunction:fail network" })
+    })
+    const page = createPage()
+    const { requirePagePermission } = require("../shared/pageAuth")
+
+    requirePagePermission(page, {
+      required: "canManageRoles",
+      noPermissionMessage: "无权访问权限管理"
+    })
+
+    expect(wx.showToast).toHaveBeenCalledWith({
+      title: "权限校验失败，请稍后重试",
+      icon: "none"
+    })
+    expect(wx.showToast).not.toHaveBeenCalledWith(expect.objectContaining({
+      title: "无权访问权限管理"
+    }))
+  })
+
+  test("云能力缺失时明确提示并返回我的页面", () => {
+    wx.cloud = null
+    const page = createPage()
+    const { requirePagePermission } = require("../shared/pageAuth")
+
+    requirePagePermission(page, { required: "canManageRoles" })
+    jest.advanceTimersByTime(500)
+
+    expect(wx.showToast).toHaveBeenCalledWith({
+      title: "云能力未初始化",
+      icon: "none"
+    })
+    expect(wx.redirectTo).toHaveBeenCalledWith(expect.objectContaining({
+      url: "/pages/mine/mine"
+    }))
+  })
+
+  test("函数型权限条件通过时正常授权", () => {
+    wx.cloud.callFunction.mockImplementation(({ success }) => {
+      success({
+        result: {
+          ok: true,
+          canManageVehicles: false,
+          canManageBookings: true
+        }
+      })
+    })
+    const page = createPage()
+    const onAuthorized = jest.fn()
+    const { requirePagePermission } = require("../shared/pageAuth")
+
+    requirePagePermission(page, {
+      required: (result) => result.canManageVehicles || result.canManageBookings,
+      onAuthorized
+    })
+
+    expect(page.data.pageAuthorized).toBe(true)
+    expect(onAuthorized).toHaveBeenCalledWith(expect.objectContaining({
+      canManageBookings: true
+    }))
+  })
+
+  test("页面卸载清理函数会取消超时并忽略迟到回调", () => {
+    let lateSuccess
+    wx.cloud.callFunction.mockImplementation(({ success }) => {
+      lateSuccess = success
+    })
+    const page = createPage()
+    const onAuthorized = jest.fn()
+    const { requirePagePermission } = require("../shared/pageAuth")
+
+    const cancel = requirePagePermission(page, {
+      required: "canManageRoles",
+      onAuthorized
+    })
+    cancel()
+    jest.advanceTimersByTime(12 * 1000)
+    lateSuccess({ result: { ok: true, canManageRoles: true } })
+
+    expect(wx.showToast).not.toHaveBeenCalled()
+    expect(page.data.pageAuthorized).toBe(false)
+    expect(onAuthorized).not.toHaveBeenCalled()
+  })
+
+  test("存在上一页时优先返回上一页", () => {
+    global.getCurrentPages.mockReturnValue([{}, {}])
+    wx.cloud.callFunction.mockImplementation(({ success }) => {
+      success({ result: { ok: true, canManageRoles: false } })
+    })
+    const page = createPage()
+    const { requirePagePermission } = require("../shared/pageAuth")
+
+    requirePagePermission(page, { required: "canManageRoles" })
+    jest.advanceTimersByTime(700)
+
+    expect(wx.navigateBack).toHaveBeenCalledWith(expect.objectContaining({ delta: 1 }))
+    expect(wx.redirectTo).not.toHaveBeenCalled()
+  })
 })

@@ -3,6 +3,9 @@ const { formatToastTitle } = require("../../shared/uiFeedback")
 
 const MAX_IMAGE_UPLOAD_BYTES = 10 * 1024 * 1024
 const ALLOWED_IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp"])
+const MAX_UPLOAD_RETRY_COUNT = 1
+const CLOUD_UPLOAD_TIMEOUT_MS = 20 * 1000
+const IMAGE_CHANGE_TIMEOUT_MS = 15 * 1000
 
 const STATUS_LABEL_MAP = {
   active: "在用",
@@ -111,6 +114,43 @@ function getFileExtension(filePath) {
 function isUserCancelError(error) {
   const message = error && (error.errMsg || error.message || error)
   return String(message || "").toLowerCase().includes("cancel")
+}
+
+function getCloudUploadErrorTitle(error) {
+  const message = String(
+    error && (error.errMsg || error.message || error.errCode || error)
+      ? error.errMsg || error.message || error.errCode || error
+      : ""
+  ).toLowerCase()
+
+  if (/permission|unauthori[sz]ed|forbidden|auth/.test(message)) {
+    return "无图片上传权限"
+  }
+  if (/quota|capacity|storage.*(full|limit)|space.*(full|limit)/.test(message)) {
+    return "云存储空间不足"
+  }
+  if (/timeout|network|request:fail|socket|connection/.test(message)) {
+    return "网络异常，请重试"
+  }
+  if (/no such file|not found|file.*missing/.test(message)) {
+    return "所选图片已失效"
+  }
+  if (/mime|buffer.*null|file type/.test(message)) {
+    return "图片格式无法识别"
+  }
+  return "图片上传失败"
+}
+
+function shouldRetryCloudUpload(error, retryCount) {
+  if (Number(retryCount) >= MAX_UPLOAD_RETRY_COUNT) {
+    return false
+  }
+  const message = String(
+    error && (error.errMsg || error.message || error.errCode || error)
+      ? error.errMsg || error.message || error.errCode || error
+      : ""
+  ).toLowerCase()
+  return /timeout|network|request:fail|socket|connection/.test(message)
 }
 
 function normalizeChosenImages(chooseRes) {
@@ -707,7 +747,7 @@ Page({
       mask: true
     })
 
-    const uploadNext = (index) => {
+    const uploadNext = (index, retryCount = 0) => {
       if (index >= filePaths.length) {
         this.persistImageChange({
           action: "add",
@@ -720,27 +760,60 @@ Page({
       const extension = getFileExtension(filePath)
       const cloudPath = `vehicle-images/${vehicleId}/${Date.now()}_${index}.${extension}`
 
-      wx.cloud.uploadFile({
-        cloudPath,
-        filePath,
-        success: (uploadRes) => {
-          if (uploadRes && uploadRes.fileID) {
-            uploadedFileIds.push(uploadRes.fileID)
+      let uploadSettled = false
+      let uploadTimeoutId = null
+      const settleUpload = (callback) => {
+        if (uploadSettled) {
+          return
+        }
+        uploadSettled = true
+        if (uploadTimeoutId) {
+          clearTimeout(uploadTimeoutId)
+          uploadTimeoutId = null
+        }
+        callback()
+      }
+      const handleUploadFailure = (error) => {
+        settleUpload(() => {
+          if (shouldRetryCloudUpload(error, retryCount)) {
+            uploadNext(index, retryCount + 1)
+            return
           }
-          uploadNext(index + 1)
-        },
-        fail: (error) => {
           wx.hideLoading()
           this.setData({
             uploading: false
           })
           deleteCloudFilesDirectBestEffort(uploadedFileIds)
           wx.showToast({
-            title: "图片上传失败",
+            title: getCloudUploadErrorTitle(error),
             icon: "none"
           })
-        }
-      })
+        })
+      }
+
+      uploadTimeoutId = setTimeout(() => {
+        handleUploadFailure({ errMsg: "uploadFile:fail timeout" })
+      }, CLOUD_UPLOAD_TIMEOUT_MS)
+
+      try {
+        wx.cloud.uploadFile({
+          cloudPath,
+          filePath,
+          success: (uploadRes) => {
+            if (!uploadRes || !uploadRes.fileID) {
+              handleUploadFailure({ errMsg: "uploadFile:fail invalid response" })
+              return
+            }
+            settleUpload(() => {
+              uploadedFileIds.push(uploadRes.fileID)
+              uploadNext(index + 1)
+            })
+          },
+          fail: handleUploadFailure
+        })
+      } catch (error) {
+        handleUploadFailure(error)
+      }
     }
 
     uploadNext(0)
@@ -804,54 +877,21 @@ Page({
       })
     }
 
-    wx.cloud.callFunction({
-      name: "vehicleImageUpdate",
-      data: {
-        id: this.data.id,
-        ...payload
-      },
-      success: (res) => {
-        wx.hideLoading()
-
-        const result = res && res.result ? res.result : null
-        if (!result || !result.ok) {
-          this.setData({
-            uploading: false
-          })
-          requestUploadedFileCleanup(this.data.id, cleanupFileIds)
-          wx.showToast({
-          title: formatToastTitle(result && result.message, "图片操作失败"),
-            icon: "none"
-          })
-          return
-        }
-
-        const currentDetail = this.data.detail || {}
-        this.setData({
-          uploading: false,
-          detail: formatDetail({
-            ...currentDetail,
-            imageList: result.imageList,
-            coverImage: result.coverImage,
-            updatedAt: new Date().toISOString()
-          })
-        })
-
-        const partialUpload = payload.action === "add" && Number(skippedCount) > 0
-        wx.showToast({
-          title:
-            payload.action === "setCover"
-              ? "封面已更新"
-              : payload.action === "remove"
-                ? "图片已移除"
-                : partialUpload
-                  ? `已上传，跳过 ${skippedCount} 张`
-                  : "图片已上传",
-          icon: partialUpload ? "none" : "success",
-          duration: partialUpload ? 2200 : 1500
-        })
-      },
-      fail: (error) => {
+    let settled = false
+    let timeoutId = null
+    const finish = (callback) => {
+      if (settled) {
+        return
+      }
+      settled = true
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+        timeoutId = null
+      }
+      callback()
+    }
+    const handleFailure = () => {
+      finish(() => {
         wx.hideLoading()
         this.setData({
           uploading: false
@@ -861,7 +901,69 @@ Page({
           title: "图片操作失败",
           icon: "none"
         })
-      }
-    })
+      })
+    }
+
+    timeoutId = setTimeout(handleFailure, IMAGE_CHANGE_TIMEOUT_MS)
+
+    const requestOptions = {
+      name: "vehicleImageUpdate",
+      data: {
+        id: this.data.id,
+        ...payload
+      },
+      success: (res) => {
+        const result = res && res.result ? res.result : null
+        if (!result || !result.ok) {
+          finish(() => {
+            wx.hideLoading()
+            this.setData({
+              uploading: false
+            })
+            requestUploadedFileCleanup(this.data.id, cleanupFileIds)
+            wx.showToast({
+              title: formatToastTitle(result && result.message, "图片操作失败"),
+              icon: "none"
+            })
+          })
+          return
+        }
+
+        finish(() => {
+          wx.hideLoading()
+          const currentDetail = this.data.detail || {}
+          this.setData({
+            uploading: false,
+            detail: formatDetail({
+              ...currentDetail,
+              imageList: result.imageList,
+              coverImage: result.coverImage,
+              updatedAt: new Date().toISOString()
+            })
+          })
+
+          const partialUpload = payload.action === "add" && Number(skippedCount) > 0
+          wx.showToast({
+            title:
+              payload.action === "setCover"
+                ? "封面已更新"
+                : payload.action === "remove"
+                  ? "图片已移除"
+                  : partialUpload
+                    ? `已上传，跳过 ${skippedCount} 张`
+                    : "图片已上传",
+            icon: partialUpload ? "none" : "success",
+            duration: partialUpload ? 2200 : 1500
+          })
+        })
+      },
+      fail: handleFailure
+    }
+
+    try {
+      wx.cloud.callFunction(requestOptions)
+    } catch (error) {
+      handleFailure()
+    }
   }
 })

@@ -7,6 +7,7 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
   const wxssSource = fs.readFileSync(path.join(pageDir, "vehicle-detail-manage.wxss"), "utf8")
 
   afterEach(() => {
+    jest.useRealTimers()
     delete global.Page
     delete global.wx
   })
@@ -243,5 +244,416 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
         }
       })
     )
+  })
+
+  test("图片上传遇到网络错误时重试一次并保留明确提示", () => {
+    let definition = null
+    global.Page = jest.fn((input) => {
+      definition = input
+    })
+    const uploadFile = jest
+      .fn()
+      .mockImplementationOnce(({ fail }) => fail({ errMsg: "uploadFile:fail network timeout" }))
+      .mockImplementationOnce(({ fail }) => fail({ errMsg: "uploadFile:fail network timeout" }))
+    global.wx = {
+      cloud: {
+        uploadFile,
+        deleteFile: jest.fn()
+      },
+      showLoading: jest.fn(),
+      hideLoading: jest.fn(),
+      showToast: jest.fn()
+    }
+    jest.resetModules()
+    require("../pages/vehicle-detail-manage/vehicle-detail-manage")
+    const page = {
+      ...definition,
+      data: {
+        ...definition.data,
+        id: "car_1"
+      }
+    }
+    page.setData = jest.fn((patch) => {
+      page.data = { ...page.data, ...patch }
+    })
+
+    page.uploadSelectedFiles(["/tmp/vehicle.jpg"], 0)
+
+    expect(uploadFile).toHaveBeenCalledTimes(2)
+    expect(global.wx.showToast).toHaveBeenCalledWith({
+      title: "网络异常，请重试",
+      icon: "none"
+    })
+    expect(page.data.uploading).toBe(false)
+  })
+
+  test("开发者工具无法识别图片内容时给出格式提示", () => {
+    let definition = null
+    global.Page = jest.fn((input) => {
+      definition = input
+    })
+    global.wx = {
+      cloud: {
+        uploadFile: jest.fn(({ fail }) => {
+          fail({ errMsg: "Could not find MIME for Buffer <null>" })
+        }),
+        deleteFile: jest.fn()
+      },
+      showLoading: jest.fn(),
+      hideLoading: jest.fn(),
+      showToast: jest.fn()
+    }
+    jest.resetModules()
+    require("../pages/vehicle-detail-manage/vehicle-detail-manage")
+    const page = {
+      ...definition,
+      data: {
+        ...definition.data,
+        id: "car_1"
+      }
+    }
+    page.setData = jest.fn((patch) => {
+      page.data = { ...page.data, ...patch }
+    })
+
+    page.uploadSelectedFiles(["/tmp/invalid.jpg"], 0)
+
+    expect(global.wx.showToast).toHaveBeenCalledWith({
+      title: "图片格式无法识别",
+      icon: "none"
+    })
+  })
+
+  test("云上传无回调时超时退出加载并只重试一次", () => {
+    jest.useFakeTimers()
+    let definition = null
+    global.Page = jest.fn((input) => {
+      definition = input
+    })
+    const uploadFile = jest.fn()
+    global.wx = {
+      cloud: {
+        uploadFile,
+        deleteFile: jest.fn()
+      },
+      showLoading: jest.fn(),
+      hideLoading: jest.fn(),
+      showToast: jest.fn()
+    }
+    jest.resetModules()
+    require("../pages/vehicle-detail-manage/vehicle-detail-manage")
+    const page = {
+      ...definition,
+      data: {
+        ...definition.data,
+        id: "car_1"
+      }
+    }
+    page.setData = jest.fn((patch) => {
+      page.data = { ...page.data, ...patch }
+    })
+
+    page.uploadSelectedFiles(["/tmp/vehicle.jpg"], 0)
+    jest.advanceTimersByTime(40 * 1000)
+
+    expect(uploadFile).toHaveBeenCalledTimes(2)
+    expect(global.wx.hideLoading).toHaveBeenCalled()
+    expect(global.wx.showToast).toHaveBeenCalledWith({
+      title: "网络异常，请重试",
+      icon: "none"
+    })
+    expect(page.data.uploading).toBe(false)
+    jest.useRealTimers()
+  })
+
+  test("云上传成功回调缺少 fileID 时按失败处理而不提交空图片", () => {
+    let definition = null
+    global.Page = jest.fn((input) => {
+      definition = input
+    })
+    global.wx = {
+      cloud: {
+        uploadFile: jest.fn(({ success }) => success({})),
+        deleteFile: jest.fn()
+      },
+      showLoading: jest.fn(),
+      hideLoading: jest.fn(),
+      showToast: jest.fn()
+    }
+    jest.resetModules()
+    require("../pages/vehicle-detail-manage/vehicle-detail-manage")
+    const page = {
+      ...definition,
+      data: {
+        ...definition.data,
+        id: "car_1"
+      },
+      persistImageChange: jest.fn()
+    }
+    page.setData = jest.fn((patch) => {
+      page.data = { ...page.data, ...patch }
+    })
+
+    page.uploadSelectedFiles(["/tmp/vehicle.jpg"], 0)
+
+    expect(page.persistImageChange).not.toHaveBeenCalled()
+    expect(global.wx.showToast).toHaveBeenCalledWith({
+      title: "图片上传失败",
+      icon: "none"
+    })
+    expect(page.data.uploading).toBe(false)
+  })
+
+  test("多张图片上传成功后一次性提交全部 fileID", () => {
+    let definition = null
+    let uploadIndex = 0
+    global.Page = jest.fn((input) => {
+      definition = input
+    })
+    global.wx = {
+      cloud: {
+        uploadFile: jest.fn(({ success }) => {
+          uploadIndex += 1
+          success({ fileID: `cloud://env/vehicle-images/car_1/image_${uploadIndex}.jpg` })
+        }),
+        deleteFile: jest.fn()
+      },
+      showLoading: jest.fn(),
+      hideLoading: jest.fn(),
+      showToast: jest.fn()
+    }
+    jest.resetModules()
+    require("../pages/vehicle-detail-manage/vehicle-detail-manage")
+    const page = {
+      ...definition,
+      data: {
+        ...definition.data,
+        id: "car_1"
+      },
+      persistImageChange: jest.fn()
+    }
+    page.setData = jest.fn((patch) => {
+      page.data = { ...page.data, ...patch }
+    })
+
+    page.uploadSelectedFiles(["/tmp/one.jpg", "/tmp/two.png"], 1)
+
+    const fileIds = [
+      "cloud://env/vehicle-images/car_1/image_1.jpg",
+      "cloud://env/vehicle-images/car_1/image_2.jpg"
+    ]
+    expect(wx.cloud.uploadFile).toHaveBeenCalledTimes(2)
+    expect(page.persistImageChange).toHaveBeenCalledWith(
+      { action: "add", fileIds },
+      fileIds,
+      1
+    )
+  })
+
+  test.each([
+    ["uploadFile:fail permission denied", "无图片上传权限"],
+    ["uploadFile:fail storage quota limit", "云存储空间不足"],
+    ["uploadFile:fail no such file", "所选图片已失效"]
+  ])("上传错误 %s 显示对应业务提示", (errMsg, title) => {
+    let definition = null
+    global.Page = jest.fn((input) => {
+      definition = input
+    })
+    global.wx = {
+      cloud: {
+        uploadFile: jest.fn(({ fail }) => fail({ errMsg })),
+        deleteFile: jest.fn()
+      },
+      showLoading: jest.fn(),
+      hideLoading: jest.fn(),
+      showToast: jest.fn()
+    }
+    jest.resetModules()
+    require("../pages/vehicle-detail-manage/vehicle-detail-manage")
+    const page = {
+      ...definition,
+      data: {
+        ...definition.data,
+        id: "car_1"
+      }
+    }
+    page.setData = jest.fn((patch) => {
+      page.data = { ...page.data, ...patch }
+    })
+
+    page.uploadSelectedFiles(["/tmp/vehicle.jpg"], 0)
+
+    expect(wx.showToast).toHaveBeenCalledWith({ title, icon: "none" })
+    expect(page.data.uploading).toBe(false)
+  })
+
+  test("上传 SDK 同步抛错时退出加载状态", () => {
+    let definition = null
+    global.Page = jest.fn((input) => {
+      definition = input
+    })
+    global.wx = {
+      cloud: {
+        uploadFile: jest.fn(() => {
+          throw new Error("upload sdk crashed")
+        }),
+        deleteFile: jest.fn()
+      },
+      showLoading: jest.fn(),
+      hideLoading: jest.fn(),
+      showToast: jest.fn()
+    }
+    jest.resetModules()
+    require("../pages/vehicle-detail-manage/vehicle-detail-manage")
+    const page = {
+      ...definition,
+      data: {
+        ...definition.data,
+        id: "car_1"
+      }
+    }
+    page.setData = jest.fn((patch) => {
+      page.data = { ...page.data, ...patch }
+    })
+
+    expect(() => page.uploadSelectedFiles(["/tmp/vehicle.jpg"], 0)).not.toThrow()
+    expect(page.data.uploading).toBe(false)
+    expect(wx.showToast).toHaveBeenCalledWith({
+      title: "图片上传失败",
+      icon: "none"
+    })
+  })
+
+  test("图片记录写入无响应时超时清理并忽略迟到成功", () => {
+    jest.useFakeTimers()
+    let definition = null
+    let lateSuccess
+    global.Page = jest.fn((input) => {
+      definition = input
+    })
+    const callFunction = jest.fn((options) => {
+      if (options.data.action === "add") {
+        lateSuccess = options.success
+      }
+    })
+    global.wx = {
+      cloud: {
+        callFunction,
+        deleteFile: jest.fn()
+      },
+      showLoading: jest.fn(),
+      hideLoading: jest.fn(),
+      showToast: jest.fn()
+    }
+    jest.resetModules()
+    require("../pages/vehicle-detail-manage/vehicle-detail-manage")
+    const page = {
+      ...definition,
+      data: {
+        ...definition.data,
+        id: "car_1",
+        uploading: true,
+        detail: { imageList: [], coverImage: "" }
+      }
+    }
+    page.setData = jest.fn((patch) => {
+      page.data = { ...page.data, ...patch }
+    })
+    const fileIds = ["cloud://env/vehicle-images/car_1/orphan.jpg"]
+
+    page.persistImageChange({ action: "add", fileIds }, fileIds, 0)
+    jest.advanceTimersByTime(15 * 1000)
+    lateSuccess({
+      result: {
+        ok: true,
+        imageList: fileIds,
+        coverImage: fileIds[0]
+      }
+    })
+
+    expect(page.data.uploading).toBe(false)
+    expect(page.data.detail.imageList).toEqual([])
+    expect(callFunction).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        data: { id: "car_1", action: "cleanupUpload", fileIds }
+      })
+    )
+    expect(wx.showToast).toHaveBeenCalledTimes(1)
+    expect(wx.showToast).toHaveBeenCalledWith({
+      title: "图片操作失败",
+      icon: "none"
+    })
+  })
+
+  test("图片记录写入同步抛错时退出加载并请求清理", () => {
+    let definition = null
+    global.Page = jest.fn((input) => {
+      definition = input
+    })
+    const callFunction = jest.fn(() => {
+      throw new Error("callFunction crashed")
+    })
+    global.wx = {
+      cloud: {
+        callFunction,
+        deleteFile: jest.fn()
+      },
+      showLoading: jest.fn(),
+      hideLoading: jest.fn(),
+      showToast: jest.fn()
+    }
+    jest.resetModules()
+    require("../pages/vehicle-detail-manage/vehicle-detail-manage")
+    const page = {
+      ...definition,
+      data: {
+        ...definition.data,
+        id: "car_1",
+        uploading: true
+      }
+    }
+    page.setData = jest.fn((patch) => {
+      page.data = { ...page.data, ...patch }
+    })
+    const fileIds = ["cloud://env/vehicle-images/car_1/orphan.jpg"]
+
+    expect(() => page.persistImageChange({ action: "add", fileIds }, fileIds, 0)).not.toThrow()
+
+    expect(page.data.uploading).toBe(false)
+    expect(callFunction).toHaveBeenCalledTimes(2)
+    expect(wx.showToast).toHaveBeenCalledWith({
+      title: "图片操作失败",
+      icon: "none"
+    })
+  })
+
+  test("云上传能力缺失时不会进入上传态", () => {
+    let definition = null
+    global.Page = jest.fn((input) => {
+      definition = input
+    })
+    global.wx = {
+      cloud: {},
+      showToast: jest.fn()
+    }
+    jest.resetModules()
+    require("../pages/vehicle-detail-manage/vehicle-detail-manage")
+    const page = {
+      ...definition,
+      data: {
+        ...definition.data,
+        id: "car_1",
+        uploading: false
+      }
+    }
+
+    page.uploadSelectedFiles(["/tmp/vehicle.jpg"], 0)
+
+    expect(page.data.uploading).toBe(false)
+    expect(wx.showToast).toHaveBeenCalledWith({
+      title: "云上传能力未初始化",
+      icon: "none"
+    })
   })
 })

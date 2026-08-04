@@ -14,29 +14,54 @@ const VEHICLE_STATUS_LABELS = {
   retired: "已停用"
 }
 
+const OVERVIEW_SOURCE_TIMEOUT_MS = 15 * 1000
+
 function callCloud(name, data) {
   return new Promise((resolve) => {
-    wx.cloud.callFunction({
-      name,
-      data: data || {},
-      success: (res) => {
-        const result = res && res.result ? res.result : null
-        if (!result || !result.ok) {
-          resolve({
-            ok: false,
-            message: (result && result.message) || "数据加载失败"
-          })
-          return
-        }
-        resolve(result)
-      },
-      fail: (error) => {
-        resolve({
-          ok: false,
-          message: (error && (error.errMsg || error.message)) || "数据加载失败"
-        })
+    let settled = false
+    let timeoutId = null
+    const finish = (result) => {
+      if (settled) {
+        return
       }
-    })
+      settled = true
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+        timeoutId = null
+      }
+      resolve(result)
+    }
+    const handleFailure = (error) => {
+      finish({
+        ok: false,
+        message: (error && (error.errMsg || error.message)) || "数据加载失败"
+      })
+    }
+
+    timeoutId = setTimeout(() => {
+      handleFailure({ message: "数据请求超时，请稍后刷新" })
+    }, OVERVIEW_SOURCE_TIMEOUT_MS)
+
+    try {
+      wx.cloud.callFunction({
+        name,
+        data: data || {},
+        success: (res) => {
+          const result = res && res.result ? res.result : null
+          if (!result || !result.ok) {
+            finish({
+              ok: false,
+              message: (result && result.message) || "数据加载失败"
+            })
+            return
+          }
+          finish(result)
+        },
+        fail: handleFailure
+      })
+    } catch (error) {
+      handleFailure(error)
+    }
   })
 }
 

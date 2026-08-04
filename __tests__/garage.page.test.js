@@ -36,6 +36,7 @@ function createPage(definition) {
 
 describe("pages/garage 首页车辆筛选", () => {
   afterEach(() => {
+    jest.useRealTimers()
     delete global.Page
     delete global.wx
   })
@@ -246,5 +247,96 @@ describe("pages/garage 首页车辆筛选", () => {
     page.handleClearSearch()
     expect(page.data.searchKeyword).toBe("")
     expect(page.data.filteredCars.map((item) => item.id)).toEqual(["porsche-911", "bmw-x7"])
+  })
+
+  test("首页云函数无响应时结束骨架屏并提供重试入口", () => {
+    jest.useFakeTimers()
+    const page = createPage(loadPageDefinition())
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn()
+      },
+      showToast: jest.fn()
+    }
+
+    page.loadCars()
+    expect(page.data.loadingCars).toBe(true)
+
+    jest.advanceTimersByTime(15 * 1000)
+
+    expect(page.data.loadingCars).toBe(false)
+    expect(page.data.initialLoading).toBe(false)
+    expect(page.data.loadError).toBe(true)
+    expect(page.data.loadErrorText).toBe("加载超时，请检查网络后重试")
+  })
+
+  test("首页超时后忽略迟到的成功回调", () => {
+    jest.useFakeTimers()
+    let lateSuccess
+    const page = createPage(loadPageDefinition())
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(({ success }) => {
+          lateSuccess = success
+        })
+      },
+      showToast: jest.fn()
+    }
+
+    page.loadCars()
+    jest.advanceTimersByTime(15 * 1000)
+    lateSuccess({
+      result: {
+        ok: true,
+        page: 0,
+        total: 1,
+        hasMore: false,
+        list: [{ id: "late-car", status: "idle" }]
+      }
+    })
+
+    expect(page.data.loadError).toBe(true)
+    expect(page.data.cars).toEqual([])
+  })
+
+  test("加载更多超时时保留已有车辆并结束按钮加载态", () => {
+    jest.useFakeTimers()
+    const page = createPage(loadPageDefinition())
+    page.data.cars = [{ id: "existing-car", status: "idle" }]
+    page.data.page = 0
+    page.data.hasMore = true
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn()
+      },
+      showToast: jest.fn()
+    }
+
+    page.loadCars({ append: true })
+    jest.advanceTimersByTime(15 * 1000)
+
+    expect(page.data.loadingCars).toBe(false)
+    expect(page.data.cars).toEqual([{ id: "existing-car", status: "idle" }])
+    expect(wx.showToast).toHaveBeenCalledWith({
+      title: "加载超时，请重试",
+      icon: "none"
+    })
+  })
+
+  test("云函数同步抛错时转为可重试错误状态", () => {
+    const page = createPage(loadPageDefinition())
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(() => {
+          throw new Error("cloud init failed")
+        })
+      },
+      showToast: jest.fn()
+    }
+
+    expect(() => page.loadCars()).not.toThrow()
+    expect(page.data.loadingCars).toBe(false)
+    expect(page.data.loadError).toBe(true)
+    expect(page.data.loadErrorText).toBe("cloud init failed")
   })
 })

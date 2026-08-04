@@ -109,11 +109,12 @@
         <view class="section-kicker">SERVICES</view>
         <view class="section-title">更多服务</view>
       </view>
-      <view class="section-count {{permissionsLoading ? 'section-count-loading' : ''}}">
+      <view class="section-count {{permissionsLoading ? 'section-count-loading' : ''}} {{permissionsError ? 'section-count-error' : ''}}" bindtap="handlePermissionRetry" hover-class="{{permissionsError ? 'section-count-pressed' : 'none'}}" aria-role="{{permissionsError ? 'button' : 'text'}}" aria-label="{{permissionsError || '服务数量 ' + menuItems.length}}">
         <block wx:if="{{permissionsLoading}}">
           <view class="section-count-dot" aria-hidden="true"></view>
           <text>同步权限</text>
         </block>
+        <block wx:elif="{{permissionsError}}"><text>{{permissionsError}}</text></block>
         <block wx:else><text class="section-count-value">{{menuItems.length}}</text><text>项服务</text></block>
       </view>
     </view>

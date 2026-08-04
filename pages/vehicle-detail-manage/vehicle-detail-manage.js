@@ -2,6 +2,7 @@ const { requirePagePermission } = require("../../shared/pageAuth")
 const { formatToastTitle } = require("../../shared/uiFeedback")
 
 const MAX_IMAGE_UPLOAD_BYTES = 10 * 1024 * 1024
+const MAX_IMAGE_COUNT = 9
 const ALLOWED_IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp"])
 const MAX_UPLOAD_RETRY_COUNT = 1
 const CLOUD_UPLOAD_TIMEOUT_MS = 20 * 1000
@@ -687,17 +688,17 @@ Page({
       return
     }
 
-    const remain = Math.max(9 - (detail.imageCount || 0), 0)
+    const remain = Math.max(MAX_IMAGE_COUNT - (detail.imageCount || 0), 0)
     if (remain <= 0) {
       wx.showToast({
-        title: "最多上传 9 张图片",
+        title: `最多上传 ${MAX_IMAGE_COUNT} 张图片`,
         icon: "none"
       })
       return
     }
 
     wx.chooseImage({
-      count: remain > 3 ? 3 : remain,
+      count: remain,
       sizeType: ["compressed"],
       sourceType: ["album", "camera"],
       success: (chooseRes) => {

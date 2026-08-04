@@ -125,6 +125,70 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
     delete global.wx
   })
 
+  test.each([
+    [0, 9],
+    [1, 8],
+    [5, 4],
+    [8, 1]
+  ])("单次可选择剩余图片名额（已有 %i 张时可选 %i 张）", (imageCount, expectedCount) => {
+    let definition = null
+    global.Page = jest.fn((input) => {
+      definition = input
+    })
+    global.wx = {
+      chooseImage: jest.fn()
+    }
+    jest.resetModules()
+    require("../pages/vehicle-detail-manage/vehicle-detail-manage")
+    const page = {
+      ...definition,
+      data: {
+        ...definition.data,
+        detail: { imageCount },
+        uploading: false
+      }
+    }
+
+    page.handleUploadImages()
+
+    expect(global.wx.chooseImage).toHaveBeenCalledWith(
+      expect.objectContaining({ count: expectedCount })
+    )
+    delete global.Page
+    delete global.wx
+  })
+
+  test("已有 9 张图片时阻止继续选择", () => {
+    let definition = null
+    global.Page = jest.fn((input) => {
+      definition = input
+    })
+    global.wx = {
+      chooseImage: jest.fn(),
+      showToast: jest.fn()
+    }
+    jest.resetModules()
+    require("../pages/vehicle-detail-manage/vehicle-detail-manage")
+    const page = {
+      ...definition,
+      data: {
+        ...definition.data,
+        detail: { imageCount: 9 },
+        uploading: false
+      }
+    }
+
+    page.handleUploadImages()
+
+    expect(global.wx.chooseImage).not.toHaveBeenCalled()
+    expect(global.wx.showToast).toHaveBeenCalledWith({
+      title: "最多上传 9 张图片",
+      icon: "none"
+    })
+    delete global.Page
+    delete global.wx
+  })
+
   test("全部图片不合规时在上传前给出明确提示", () => {
     let definition = null
     global.Page = jest.fn((input) => {
@@ -447,6 +511,53 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
       { action: "add", fileIds },
       fileIds,
       1
+    )
+  })
+
+  test("单次选择 9 张图片时全部上传并一次性提交", () => {
+    let definition = null
+    let uploadIndex = 0
+    global.Page = jest.fn((input) => {
+      definition = input
+    })
+    global.wx = {
+      cloud: {
+        uploadFile: jest.fn(({ success }) => {
+          uploadIndex += 1
+          success({ fileID: `cloud://env/vehicle-images/car_1/image_${uploadIndex}.jpg` })
+        }),
+        deleteFile: jest.fn()
+      },
+      showLoading: jest.fn(),
+      hideLoading: jest.fn(),
+      showToast: jest.fn()
+    }
+    jest.resetModules()
+    require("../pages/vehicle-detail-manage/vehicle-detail-manage")
+    const page = {
+      ...definition,
+      data: {
+        ...definition.data,
+        id: "car_1"
+      },
+      persistImageChange: jest.fn()
+    }
+    page.setData = jest.fn((patch) => {
+      page.data = { ...page.data, ...patch }
+    })
+    const localFiles = Array.from({ length: 9 }, (_, index) => `/tmp/image_${index + 1}.jpg`)
+    const fileIds = Array.from(
+      { length: 9 },
+      (_, index) => `cloud://env/vehicle-images/car_1/image_${index + 1}.jpg`
+    )
+
+    page.uploadSelectedFiles(localFiles, 0)
+
+    expect(global.wx.cloud.uploadFile).toHaveBeenCalledTimes(9)
+    expect(page.persistImageChange).toHaveBeenCalledWith(
+      { action: "add", fileIds },
+      fileIds,
+      0
     )
   })
 

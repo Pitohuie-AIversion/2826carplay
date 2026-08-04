@@ -115,6 +115,75 @@ describe("cloudfunctions/vehicleImageUpdate integration", () => {
     })
   })
 
+  test("admin 可一次新增 9 张图片", async () => {
+    const mocks = createMockDb({
+      rolesData: [{ role: "admin" }],
+      currentData: {
+        _id: "car_1",
+        imageList: [],
+        coverImage: ""
+      },
+      updateResult: { stats: { updated: 1 } }
+    })
+    const vehicleImageUpdate = await loadVehicleImageUpdateWith({
+      openid: "admin_openid",
+      mockDb: mocks.db
+    })
+    const fileIds = Array.from(
+      { length: 9 },
+      (_, index) => `cloud://env.bucket/vehicle-images/car_1/img${index + 1}.jpg`
+    )
+
+    const res = await vehicleImageUpdate.main({
+      id: "car_1",
+      action: "add",
+      fileIds
+    })
+
+    expect(res).toMatchObject({
+      ok: true,
+      id: "car_1",
+      action: "add",
+      imageList: fileIds,
+      coverImage: fileIds[0],
+      imageCount: 9
+    })
+    expect(mocks.update).toHaveBeenCalled()
+  })
+
+  test("admin 一次新增 10 张图片时被后端拒绝", async () => {
+    const mocks = createMockDb({
+      rolesData: [{ role: "admin" }],
+      currentData: {
+        _id: "car_1",
+        imageList: [],
+        coverImage: ""
+      },
+      updateResult: { stats: { updated: 1 } }
+    })
+    const vehicleImageUpdate = await loadVehicleImageUpdateWith({
+      openid: "admin_openid",
+      mockDb: mocks.db
+    })
+    const fileIds = Array.from(
+      { length: 10 },
+      (_, index) => `cloud://env.bucket/vehicle-images/car_1/img${index + 1}.jpg`
+    )
+
+    const res = await vehicleImageUpdate.main({
+      id: "car_1",
+      action: "add",
+      fileIds
+    })
+
+    expect(res).toMatchObject({
+      ok: false,
+      code: "VALIDATION_ERROR",
+      message: "最多只能上传 9 张图片"
+    })
+    expect(mocks.update).not.toHaveBeenCalled()
+  })
+
   test("admin 设置封面成功", async () => {
     const mocks = createMockDb({
       rolesData: [{ role: "admin" }],

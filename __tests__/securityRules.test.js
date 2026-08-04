@@ -62,7 +62,10 @@ describe("production security rules", () => {
     expect(storageRule.write).toContain("auth.loginType != 'ANONYMOUS'")
     expect(storageRule.write).toContain("resource.openid == auth.openid")
     expect(storageRule.write).toContain("resource.openid == auth.uid")
-    expect(storageRule.write).toContain("resource.size <= 10485760")
+    // CloudBase does not reliably expose resource.size during the upload
+    // authorization phase. Keep the client-side limit from the manifest,
+    // but do not make otherwise valid uploads depend on this server field.
+    expect(storageRule.write).not.toContain("resource.size")
     expect(storageRule.write).toContain("/\\.jpg$/")
     expect(storageRule.write).toContain("/\\.jpeg$/")
     expect(storageRule.write).toContain("/\\.png$/")

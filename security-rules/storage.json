@@ -1,4 +1,4 @@
 {
   "read": "/^vehicle-images\\//.test(resource.path)",
-  "write": "auth != null && auth.loginType != 'ANONYMOUS' && /^vehicle-images\\//.test(resource.path) && (/\\.jpg$/.test(resource.path) || /\\.jpeg$/.test(resource.path) || /\\.png$/.test(resource.path) || /\\.webp$/.test(resource.path)) && (resource.openid == auth.openid || resource.openid == auth.uid) && resource.size <= 10485760"
+  "write": "auth != null && auth.loginType != 'ANONYMOUS' && /^vehicle-images\\//.test(resource.path) && (/\\.jpg$/.test(resource.path) || /\\.jpeg$/.test(resource.path) || /\\.png$/.test(resource.path) || /\\.webp$/.test(resource.path)) && (resource.openid == auth.openid || resource.openid == auth.uid)"
 }

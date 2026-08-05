@@ -204,8 +204,26 @@
           </view>
         </view>
         <button class="upload-button ui-btn ui-btn-primary" bindtap="handleUploadImages" loading="{{uploading}}" disabled="{{uploading}}">
-          <view class="upload-button-content"><view wx:if="{{!uploading}}" class="upload-native-icon" aria-hidden="true"></view><text>{{uploading ? "上传中…" : "上传图片"}}</text></view>
+          <view class="upload-button-content"><view wx:if="{{!uploading}}" class="upload-native-icon" aria-hidden="true"></view><text>{{uploading ? "处理中…" : "上传图片"}}</text></view>
         </button>
+      </view>
+
+      <view wx:if="{{uploading || failedUploadPaths.length}}" class="upload-progress-panel" aria-live="polite">
+        <view class="upload-progress-header">
+          <view>
+            <view class="upload-progress-title">{{uploading ? '图片上传进度' : '部分图片需要重试'}}</view>
+            <view class="upload-progress-desc">{{uploadProgressText}}</view>
+          </view>
+          <button wx:if="{{uploading}}" class="upload-progress-action" bindtap="handleCancelUpload">取消</button>
+          <button wx:else class="upload-progress-action upload-progress-retry" bindtap="handleRetryFailedUploads">重试失败项</button>
+        </view>
+        <view class="upload-progress-list">
+          <view wx:for="{{uploadItems}}" wx:key="id" class="upload-progress-item upload-progress-item-{{item.status}}">
+            <view class="upload-progress-dot"></view>
+            <text class="upload-progress-name">{{item.name}}</text>
+            <text class="upload-progress-status">{{item.statusText}}</text>
+          </view>
+        </view>
       </view>
 
       <view wx:if="{{detail.imageItems.length}}" class="image-list">

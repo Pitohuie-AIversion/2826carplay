@@ -4,6 +4,7 @@ const mockCategories = require("../../data/categories")
 const DEFAULT_GARAGE_SUBTITLE = "甄选座驾，为每一次出发预留专属席位"
 const LEGACY_GARAGE_SUBTITLE = "后台车辆资料已接入首页展示，上传封面后会同步展示到车库首页"
 const GARAGE_LOAD_TIMEOUT_MS = 15 * 1000
+const SEARCH_DEBOUNCE_MS = 350
 
 const CATEGORY_LABEL_MAP = {
   all: "全部",
@@ -89,10 +90,10 @@ function sortCars(carList) {
     .map(attachStatusClass)
 }
 
-function buildCategoriesWithCount(carList) {
-  const countMap = {}
+function buildCategoriesWithCount(carList, serverCountMap) {
+  const countMap = serverCountMap && typeof serverCountMap === "object" ? { ...serverCountMap } : {}
 
-  carList.forEach((car) => {
+  if (!serverCountMap) carList.forEach((car) => {
     const categoryId = String(car.category || "").trim()
     if (!categoryId) {
       return
@@ -129,7 +130,7 @@ function buildCategoriesWithCount(carList) {
     {
       id: "all",
       name: "全部",
-      count: carList.length
+      count: Number.isFinite(Number(countMap.all)) ? Number(countMap.all) : carList.length
     }
   ]
     .concat(mergedBase)
@@ -167,6 +168,10 @@ function matchesCarSearch(car, keyword) {
   return searchText.includes(query)
 }
 
+function canLoadGarageRemotely() {
+  return typeof wx !== "undefined" && wx.cloud && typeof wx.cloud.callFunction === "function"
+}
+
 Page({
   data: {
     pageTitle: "极境车库",
@@ -184,6 +189,7 @@ Page({
     availableOnly: false,
     searchKeyword: "",
     searchResultCount: 0,
+    searchDebouncing: false,
     categories: [],
     cars: [],
     filteredCars: [],
@@ -247,9 +253,15 @@ Page({
 
   loadCars(input) {
     const append = Boolean(input && input.append)
+    const force = Boolean(input && input.force)
     const nextPage = append ? this.data.page + 1 : 0
-    if (this.data.loadingCars) {
+    if (this.data.loadingCars && !force) {
       return
+    }
+
+    if (force && this._carsLoadTimer) {
+      clearTimeout(this._carsLoadTimer)
+      this._carsLoadTimer = null
     }
 
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
@@ -312,7 +324,10 @@ Page({
       name: "garageVehicleList",
       data: {
         page: nextPage,
-        pageSize: this.data.pageSize
+        pageSize: this.data.pageSize,
+        keyword: this.data.searchKeyword,
+        category: this.data.currentCategory,
+        availableOnly: this.data.availableOnly
       },
       success: (res) => {
         if (!finishRequest()) {
@@ -329,7 +344,11 @@ Page({
           page: Number.isInteger(result.page) ? result.page : nextPage,
           total: Number(result.total) || nextCars.length,
           truncated: Boolean(result.truncated),
-          hasMore: Boolean(result.hasMore)
+          hasMore: Boolean(result.hasMore),
+          searchedTotal: Number(result.searchedTotal),
+          categoryTotal: Number(result.categoryTotal),
+          availableCount: Number(result.availableCount),
+          categoryCounts: result.categoryCounts
         })
       },
       fail: handleFailure
@@ -347,6 +366,10 @@ Page({
     if (this._carsLoadTimer) {
       clearTimeout(this._carsLoadTimer)
       this._carsLoadTimer = null
+    }
+    if (this._searchDebounceTimer) {
+      clearTimeout(this._searchDebounceTimer)
+      this._searchDebounceTimer = null
     }
   },
 
@@ -383,7 +406,7 @@ Page({
       uniqueCars.push(car)
     })
     const sortedCars = sortCars(uniqueCars)
-    const categories = buildCategoriesWithCount(sortedCars)
+    const categories = buildCategoriesWithCount(sortedCars, pagination && pagination.categoryCounts)
     const categoryIds = categories.map((item) => item.id)
     const nextCategory = categoryIds.includes(this.data.currentCategory) ? this.data.currentCategory : "all"
 
@@ -399,10 +422,10 @@ Page({
       hasMore: Boolean(pagination && pagination.hasMore)
     })
 
-    this.filterCars(nextCategory)
+    this.filterCars(nextCategory, this.data.availableOnly, this.data.searchKeyword, pagination)
   },
 
-  filterCars(categoryId, availableOnlyInput, searchKeywordInput) {
+  filterCars(categoryId, availableOnlyInput, searchKeywordInput, serverSummary) {
     const nextCategory = categoryId || "all"
     const availableOnly =
       typeof availableOnlyInput === "boolean" ? availableOnlyInput : this.data.availableOnly
@@ -421,20 +444,50 @@ Page({
       currentCategory: nextCategory,
       availableOnly,
       searchKeyword,
-      searchResultCount: filteredCars.length,
+      searchResultCount: serverSummary && Number.isFinite(serverSummary.total)
+        ? serverSummary.total
+        : filteredCars.length,
       filteredCars,
-      categorySummary: buildCategorySummary(nextCategory, this.data.categories, categoryCars)
+      categorySummary: serverSummary && Number.isFinite(serverSummary.categoryTotal)
+        ? {
+            name: (this.data.categories.find((item) => item.id === nextCategory) || {}).name || "",
+            total: serverSummary.categoryTotal,
+            available: Number.isFinite(serverSummary.availableCount) ? serverSummary.availableCount : 0
+          }
+        : buildCategorySummary(nextCategory, this.data.categories, categoryCars),
+      searchDebouncing: false
     })
   },
 
   handleSearchInput(event) {
-    const keyword = String((event.detail && event.detail.value) || "")
+    const keyword = String((event.detail && event.detail.value) || "").slice(0, 50)
     this.filterCars(this.data.currentCategory, this.data.availableOnly, keyword)
+    if (!canLoadGarageRemotely()) {
+      return
+    }
+    if (this._searchDebounceTimer) {
+      clearTimeout(this._searchDebounceTimer)
+    }
+    this.setData({
+      searchKeyword: keyword,
+      searchDebouncing: true
+    })
+    this._searchDebounceTimer = setTimeout(() => {
+      this._searchDebounceTimer = null
+      this.loadCars({ force: true })
+    }, SEARCH_DEBOUNCE_MS)
   },
 
   handleClearSearch() {
     if (this.data.searchKeyword) {
+      if (this._searchDebounceTimer) {
+        clearTimeout(this._searchDebounceTimer)
+        this._searchDebounceTimer = null
+      }
       this.filterCars(this.data.currentCategory, this.data.availableOnly, "")
+      if (canLoadGarageRemotely()) {
+        this.loadCars({ force: true })
+      }
     }
   },
 
@@ -446,6 +499,9 @@ Page({
     }
 
     this.filterCars(categoryId)
+    if (canLoadGarageRemotely()) {
+      this.loadCars({ force: true })
+    }
   },
 
   handleAvailabilityFilterTap(event) {
@@ -455,11 +511,17 @@ Page({
       return
     }
     this.filterCars(this.data.currentCategory, availableOnly)
+    if (canLoadGarageRemotely()) {
+      this.loadCars({ force: true })
+    }
   },
 
   handleShowAllStatuses() {
     if (this.data.availableOnly) {
       this.filterCars(this.data.currentCategory, false)
+      if (canLoadGarageRemotely()) {
+        this.loadCars({ force: true })
+      }
     }
   },
 

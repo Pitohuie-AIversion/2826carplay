@@ -176,7 +176,7 @@
 .core-nav-label {
   margin-top: 7rpx;
   color: currentColor;
-  font-size: 18rpx;
+  font-size: 22rpx;
   font-weight: 550;
   line-height: 1;
   transition: font-weight 150ms ease, letter-spacing 150ms ease;

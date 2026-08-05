@@ -192,7 +192,7 @@
         <view class="list-kicker">CURATED FLEET</view>
         <view class="list-title">{{searchKeyword ? '搜索结果' : '为你甄选'}}</view>
       </view>
-      <view class="list-count">{{searchKeyword && hasMore ? '当前已加载 ' : ''}}{{filteredCars.length}} VEHICLES</view>
+      <view class="list-count">{{searchKeyword ? searchResultCount : categorySummary.total}} VEHICLES</view>
     </view>
     <car-card
       wx:for="{{filteredCars}}"
@@ -219,15 +219,8 @@
     <view wx:else class="garage-state-icon garage-empty-native-icon" aria-hidden="true"><view class="garage-empty-native-door"></view></view>
     <view class="empty-title">{{searchKeyword ? '没有找到相关车辆' : availableOnly && categorySummary.total ? '当前暂无可预约车辆' : '暂无车辆'}}</view>
     <view class="empty-desc">
-      {{searchKeyword ? '试试车型、品牌或车辆标签；当前搜索范围为已加载车辆' : availableOnly && categorySummary.total ? '可查看全部状态，或联系专属顾问确认后续档期' : emptyText}}
+      {{searchKeyword ? '试试车型、品牌或车辆标签，搜索会覆盖全部在库车辆' : availableOnly && categorySummary.total ? '可查看全部状态，或联系专属顾问确认后续档期' : emptyText}}
     </view>
-    <button
-      wx:if="{{searchKeyword && hasMore}}"
-      class="ui-btn ui-btn-primary"
-      loading="{{loadingCars}}"
-      disabled="{{loadingCars}}"
-      bindtap="handleLoadMore"
-    ><view class="garage-action-content"><view wx:if="{{!loadingCars}}" class="garage-action-native-icon garage-search-more-native-icon" aria-hidden="true"></view><text>{{loadingCars ? '正在搜索' : '继续搜索更多车辆'}}</text></view></button>
     <button
       wx:if="{{searchKeyword}}"
       class="ui-btn ui-btn-ghost empty-secondary-action"

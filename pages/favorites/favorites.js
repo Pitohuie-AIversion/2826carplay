@@ -75,6 +75,8 @@ Page({
     pageSize: 10,
     hasMore: false,
     removingId: "",
+    undoFavorite: null,
+    undoingFavorite: false,
     loadedOnce: false
   },
 
@@ -92,6 +94,13 @@ Page({
     this.fetchList({
       done: () => wx.stopPullDownRefresh()
     })
+  },
+
+  onUnload() {
+    if (this._undoFavoriteTimer) {
+      clearTimeout(this._undoFavoriteTimer)
+      this._undoFavoriteTimer = null
+    }
   },
 
   handleRetry() {
@@ -180,6 +189,8 @@ Page({
       return
     }
 
+    const removedIndex = this.data.list.findIndex((item) => item.id === vehicleId)
+    const removedCar = removedIndex >= 0 ? this.data.list[removedIndex] : null
     this.setData({ removingId: vehicleId })
     wx.cloud.callFunction({
       name: "favoriteSet",
@@ -199,9 +210,24 @@ Page({
         this.applyFavoriteList(this.data.list.filter((item) => item.id !== vehicleId), {
           availableOnly: this.data.availableOnly
         })
+        if (this._undoFavoriteTimer) {
+          clearTimeout(this._undoFavoriteTimer)
+        }
+        if (removedCar) {
+          this.setData({
+            undoFavorite: {
+              car: removedCar,
+              index: removedIndex
+            }
+          })
+          this._undoFavoriteTimer = setTimeout(() => {
+            this._undoFavoriteTimer = null
+            this.setData({ undoFavorite: null })
+          }, 5000)
+        }
         wx.showToast({
-          title: "已取消收藏",
-          icon: "success"
+          title: "已取消，可撤销",
+          icon: "none"
         })
       },
       fail: (error) => {
@@ -212,6 +238,51 @@ Page({
       },
       complete: () => {
         this.setData({ removingId: "" })
+      }
+    })
+  },
+
+  handleUndoRemove() {
+    const undo = this.data.undoFavorite
+    if (!undo || !undo.car || this.data.undoingFavorite) {
+      return
+    }
+    if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
+      wx.showToast({ title: "云能力未初始化", icon: "none" })
+      return
+    }
+
+    this.setData({ undoingFavorite: true })
+    wx.cloud.callFunction({
+      name: "favoriteSet",
+      data: {
+        vehicleId: undo.car.id,
+        favorited: true
+      },
+      success: (res) => {
+        const result = res && res.result ? res.result : null
+        if (!result || !result.ok) {
+          wx.showToast({
+            title: formatToastTitle(result && result.message, "撤销失败"),
+            icon: "none"
+          })
+          return
+        }
+        const nextList = this.data.list.slice()
+        nextList.splice(Math.min(Math.max(Number(undo.index) || 0, 0), nextList.length), 0, undo.car)
+        this.applyFavoriteList(nextList, { availableOnly: this.data.availableOnly })
+        if (this._undoFavoriteTimer) {
+          clearTimeout(this._undoFavoriteTimer)
+          this._undoFavoriteTimer = null
+        }
+        this.setData({ undoFavorite: null })
+        wx.showToast({ title: "已恢复收藏", icon: "success" })
+      },
+      fail: () => {
+        wx.showToast({ title: "撤销失败", icon: "none" })
+      },
+      complete: () => {
+        this.setData({ undoingFavorite: false })
       }
     })
   },

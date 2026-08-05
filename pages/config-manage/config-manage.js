@@ -1,5 +1,6 @@
 const { requirePagePermission } = require("../../shared/pageAuth")
 const { formatToastTitle } = require("../../shared/uiFeedback")
+const { clearUnsaved, markUnsaved } = require("../../shared/unsavedChanges")
 
 const LEGACY_GARAGE_SUBTITLE = "后台车辆资料已接入首页展示，上传封面后会同步展示到车库首页"
 
@@ -139,6 +140,7 @@ Page({
           isDirty: false,
           form: buildForm(result.config)
         })
+        clearUnsaved(this)
         if (typeof done === "function") {
           done()
         }
@@ -166,6 +168,7 @@ Page({
       [`form.${field}`]: String((event.detail && event.detail.value) || ""),
       isDirty: true
     })
+    markUnsaved(this, "运营配置尚未保存，确定离开吗？")
   },
 
   handleReset() {
@@ -181,6 +184,7 @@ Page({
       form: buildForm(DEFAULT_CONFIG),
       isDirty: true
     })
+    markUnsaved(this, "运营配置尚未保存，确定离开吗？")
   },
 
   handleRetryLoad() {
@@ -260,6 +264,7 @@ Page({
           isDirty: false,
           form: buildForm(result.config || DEFAULT_CONFIG)
         })
+        clearUnsaved(this)
       },
       fail: (error) => {
         wx.hideLoading()

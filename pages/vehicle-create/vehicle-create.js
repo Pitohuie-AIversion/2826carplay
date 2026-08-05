@@ -2,6 +2,7 @@ const vehicleUtils = require("../../shared/vehicle")
 const { buildVehicleFormProgress } = require("../../shared/vehicleFormProgress")
 const { requirePagePermission } = require("../../shared/pageAuth")
 const { formatToastTitle } = require("../../shared/uiFeedback")
+const { clearUnsaved, markUnsaved } = require("../../shared/unsavedChanges")
 
 const VEHICLE_TYPE_LABEL_MAP = {
   sedan: "轿车",
@@ -190,6 +191,7 @@ Page({
       "form.plateNumber": value,
       formProgress: buildVehicleFormProgress({ ...this.data.form, plateNumber: value })
     })
+    markUnsaved(this, "车辆资料尚未保存，确定离开吗？")
   },
 
   handleTextInput(event) {
@@ -236,6 +238,7 @@ Page({
     }
 
     this.setData(nextData)
+    markUnsaved(this, "车辆资料尚未保存，确定离开吗？")
   },
 
   handleVehicleTypeChange(event) {
@@ -249,6 +252,7 @@ Page({
       "form.vehicleType": value,
       formProgress: buildVehicleFormProgress({ ...this.data.form, vehicleType: value })
     })
+    markUnsaved(this, "车辆资料尚未保存，确定离开吗？")
   },
 
   handleStatusChange(event) {
@@ -262,6 +266,7 @@ Page({
       "form.status": value,
       formProgress: buildVehicleFormProgress({ ...this.data.form, status: value })
     })
+    markUnsaved(this, "车辆资料尚未保存，确定离开吗？")
   },
 
   handleDateChange(event) {
@@ -271,6 +276,7 @@ Page({
       "form.registerDate": value,
       formProgress: buildVehicleFormProgress({ ...this.data.form, registerDate: value })
     })
+    markUnsaved(this, "车辆资料尚未保存，确定离开吗？")
   },
 
   handleTransmissionChange(event) {
@@ -283,6 +289,7 @@ Page({
       transmissionLabel: label,
       "form.transmission": value
     })
+    markUnsaved(this, "车辆资料尚未保存，确定离开吗？")
   },
 
   handleFuelTypeChange(event) {
@@ -295,6 +302,7 @@ Page({
       fuelTypeLabel: label,
       "form.fuelType": value
     })
+    markUnsaved(this, "车辆资料尚未保存，确定离开吗？")
   },
 
   getValidationMessage(result) {
@@ -344,6 +352,7 @@ Page({
         const result = res && res.result ? res.result : null
 
         if (result && result.ok) {
+          clearUnsaved(this)
           this.setData({
             isSubmitting: false
           })

@@ -170,6 +170,10 @@
       </view>
     </view>
 
+    <button wx:if="{{savedContactAvailable}}" class="saved-contact-button" bindtap="handleUseSavedContact" hover-class="booking-link-pressed">
+      使用上次联系人
+    </button>
+
     <view class="form-item">
       <view class="form-label-row">
         <view class="form-label">姓名</view>
@@ -207,6 +211,7 @@
         aria-label="填写十一位手机号"
         aria-required="{{true}}"
       />
+      <view wx:if="{{form.phone && !formProgress.phoneComplete}}" class="field-inline-error">请输入正确的 11 位手机号</view>
     </view>
 
     <view class="form-section-divider">
@@ -235,6 +240,12 @@
           </view>
         </picker>
       </view>
+    </view>
+
+    <view class="date-shortcuts" aria-role="group" aria-label="常用日期快捷选择">
+      <button class="date-shortcut" data-action="today" bindtap="handleDateShortcut">今天取车</button>
+      <button class="date-shortcut" data-action="tomorrow" bindtap="handleDateShortcut">明天取车</button>
+      <button class="date-shortcut" data-action="three-days" bindtap="handleDateShortcut">安排 3 天</button>
     </view>
 
     <view class="availability-card availability-{{availabilityState}}">

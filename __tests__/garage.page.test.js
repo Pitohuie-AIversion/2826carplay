@@ -110,12 +110,11 @@ describe("pages/garage 首页车辆筛选", () => {
     expect(wxml).toContain("garage-empty-native-icon")
     expect(wxml).toContain("garage-retry-native-icon")
     expect(wxml).toContain("garage-more-native-icon")
-    expect(wxml).toContain("garage-search-more-native-icon")
     expect(wxml).toContain("garage-clear-native-icon")
     expect(wxml).toContain("garage-status-native-icon")
     expect(wxml).toContain("garage-complete-native-icon")
     expect(wxml).toContain("{{loadingCars ? '正在加载' : '加载更多车辆'}}")
-    expect(wxml).toContain("{{loadingCars ? '正在搜索' : '继续搜索更多车辆'}}")
+    expect(wxml).toContain("搜索会覆盖全部在库车辆")
     expect(wxml).not.toContain('bindtap="handleRetryLoad">重新加载</button>')
     expect(wxss).toContain(".garage-action-content")
     expect(wxss).toContain(".garage-state-icon")
@@ -247,6 +246,47 @@ describe("pages/garage 首页车辆筛选", () => {
     page.handleClearSearch()
     expect(page.data.searchKeyword).toBe("")
     expect(page.data.filteredCars.map((item) => item.id)).toEqual(["porsche-911", "bmw-x7"])
+  })
+
+  test("输入关键词后防抖请求服务端全量搜索并携带组合筛选", () => {
+    jest.useFakeTimers()
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(({ success }) => success({
+          result: {
+            ok: true,
+            page: 0,
+            total: 1,
+            searchedTotal: 1,
+            categoryTotal: 1,
+            availableCount: 1,
+            categoryCounts: { all: 1, supercar: 1 },
+            hasMore: false,
+            list: [{ id: "remote-911", name: "Porsche 911", category: "supercar", status: "available" }]
+          }
+        }))
+      },
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition())
+    page.data.currentCategory = "supercar"
+    page.data.availableOnly = true
+
+    page.handleSearchInput({ detail: { value: "Porsche" } })
+    expect(wx.cloud.callFunction).not.toHaveBeenCalled()
+
+    jest.advanceTimersByTime(350)
+
+    expect(wx.cloud.callFunction).toHaveBeenCalledWith(expect.objectContaining({
+      name: "garageVehicleList",
+      data: expect.objectContaining({
+        keyword: "Porsche",
+        category: "supercar",
+        availableOnly: true
+      })
+    }))
+    expect(page.data.filteredCars.map((item) => item.id)).toEqual(["remote-911"])
+    expect(page.data.searchResultCount).toBe(1)
   })
 
   test("首页云函数无响应时结束骨架屏并提供重试入口", () => {

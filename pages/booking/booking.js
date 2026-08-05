@@ -1,5 +1,6 @@
 const { trackEvent } = require("../../shared/analytics")
 const { formatToastTitle } = require("../../shared/uiFeedback")
+const LAST_BOOKING_CONTACT_KEY = "lastBookingContact"
 
 function formatDate(date) {
   const year = date.getFullYear()
@@ -7,6 +8,12 @@ function formatDate(date) {
   const day = `${date.getDate()}`.padStart(2, "0")
 
   return `${year}-${month}-${day}`
+}
+
+function addDays(dateText, days) {
+  const base = dateText ? new Date(`${dateText}T00:00:00`) : new Date()
+  base.setDate(base.getDate() + Number(days || 0))
+  return formatDate(base)
 }
 
 function createBookingRequestId() {
@@ -138,6 +145,7 @@ Page({
     pickerCityIndex: 0,
     bookingStatusTemplateId: "",
     subscriptionEnabled: false,
+    savedContactAvailable: false,
     availabilityState: "idle",
     availabilityText: "选好取还车日期后，将自动查看同期咨询情况",
     availabilityConflictCount: 0,
@@ -176,9 +184,47 @@ Page({
       carId
     })
 
+    this.loadSavedContact()
     this.loadOperationConfig()
     this.loadBookingCar(carId)
     trackEvent("booking_start", carId)
+  },
+
+  loadSavedContact() {
+    if (typeof wx.getStorageSync !== "function") {
+      return
+    }
+    try {
+      const saved = wx.getStorageSync(LAST_BOOKING_CONTACT_KEY)
+      this._savedContact = saved && typeof saved === "object" ? saved : null
+      this.setData({
+        savedContactAvailable: Boolean(
+          this._savedContact &&
+          String(this._savedContact.userName || "").trim() &&
+          /^1\d{10}$/.test(String(this._savedContact.phone || "").trim())
+        )
+      })
+    } catch (error) {}
+  },
+
+  handleUseSavedContact() {
+    const saved = this._savedContact
+    if (!saved) {
+      return
+    }
+    const nextForm = {
+      ...this.data.form,
+      userName: String(saved.userName || "").trim().slice(0, 20),
+      phone: String(saved.phone || "").replace(/\D/g, "").slice(0, 11)
+    }
+    this.setData({
+      "form.userName": nextForm.userName,
+      "form.phone": nextForm.phone,
+      formProgress: buildFormProgress(nextForm, this.data.privacyAgreed),
+      bookingSummary: buildBookingSummary(nextForm, this.data.carName),
+      submitRequestId: ""
+    })
+    wx.showToast({ title: "已填入上次联系人", icon: "none" })
   },
 
   loadOperationConfig() {
@@ -288,20 +334,6 @@ Page({
     const currentCity = String((this.data.form && this.data.form.city) || "").trim()
     const cityIndex = cityOptions.indexOf(currentCity)
 
-    if (!currentCity && cityOptions.length) {
-      const nextForm = {
-        ...this.data.form,
-        city: cityOptions[0]
-      }
-      this.setData({
-        cityIndex: 0,
-        pickerCityIndex: 0,
-        "form.city": cityOptions[0],
-        bookingSummary: buildBookingSummary(nextForm, this.data.carName)
-      })
-      return
-    }
-
     this.setData({
       cityIndex,
       pickerCityIndex: cityIndex >= 0 ? cityIndex : 0
@@ -374,6 +406,32 @@ Page({
       bookingSummary: buildBookingSummary(nextForm, this.data.carName)
     })
     this.checkVehicleAvailability()
+  },
+
+  handleDateShortcut(event) {
+    const action = String(event.currentTarget.dataset.action || "")
+    const today = this.data.today
+    const nextForm = { ...this.data.form }
+    if (action === "today" || action === "tomorrow") {
+      nextForm.startDate = action === "today" ? today : addDays(today, 1)
+      if (nextForm.endDate && nextForm.endDate < nextForm.startDate) {
+        nextForm.endDate = ""
+      }
+    } else if (action === "three-days") {
+      nextForm.startDate = nextForm.startDate || today
+      nextForm.endDate = addDays(nextForm.startDate, 3)
+    } else {
+      return
+    }
+
+    this.setData({
+      "form.startDate": nextForm.startDate,
+      "form.endDate": nextForm.endDate,
+      endMinDate: nextForm.startDate || today,
+      submitRequestId: "",
+      formProgress: buildFormProgress(nextForm, this.data.privacyAgreed),
+      bookingSummary: buildBookingSummary(nextForm, this.data.carName)
+    }, () => this.checkVehicleAvailability())
   },
 
   resetAvailability() {
@@ -630,6 +688,14 @@ Page({
         }
 
         trackEvent("booking_submit", this.data.carId)
+        if (typeof wx.setStorageSync === "function") {
+          try {
+            wx.setStorageSync(LAST_BOOKING_CONTACT_KEY, {
+              userName: String(this.data.form.userName || "").trim(),
+              phone: String(this.data.form.phone || "").trim()
+            })
+          } catch (error) {}
+        }
         this.setData({
           isSubmitting: false,
           submitButtonText: "提交预约",

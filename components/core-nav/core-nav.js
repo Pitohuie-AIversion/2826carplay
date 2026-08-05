@@ -5,6 +5,10 @@ const ROUTES = {
   mine: "/pages/mine/mine"
 }
 
+function getRoutePath(page) {
+  return String((page && (page.route || page.__route__)) || "").replace(/^\//, "")
+}
+
 Component({
   properties: {
     activeKey: {
@@ -21,20 +25,50 @@ Component({
         return
       }
 
-      wx.redirectTo({
-        url,
-        fail: () => {
-          wx.reLaunch({
-            url,
-            fail: () => {
-              wx.showToast({
-                title: "页面切换失败",
-                icon: "none"
-              })
-            }
-          })
+      const targetRoute = url.replace(/^\//, "")
+      const pages = typeof getCurrentPages === "function" ? getCurrentPages() : []
+      let existingIndex = -1
+      for (let index = pages.length - 2; index >= 0; index -= 1) {
+        if (getRoutePath(pages[index]) === targetRoute) {
+          existingIndex = index
+          break
         }
-      })
+      }
+
+      const fallback = () => {
+        wx.redirectTo({
+          url,
+          fail: () => {
+            wx.reLaunch({
+              url,
+              fail: () => {
+                wx.showToast({
+                  title: "页面切换失败",
+                  icon: "none"
+                })
+              }
+            })
+          }
+        })
+      }
+
+      if (existingIndex >= 0 && typeof wx.navigateBack === "function") {
+        wx.navigateBack({
+          delta: pages.length - 1 - existingIndex,
+          fail: fallback
+        })
+        return
+      }
+
+      if (typeof wx.navigateTo === "function") {
+        wx.navigateTo({
+          url,
+          fail: fallback
+        })
+        return
+      }
+
+      fallback()
     }
   }
 })

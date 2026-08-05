@@ -188,6 +188,7 @@ function buildRecentAddedViewModel(list) {
 Page({
   data: {
     loading: false,
+    deletingId: "",
     pageAuthorized: false,
     keyword: "",
     currentStatus: "all",
@@ -459,6 +460,10 @@ Page({
       return
     }
 
+    if (this.data.deletingId) {
+      return
+    }
+
     wx.showModal({
       title: "删除车辆",
       content: `确认删除车辆 ${plateNumber || id}？仅无预约历史的车辆可删除；有预约历史请改为停用。删除后不可恢复。`,
@@ -611,6 +616,10 @@ Page({
   },
 
   deleteVehicle(id) {
+    if (this.data.deletingId) {
+      return
+    }
+
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       wx.showToast({
         title: "云能力未初始化",
@@ -618,6 +627,8 @@ Page({
       })
       return
     }
+
+    this.setData({ deletingId: id })
 
     wx.showLoading({
       title: "删除中…",
@@ -629,13 +640,11 @@ Page({
       data: { id },
       success: (res) => {
         wx.hideLoading()
+        this.setData({ deletingId: "" })
 
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
-          wx.showToast({
-          title: formatToastTitle(result && result.message, "删除失败"),
-            icon: "none"
-          })
+          this.showDeleteFailure(id, result)
           return
         }
 
@@ -648,10 +657,59 @@ Page({
       },
       fail: (error) => {
         wx.hideLoading()
-        wx.showToast({
-          title: "删除失败",
-          icon: "none"
-        })
+        this.setData({ deletingId: "" })
+        this.showDeleteFailure(id, null)
+      }
+    })
+  },
+
+  showDeleteFailure(id, result) {
+    const code = String((result && result.code) || "").trim()
+    const message = String((result && result.message) || "").trim()
+
+    if (code === "VEHICLE_HAS_BOOKINGS") {
+      wx.showModal({
+        title: "无法彻底删除",
+        content: message || "该车辆存在预约记录。为保留历史记录，可以将车辆改为停用，停用后用户端不再展示。",
+        confirmText: "改为停用",
+        cancelText: "暂不处理",
+        confirmColor: "#d46868",
+        success: (modalRes) => {
+          if (modalRes.confirm) {
+            this.retireVehicle(id)
+          }
+        }
+      })
+      return
+    }
+
+    if (code === "NOT_FOUND") {
+      wx.showModal({
+        title: "车辆已不存在",
+        content: message || "该车辆可能已被其他管理员删除，列表将自动刷新。",
+        showCancel: false,
+        confirmText: "知道了",
+        confirmColor: "#528fff",
+        success: () => this.fetchList()
+      })
+      return
+    }
+
+    const content = code === "FORBIDDEN"
+      ? "当前账号没有删除车辆的权限，请重新进入小程序刷新权限，或检查管理员配置。"
+      : message || "云端删除请求未完成，请检查网络后重试。"
+
+    wx.showModal({
+      title: code === "FORBIDDEN" ? "无删除权限" : "删除未完成",
+      content,
+      confirmText: code === "FORBIDDEN" ? "知道了" : "重试",
+      cancelText: "取消",
+      showCancel: code !== "FORBIDDEN",
+      confirmColor: code === "FORBIDDEN" ? "#528fff" : "#d46868",
+      success: (modalRes) => {
+        if (code !== "FORBIDDEN" && modalRes.confirm) {
+          this.deleteVehicle(id)
+        }
       }
     })
   },

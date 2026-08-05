@@ -181,7 +181,7 @@
         <view class="template-state-icon" aria-hidden="true"><view class="template-state-check"></view></view>
         <view>{{form.bookingStatusTemplateId ? '已填写订阅模板 ID' : '当前未启用状态订阅通知'}}</view>
       </view>
-      <view class="form-tip">模板需包含：车辆名称 thing1、预约状态 phrase2、服务说明 thing3、更新时间 time4。</view>
+      <view class="form-tip">模板需包含：车辆名称 thing1、预约状态 phrase2、服务说明 thing3、更新时间 time4。未配置时预约仍可提交，但用户收不到状态变更提醒。</view>
     </view>
   </view>
 

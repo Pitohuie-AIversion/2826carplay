@@ -2,6 +2,7 @@ const vehicleUtils = require("../../shared/vehicle")
 const { buildVehicleFormProgress } = require("../../shared/vehicleFormProgress")
 const { requirePagePermission } = require("../../shared/pageAuth")
 const { formatToastTitle } = require("../../shared/uiFeedback")
+const { clearUnsaved, markUnsaved } = require("../../shared/unsavedChanges")
 
 const VEHICLE_TYPE_LABEL_MAP = {
   sedan: "轿车",
@@ -225,6 +226,7 @@ Page({
             note: current.note || ""
           }
         })
+        clearUnsaved(this)
       },
       fail: (error) => {
         wx.showToast({
@@ -249,6 +251,7 @@ Page({
       "form.plateNumber": value,
       formProgress: buildVehicleFormProgress({ ...this.data.form, plateNumber: value })
     })
+    markUnsaved(this, "车辆资料尚未保存，确定离开吗？")
   },
 
   handleTextInput(event) {
@@ -295,6 +298,7 @@ Page({
     }
 
     this.setData(nextData)
+    markUnsaved(this, "车辆资料尚未保存，确定离开吗？")
   },
 
   handleVehicleTypeChange(event) {
@@ -308,6 +312,7 @@ Page({
       "form.vehicleType": value,
       formProgress: buildVehicleFormProgress({ ...this.data.form, vehicleType: value })
     })
+    markUnsaved(this, "车辆资料尚未保存，确定离开吗？")
   },
 
   handleStatusChange(event) {
@@ -321,6 +326,7 @@ Page({
       "form.status": value,
       formProgress: buildVehicleFormProgress({ ...this.data.form, status: value })
     })
+    markUnsaved(this, "车辆资料尚未保存，确定离开吗？")
   },
 
   handleDateChange(event) {
@@ -328,6 +334,7 @@ Page({
       "form.registerDate": event.detail.value,
       formProgress: buildVehicleFormProgress({ ...this.data.form, registerDate: event.detail.value })
     })
+    markUnsaved(this, "车辆资料尚未保存，确定离开吗？")
   },
 
   handleTransmissionChange(event) {
@@ -340,6 +347,7 @@ Page({
       transmissionLabel: label,
       "form.transmission": value
     })
+    markUnsaved(this, "车辆资料尚未保存，确定离开吗？")
   },
 
   handleFuelTypeChange(event) {
@@ -352,6 +360,7 @@ Page({
       fuelTypeLabel: label,
       "form.fuelType": value
     })
+    markUnsaved(this, "车辆资料尚未保存，确定离开吗？")
   },
 
   handleManageImages() {
@@ -473,6 +482,7 @@ Page({
         const result = res && res.result ? res.result : null
 
         if (result && result.ok) {
+          clearUnsaved(this)
           wx.showToast({
             title: "保存成功",
             icon: "success",

@@ -35,6 +35,7 @@ function createPage(definition) {
 
 describe("pages/favorites 收藏车辆视图", () => {
   afterEach(() => {
+    jest.useRealTimers()
     delete global.Page
     delete global.wx
   })
@@ -193,5 +194,37 @@ describe("pages/favorites 收藏车辆视图", () => {
       available: 0
     })
     expect(page.data.removingId).toBe("")
+    page.onUnload()
+  })
+
+  test("取消收藏后五秒内可以撤销并恢复原位置", () => {
+    jest.useFakeTimers()
+    global.wx = {
+      showModal: jest.fn(({ success }) => success({ confirm: true })),
+      showToast: jest.fn(),
+      cloud: {
+        callFunction: jest.fn(({ success, complete }) => {
+          success({ result: { ok: true } })
+          complete()
+        })
+      }
+    }
+    const page = createPage(loadPageDefinition())
+    page.applyFavoriteList([
+      { id: "first", name: "第一辆", status: "available" },
+      { id: "second", name: "第二辆", status: "available" }
+    ])
+
+    page.handleRemove({ currentTarget: { dataset: { id: "first" } } })
+    expect(page.data.undoFavorite.car.id).toBe("first")
+    expect(page.data.list.map((item) => item.id)).toEqual(["second"])
+
+    page.handleUndoRemove()
+
+    expect(wx.cloud.callFunction).toHaveBeenLastCalledWith(expect.objectContaining({
+      data: { vehicleId: "first", favorited: true }
+    }))
+    expect(page.data.list.map((item) => item.id)).toEqual(["first", "second"])
+    expect(page.data.undoFavorite).toBeNull()
   })
 })

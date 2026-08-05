@@ -1,5 +1,6 @@
 const { requirePagePermission } = require("../../shared/pageAuth")
 const { formatToastTitle } = require("../../shared/uiFeedback")
+const { clearUnsaved, markUnsaved } = require("../../shared/unsavedChanges")
 
 const PERMISSION_OPTIONS = [
   {
@@ -197,6 +198,7 @@ Page({
     this.setData({
       formOpenid: String((event.detail && event.detail.value) || "").trim()
     })
+    markUnsaved(this, "权限修改尚未保存，确定离开吗？")
   },
 
   handleTogglePermission(event) {
@@ -211,6 +213,7 @@ Page({
       selectedPermissions: nextSelected,
       permissionOptions: buildPermissionOptions(nextSelected)
     })
+    markUnsaved(this, "权限修改尚未保存，确定离开吗？")
   },
 
   handleEditRole(event) {
@@ -234,6 +237,7 @@ Page({
       selectedPermissions: permissions,
       permissionOptions: buildPermissionOptions(permissions)
     })
+    clearUnsaved(this)
   },
 
   handleResetForm() {
@@ -243,6 +247,7 @@ Page({
       selectedPermissions: [],
       permissionOptions: buildPermissionOptions([])
     })
+    clearUnsaved(this)
   },
 
   handleSubmit() {

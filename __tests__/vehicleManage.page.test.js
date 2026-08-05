@@ -39,7 +39,10 @@ describe("pages/vehicle-manage 车辆管理列表体验", () => {
       cloud: {
         callFunction: jest.fn()
       },
-      showToast: jest.fn()
+      showToast: jest.fn(),
+      showModal: jest.fn(),
+      showLoading: jest.fn(),
+      hideLoading: jest.fn()
     }
   })
 
@@ -181,5 +184,50 @@ describe("pages/vehicle-manage 车辆管理列表体验", () => {
     expect(wxmlSource).not.toContain('bindtap="handleReset">重置筛选</button>')
     expect(wxssSource).toContain(".result-limit-tip")
     expect(wxssSource).toContain(".load-complete-native-icon")
+  })
+
+  test("存在预约历史时完整说明原因并允许一键停用", () => {
+    wx.cloud.callFunction.mockImplementation(({ name, success }) => {
+      if (name === "vehicleDelete") {
+        success({
+          result: {
+            ok: false,
+            code: "VEHICLE_HAS_BOOKINGS",
+            message: "车辆存在预约记录，请改为停用车辆"
+          }
+        })
+      }
+    })
+    wx.showModal.mockImplementation(({ success }) => success({ confirm: true }))
+
+    const page = createPage(loadPageDefinition())
+    page.retireVehicle = jest.fn()
+    page.deleteVehicle("car_1")
+
+    expect(wx.showModal).toHaveBeenCalledWith(expect.objectContaining({
+      title: "无法彻底删除",
+      content: "车辆存在预约记录，请改为停用车辆",
+      confirmText: "改为停用"
+    }))
+    expect(page.retireVehicle).toHaveBeenCalledWith("car_1")
+    expect(page.data.deletingId).toBe("")
+  })
+
+  test("云调用失败时提供重试并阻止重复删除请求", () => {
+    wx.cloud.callFunction.mockImplementation(({ fail }) => fail({ errMsg: "network error" }))
+    wx.showModal.mockImplementation(({ success }) => success({ confirm: false }))
+
+    const page = createPage(loadPageDefinition())
+    page.deleteVehicle("car_1")
+
+    expect(wx.showModal).toHaveBeenCalledWith(expect.objectContaining({
+      title: "删除未完成",
+      confirmText: "重试"
+    }))
+    expect(page.data.deletingId).toBe("")
+
+    page.data.deletingId = "car_busy"
+    page.deleteVehicle("car_2")
+    expect(wx.cloud.callFunction).toHaveBeenCalledTimes(1)
   })
 })

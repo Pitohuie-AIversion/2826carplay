@@ -178,6 +178,37 @@ describe("cloudfunctions/garageVehicleList integration", () => {
     expect(mocks.vehiclesOrderedSkip).toHaveBeenCalledWith(100)
   })
 
+  test("服务端搜索覆盖未加载分页并组合分类与可预约筛选", async () => {
+    const vehiclesData = Array.from({ length: 35 }, (_, index) => ({
+      _id: `car_${index}`,
+      plateNumber: `浙A${String(index).padStart(5, "0")}`,
+      vehicleType: index >= 25 ? "sports" : "sedan",
+      brandModel: index >= 25 ? `Ferrari Roma ${index}` : `Common Vehicle ${index}`,
+      status: index === 26 ? "active" : "idle",
+      updatedAt: new Date(Date.UTC(2026, 0, 1, 0, 0, index)).toISOString()
+    }))
+    const mocks = createMockDb({ vehiclesData })
+    const garageVehicleList = await loadGarageVehicleListWith({ mockDb: mocks.db })
+
+    const res = await garageVehicleList.main({
+      page: 0,
+      pageSize: 20,
+      keyword: "ferrari",
+      category: "supercar",
+      availableOnly: true
+    })
+
+    expect(res.ok).toBe(true)
+    expect(res.searchedTotal).toBe(10)
+    expect(res.categoryTotal).toBe(10)
+    expect(res.availableCount).toBe(9)
+    expect(res.total).toBe(9)
+    expect(res.list).toHaveLength(9)
+    expect(res.list.some((item) => item.id === "car_25")).toBe(true)
+    expect(res.list.some((item) => item.id === "car_26")).toBe(false)
+    expect(res.categoryCounts).toMatchObject({ all: 10, supercar: 10 })
+  })
+
   test("缺少 updatedAt 索引时首页自动降级读取", async () => {
     const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {})
     const mocks = createMockDb({

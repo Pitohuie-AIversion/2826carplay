@@ -48,6 +48,15 @@ const STATUS_MAP = {
   }
 }
 
+const CATEGORY_LABEL_MAP = {
+  luxury_sedan: "豪华轿车",
+  city_suv: "城市SUV",
+  offroad: "硬派越野",
+  supercar: "超级跑车",
+  commuter_ev: "代步电车",
+  pickup: "皮卡"
+}
+
 const PERFORMANCE_BRANDS = ["PORSCHE", "FERRARI", "LAMBORGHINI", "MCLAREN", "LOTUS", "ASTON"]
 const OFFROAD_BRANDS = [
   "JEEP",
@@ -273,6 +282,42 @@ function mapVehicle(vehicle) {
   }
 }
 
+function normalizeSearchKeyword(value) {
+  return String(value || "").trim().toLowerCase().slice(0, 50)
+}
+
+function matchesVehicleSearch(vehicle, keyword) {
+  const query = normalizeSearchKeyword(keyword)
+  if (!query) {
+    return true
+  }
+
+  const source = vehicle && typeof vehicle === "object" ? vehicle : {}
+  const tags = Array.isArray(source.tags) ? source.tags : []
+  return [
+    source.name,
+    source.nickname,
+    source.brand,
+    source.category,
+    CATEGORY_LABEL_MAP[source.category],
+    ...tags
+  ]
+    .map((value) => String(value || "").toLowerCase())
+    .join(" ")
+    .includes(query)
+}
+
+function buildCategoryCounts(list) {
+  const counts = { all: list.length }
+  list.forEach((item) => {
+    const category = String((item && item.category) || "").trim()
+    if (category) {
+      counts[category] = (counts[category] || 0) + 1
+    }
+  })
+  return counts
+}
+
 async function readVehiclesByMode(ordered) {
   const list = []
 
@@ -322,11 +367,23 @@ exports.main = async (event) => {
     const pageSizeRaw = Number(payload.pageSize)
     const page = Number.isFinite(pageRaw) && pageRaw > 0 ? Math.floor(pageRaw) : 0
     const pageSize = Number.isFinite(pageSizeRaw) && pageSizeRaw > 0 ? Math.min(Math.max(Math.floor(pageSizeRaw), 1), 100) : 100
+    const keyword = normalizeSearchKeyword(payload.keyword)
+    const category = String(payload.category || "all").trim().slice(0, 50) || "all"
+    const availableOnly = payload.availableOnly === true
     const vehicleRecords = await readVehicles()
-    const fullList = vehicleRecords.list
+    const publicList = vehicleRecords.list
       .filter((item) => item && item.status !== "retired")
       .map(mapVehicle)
       .sort((prev, next) => next.sort - prev.sort)
+    const searchedList = publicList.filter((item) => matchesVehicleSearch(item, keyword))
+    const categoryCounts = buildCategoryCounts(searchedList)
+    const categoryList = category === "all"
+      ? searchedList
+      : searchedList.filter((item) => item.category === category)
+    const availableCount = categoryList.filter((item) => item.status === "available").length
+    const fullList = availableOnly
+      ? categoryList.filter((item) => item.status === "available")
+      : categoryList
     const offset = page * pageSize
     const list = fullList.slice(offset, offset + pageSize)
 
@@ -335,6 +392,13 @@ exports.main = async (event) => {
       page,
       pageSize,
       total: fullList.length,
+      searchedTotal: searchedList.length,
+      categoryTotal: categoryList.length,
+      availableCount,
+      categoryCounts,
+      keyword,
+      category,
+      availableOnly,
       truncated: vehicleRecords.truncated,
       hasMore: offset + pageSize < fullList.length,
       list

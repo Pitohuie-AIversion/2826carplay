@@ -24,6 +24,7 @@ describe("components/core-nav 核心导航", () => {
   afterEach(() => {
     delete global.Component
     delete global.wx
+    delete global.getCurrentPages
   })
 
   test.each([
@@ -67,6 +68,44 @@ describe("components/core-nav 核心导航", () => {
       }
     })
 
+    expect(wx.redirectTo).not.toHaveBeenCalled()
+  })
+
+  test("目标核心页已在页面栈中时返回原页面以保留状态", () => {
+    global.getCurrentPages = jest.fn(() => [
+      { route: "pages/garage/garage" },
+      { route: "pages/favorites/favorites" },
+      { route: "pages/bookings/bookings" }
+    ])
+    global.wx = {
+      navigateBack: jest.fn(),
+      navigateTo: jest.fn(),
+      redirectTo: jest.fn(),
+      reLaunch: jest.fn()
+    }
+    const component = createComponent(loadComponentDefinition(), "bookings")
+
+    component.handleNavigate({ currentTarget: { dataset: { key: "garage" } } })
+
+    expect(wx.navigateBack).toHaveBeenCalledWith(expect.objectContaining({ delta: 2 }))
+    expect(wx.navigateTo).not.toHaveBeenCalled()
+  })
+
+  test("目标页不在页面栈时使用 navigateTo 保留当前页状态", () => {
+    global.getCurrentPages = jest.fn(() => [{ route: "pages/garage/garage" }])
+    global.wx = {
+      navigateBack: jest.fn(),
+      navigateTo: jest.fn(),
+      redirectTo: jest.fn(),
+      reLaunch: jest.fn()
+    }
+    const component = createComponent(loadComponentDefinition(), "garage")
+
+    component.handleNavigate({ currentTarget: { dataset: { key: "favorites" } } })
+
+    expect(wx.navigateTo).toHaveBeenCalledWith(expect.objectContaining({
+      url: "/pages/favorites/favorites"
+    }))
     expect(wx.redirectTo).not.toHaveBeenCalled()
   })
 

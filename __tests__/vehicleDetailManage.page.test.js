@@ -767,4 +767,93 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
       icon: "none"
     })
   })
+
+  test("多图中单张失败时保留成功项并仅暴露失败项重试", () => {
+    let definition = null
+    let index = 0
+    global.Page = jest.fn((input) => {
+      definition = input
+    })
+    global.wx = {
+      cloud: {
+        uploadFile: jest.fn(({ success, fail }) => {
+          index += 1
+          if (index === 2) {
+            fail({ errMsg: "uploadFile:fail invalid image" })
+            return null
+          }
+          success({ fileID: `cloud://env/success_${index}.jpg` })
+          return null
+        }),
+        deleteFile: jest.fn()
+      },
+      hideLoading: jest.fn(),
+      showToast: jest.fn()
+    }
+    jest.resetModules()
+    require("../pages/vehicle-detail-manage/vehicle-detail-manage")
+    const page = {
+      ...definition,
+      data: { ...definition.data, id: "car_1" },
+      persistImageChange: jest.fn()
+    }
+    page.setData = jest.fn((patch) => {
+      page.data = { ...page.data, ...patch }
+    })
+
+    page.uploadSelectedFiles(["/tmp/one.jpg", "/tmp/bad.jpg", "/tmp/three.jpg"], 0)
+
+    expect(page.persistImageChange).toHaveBeenCalledWith(
+      {
+        action: "add",
+        fileIds: ["cloud://env/success_1.jpg", "cloud://env/success_3.jpg"]
+      },
+      ["cloud://env/success_1.jpg", "cloud://env/success_3.jpg"],
+      1,
+      expect.objectContaining({
+        failedUploadPaths: ["/tmp/bad.jpg"],
+        uploadedCount: 2
+      })
+    )
+    expect(page.data.failedUploadPaths).toEqual(["/tmp/bad.jpg"])
+    expect(page.data.uploadItems.map((item) => item.status)).toEqual(["success", "failed", "success"])
+    expect(wx.cloud.deleteFile).not.toHaveBeenCalled()
+  })
+
+  test("上传中可取消并保留未完成图片用于重试", () => {
+    let definition = null
+    let failUpload
+    const abort = jest.fn(() => failUpload({ errMsg: "uploadFile:fail abort" }))
+    global.Page = jest.fn((input) => {
+      definition = input
+    })
+    global.wx = {
+      cloud: {
+        uploadFile: jest.fn((options) => {
+          failUpload = options.fail
+          return { abort }
+        }),
+        deleteFile: jest.fn()
+      },
+      hideLoading: jest.fn(),
+      showToast: jest.fn()
+    }
+    jest.resetModules()
+    require("../pages/vehicle-detail-manage/vehicle-detail-manage")
+    const page = {
+      ...definition,
+      data: { ...definition.data, id: "car_1" }
+    }
+    page.setData = jest.fn((patch) => {
+      page.data = { ...page.data, ...patch }
+    })
+
+    page.uploadSelectedFiles(["/tmp/one.jpg", "/tmp/two.jpg"], 0)
+    page.handleCancelUpload()
+
+    expect(abort).toHaveBeenCalled()
+    expect(page.data.uploading).toBe(false)
+    expect(page.data.failedUploadPaths).toEqual(["/tmp/one.jpg", "/tmp/two.jpg"])
+    expect(page.data.uploadProgressText).toContain("已取消")
+  })
 })

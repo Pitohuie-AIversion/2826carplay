@@ -504,7 +504,7 @@ describe("用户主流程原生图标", () => {
       })
     })
 
-    expect(confirmationCount).toBe(26)
+    expect(confirmationCount).toBe(28)
   })
 
   test("原生操作菜单统一使用品牌色与顶部说明", () => {
@@ -590,7 +590,7 @@ describe("用户主流程原生图标", () => {
       })
     })
 
-    expect(infoModalCount).toBe(19)
+    expect(infoModalCount).toBe(20)
   })
 
   test("动态轻提示保留短消息并为长消息使用业务回退", () => {
@@ -673,10 +673,10 @@ describe("用户主流程原生图标", () => {
     const componentScripts = ["components/core-nav/core-nav.js"]
     const scripts = appConfig.pages.map((route) => `${route}.js`).concat(componentScripts)
     const expectedCounts = {
-      navigateTo: 43,
+      navigateTo: 44,
       redirectTo: 19,
       reLaunch: 17,
-      navigateBack: 8,
+      navigateBack: 9,
       previewImage: 2
     }
     const actualCounts = {}
@@ -729,7 +729,8 @@ describe("用户主流程原生图标", () => {
       })
     })
 
-    expect(loadingCount).toBe(15)
+    expect(loadingCount).toBe(14)
+    expect(read("pages/vehicle-detail-manage/vehicle-detail-manage.wxml")).toContain("upload-progress-panel")
   })
 
   test("车辆详情使用放大预览、收藏与转化操作图标", () => {

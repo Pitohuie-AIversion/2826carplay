@@ -245,6 +245,9 @@ Page({
     id: "",
     loading: true,
     uploading: false,
+    uploadItems: [],
+    uploadProgressText: "",
+    failedUploadPaths: [],
     updatingStatus: false,
     pageAuthorized: false,
     statusOpOptions: STATUS_OP_OPTIONS,
@@ -736,30 +739,102 @@ Page({
       return
     }
 
+    const selectedPaths = (Array.isArray(filePaths) ? filePaths : []).filter(Boolean)
+    if (!selectedPaths.length) {
+      return
+    }
+
     const uploadedFileIds = []
+    const failedFiles = []
     const vehicleId = this.data.id
+    this._uploadCancelled = false
+    const uploadItems = selectedPaths.map((filePath, index) => ({
+      id: `${index}-${filePath}`,
+      filePath,
+      name: String(filePath).split(/[\\/]/).pop() || `图片 ${index + 1}`,
+      status: "pending",
+      statusText: "等待上传"
+    }))
 
     this.setData({
-      uploading: true
+      uploading: true,
+      uploadItems,
+      uploadProgressText: `准备上传 0 / ${selectedPaths.length}`,
+      failedUploadPaths: []
     })
 
-    wx.showLoading({
-      title: "上传中…",
-      mask: true
-    })
+    const updateItem = (index, status, statusText) => {
+      const nextItems = this.data.uploadItems.slice()
+      nextItems[index] = {
+        ...nextItems[index],
+        status,
+        statusText
+      }
+      this.setData({
+        uploadItems: nextItems,
+        uploadProgressText: `已处理 ${uploadedFileIds.length + failedFiles.length} / ${selectedPaths.length}，成功 ${uploadedFileIds.length} 张`
+      })
+    }
 
-    const uploadNext = (index, retryCount = 0) => {
-      if (index >= filePaths.length) {
-        this.persistImageChange({
-          action: "add",
-          fileIds: uploadedFileIds
-        }, uploadedFileIds, skippedCount)
+    const finishBatch = () => {
+      this._activeUploadTask = null
+      const failedUploadPaths = failedFiles.map((item) => item.filePath)
+      if (uploadedFileIds.length) {
+        this.setData({
+          uploadProgressText: `正在保存 ${uploadedFileIds.length} 张图片…`,
+          failedUploadPaths
+        })
+        const totalSkipped = Number(skippedCount || 0) + failedUploadPaths.length
+        const summary = failedUploadPaths.length
+          ? { failedUploadPaths, allFilePaths: selectedPaths.slice(), uploadedCount: uploadedFileIds.length }
+          : null
+        const args = [
+          { action: "add", fileIds: uploadedFileIds },
+          uploadedFileIds,
+          totalSkipped
+        ]
+        if (summary) {
+          args.push(summary)
+        }
+        this.persistImageChange(...args)
         return
       }
 
-      const filePath = filePaths[index]
+      wx.hideLoading()
+      this.setData({
+        uploading: false,
+        failedUploadPaths,
+        uploadProgressText: this._uploadCancelled ? "上传已取消，可重试未完成图片" : "本次图片均未上传成功"
+      })
+      const firstError = failedFiles[0] && failedFiles[0].error
+      wx.showToast({
+        title: this._uploadCancelled ? "已取消上传" : getCloudUploadErrorTitle(firstError),
+        icon: "none"
+      })
+    }
+
+    const uploadNext = (index, retryCount = 0) => {
+      if (index >= selectedPaths.length) {
+        finishBatch()
+        return
+      }
+
+      if (this._uploadCancelled) {
+        for (let nextIndex = index; nextIndex < selectedPaths.length; nextIndex += 1) {
+          failedFiles.push({
+            filePath: selectedPaths[nextIndex],
+            error: { errMsg: "uploadFile:fail cancel" }
+          })
+          updateItem(nextIndex, "cancelled", "已取消")
+        }
+        finishBatch()
+        return
+      }
+
+      const filePath = selectedPaths[index]
       const extension = getFileExtension(filePath)
       const cloudPath = `vehicle-images/${vehicleId}/${Date.now()}_${index}.${extension}`
+      updateItem(index, "uploading", retryCount ? "正在重试" : "上传中")
 
       let uploadSettled = false
       let uploadTimeoutId = null
@@ -776,19 +851,13 @@ Page({
       }
       const handleUploadFailure = (error) => {
         settleUpload(() => {
-          if (shouldRetryCloudUpload(error, retryCount)) {
+          if (!this._uploadCancelled && shouldRetryCloudUpload(error, retryCount)) {
             uploadNext(index, retryCount + 1)
             return
           }
-          wx.hideLoading()
-          this.setData({
-            uploading: false
-          })
-          deleteCloudFilesDirectBestEffort(uploadedFileIds)
-          wx.showToast({
-            title: getCloudUploadErrorTitle(error),
-            icon: "none"
-          })
+          failedFiles.push({ filePath, error })
+          updateItem(index, this._uploadCancelled ? "cancelled" : "failed", this._uploadCancelled ? "已取消" : "上传失败")
+          uploadNext(index + 1)
         })
       }
 
@@ -797,7 +866,7 @@ Page({
       }, CLOUD_UPLOAD_TIMEOUT_MS)
 
       try {
-        wx.cloud.uploadFile({
+        this._activeUploadTask = wx.cloud.uploadFile({
           cloudPath,
           filePath,
           success: (uploadRes) => {
@@ -807,6 +876,7 @@ Page({
             }
             settleUpload(() => {
               uploadedFileIds.push(uploadRes.fileID)
+              updateItem(index, "success", "上传成功")
               uploadNext(index + 1)
             })
           },
@@ -818,6 +888,29 @@ Page({
     }
 
     uploadNext(0)
+  },
+
+  handleCancelUpload() {
+    if (!this.data.uploading) {
+      return
+    }
+    this._uploadCancelled = true
+    this.setData({
+      uploadProgressText: "正在取消上传…"
+    })
+    if (this._activeUploadTask && typeof this._activeUploadTask.abort === "function") {
+      try {
+        this._activeUploadTask.abort()
+      } catch (error) {}
+    }
+  },
+
+  handleRetryFailedUploads() {
+    const filePaths = Array.isArray(this.data.failedUploadPaths) ? this.data.failedUploadPaths.slice() : []
+    if (!filePaths.length || this.data.uploading) {
+      return
+    }
+    this.uploadSelectedFiles(filePaths, 0)
   },
 
   handleSetCover(event) {
@@ -856,11 +949,20 @@ Page({
     })
   },
 
-  persistImageChange(payload, cleanupFileIds, skippedCount) {
+  persistImageChange(payload, cleanupFileIds, skippedCount, uploadSummary) {
+    const getRetryUploadItems = () => payload.action === "add"
+      ? (Array.isArray(this.data.uploadItems) ? this.data.uploadItems : []).map((item) => ({
+          ...item,
+          status: "failed",
+          statusText: "保存失败"
+        }))
+      : this.data.uploadItems
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       wx.hideLoading()
       this.setData({
-        uploading: false
+        uploading: false,
+        uploadItems: getRetryUploadItems(),
+        failedUploadPaths: uploadSummary && uploadSummary.allFilePaths ? uploadSummary.allFilePaths : this.data.failedUploadPaths
       })
       deleteCloudFilesDirectBestEffort(cleanupFileIds)
       wx.showToast({
@@ -870,7 +972,7 @@ Page({
       return
     }
 
-    const showLoading = payload.action === "add" || payload.action === "remove" || payload.action === "setCover"
+    const showLoading = payload.action === "remove" || payload.action === "setCover"
     if (showLoading) {
       wx.showLoading({
         title: payload.action === "setCover" ? "设置中…" : payload.action === "remove" ? "处理中…" : "上传中…",
@@ -895,7 +997,10 @@ Page({
       finish(() => {
         wx.hideLoading()
         this.setData({
-          uploading: false
+          uploading: false,
+          uploadItems: getRetryUploadItems(),
+          failedUploadPaths: uploadSummary && uploadSummary.allFilePaths ? uploadSummary.allFilePaths : this.data.failedUploadPaths,
+          uploadProgressText: payload.action === "add" ? "保存失败，可重试本次图片" : this.data.uploadProgressText
         })
         requestUploadedFileCleanup(this.data.id, cleanupFileIds)
         wx.showToast({
@@ -919,7 +1024,10 @@ Page({
           finish(() => {
             wx.hideLoading()
             this.setData({
-              uploading: false
+              uploading: false,
+              uploadItems: getRetryUploadItems(),
+              failedUploadPaths: uploadSummary && uploadSummary.allFilePaths ? uploadSummary.allFilePaths : this.data.failedUploadPaths,
+              uploadProgressText: payload.action === "add" ? "保存失败，可重试本次图片" : this.data.uploadProgressText
             })
             requestUploadedFileCleanup(this.data.id, cleanupFileIds)
             wx.showToast({
@@ -935,6 +1043,12 @@ Page({
           const currentDetail = this.data.detail || {}
           this.setData({
             uploading: false,
+            failedUploadPaths: uploadSummary && uploadSummary.failedUploadPaths ? uploadSummary.failedUploadPaths : [],
+            uploadProgressText: payload.action === "add"
+              ? uploadSummary && uploadSummary.failedUploadPaths && uploadSummary.failedUploadPaths.length
+                ? `已上传 ${uploadSummary.uploadedCount} 张，${uploadSummary.failedUploadPaths.length} 张可重试`
+                : "图片上传完成"
+              : this.data.uploadProgressText,
             detail: formatDetail({
               ...currentDetail,
               imageList: result.imageList,
@@ -944,6 +1058,9 @@ Page({
           })
 
           const partialUpload = payload.action === "add" && Number(skippedCount) > 0
+          const failedCount = uploadSummary && Array.isArray(uploadSummary.failedUploadPaths)
+            ? uploadSummary.failedUploadPaths.length
+            : 0
           wx.showToast({
             title:
               payload.action === "setCover"
@@ -951,7 +1068,9 @@ Page({
                 : payload.action === "remove"
                   ? "图片已移除"
                   : partialUpload
-                    ? `已上传，跳过 ${skippedCount} 张`
+                    ? failedCount
+                      ? `成功 ${uploadSummary.uploadedCount} 张，失败 ${failedCount} 张`
+                      : `已上传，跳过 ${skippedCount} 张`
                     : "图片已上传",
             icon: partialUpload ? "none" : "success",
             duration: partialUpload ? 2200 : 1500

@@ -154,5 +154,9 @@
       <view class="favorite-action-content"><view class="favorite-action-native-icon favorite-garage-native-icon" aria-hidden="true"><view class="favorite-garage-door"></view></view><text>浏览极境车库</text></view>
     </button>
   </view>
+  <view wx:if="{{undoFavorite}}" class="favorite-undo-bar" aria-live="polite">
+    <text>已取消收藏“{{undoFavorite.car.name || '车辆'}}”</text>
+    <button class="favorite-undo-button" loading="{{undoingFavorite}}" disabled="{{undoingFavorite}}" bindtap="handleUndoRemove">撤销</button>
+  </view>
   <core-nav active-key="favorites" />
 </view>

@@ -123,6 +123,17 @@ function getSafeErrorCode(error) {
   return String((error && (error.code || error.errCode)) || "").trim().slice(0, 64)
 }
 
+function isDocumentNotFoundError(error) {
+  const code = getSafeErrorCode(error)
+  const message = String(
+    error && (error.message || error.errMsg) ? error.message || error.errMsg : error || ""
+  )
+  return (
+    /DOCUMENT_NOT_FOUND|DATABASE_DOCUMENT_NOT_EXIST|OBJECT_NOT_EXIST/i.test(code) ||
+    /document.*(?:not\s+found|not\s+exist)|文档不存在/i.test(message)
+  )
+}
+
 async function deleteFilesBestEffort(fileList, context) {
   const list = normalizeStringArray(fileList)
   if (!list.length) {
@@ -218,11 +229,19 @@ exports.main = async (event) => {
       })
     }
 
-    const currentRes = await db
-      .collection("vehicles")
-      .doc(id)
-      .field(VEHICLE_DELETE_FIELDS)
-      .get()
+    let currentRes = null
+    try {
+      currentRes = await db
+        .collection("vehicles")
+        .doc(id)
+        .field(VEHICLE_DELETE_FIELDS)
+        .get()
+    } catch (error) {
+      if (isDocumentNotFoundError(error)) {
+        return createError("NOT_FOUND", "车辆不存在或已被删除")
+      }
+      throw error
+    }
     const current = currentRes && currentRes.data ? currentRes.data : null
     if (!current) {
       return createError("NOT_FOUND", "车辆不存在")
@@ -239,7 +258,11 @@ exports.main = async (event) => {
       return createError("VEHICLE_HAS_BOOKINGS", "车辆存在预约记录，请改为停用车辆")
     }
 
-    await db.collection("vehicles").doc(id).remove()
+    const removeRes = await db.collection("vehicles").doc(id).remove()
+    const removed = Number(removeRes && removeRes.stats && removeRes.stats.removed) || 0
+    if (removed < 1) {
+      return createError("DELETE_CONFLICT", "车辆未能删除，可能已被其他管理员处理，请刷新后重试")
+    }
 
     const coverImage = String((current && current.coverImage) || "").trim()
     const fileList = normalizeStringArray(current && current.imageList).concat(coverImage ? [coverImage] : [])

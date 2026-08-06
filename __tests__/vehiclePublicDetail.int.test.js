@@ -115,6 +115,7 @@ describe("cloudfunctions/vehiclePublicDetail integration", () => {
 
     expect(res.ok).toBe(true)
     expect(res.car.description).toBe("Legacy Car支持到店咨询与预约服务。")
+    expect(res.car.seatsText).toBe("—")
     expect(JSON.stringify(res.car)).not.toContain("内部维修记录不得公开")
   })
 

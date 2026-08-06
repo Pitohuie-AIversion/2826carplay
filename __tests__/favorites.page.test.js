@@ -138,6 +138,76 @@ describe("pages/favorites 收藏车辆视图", () => {
     expect(wxssSource).toContain(".remove-button-pressed")
   })
 
+  test("收藏列表无响应时退出骨架屏并结束下拉刷新", () => {
+    jest.useFakeTimers()
+    let lateSuccess
+    const done = jest.fn()
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(({ success }) => {
+          lateSuccess = success
+        })
+      }
+    }
+    const page = createPage(loadPageDefinition())
+
+    page.fetchList({ done })
+    expect(page.data.loading).toBe(true)
+
+    jest.advanceTimersByTime(15 * 1000)
+    expect(page.data.initialLoading).toBe(false)
+    expect(page.data.loading).toBe(false)
+    expect(page.data.loadError).toBe("收藏列表加载超时，请检查网络后重试")
+    expect(done).toHaveBeenCalledTimes(1)
+
+    lateSuccess({ result: { ok: true, list: [{ id: "late-car" }], hasMore: false } })
+    expect(page.data.list).toEqual([])
+  })
+
+  test("收藏列表刷新后忽略旧分页请求的迟到结果", () => {
+    const requests = []
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn((options) => {
+          requests.push(options)
+        })
+      }
+    }
+    const page = createPage(loadPageDefinition())
+    page.data.list = [{ id: "existing-car", status: "available" }]
+    page.data.visibleList = page.data.list.slice()
+    page.data.page = 0
+    page.data.hasMore = true
+
+    page.fetchList({ append: true })
+    page.fetchList()
+    requests[1].success({
+      result: { ok: true, page: 0, hasMore: false, list: [{ id: "fresh-car", status: "idle" }] }
+    })
+    requests[0].success({
+      result: { ok: true, page: 1, hasMore: false, list: [{ id: "stale-car", status: "idle" }] }
+    })
+
+    expect(page.data.list.map((item) => item.id)).toEqual(["fresh-car"])
+    expect(page.data.loading).toBe(false)
+  })
+
+  test("收藏列表调用同步异常时安全进入重试状态", () => {
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(() => {
+          throw new Error("cloud sdk crashed")
+        })
+      }
+    }
+    const page = createPage(loadPageDefinition())
+
+    expect(() => page.fetchList()).not.toThrow()
+    expect(page.data.initialLoading).toBe(false)
+    expect(page.data.loading).toBe(false)
+    expect(page.data.loadError).toBe("cloud sdk crashed")
+  })
+
   test("取消收藏先确认并同步更新概览", () => {
     global.wx = {
       showModal: jest.fn(({ success }) => success({ confirm: true })),
@@ -226,5 +296,96 @@ describe("pages/favorites 收藏车辆视图", () => {
     }))
     expect(page.data.list.map((item) => item.id)).toEqual(["first", "second"])
     expect(page.data.undoFavorite).toBeNull()
+  })
+
+  test("取消收藏无响应时恢复按钮并忽略迟到成功", () => {
+    jest.useFakeTimers()
+    let lateSuccess
+    global.wx = {
+      showToast: jest.fn(),
+      cloud: {
+        callFunction: jest.fn(({ success }) => {
+          lateSuccess = success
+        })
+      }
+    }
+    const page = createPage(loadPageDefinition())
+    page.applyFavoriteList([{ id: "favorite-timeout", name: "超时车辆", status: "available" }])
+
+    page.removeFavorite("favorite-timeout")
+    expect(page.data.removingId).toBe("favorite-timeout")
+
+    jest.advanceTimersByTime(12 * 1000)
+    expect(page.data.removingId).toBe("")
+    expect(page.data.list.map((item) => item.id)).toEqual(["favorite-timeout"])
+    expect(wx.showToast).toHaveBeenCalledWith({ title: "取消收藏超时，请重试", icon: "none" })
+
+    lateSuccess({ result: { ok: true } })
+    expect(page.data.list.map((item) => item.id)).toEqual(["favorite-timeout"])
+    expect(page.data.undoFavorite).toBeNull()
+  })
+
+  test("撤销收藏无响应时保留撤销入口并忽略迟到成功", () => {
+    jest.useFakeTimers()
+    let lateSuccess
+    global.wx = {
+      showToast: jest.fn(),
+      cloud: {
+        callFunction: jest.fn(({ success }) => {
+          lateSuccess = success
+        })
+      }
+    }
+    const page = createPage(loadPageDefinition())
+    page.data.undoFavorite = {
+      car: { id: "undo-timeout", name: "待恢复车辆", status: "available" },
+      index: 0
+    }
+
+    page.handleUndoRemove()
+    expect(page.data.undoingFavorite).toBe(true)
+
+    jest.advanceTimersByTime(12 * 1000)
+    expect(page.data.undoingFavorite).toBe(false)
+    expect(page.data.undoFavorite.car.id).toBe("undo-timeout")
+    expect(wx.showToast).toHaveBeenCalledWith({ title: "撤销超时，请重试", icon: "none" })
+
+    lateSuccess({ result: { ok: true } })
+    expect(page.data.list).toEqual([])
+    expect(page.data.undoFavorite.car.id).toBe("undo-timeout")
+  })
+
+  test("收藏变更期间拒绝下拉刷新避免旧列表覆盖", () => {
+    global.wx = {
+      stopPullDownRefresh: jest.fn(),
+      cloud: {
+        callFunction: jest.fn()
+      }
+    }
+    const page = createPage(loadPageDefinition())
+    page.data.removingId = "vehicle-mutating"
+
+    page.onPullDownRefresh()
+
+    expect(wx.stopPullDownRefresh).toHaveBeenCalledTimes(1)
+    expect(wx.cloud.callFunction).not.toHaveBeenCalled()
+  })
+
+  test("取消收藏同步异常时安全恢复可重试状态", () => {
+    global.wx = {
+      showToast: jest.fn(),
+      cloud: {
+        callFunction: jest.fn(() => {
+          throw new Error("cloud sdk crashed")
+        })
+      }
+    }
+    const page = createPage(loadPageDefinition())
+    page.applyFavoriteList([{ id: "favorite-error", status: "available" }])
+
+    expect(() => page.removeFavorite("favorite-error")).not.toThrow()
+    expect(page.data.removingId).toBe("")
+    expect(page.data.list.map((item) => item.id)).toEqual(["favorite-error"])
+    expect(wx.showToast).toHaveBeenCalledWith({ title: "取消收藏失败", icon: "none" })
   })
 })

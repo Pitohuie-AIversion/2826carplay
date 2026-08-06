@@ -367,10 +367,15 @@ Page({
       clearTimeout(this._carsLoadTimer)
       this._carsLoadTimer = null
     }
-    if (this._searchDebounceTimer) {
-      clearTimeout(this._searchDebounceTimer)
-      this._searchDebounceTimer = null
+    this.clearSearchDebounce()
+  },
+
+  clearSearchDebounce() {
+    if (!this._searchDebounceTimer) {
+      return
     }
+    clearTimeout(this._searchDebounceTimer)
+    this._searchDebounceTimer = null
   },
 
   setCarsLoadError(message) {
@@ -465,9 +470,7 @@ Page({
     if (!canLoadGarageRemotely()) {
       return
     }
-    if (this._searchDebounceTimer) {
-      clearTimeout(this._searchDebounceTimer)
-    }
+    this.clearSearchDebounce()
     this.setData({
       searchKeyword: keyword,
       searchDebouncing: true
@@ -480,10 +483,7 @@ Page({
 
   handleClearSearch() {
     if (this.data.searchKeyword) {
-      if (this._searchDebounceTimer) {
-        clearTimeout(this._searchDebounceTimer)
-        this._searchDebounceTimer = null
-      }
+      this.clearSearchDebounce()
       this.filterCars(this.data.currentCategory, this.data.availableOnly, "")
       if (canLoadGarageRemotely()) {
         this.loadCars({ force: true })
@@ -498,6 +498,7 @@ Page({
       return
     }
 
+    this.clearSearchDebounce()
     this.filterCars(categoryId)
     if (canLoadGarageRemotely()) {
       this.loadCars({ force: true })
@@ -510,6 +511,7 @@ Page({
     if (availableOnly === this.data.availableOnly) {
       return
     }
+    this.clearSearchDebounce()
     this.filterCars(this.data.currentCategory, availableOnly)
     if (canLoadGarageRemotely()) {
       this.loadCars({ force: true })
@@ -518,6 +520,7 @@ Page({
 
   handleShowAllStatuses() {
     if (this.data.availableOnly) {
+      this.clearSearchDebounce()
       this.filterCars(this.data.currentCategory, false)
       if (canLoadGarageRemotely()) {
         this.loadCars({ force: true })
@@ -526,7 +529,7 @@ Page({
   },
 
   handleLoadMore() {
-    if (this.data.loadingCars || !this.data.hasMore) {
+    if (this.data.loadingCars || this.data.searchDebouncing || !this.data.hasMore) {
       return
     }
 

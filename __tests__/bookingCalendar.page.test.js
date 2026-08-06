@@ -27,6 +27,7 @@ function createPage(definition, overrides) {
 
 describe("pages/booking-calendar", () => {
   afterEach(() => {
+    jest.useRealTimers()
     delete global.Page
     delete global.wx
   })
@@ -63,6 +64,121 @@ describe("pages/booking-calendar", () => {
       fail: expect.any(Function),
       complete: expect.any(Function)
     })
+  })
+
+  test("日历加载超时后结束刷新并忽略迟到结果", () => {
+    jest.useFakeTimers()
+    let requestOptions = null
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn((options) => {
+          requestOptions = options
+        })
+      }
+    }
+    const page = createPage(loadPageDefinition(), {
+      monthKey: "2026-08",
+      allBookings: [{ id: "existing_booking" }]
+    })
+    const done = jest.fn()
+
+    page.fetchBookings(done)
+    jest.advanceTimersByTime(15 * 1000)
+
+    expect(page.data.loading).toBe(false)
+    expect(page.data.loadError).toBe("日历加载超时，请重试")
+    expect(done).toHaveBeenCalledTimes(1)
+
+    requestOptions.success({
+      result: {
+        ok: true,
+        list: [{ id: "late_booking" }]
+      }
+    })
+    expect(page.data.allBookings).toEqual([{ id: "existing_booking" }])
+  })
+
+  test("快速连续翻月时只保留最新月份结果", () => {
+    const requests = []
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn((options) => requests.push(options))
+      }
+    }
+    const page = createPage(loadPageDefinition(), {
+      monthKey: "2026-11",
+      loading: false
+    })
+
+    page.changeMonth(1)
+    page.changeMonth(1)
+    requests[1].success({
+      result: {
+        ok: true,
+        list: [
+          {
+            id: "latest_booking",
+            startDate: "2027-01-10",
+            endDate: "2027-01-10",
+            status: "pending"
+          }
+        ]
+      }
+    })
+    requests[0].success({
+      result: {
+        ok: true,
+        list: [{ id: "stale_booking" }]
+      }
+    })
+
+    expect(requests[0].data.month).toBe("2026-12")
+    expect(requests[1].data.month).toBe("2027-01")
+    expect(page.data.monthKey).toBe("2027-01")
+    expect(page.data.allBookings[0].id).toBe("latest_booking")
+  })
+
+  test("云 SDK 同步异常时安全退出日历加载", () => {
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(() => {
+          throw new Error("cloud down")
+        })
+      }
+    }
+    const page = createPage(loadPageDefinition(), {
+      monthKey: "2026-08"
+    })
+
+    expect(() => page.fetchBookings()).not.toThrow()
+    expect(page.data.loading).toBe(false)
+    expect(page.data.loadError).toBe("cloud down")
+  })
+
+  test("离开日历后迟到结果不再修改月份数据", () => {
+    let lateSuccess = null
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(({ success }) => {
+          lateSuccess = success
+        })
+      }
+    }
+    const page = createPage(loadPageDefinition(), {
+      monthKey: "2026-08",
+      allBookings: [{ id: "existing_booking" }]
+    })
+
+    page.fetchBookings()
+    page.onUnload()
+    lateSuccess({
+      result: {
+        ok: true,
+        list: [{ id: "late_booking" }]
+      }
+    })
+
+    expect(page.data.allBookings).toEqual([{ id: "existing_booking" }])
   })
 
   test("首次加载使用摘要、月份、日期网格与日程骨架", () => {

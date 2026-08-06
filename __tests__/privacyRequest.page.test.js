@@ -33,6 +33,7 @@ function createPage(definition) {
 
 describe("pages/privacy-request 用户申请流程", () => {
   afterEach(() => {
+    jest.useRealTimers()
     delete global.Page
     delete global.wx
   })
@@ -189,5 +190,174 @@ describe("pages/privacy-request 用户申请流程", () => {
 
     expect(page.data.visibleList.map((item) => item.id)).toEqual(["completed", "cancelled"])
     expect(page.data.list.find((item) => item.id === "completed").stageHint).toContain("处理完成")
+  })
+
+  test("申请记录无响应时退出骨架屏并结束下拉刷新", () => {
+    jest.useFakeTimers()
+    let lateSuccess
+    const done = jest.fn()
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(({ success }) => {
+          lateSuccess = success
+        })
+      }
+    }
+    const page = createPage(loadPageDefinition())
+
+    page.fetchList({ done })
+    jest.advanceTimersByTime(15 * 1000)
+
+    expect(page.data.initialLoading).toBe(false)
+    expect(page.data.loading).toBe(false)
+    expect(page.data.loadError).toBe("申请记录加载超时，请检查网络后重试")
+    expect(done).toHaveBeenCalledTimes(1)
+
+    lateSuccess({ result: { ok: true, list: [{ id: "late-request" }], hasMore: false } })
+    expect(page.data.list).toEqual([])
+  })
+
+  test("申请记录刷新后忽略旧分页请求的迟到结果", () => {
+    const requests = []
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn((options) => requests.push(options))
+      }
+    }
+    const page = createPage(loadPageDefinition())
+    page.data.list = [{ id: "existing", type: "access", status: "pending" }]
+    page.data.visibleList = page.data.list.slice()
+    page.data.page = 0
+    page.data.hasMore = true
+
+    page.fetchList({ append: true })
+    page.fetchList()
+    requests[1].success({
+      result: { ok: true, page: 0, hasMore: false, list: [{ id: "fresh", type: "access", status: "pending" }] }
+    })
+    requests[0].success({
+      result: { ok: true, page: 1, hasMore: false, list: [{ id: "stale", type: "access", status: "pending" }] }
+    })
+
+    expect(page.data.list.map((item) => item.id)).toEqual(["fresh"])
+  })
+
+  test("申请记录调用同步异常时安全进入重试状态", () => {
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(() => {
+          throw new Error("cloud sdk crashed")
+        })
+      }
+    }
+    const page = createPage(loadPageDefinition())
+
+    expect(() => page.fetchList()).not.toThrow()
+    expect(page.data.loading).toBe(false)
+    expect(page.data.loadError).toBe("cloud sdk crashed")
+  })
+
+  test("提交申请无响应时恢复按钮并忽略迟到成功", () => {
+    jest.useFakeTimers()
+    let lateSuccess
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(({ success }) => {
+          lateSuccess = success
+        })
+      },
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition())
+    page.data.description = "查询当前保存的信息"
+    page.data.formReady = true
+    page.fetchList = jest.fn()
+
+    page.handleSubmit()
+    expect(page.data.submitting).toBe(true)
+
+    jest.advanceTimersByTime(12 * 1000)
+    expect(page.data.submitting).toBe(false)
+    expect(page.data.description).toBe("查询当前保存的信息")
+    expect(wx.showToast).toHaveBeenCalledWith({ title: "提交超时，请重试", icon: "none" })
+
+    lateSuccess({ result: { ok: true } })
+    expect(page.data.description).toBe("查询当前保存的信息")
+    expect(page.fetchList).not.toHaveBeenCalled()
+  })
+
+  test("提交申请同步异常时安全恢复可重试状态", () => {
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(() => {
+          throw new Error("cloud sdk crashed")
+        })
+      },
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition())
+    page.data.description = "删除当前保存的信息"
+
+    expect(() => page.handleSubmit()).not.toThrow()
+    expect(page.data.submitting).toBe(false)
+    expect(page.data.description).toBe("删除当前保存的信息")
+    expect(wx.showToast).toHaveBeenCalledWith({ title: "提交失败", icon: "none" })
+  })
+
+  test("撤回申请无响应时恢复按钮并忽略迟到成功", () => {
+    jest.useFakeTimers()
+    let lateSuccess
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(({ success }) => {
+          lateSuccess = success
+        })
+      },
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition())
+    page.fetchList = jest.fn()
+
+    page.cancelRequest("privacy-timeout")
+    expect(page.data.cancellingId).toBe("privacy-timeout")
+
+    jest.advanceTimersByTime(12 * 1000)
+    expect(page.data.cancellingId).toBe("")
+    expect(wx.showToast).toHaveBeenCalledWith({ title: "撤回超时，请重试", icon: "none" })
+
+    lateSuccess({ result: { ok: true } })
+    expect(page.fetchList).not.toHaveBeenCalled()
+  })
+
+  test("撤回申请同步异常时安全恢复可重试状态", () => {
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(() => {
+          throw new Error("cloud sdk crashed")
+        })
+      },
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition())
+
+    expect(() => page.cancelRequest("privacy-error")).not.toThrow()
+    expect(page.data.cancellingId).toBe("")
+    expect(wx.showToast).toHaveBeenCalledWith({ title: "撤回失败", icon: "none" })
+  })
+
+  test("申请写操作期间拒绝下拉刷新避免旧记录覆盖", () => {
+    global.wx = {
+      stopPullDownRefresh: jest.fn(),
+      cloud: {
+        callFunction: jest.fn()
+      }
+    }
+    const page = createPage(loadPageDefinition())
+    page.data.submitting = true
+
+    page.onPullDownRefresh()
+
+    expect(wx.stopPullDownRefresh).toHaveBeenCalledTimes(1)
+    expect(wx.cloud.callFunction).not.toHaveBeenCalled()
   })
 })

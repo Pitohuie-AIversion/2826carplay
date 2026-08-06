@@ -7,6 +7,7 @@ const STATUS_META = {
 }
 
 const MANUAL_REVIEW_STORAGE_KEY = "system_health_manual_review_v1"
+const SYSTEM_HEALTH_TIMEOUT_MS = 20 * 1000
 const MANUAL_CHECK_DEFINITIONS = [
   { key: "indexes", label: "在云控制台按上线清单确认数据库索引已建立", iconClass: "manual-kind-icon-index" },
   {
@@ -166,6 +167,11 @@ Page({
     })
   },
 
+  onUnload() {
+    this._healthRequestId = Number(this._healthRequestId || 0) + 1
+    this.finishHealthRequestEffects()
+  },
+
   handleRefresh() {
     if (!this.data.loading && !this.data.refreshing) {
       this.loadHealth({ refreshing: true })
@@ -228,6 +234,9 @@ Page({
 
   loadHealth(options) {
     const input = options && typeof options === "object" ? options : {}
+    const requestId = Number(this._healthRequestId || 0) + 1
+    this._healthRequestId = requestId
+    this.finishHealthRequestEffects()
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       this.setData({
         loading: false,
@@ -240,15 +249,44 @@ Page({
       return
     }
 
+    this._healthRequestDone = typeof input.done === "function" ? input.done : null
+
     this.setData({
       loading: !input.refreshing,
       refreshing: Boolean(input.refreshing),
       loadError: ""
     })
 
-    wx.cloud.callFunction({
+    let settled = false
+    const finishRequest = () => {
+      if (settled || this._healthRequestId !== requestId) {
+        return false
+      }
+      settled = true
+      this.finishHealthRequestEffects()
+      return true
+    }
+    const handleFailure = (message) => {
+      if (!finishRequest()) {
+        return
+      }
+      this.setData({
+        loading: false,
+        refreshing: false,
+        loadError: message
+      })
+    }
+
+    this._healthRequestTimer = setTimeout(() => {
+      handleFailure("上线检查超时，请检查网络后重试")
+    }, SYSTEM_HEALTH_TIMEOUT_MS)
+
+    const requestOptions = {
       name: "systemHealthCheck",
       success: (res) => {
+        if (!finishRequest()) {
+          return
+        }
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
           this.setData({
@@ -279,18 +317,31 @@ Page({
         })
       },
       fail: (error) => {
-        this.setData({
-          loading: false,
-          refreshing: false,
-          loadError:
-            (error && (error.errMsg || error.message)) || "上线检查失败，请稍后重试"
-        })
+        handleFailure(
+          (error && (error.errMsg || error.message)) || "上线检查失败，请稍后重试"
+        )
       },
-      complete: () => {
-        if (typeof input.done === "function") {
-          input.done()
-        }
-      }
-    })
+      complete: () => {}
+    }
+
+    try {
+      wx.cloud.callFunction(requestOptions)
+    } catch (error) {
+      handleFailure(
+        (error && (error.errMsg || error.message)) || "上线检查失败，请稍后重试"
+      )
+    }
+  },
+
+  finishHealthRequestEffects() {
+    if (this._healthRequestTimer) {
+      clearTimeout(this._healthRequestTimer)
+      this._healthRequestTimer = null
+    }
+    const done = this._healthRequestDone
+    this._healthRequestDone = null
+    if (typeof done === "function") {
+      done()
+    }
   }
 })

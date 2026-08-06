@@ -1,5 +1,7 @@
 const { trackEvent } = require("../../shared/analytics")
 const { formatToastTitle } = require("../../shared/uiFeedback")
+const CAR_DETAIL_LOAD_TIMEOUT_MS = 15 * 1000
+const FAVORITE_UPDATE_TIMEOUT_MS = 12 * 1000
 
 function getStatusText(status, fallbackText) {
   const statusTextMap = {
@@ -168,12 +170,17 @@ Page({
     if (!carId || !wx.cloud || typeof wx.cloud.callFunction !== "function") {
       return
     }
+    const requestId = Number(this._favoriteStatusRequestId || 0) + 1
+    this._favoriteStatusRequestId = requestId
     wx.cloud.callFunction({
       name: "favoriteStatus",
       data: {
         vehicleId: carId
       },
       success: (res) => {
+        if (requestId !== this._favoriteStatusRequestId) {
+          return
+        }
         const result = res && res.result ? res.result : null
         if (result && result.ok) {
           this.setData({
@@ -186,6 +193,10 @@ Page({
   },
 
   loadCarDetail(carId) {
+    const requestId = Number(this._carDetailRequestId || 0) + 1
+    this._carDetailRequestId = requestId
+    this.clearCarDetailLoadTimer()
+
     if (!carId) {
       this.applyCar(null)
       return
@@ -201,12 +212,35 @@ Page({
       loadError: false
     })
 
-    wx.cloud.callFunction({
+    let settled = false
+    const finishRequest = () => {
+      if (settled || requestId !== this._carDetailRequestId) {
+        return false
+      }
+      settled = true
+      this.clearCarDetailLoadTimer()
+      return true
+    }
+    const handleFailure = (message) => {
+      if (!finishRequest()) {
+        return
+      }
+      this.setLoadError(message || "车辆详情加载失败，请返回车库后重试")
+    }
+
+    this._carDetailLoadTimer = setTimeout(() => {
+      handleFailure("车辆详情加载超时，请检查网络后重试")
+    }, CAR_DETAIL_LOAD_TIMEOUT_MS)
+
+    const requestOptions = {
       name: "vehiclePublicDetail",
       data: {
         id: carId
       },
       success: (res) => {
+        if (!finishRequest()) {
+          return
+        }
         const result = res && res.result ? res.result : null
         const car = result && result.ok ? result.car : null
         if (car) {
@@ -222,9 +256,31 @@ Page({
         this.setLoadError((result && result.message) || "车辆详情加载失败，请返回车库后重试")
       },
       fail: (error) => {
-        this.setLoadError((error && (error.errMsg || error.message)) || "车辆详情加载失败，请返回车库后重试")
+        handleFailure((error && (error.errMsg || error.message)) || "车辆详情加载失败，请返回车库后重试")
       }
-    })
+    }
+
+    try {
+      wx.cloud.callFunction(requestOptions)
+    } catch (error) {
+      handleFailure((error && (error.errMsg || error.message)) || "车辆详情加载失败，请返回车库后重试")
+    }
+  },
+
+  clearCarDetailLoadTimer() {
+    if (!this._carDetailLoadTimer) {
+      return
+    }
+    clearTimeout(this._carDetailLoadTimer)
+    this._carDetailLoadTimer = null
+  },
+
+  onUnload() {
+    this._carDetailRequestId = Number(this._carDetailRequestId || 0) + 1
+    this._favoriteStatusRequestId = Number(this._favoriteStatusRequestId || 0) + 1
+    this._favoriteUpdateSerial = Number(this._favoriteUpdateSerial || 0) + 1
+    this.clearCarDetailLoadTimer()
+    this.clearFavoriteUpdateTimer()
   },
 
   setLoadError(message) {
@@ -338,27 +394,62 @@ Page({
     }
 
     const nextFavorited = !this.data.favorited
+    const vehicleId = String(this.data.carId || "").trim()
+    const updateSerial = Number(this._favoriteUpdateSerial || 0) + 1
+    this._favoriteUpdateSerial = updateSerial
+    this._favoriteStatusRequestId = Number(this._favoriteStatusRequestId || 0) + 1
+    this.clearFavoriteUpdateTimer()
     this.setData({ favoriteLoading: true })
-    wx.cloud.callFunction({
+
+    let settled = false
+    const finishRequest = () => {
+      if (settled || updateSerial !== this._favoriteUpdateSerial) {
+        return false
+      }
+      settled = true
+      this.clearFavoriteUpdateTimer()
+      return true
+    }
+    const handleFailure = (message) => {
+      if (!finishRequest()) {
+        return
+      }
+      this.setData({ favoriteLoading: false })
+      wx.showToast({
+        title: formatToastTitle(message, "收藏操作失败"),
+        icon: "none"
+      })
+    }
+
+    this._favoriteUpdateTimer = setTimeout(() => {
+      handleFailure("收藏请求超时，请重试")
+    }, FAVORITE_UPDATE_TIMEOUT_MS)
+
+    const requestOptions = {
       name: "favoriteSet",
       data: {
-        vehicleId: this.data.carId,
+        vehicleId,
         favorited: nextFavorited
       },
       success: (res) => {
+        if (!finishRequest()) {
+          return
+        }
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
+          this.setData({ favoriteLoading: false })
           wx.showToast({
-          title: formatToastTitle(result && result.message, "收藏操作失败"),
+            title: formatToastTitle(result && result.message, "收藏操作失败"),
             icon: "none"
           })
           return
         }
         this.setData({
-          favorited: Boolean(result.favorited)
+          favorited: Boolean(result.favorited),
+          favoriteLoading: false
         })
         if (result.favorited) {
-          trackEvent("favorite_add", this.data.carId)
+          trackEvent("favorite_add", vehicleId)
         }
         wx.showToast({
           title: result.favorited ? "已加入收藏" : "已取消收藏",
@@ -366,15 +457,23 @@ Page({
         })
       },
       fail: (error) => {
-        wx.showToast({
-          title: "收藏操作失败",
-          icon: "none"
-        })
-      },
-      complete: () => {
-        this.setData({ favoriteLoading: false })
+        handleFailure(error && (error.errMsg || error.message))
       }
-    })
+    }
+
+    try {
+      wx.cloud.callFunction(requestOptions)
+    } catch (error) {
+      handleFailure(error && (error.errMsg || error.message))
+    }
+  },
+
+  clearFavoriteUpdateTimer() {
+    if (!this._favoriteUpdateTimer) {
+      return
+    }
+    clearTimeout(this._favoriteUpdateTimer)
+    this._favoriteUpdateTimer = null
   },
 
   handleBookingTap() {

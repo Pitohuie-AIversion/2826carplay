@@ -900,3 +900,105 @@ Agent 每完成一个 Phase，必须追加记录。
 下一步建议：
 - 真机检查首页标题、分享标题和“我的”页品牌文案是否已切换为“极境车库”。
 - 如无更多问题，可进入素材替换与最终交付阶段。
+
+---
+
+## 2026-08-06 Phase 10 后异步体验验收修正
+
+完成阶段：Phase 10 后验收反馈修正
+
+修改文件：
+- `pages/booking/booking.js`
+- `pages/booking-detail/booking-detail.js`
+- `pages/car-detail/car-detail.js`
+- `pages/bookings/bookings.js`
+- `pages/favorites/favorites.js`
+- `pages/privacy-request/privacy-request.js`
+- `pages/privacy-request-manage/privacy-request-manage.js`
+- `pages/privacy-request-manage/privacy-request-manage.wxml`
+- `pages/privacy-data-inventory/privacy-data-inventory.js`
+- `pages/system-health/system-health.js`
+- `pages/role-manage/role-manage.js`
+- `pages/audit-log-manage/audit-log-manage.js`
+- `pages/error-log-manage/error-log-manage.js`
+- `pages/config-manage/config-manage.js`
+- `pages/analytics-manage/analytics-manage.js`
+- `pages/vehicle-manage/vehicle-manage.js`
+- `pages/booking-manage/booking-manage.js`
+- `pages/booking-workbench/booking-workbench.js`
+- `pages/booking-manage-detail/booking-manage-detail.js`
+- `pages/booking-manage-detail/booking-manage-detail.wxml`
+- `pages/booking-calendar/booking-calendar.js`
+- `pages/garage/garage.js`
+- `pages/garage/garage.wxml`
+- `pages/vehicle-detail-manage/vehicle-detail-manage.js`
+- `cloudfunctions/garageVehicleList/index.js`
+- `cloudfunctions/vehiclePublicDetail/index.js`
+- `__tests__/bookingAvailability.page.test.js`
+- `__tests__/bookingExperience.page.test.js`
+- `__tests__/carDetail.page.test.js`
+- `__tests__/bookingJourney.page.test.js`
+- `__tests__/favorites.page.test.js`
+- `__tests__/privacyRequest.page.test.js`
+- `__tests__/privacyRequestManage.page.test.js`
+- `__tests__/privacyDataInventory.page.test.js`
+- `__tests__/systemHealth.page.test.js`
+- `__tests__/roleManage.page.test.js`
+- `__tests__/auditLogManage.page.test.js`
+- `__tests__/errorLogManage.page.test.js`
+- `__tests__/configManage.page.test.js`
+- `__tests__/analyticsManage.page.test.js`
+- `__tests__/vehicleManage.page.test.js`
+- `__tests__/consumerIconStyle.test.js`
+- `__tests__/bookingManageFilters.page.test.js`
+- `__tests__/bookingManageConflict.page.test.js`
+- `__tests__/bookingStatusFeedback.page.test.js`
+- `__tests__/bookingWorkbench.page.test.js`
+- `__tests__/bookingCalendar.page.test.js`
+- `__tests__/garage.page.test.js`
+- `__tests__/garageVehicleList.int.test.js`
+- `__tests__/vehicleDetailManage.page.test.js`
+- `__tests__/vehiclePublicDetail.int.test.js`
+- `jijing_garage_project_docs_v2/CHANGELOG.md`
+
+新增文件：无
+
+删除文件：无
+
+主要改动：
+- 为预约页车辆详情、档期查询和最终提交补充超时收口、同步异常降级、迟到回调隔离及离页清理，避免页面长期停留在加载或提交状态。
+- 为客户侧车辆详情加载补充相同的超时、同步异常、请求切换及离页保护，避免骨架屏卡死或旧车辆迟到结果覆盖新内容。
+- 为详情页收藏操作补充超时与同步异常恢复，并隔离初始收藏状态的迟到结果，避免按钮卡死或新收藏结果被旧查询覆盖。
+- 为“我的预约”和“我的收藏”列表补充加载超时、同步异常、刷新竞态与离页保护；追加加载失败时保留现有分页，允许用户继续重试。
+- 为取消收藏、撤销收藏和取消预约补充操作超时、同步异常与迟到回调隔离；收藏变更期间暂停列表刷新，避免旧列表覆盖用户操作结果。
+- 为预约详情加载、联系信息保存和详情内取消预约补充超时、同步异常、离页清理与迟到回调隔离；保存时固定表单快照，避免请求期间输入变化污染提交内容。
+- 为个人信息申请记录、申请提交与撤回操作补充超时、同步异常、刷新竞态和离页保护；写操作期间暂停刷新与分页，避免旧记录覆盖最新处理结果。
+- 为个人数据核验与 CSV 导出补充全链路超时、同步异常、刷新竞态和离页保护；超时或离页后迟到生成的敏感 CSV 会被主动删除，避免无引用文件残留。
+- 为上线系统健康检查补充超时、同步异常、刷新竞态和离页保护，确保诊断页不会因无回调或迟到结果误报环境状态。
+- 为权限管理的成员列表与权限保存补充超时、同步异常、请求竞态和离页保护；保存时固定账号与权限快照，避免迟到结果覆盖新列表或表单变化污染已确认内容。
+- 为审计日志列表与 CSV 导出补充全链路超时、同步异常、请求竞态和离页保护；导出超时或离页后迟到写入的 CSV 会被主动删除，避免无引用日志文件残留。
+- 为错误日志列表与 CSV 导出补充相同的超时、同步异常、请求竞态和离页保护；固定函数与关键词筛选快照，并清理超时或离页后的迟到本地文件。
+- 为运营配置读取与保存补充超时、同步异常、请求竞态和离页保护；保存时固定配置快照，并阻止下拉刷新覆盖尚未保存的编辑内容。
+- 为数据分析概览与匿名数据清理补充超时、同步异常、周期切换竞态和离页保护；固定统计周期参数，确保清理无回调时也能解除遮罩与按钮状态。
+- 为车辆管理列表及状态更新、停用、恢复、删除统一补充超时、同步异常、重复操作和离页保护；筛选请求固定快照，迟到结果不会覆盖新列表或重复触发写后刷新；加载遮罩测试同步改为验证统一执行器及四类操作入口。
+- 为预约管理列表、状态更新、备注保存和 CSV 导出补充超时、同步异常、请求竞态与离页保护；固定筛选及写入快照，导出超时或离页后迟到写入的本地文件会被主动删除。
+- 为预约工作台加载、状态推进、协调更新和内部备注保存补充超时、同步异常、写操作互斥、请求竞态和离页保护，避免迟到结果重复刷新队列。
+- 为预约管理详情读取、状态更新、协调安排和管理员备注保存补充超时、同步异常、请求竞态、操作互斥和离页保护；写入期间统一禁用相关操作入口，避免重复提交及迟到结果刷新旧详情。
+- 为隐私申请管理列表与状态处理补充超时、同步异常、筛选请求竞态、写操作互斥和离页保护；状态处理期间冻结搜索、重置和分页入口，避免旧队列覆盖最新处理结果。
+- 为预约日历加载补充超时、同步异常、连续翻月竞态和离页保护；请求固定月份快照，新月份请求会淘汰旧请求并正确结束下拉刷新。
+- 在订阅消息弹窗出现前固定本次提交的车辆、表单和摘要快照，避免弹窗期间的输入变化影响已确认内容。
+- 车库搜索防抖期间锁定旧分页入口；切换分类或状态时取消待执行搜索，确保新筛选只从第一页请求一次。
+- 车辆图片上传取消时主动结束当前任务，即使 SDK 不回调也能立即退出上传态并保留未完成图片供重试。
+- 公开车辆缺少座位数时统一显示中文破折号占位。
+
+测试方式：
+- `npm.cmd run check:release`
+- 发布检查覆盖项目结构、密钥扫描、主包体积与 Jest 全量测试。
+
+已知问题：
+- 微信开发者工具编译和真机网络中断场景仍需人工验收。
+- 云函数生产部署与安全规则发布需按 `DEPLOY_CHECKLIST.md` 执行。
+
+下一步建议：
+- 真机重点验证弱网提交、搜索后快速切换分类以及上传中取消。
+- 验收无新增问题后进入云函数部署与发布检查。

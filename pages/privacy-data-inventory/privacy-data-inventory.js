@@ -8,6 +8,8 @@ const {
   saveCsvFile,
   shareCsvFile
 } = require("../../shared/csvFile")
+const INVENTORY_LOAD_TIMEOUT_MS = 15 * 1000
+const INVENTORY_EXPORT_TIMEOUT_MS = 20 * 1000
 
 const REQUEST_TYPE_LABELS = {
   access: "查询信息",
@@ -237,6 +239,13 @@ Page({
     })
   },
 
+  onUnload() {
+    this._inventoryRequestId = Number(this._inventoryRequestId || 0) + 1
+    this._exportRequestSerial = Number(this._exportRequestSerial || 0) + 1
+    this.finishInventoryRequestEffects()
+    this.clearExportRequestTimer()
+  },
+
   onPullDownRefresh() {
     if (!this.data.pageAuthorized || !this.data.requestId) {
       wx.stopPullDownRefresh()
@@ -331,29 +340,64 @@ Page({
         if (!modalResult.confirm) {
           return
         }
+        const inventoryRequestId = String(this.data.requestId || "").trim()
+        const exportSerial = Number(this._exportRequestSerial || 0) + 1
+        this._exportRequestSerial = exportSerial
+        this.clearExportRequestTimer()
         this.setData({ exporting: true })
-        wx.cloud.callFunction({
+
+        let settled = false
+        const isActive = () => !settled && exportSerial === this._exportRequestSerial
+        const finishRequest = () => {
+          if (!isActive()) {
+            return false
+          }
+          settled = true
+          this.clearExportRequestTimer()
+          return true
+        }
+        const handleFailure = (message, fallback = "导出失败") => {
+          if (!finishRequest()) {
+            return
+          }
+          this.setData({ exporting: false })
+          wx.showToast({
+            title: formatToastTitle(message, fallback),
+            icon: "none"
+          })
+        }
+
+        this._exportRequestTimer = setTimeout(() => {
+          handleFailure("导出超时，请重试")
+        }, INVENTORY_EXPORT_TIMEOUT_MS)
+
+        const requestOptions = {
           name: "privacyRequestDataInventory",
           data: {
-            requestId: this.data.requestId,
+            requestId: inventoryRequestId,
             mode: "export"
           },
           success: (res) => {
+            if (!isActive()) {
+              return
+            }
             const result = res && res.result ? res.result : null
             if (!result || !result.ok || !result.csvText) {
-              wx.showToast({
-              title: formatToastTitle(result && result.message, "导出失败"),
-                icon: "none"
-              })
-              this.setData({ exporting: false })
+              handleFailure(result && result.message)
               return
             }
             saveCsvFile({
               fileName: result.fileName,
-              fallbackFileName: `privacy-data-${this.data.requestId}.csv`,
+              fallbackFileName: `privacy-data-${inventoryRequestId}.csv`,
               csvText: result.csvText
             })
               .then(({ filePath, fileName }) => {
+                if (!finishRequest()) {
+                  if (filePath) {
+                    removeCsvFile(filePath).catch(() => {})
+                  }
+                  return
+                }
                 const previousFilePath = this.data.exportFilePath
                 this.setData({
                   exporting: false,
@@ -369,21 +413,19 @@ Page({
                 })
               })
               .catch((error) => {
-                this.setData({ exporting: false })
-                wx.showToast({
-                  title: "保存失败",
-                  icon: "none"
-                })
+                handleFailure(error && (error.errMsg || error.message), "保存失败")
               })
           },
           fail: (error) => {
-            this.setData({ exporting: false })
-            wx.showToast({
-              title: "导出失败",
-              icon: "none"
-            })
+            handleFailure(error && (error.errMsg || error.message))
           }
-        })
+        }
+
+        try {
+          wx.cloud.callFunction(requestOptions)
+        } catch (error) {
+          handleFailure(error && (error.errMsg || error.message))
+        }
       }
     })
   },
@@ -449,6 +491,9 @@ Page({
 
   loadInventory(options) {
     const input = options && typeof options === "object" ? options : {}
+    const requestId = Number(this._inventoryRequestId || 0) + 1
+    this._inventoryRequestId = requestId
+    this.finishInventoryRequestEffects()
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       this.setData({
         loading: false,
@@ -461,17 +506,47 @@ Page({
       return
     }
 
+    this._inventoryRequestDone = typeof input.done === "function" ? input.done : null
     this.setData({
       loading: !input.refreshing,
       refreshing: Boolean(input.refreshing),
       loadError: ""
     })
-    wx.cloud.callFunction({
+
+    let settled = false
+    const finishRequest = () => {
+      if (settled || requestId !== this._inventoryRequestId) {
+        return false
+      }
+      settled = true
+      this.finishInventoryRequestEffects()
+      return true
+    }
+    const handleFailure = (message) => {
+      if (!finishRequest()) {
+        return
+      }
+      this.setData({
+        loading: false,
+        refreshing: false,
+        loadError: String(message || "相关数据核验失败，请稍后重试")
+      })
+    }
+
+    this._inventoryRequestTimer = setTimeout(() => {
+      handleFailure("相关数据核验超时，请检查网络后重试")
+    }, INVENTORY_LOAD_TIMEOUT_MS)
+
+    const inventoryRequestId = String(this.data.requestId || "").trim()
+    const requestOptions = {
       name: "privacyRequestDataInventory",
       data: {
-        requestId: this.data.requestId
+        requestId: inventoryRequestId
       },
       success: (res) => {
+        if (!finishRequest()) {
+          return
+        }
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
           this.setData({
@@ -489,18 +564,34 @@ Page({
         })
       },
       fail: (error) => {
-        this.setData({
-          loading: false,
-          refreshing: false,
-          loadError:
-            (error && (error.errMsg || error.message)) || "相关数据核验失败，请稍后重试"
-        })
-      },
-      complete: () => {
-        if (typeof input.done === "function") {
-          input.done()
-        }
+        handleFailure((error && (error.errMsg || error.message)) || "相关数据核验失败，请稍后重试")
       }
-    })
+    }
+
+    try {
+      wx.cloud.callFunction(requestOptions)
+    } catch (error) {
+      handleFailure((error && (error.errMsg || error.message)) || "相关数据核验失败，请稍后重试")
+    }
+  },
+
+  finishInventoryRequestEffects() {
+    if (this._inventoryRequestTimer) {
+      clearTimeout(this._inventoryRequestTimer)
+      this._inventoryRequestTimer = null
+    }
+    const done = this._inventoryRequestDone
+    this._inventoryRequestDone = null
+    if (typeof done === "function") {
+      done()
+    }
+  },
+
+  clearExportRequestTimer() {
+    if (!this._exportRequestTimer) {
+      return
+    }
+    clearTimeout(this._exportRequestTimer)
+    this._exportRequestTimer = null
   }
 })

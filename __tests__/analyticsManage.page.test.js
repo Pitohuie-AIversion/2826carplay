@@ -27,8 +27,139 @@ function createPage(definition, overrides) {
 
 describe("pages/analytics-manage cleanup", () => {
   afterEach(() => {
+    jest.useRealTimers()
     delete global.Page
     delete global.wx
+  })
+
+  test("分析概览无回调时超时收尾并忽略迟到结果", () => {
+    jest.useFakeTimers()
+    let lateSuccess
+    const done = jest.fn()
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(({ success }) => {
+          lateSuccess = success
+        })
+      }
+    }
+    const page = createPage(loadPageDefinition())
+
+    page.fetchOverview(done)
+    jest.advanceTimersByTime(15 * 1000)
+
+    expect(page.data.loading).toBe(false)
+    expect(page.data.loadError).toBe("数据分析加载超时，请检查网络后重试")
+    expect(done).toHaveBeenCalledTimes(1)
+
+    lateSuccess({
+      result: {
+        ok: true,
+        metrics: { vehicle_detail: 99 },
+        conversionRate: 50,
+        trend: [],
+        topVehicles: []
+      }
+    })
+    expect(page.data.metricItems).toEqual([])
+    expect(page.data.loadError).toBe("数据分析加载超时，请检查网络后重试")
+  })
+
+  test("新分析周期请求覆盖旧请求并固定周期参数", () => {
+    const requests = []
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn((options) => requests.push(options))
+      }
+    }
+    const page = createPage(loadPageDefinition(), { days: 7 })
+
+    page.fetchOverview()
+    page.data.days = 30
+    page.fetchOverview()
+    expect(requests[0].data.days).toBe(7)
+    expect(requests[1].data.days).toBe(30)
+
+    requests[1].success({
+      result: {
+        ok: true,
+        metrics: { vehicle_detail: 30 },
+        conversionRate: 20,
+        trend: [],
+        topVehicles: []
+      }
+    })
+    requests[0].success({
+      result: {
+        ok: true,
+        metrics: { vehicle_detail: 7 },
+        conversionRate: 10,
+        trend: [],
+        topVehicles: []
+      }
+    })
+
+    expect(page.data.metricItems[0].value).toBe(30)
+    expect(page.data.metricItems[3].value).toBe("20%")
+  })
+
+  test("匿名数据清理无回调时超时收尾并忽略迟到结果", () => {
+    jest.useFakeTimers()
+    let lateSuccess
+    global.wx = {
+      showLoading: jest.fn(),
+      hideLoading: jest.fn(),
+      showToast: jest.fn(),
+      showModal: jest.fn(),
+      cloud: {
+        callFunction: jest.fn(({ success }) => {
+          lateSuccess = success
+        })
+      }
+    }
+    const page = createPage(loadPageDefinition(), { canCleanup: true })
+
+    page.runCleanup()
+    jest.advanceTimersByTime(20 * 1000)
+
+    expect(page.data.cleanupLoading).toBe(false)
+    expect(global.wx.hideLoading).toHaveBeenCalledTimes(1)
+    expect(global.wx.showToast).toHaveBeenCalledWith({
+      title: "清理超时，请重试",
+      icon: "none"
+    })
+
+    lateSuccess({
+      result: {
+        ok: true,
+        processed: 1,
+        deleted: 1,
+        failed: 0
+      }
+    })
+    expect(global.wx.showModal).not.toHaveBeenCalled()
+  })
+
+  test("匿名数据清理遇到云 SDK 同步异常时安全结束", () => {
+    global.wx = {
+      showLoading: jest.fn(),
+      hideLoading: jest.fn(),
+      showToast: jest.fn(),
+      cloud: {
+        callFunction: jest.fn(() => {
+          throw new Error("cloud down")
+        })
+      }
+    }
+    const page = createPage(loadPageDefinition(), { canCleanup: true })
+
+    expect(() => page.runCleanup()).not.toThrow()
+    expect(page.data.cleanupLoading).toBe(false)
+    expect(global.wx.hideLoading).toHaveBeenCalledTimes(1)
+    expect(global.wx.showToast).toHaveBeenCalledWith({
+      title: "cloud down",
+      icon: "none"
+    })
   })
 
   test("管理员确认后调用限量清理并展示结果", () => {

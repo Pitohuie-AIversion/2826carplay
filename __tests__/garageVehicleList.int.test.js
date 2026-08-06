@@ -126,6 +126,7 @@ describe("cloudfunctions/garageVehicleList integration", () => {
       coverPlaceholderText: "理想 L9"
     })
     expect(res.list[0].description).toBe("旗舰家用 SUV")
+    expect(res.list[0].seatsText).toBe("—")
     expect(JSON.stringify(res.list[0])).not.toContain("内部维修记录不得公开")
     expect(res.list[0].images).toEqual(["cloud://img1", "cloud://img2"])
     expect(res.list[0].tags).toEqual(["SUV", "上牌 2024", "粤A***45"])

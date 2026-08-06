@@ -1,6 +1,9 @@
 const { requirePagePermission } = require("../../shared/pageAuth")
 const { formatToastTitle } = require("../../shared/uiFeedback")
 
+const ANALYTICS_OVERVIEW_TIMEOUT_MS = 15 * 1000
+const ANALYTICS_CLEANUP_TIMEOUT_MS = 20 * 1000
+
 function buildMetrics(metrics, conversionRate) {
   const source = metrics && typeof metrics === "object" ? metrics : {}
   return [
@@ -82,6 +85,13 @@ Page({
     this.fetchOverview(() => wx.stopPullDownRefresh())
   },
 
+  onUnload() {
+    this._overviewRequestId = Number(this._overviewRequestId || 0) + 1
+    this._cleanupRequestId = Number(this._cleanupRequestId || 0) + 1
+    this.finishOverviewRequestEffects()
+    this.finishCleanupRequestEffects()
+  },
+
   handlePeriodTap(event) {
     const days = Number(event.currentTarget.dataset.days)
     if (![7, 30].includes(days) || days === this.data.days || this.data.loading) {
@@ -123,14 +133,47 @@ Page({
       return
     }
 
+    const requestId = Number(this._cleanupRequestId || 0) + 1
+    this._cleanupRequestId = requestId
+    this.finishCleanupRequestEffects()
     this.setData({ cleanupLoading: true })
     wx.showLoading({ title: "清理中…", mask: true })
-    wx.cloud.callFunction({
+    this._cleanupLoadingVisible = true
+
+    let settled = false
+    const finishRequest = () => {
+      if (settled || this._cleanupRequestId !== requestId) {
+        return false
+      }
+      settled = true
+      this.finishCleanupRequestEffects()
+      return true
+    }
+    const handleFailure = (message) => {
+      if (!finishRequest()) {
+        return
+      }
+      wx.showToast({
+        title: formatToastTitle(message, "清理失败"),
+        icon: "none"
+      })
+      this.setData({ cleanupLoading: false })
+    }
+
+    this._cleanupRequestTimer = setTimeout(() => {
+      handleFailure("清理超时，请重试")
+    }, ANALYTICS_CLEANUP_TIMEOUT_MS)
+
+    const requestOptions = {
       name: "analyticsCleanup",
       data: {
         limit: 100
       },
       success: (res) => {
+        if (!finishRequest()) {
+          return
+        }
+        this.setData({ cleanupLoading: false })
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
           wx.showToast({
@@ -149,19 +192,22 @@ Page({
         })
       },
       fail: (error) => {
-        wx.showToast({
-          title: "清理失败",
-          icon: "none"
-        })
+        handleFailure(error && (error.errMsg || error.message))
       },
-      complete: () => {
-        wx.hideLoading()
-        this.setData({ cleanupLoading: false })
-      }
-    })
+      complete: () => {}
+    }
+
+    try {
+      wx.cloud.callFunction(requestOptions)
+    } catch (error) {
+      handleFailure(error && (error.errMsg || error.message))
+    }
   },
 
   fetchOverview(done) {
+    const requestId = Number(this._overviewRequestId || 0) + 1
+    this._overviewRequestId = requestId
+    this.finishOverviewRequestEffects()
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       this.setData({
         loading: false,
@@ -173,16 +219,45 @@ Page({
       return
     }
 
+    this._overviewRequestDone = typeof done === "function" ? done : null
+    const days = this.data.days
     this.setData({
       loading: true,
       loadError: ""
     })
-    wx.cloud.callFunction({
+
+    let settled = false
+    const finishRequest = () => {
+      if (settled || this._overviewRequestId !== requestId) {
+        return false
+      }
+      settled = true
+      this.finishOverviewRequestEffects()
+      return true
+    }
+    const handleFailure = (message) => {
+      if (!finishRequest()) {
+        return
+      }
+      this.setData({
+        loading: false,
+        loadError: String(message || "数据分析加载失败")
+      })
+    }
+
+    this._overviewRequestTimer = setTimeout(() => {
+      handleFailure("数据分析加载超时，请检查网络后重试")
+    }, ANALYTICS_OVERVIEW_TIMEOUT_MS)
+
+    const requestOptions = {
       name: "analyticsOverview",
       data: {
-        days: this.data.days
+        days
       },
       success: (res) => {
+        if (!finishRequest()) {
+          return
+        }
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
           this.setData({
@@ -202,16 +277,38 @@ Page({
         })
       },
       fail: (error) => {
-        this.setData({
-          loading: false,
-          loadError: (error && (error.errMsg || error.message)) || "数据分析加载失败"
-        })
+        handleFailure(error && (error.errMsg || error.message))
       },
-      complete: () => {
-        if (typeof done === "function") {
-          done()
-        }
-      }
-    })
+      complete: () => {}
+    }
+
+    try {
+      wx.cloud.callFunction(requestOptions)
+    } catch (error) {
+      handleFailure(error && (error.errMsg || error.message))
+    }
+  },
+
+  finishOverviewRequestEffects() {
+    if (this._overviewRequestTimer) {
+      clearTimeout(this._overviewRequestTimer)
+      this._overviewRequestTimer = null
+    }
+    const done = this._overviewRequestDone
+    this._overviewRequestDone = null
+    if (typeof done === "function") {
+      done()
+    }
+  },
+
+  finishCleanupRequestEffects() {
+    if (this._cleanupRequestTimer) {
+      clearTimeout(this._cleanupRequestTimer)
+      this._cleanupRequestTimer = null
+    }
+    if (this._cleanupLoadingVisible) {
+      this._cleanupLoadingVisible = false
+      wx.hideLoading()
+    }
   }
 })

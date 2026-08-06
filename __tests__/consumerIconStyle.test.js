@@ -729,7 +729,13 @@ describe("用户主流程原生图标", () => {
       })
     })
 
-    expect(loadingCount).toBe(14)
+    expect(loadingCount).toBeGreaterThanOrEqual(10)
+    const vehicleManageSource = read("pages/vehicle-manage/vehicle-manage.js")
+    const mutationLoadingTitles = ["更新中…", "停用中…", "恢复中…", "删除中…"]
+    expect(vehicleManageSource).toContain("runVehicleMutation(options)")
+    mutationLoadingTitles.forEach((title) => {
+      expect(vehicleManageSource).toContain(`loadingTitle: "${title}"`)
+    })
     expect(read("pages/vehicle-detail-manage/vehicle-detail-manage.wxml")).toContain("upload-progress-panel")
   })
 

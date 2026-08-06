@@ -1,6 +1,9 @@
 const { trackEvent } = require("../../shared/analytics")
 const { formatToastTitle } = require("../../shared/uiFeedback")
 const LAST_BOOKING_CONTACT_KEY = "lastBookingContact"
+const BOOKING_CAR_LOAD_TIMEOUT_MS = 15 * 1000
+const AVAILABILITY_CHECK_TIMEOUT_MS = 12 * 1000
+const BOOKING_SUBMIT_TIMEOUT_MS = 15 * 1000
 
 function formatDate(date) {
   const year = date.getFullYear()
@@ -259,6 +262,13 @@ Page({
   },
 
   loadBookingCar(carId) {
+    const requestId = Number(this._bookingCarRequestId || 0) + 1
+    this._bookingCarRequestId = requestId
+    if (this._bookingCarLoadTimer) {
+      clearTimeout(this._bookingCarLoadTimer)
+      this._bookingCarLoadTimer = null
+    }
+
     if (!carId) {
       this.applyCar(null)
       return
@@ -269,12 +279,43 @@ Page({
       return
     }
 
-    wx.cloud.callFunction({
+    this.setData({
+      loadingCar: true,
+      loadError: false
+    })
+
+    let settled = false
+    const finishRequest = () => {
+      if (settled || requestId !== this._bookingCarRequestId) {
+        return false
+      }
+      settled = true
+      if (this._bookingCarLoadTimer) {
+        clearTimeout(this._bookingCarLoadTimer)
+        this._bookingCarLoadTimer = null
+      }
+      return true
+    }
+    const handleFailure = (message) => {
+      if (!finishRequest()) {
+        return
+      }
+      this.setLoadError(message)
+    }
+
+    this._bookingCarLoadTimer = setTimeout(() => {
+      handleFailure("车辆信息加载超时，请检查网络后重试")
+    }, BOOKING_CAR_LOAD_TIMEOUT_MS)
+
+    const requestOptions = {
       name: "vehiclePublicDetail",
       data: {
         id: carId
       },
       success: (res) => {
+        if (!finishRequest()) {
+          return
+        }
         const result = res && res.result ? res.result : null
         const car = result && result.ok ? result.car : null
         if (car) {
@@ -290,9 +331,27 @@ Page({
         this.setLoadError((result && result.message) || "车辆信息加载失败，请稍后重试")
       },
       fail: (error) => {
-        this.setLoadError((error && (error.errMsg || error.message)) || "车辆信息加载失败，请稍后重试")
+        handleFailure((error && (error.errMsg || error.message)) || "车辆信息加载失败，请稍后重试")
       }
-    })
+    }
+
+    try {
+      wx.cloud.callFunction(requestOptions)
+    } catch (error) {
+      handleFailure((error && (error.errMsg || error.message)) || "车辆信息加载失败，请稍后重试")
+    }
+  },
+
+  onUnload() {
+    this._bookingCarRequestId = Number(this._bookingCarRequestId || 0) + 1
+    this.availabilityRequestSerial = Number(this.availabilityRequestSerial || 0) + 1
+    this._bookingSubmitSerial = Number(this._bookingSubmitSerial || 0) + 1
+    if (this._bookingCarLoadTimer) {
+      clearTimeout(this._bookingCarLoadTimer)
+      this._bookingCarLoadTimer = null
+    }
+    this.clearAvailabilityCheckTimer()
+    this.clearBookingSubmitTimer()
   },
 
   setLoadError(message) {
@@ -436,11 +495,28 @@ Page({
 
   resetAvailability() {
     this.availabilityRequestSerial = Number(this.availabilityRequestSerial || 0) + 1
+    this.clearAvailabilityCheckTimer()
     this.setData({
       availabilityState: "idle",
       availabilityText: "选好取还车日期后，将自动查看同期咨询情况",
       availabilityConflictCount: 0
     })
+  },
+
+  clearAvailabilityCheckTimer() {
+    if (!this._availabilityCheckTimer) {
+      return
+    }
+    clearTimeout(this._availabilityCheckTimer)
+    this._availabilityCheckTimer = null
+  },
+
+  clearBookingSubmitTimer() {
+    if (!this._bookingSubmitTimer) {
+      return
+    }
+    clearTimeout(this._bookingSubmitTimer)
+    this._bookingSubmitTimer = null
   },
 
   checkVehicleAvailability() {
@@ -454,6 +530,10 @@ Page({
       return
     }
 
+    const requestSerial = Number(this.availabilityRequestSerial || 0) + 1
+    this.availabilityRequestSerial = requestSerial
+    this.clearAvailabilityCheckTimer()
+
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       this.setData({
         availabilityState: "unknown",
@@ -463,15 +543,37 @@ Page({
       return
     }
 
-    const requestSerial = Number(this.availabilityRequestSerial || 0) + 1
-    this.availabilityRequestSerial = requestSerial
     this.setData({
       availabilityState: "checking",
       availabilityText: "正在查看同期咨询情况…",
       availabilityConflictCount: 0
     })
 
-    wx.cloud.callFunction({
+    let settled = false
+    const finishRequest = () => {
+      if (settled || requestSerial !== this.availabilityRequestSerial) {
+        return false
+      }
+      settled = true
+      this.clearAvailabilityCheckTimer()
+      return true
+    }
+    const handleFailure = (message) => {
+      if (!finishRequest()) {
+        return
+      }
+      this.setData({
+        availabilityState: "unknown",
+        availabilityText: message || "档期查询暂时失败，仍可提交并由顾问确认",
+        availabilityConflictCount: 0
+      })
+    }
+
+    this._availabilityCheckTimer = setTimeout(() => {
+      handleFailure("档期查询超时，仍可提交并由顾问确认")
+    }, AVAILABILITY_CHECK_TIMEOUT_MS)
+
+    const requestOptions = {
       name: "vehicleAvailabilityCheck",
       data: {
         vehicleId,
@@ -479,7 +581,7 @@ Page({
         endDate
       },
       success: (res) => {
-        if (requestSerial !== this.availabilityRequestSerial) {
+        if (!finishRequest()) {
           return
         }
 
@@ -506,16 +608,15 @@ Page({
         })
       },
       fail: () => {
-        if (requestSerial !== this.availabilityRequestSerial) {
-          return
-        }
-        this.setData({
-          availabilityState: "unknown",
-          availabilityText: "档期查询暂时失败，仍可提交并由顾问确认",
-          availabilityConflictCount: 0
-        })
+        handleFailure()
       }
-    })
+    }
+
+    try {
+      wx.cloud.callFunction(requestOptions)
+    } catch (error) {
+      handleFailure()
+    }
   },
 
   handleCityChange(event) {
@@ -640,6 +741,15 @@ Page({
     }
 
     const requestId = this.data.submitRequestId || createBookingRequestId()
+    const submittedVehicleId = String(this.data.carId || "").trim()
+    const submittedForm = {
+      ...this.data.form
+    }
+    const submittedSummary = {
+      ...this.data.bookingSummary
+    }
+    const submitSerial = Number(this._bookingSubmitSerial || 0) + 1
+    this._bookingSubmitSerial = submitSerial
 
     this.setData({
       isSubmitting: true,
@@ -661,57 +771,25 @@ Page({
     }
 
     this.requestStatusSubscription(() => {
-      wx.cloud.callFunction({
-      name: "bookingCreate",
-      data: {
-        vehicleId: this.data.carId,
-        userName: this.data.form.userName,
-        phone: this.data.form.phone,
-        startDate: this.data.form.startDate,
-        endDate: this.data.form.endDate,
-        city: this.data.form.city,
-        note: this.data.form.note,
-        requestId
-      },
-      success: (res) => {
-        const result = res && res.result ? res.result : null
-        if (!result || !result.ok) {
-          wx.showToast({
-          title: formatToastTitle(result && result.message, "预约提交失败"),
-            icon: "none"
-          })
-          this.setData({
-            isSubmitting: false,
-            submitButtonText: "提交预约"
-          })
+      if (submitSerial !== this._bookingSubmitSerial) {
+        return
+      }
+
+      let settled = false
+      const finishRequest = () => {
+        if (settled || submitSerial !== this._bookingSubmitSerial) {
+          return false
+        }
+        settled = true
+        this.clearBookingSubmitTimer()
+        return true
+      }
+      const handleFailure = (message) => {
+        if (!finishRequest()) {
           return
         }
-
-        trackEvent("booking_submit", this.data.carId)
-        if (typeof wx.setStorageSync === "function") {
-          try {
-            wx.setStorageSync(LAST_BOOKING_CONTACT_KEY, {
-              userName: String(this.data.form.userName || "").trim(),
-              phone: String(this.data.form.phone || "").trim()
-            })
-          } catch (error) {}
-        }
-        this.setData({
-          isSubmitting: false,
-          submitButtonText: "提交预约",
-          submitSuccess: true,
-          submittedBookingId: String(result.id || "").trim(),
-          submittedSummary: {
-            ...this.data.bookingSummary
-          }
-        })
-        wx.setNavigationBarTitle({
-          title: "预约已提交"
-        })
-      },
-      fail: (error) => {
         wx.showToast({
-          title: "预约提交失败",
+          title: formatToastTitle(message, "预约提交失败"),
           icon: "none"
         })
         this.setData({
@@ -719,7 +797,70 @@ Page({
           submitButtonText: "提交预约"
         })
       }
-    })
+
+      this._bookingSubmitTimer = setTimeout(() => {
+        handleFailure("提交超时，请重试")
+      }, BOOKING_SUBMIT_TIMEOUT_MS)
+
+      const requestOptions = {
+        name: "bookingCreate",
+        data: {
+          vehicleId: submittedVehicleId,
+          userName: submittedForm.userName,
+          phone: submittedForm.phone,
+          startDate: submittedForm.startDate,
+          endDate: submittedForm.endDate,
+          city: submittedForm.city,
+          note: submittedForm.note,
+          requestId
+        },
+        success: (res) => {
+          if (!finishRequest()) {
+            return
+          }
+          const result = res && res.result ? res.result : null
+          if (!result || !result.ok) {
+            wx.showToast({
+              title: formatToastTitle(result && result.message, "预约提交失败"),
+              icon: "none"
+            })
+            this.setData({
+              isSubmitting: false,
+              submitButtonText: "提交预约"
+            })
+            return
+          }
+
+          trackEvent("booking_submit", submittedVehicleId)
+          if (typeof wx.setStorageSync === "function") {
+            try {
+              wx.setStorageSync(LAST_BOOKING_CONTACT_KEY, {
+                userName: String(submittedForm.userName || "").trim(),
+                phone: String(submittedForm.phone || "").trim()
+              })
+            } catch (error) {}
+          }
+          this.setData({
+            isSubmitting: false,
+            submitButtonText: "提交预约",
+            submitSuccess: true,
+            submittedBookingId: String(result.id || "").trim(),
+            submittedSummary
+          })
+          wx.setNavigationBarTitle({
+            title: "预约已提交"
+          })
+        },
+        fail: (error) => {
+          handleFailure(error && (error.errMsg || error.message))
+        }
+      }
+
+      try {
+        wx.cloud.callFunction(requestOptions)
+      } catch (error) {
+        handleFailure(error && (error.errMsg || error.message))
+      }
     })
   },
 

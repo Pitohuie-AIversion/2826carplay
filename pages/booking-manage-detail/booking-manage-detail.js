@@ -1,6 +1,9 @@
 const { requirePagePermission } = require("../../shared/pageAuth")
 const { formatToastTitle } = require("../../shared/uiFeedback")
 
+const BOOKING_DETAIL_LOAD_TIMEOUT_MS = 15 * 1000
+const BOOKING_DETAIL_WRITE_TIMEOUT_MS = 20 * 1000
+
 const STATUS_TEXT_MAP = {
   pending: "待联系",
   contacted: "已联系",
@@ -214,9 +217,22 @@ Page({
   },
 
   onShow() {
-    if (this.data.pageAuthorized && this.data.id) {
+    if (
+      this.data.pageAuthorized &&
+      this.data.id &&
+      !this._bookingDetailMutationActive
+    ) {
       this.loadDetail()
     }
+  },
+
+  onUnload() {
+    this._bookingDetailRequestId = Number(this._bookingDetailRequestId || 0) + 1
+    this._bookingDetailMutationRequestId =
+      Number(this._bookingDetailMutationRequestId || 0) + 1
+    this.clearBookingDetailTimer()
+    this.clearBookingDetailMutationTimer()
+    this._bookingDetailMutationActive = false
   },
 
   applyBooking(booking, conflictResult) {
@@ -246,13 +262,22 @@ Page({
   },
 
   loadDetail() {
-    if (!this.data.id) {
+    const id = String(this.data.id || "").trim()
+    if (!id) {
       this.setData({
         initialLoading: false,
         loading: false
       })
       return
     }
+
+    if (this._bookingDetailMutationActive) {
+      return
+    }
+
+    const requestId = Number(this._bookingDetailRequestId || 0) + 1
+    this._bookingDetailRequestId = requestId
+    this.clearBookingDetailTimer()
 
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       this.setData({
@@ -269,17 +294,49 @@ Page({
       loadFailed: false
     })
 
-    wx.cloud.callFunction({
+    let settled = false
+    const finishRequest = () => {
+      if (settled || this._bookingDetailRequestId !== requestId) {
+        return false
+      }
+      settled = true
+      this.clearBookingDetailTimer()
+      return true
+    }
+    const handleFailure = (message) => {
+      if (!finishRequest()) {
+        return
+      }
+      wx.showToast({
+        title: formatToastTitle(message, "加载失败"),
+        icon: "none"
+      })
+      this.setData({
+        initialLoading: false,
+        loading: false,
+        loadFailed: true,
+        loadErrorText: message || "预约详情加载失败，请稍后重试"
+      })
+    }
+
+    this._bookingDetailTimer = setTimeout(() => {
+      handleFailure("详情加载超时，请重试")
+    }, BOOKING_DETAIL_LOAD_TIMEOUT_MS)
+
+    const requestOptions = {
       name: "bookingDetail",
       data: {
-        id: this.data.id
+        id
       },
       success: (res) => {
+        if (!finishRequest()) {
+          return
+        }
         const result = res && res.result ? res.result : null
         const current = result && result.ok ? result.detail : null
         if (!current) {
           wx.showToast({
-          title: formatToastTitle(result && result.message, "预约不存在"),
+            title: formatToastTitle(result && result.message, "预约不存在"),
             icon: "none"
           })
           this.setData({
@@ -301,18 +358,15 @@ Page({
         this.setData({ loading: false })
       },
       fail: (error) => {
-        wx.showToast({
-          title: "加载失败",
-          icon: "none"
-        })
-        this.setData({
-          initialLoading: false,
-          loading: false,
-          loadFailed: true,
-          loadErrorText: (error && (error.errMsg || error.message)) || "预约详情加载失败，请稍后重试"
-        })
+        handleFailure(error && (error.errMsg || error.message))
       }
-    })
+    }
+
+    try {
+      wx.cloud.callFunction(requestOptions)
+    } catch (error) {
+      handleFailure(error && (error.errMsg || error.message))
+    }
   },
 
   handleRemarkInput(event) {
@@ -323,24 +377,32 @@ Page({
   },
 
   handleSaveRemark() {
-    if (this.data.loading || !this.data.id) {
+    if (
+      this.data.loading ||
+      this.data.coordinationLoading ||
+      this._bookingDetailMutationActive ||
+      !this.data.id
+    ) {
       return
     }
 
+    const id = String(this.data.id || "").trim()
     const adminRemark = normalizeRemark(this.data.booking.adminRemarkDraft)
 
-    this.setData({ loading: true })
-    wx.cloud.callFunction({
+    this.runBookingDetailMutation({
       name: "bookingUpdateAdminRemark",
       data: {
-        id: this.data.id,
+        id,
         adminRemark
       },
-      success: (res) => {
-        const result = res && res.result ? res.result : null
+      startState: { loading: true },
+      endState: { loading: false },
+      timeoutTitle: "保存超时，请重试",
+      failureFallback: "保存失败",
+      onResult: (result, isCurrent) => {
         if (!result || !result.ok) {
           wx.showToast({
-          title: formatToastTitle(result && result.message, "保存失败"),
+            title: formatToastTitle(result && result.message, "保存失败"),
             icon: "none"
           })
           this.setData({ loading: false })
@@ -351,20 +413,21 @@ Page({
           title: "备注已保存",
           icon: "none"
         })
-        this.loadDetail()
-      },
-      fail: (error) => {
-        wx.showToast({
-          title: "保存失败",
-          icon: "none"
-        })
-        this.setData({ loading: false })
+        if (isCurrent()) {
+          this.loadDetail()
+        }
       }
     })
   },
 
   handleUpdateCoordination(event) {
-    if (this.data.coordinationLoading || !this.data.coordinationEditable || !this.data.id) {
+    if (
+      this.data.loading ||
+      this.data.coordinationLoading ||
+      this._bookingDetailMutationActive ||
+      !this.data.coordinationEditable ||
+      !this.data.id
+    ) {
       return
     }
 
@@ -390,19 +453,22 @@ Page({
       return
     }
 
-    this.setData({ coordinationLoading: true })
-    wx.cloud.callFunction({
+    const id = String(this.data.id || "").trim()
+    this.runBookingDetailMutation({
       name: "bookingUpdateCoordination",
       data: {
-        id: this.data.id,
+        id,
         schedulePriority,
         coordinationStatus
       },
-      success: (res) => {
-        const result = res && res.result ? res.result : null
+      startState: { coordinationLoading: true },
+      endState: { coordinationLoading: false },
+      timeoutTitle: "协调更新超时，请重试",
+      failureFallback: "协调更新失败",
+      onResult: (result, isCurrent) => {
         if (!result || !result.ok) {
           wx.showToast({
-          title: formatToastTitle(result && result.message, "协调更新失败"),
+            title: formatToastTitle(result && result.message, "协调更新失败"),
             icon: "none"
           })
           this.setData({ coordinationLoading: false })
@@ -414,14 +480,9 @@ Page({
           icon: "none"
         })
         this.setData({ coordinationLoading: false })
-        this.loadDetail()
-      },
-      fail: (error) => {
-        wx.showToast({
-          title: "协调更新失败",
-          icon: "none"
-        })
-        this.setData({ coordinationLoading: false })
+        if (isCurrent()) {
+          this.loadDetail()
+        }
       }
     })
   },
@@ -512,7 +573,12 @@ Page({
   },
 
   handleUpdateStatus(event) {
-    if (this.data.loading || !this.data.id) {
+    if (
+      this.data.loading ||
+      this.data.coordinationLoading ||
+      this._bookingDetailMutationActive ||
+      !this.data.id
+    ) {
       return
     }
 
@@ -539,19 +605,32 @@ Page({
   },
 
   updateStatus(status) {
-    this.setData({ loading: true })
+    if (
+      this.data.loading ||
+      this.data.coordinationLoading ||
+      this._bookingDetailMutationActive
+    ) {
+      return
+    }
+    const id = String(this.data.id || "").trim()
+    if (!id) {
+      return
+    }
 
-    wx.cloud.callFunction({
+    this.runBookingDetailMutation({
       name: "bookingUpdateStatus",
       data: {
-        id: this.data.id,
+        id,
         status
       },
-      success: (res) => {
-        const result = res && res.result ? res.result : null
+      startState: { loading: true },
+      endState: { loading: false },
+      timeoutTitle: "更新超时，请重试",
+      failureFallback: "更新失败",
+      onResult: (result, isCurrent) => {
         if (!result || !result.ok) {
           wx.showToast({
-          title: formatToastTitle(result && result.message, "更新失败"),
+            title: formatToastTitle(result && result.message, "更新失败"),
             icon: "none"
           })
           this.setData({ loading: false })
@@ -559,17 +638,103 @@ Page({
         }
 
         showStatusUpdateFeedback(result, () => {
-          this.loadDetail()
+          if (isCurrent()) {
+            this.loadDetail()
+          }
         })
-      },
-      fail: (error) => {
-        wx.showToast({
-          title: "更新失败",
-          icon: "none"
-        })
-        this.setData({ loading: false })
       }
     })
+  },
+
+  runBookingDetailMutation(options) {
+    const input = options && typeof options === "object" ? options : {}
+    if (this._bookingDetailMutationActive) {
+      return
+    }
+    if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
+      if (input.endState) {
+        this.setData(input.endState)
+      }
+      wx.showToast({
+        title: "云能力未初始化",
+        icon: "none"
+      })
+      return
+    }
+
+    const requestId = Number(this._bookingDetailMutationRequestId || 0) + 1
+    this._bookingDetailMutationRequestId = requestId
+    this._bookingDetailMutationActive = true
+    this.clearBookingDetailMutationTimer()
+    if (input.startState) {
+      this.setData(input.startState)
+    }
+
+    let settled = false
+    const isCurrent = () =>
+      this._bookingDetailMutationRequestId === requestId
+    const finishRequest = () => {
+      if (settled || !isCurrent()) {
+        return false
+      }
+      settled = true
+      this._bookingDetailMutationActive = false
+      this.clearBookingDetailMutationTimer()
+      return true
+    }
+    const handleFailure = (message) => {
+      if (!finishRequest()) {
+        return
+      }
+      if (input.endState) {
+        this.setData(input.endState)
+      }
+      wx.showToast({
+        title: formatToastTitle(message, input.failureFallback || "操作失败"),
+        icon: "none"
+      })
+    }
+
+    this._bookingDetailMutationTimer = setTimeout(() => {
+      handleFailure(input.timeoutTitle || "操作超时，请重试")
+    }, BOOKING_DETAIL_WRITE_TIMEOUT_MS)
+
+    const requestOptions = {
+      name: input.name,
+      data: input.data,
+      success: (res) => {
+        if (!finishRequest()) {
+          return
+        }
+        const result = res && res.result ? res.result : null
+        if (typeof input.onResult === "function") {
+          input.onResult(result, isCurrent)
+        }
+      },
+      fail: (error) => {
+        handleFailure(error && (error.errMsg || error.message))
+      }
+    }
+
+    try {
+      wx.cloud.callFunction(requestOptions)
+    } catch (error) {
+      handleFailure(error && (error.errMsg || error.message))
+    }
+  },
+
+  clearBookingDetailTimer() {
+    if (this._bookingDetailTimer) {
+      clearTimeout(this._bookingDetailTimer)
+      this._bookingDetailTimer = null
+    }
+  },
+
+  clearBookingDetailMutationTimer() {
+    if (this._bookingDetailMutationTimer) {
+      clearTimeout(this._bookingDetailMutationTimer)
+      this._bookingDetailMutationTimer = null
+    }
   },
 
   handleRetryLoad() {

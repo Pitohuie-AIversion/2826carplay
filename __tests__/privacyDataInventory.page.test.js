@@ -59,6 +59,7 @@ describe("pages/privacy-data-inventory", () => {
   })
 
   afterEach(() => {
+    jest.useRealTimers()
     delete global.Page
     delete global.wx
   })
@@ -169,6 +170,78 @@ describe("pages/privacy-data-inventory", () => {
     expect(page.data.loadError).toBe("隐私申请不存在")
   })
 
+  test("数据核验无响应时退出骨架屏并结束下拉刷新", () => {
+    jest.useFakeTimers()
+    let lateSuccess
+    const done = jest.fn()
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(({ success }) => {
+          lateSuccess = success
+        })
+      }
+    }
+    const page = createPage(loadPageDefinition(), { requestId: "request_timeout" })
+
+    page.loadInventory({ refreshing: true, done })
+    jest.advanceTimersByTime(15 * 1000)
+
+    expect(page.data.loading).toBe(false)
+    expect(page.data.refreshing).toBe(false)
+    expect(page.data.loadError).toBe("相关数据核验超时，请检查网络后重试")
+    expect(done).toHaveBeenCalledTimes(1)
+
+    lateSuccess({ result: { ok: true, request: { id: "request_timeout" }, categories: {} } })
+    expect(page.data.request).toEqual({})
+  })
+
+  test("重新核验后忽略旧请求的迟到结果", () => {
+    const requests = []
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn((options) => requests.push(options))
+      }
+    }
+    const page = createPage(loadPageDefinition(), { requestId: "request_race" })
+
+    page.loadInventory()
+    page.loadInventory({ refreshing: true })
+    requests[1].success({
+      result: {
+        ok: true,
+        request: { id: "request_race", type: "access", status: "pending" },
+        categories: {},
+        unavailable: ["favorites"]
+      }
+    })
+    requests[0].success({
+      result: {
+        ok: true,
+        request: { id: "stale_request", type: "deletion", status: "completed" },
+        categories: {}
+      }
+    })
+
+    expect(page.data.request.id).toBe("request_race")
+    expect(page.data.partial).toBe(false)
+    expect(page.data.unavailable).toEqual(["favorites"])
+  })
+
+  test("数据核验调用同步异常时安全进入重试状态", () => {
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(() => {
+          throw new Error("cloud sdk crashed")
+        })
+      }
+    }
+    const page = createPage(loadPageDefinition(), { requestId: "request_error" })
+
+    expect(() => page.loadInventory()).not.toThrow()
+    expect(page.data.loading).toBe(false)
+    expect(page.data.loadError).toBe("cloud sdk crashed")
+  })
+
   test("完整的查询申请可生成并保存个人数据 CSV", async () => {
     const callFunction = jest.fn(({ data, success }) => {
       expect(data).toEqual({
@@ -208,6 +281,93 @@ describe("pages/privacy-data-inventory", () => {
     expect(page.data.exporting).toBe(false)
     expect(page.data.exportFilePath).toBe("wxfile://usr/privacy-data-request_1.csv")
     expect(page.data.exportFileName).toBe("privacy-data-request_1.csv")
+  })
+
+  test("个人数据导出无响应时恢复按钮并忽略迟到结果", () => {
+    jest.useFakeTimers()
+    let lateSuccess
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(({ success }) => {
+          lateSuccess = success
+        })
+      },
+      showModal: jest.fn(({ success }) => success({ confirm: true })),
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition(), {
+      loading: false,
+      requestId: "request_export_timeout",
+      partial: false,
+      request: { type: "access" }
+    })
+
+    page.handleExport()
+    expect(page.data.exporting).toBe(true)
+
+    jest.advanceTimersByTime(20 * 1000)
+    expect(page.data.exporting).toBe(false)
+    expect(global.wx.showToast).toHaveBeenCalledWith({ title: "导出超时，请重试", icon: "none" })
+
+    lateSuccess({ result: { ok: true, fileName: "late.csv", csvText: "敏感数据" } })
+    expect(mockSaveCsvFile).not.toHaveBeenCalled()
+    expect(page.data.exportFilePath).toBe("")
+  })
+
+  test("个人数据导出同步异常时安全恢复可重试状态", () => {
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(() => {
+          throw new Error("cloud sdk crashed")
+        })
+      },
+      showModal: jest.fn(({ success }) => success({ confirm: true })),
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition(), {
+      loading: false,
+      requestId: "request_export_error",
+      partial: false,
+      request: { type: "access" }
+    })
+
+    expect(() => page.handleExport()).not.toThrow()
+    expect(page.data.exporting).toBe(false)
+    expect(global.wx.showToast).toHaveBeenCalledWith({ title: "导出失败", icon: "none" })
+  })
+
+  test("导出超时后清理迟到生成的敏感文件", async () => {
+    jest.useFakeTimers()
+    let resolveSave
+    mockSaveCsvFile.mockImplementationOnce(
+      () => new Promise((resolve) => {
+        resolveSave = resolve
+      })
+    )
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(({ success }) => {
+          success({ result: { ok: true, fileName: "privacy-late.csv", csvText: "敏感数据" } })
+        })
+      },
+      showModal: jest.fn(({ success }) => success({ confirm: true })),
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition(), {
+      loading: false,
+      requestId: "request_export_late_file",
+      partial: false,
+      request: { type: "access" }
+    })
+
+    page.handleExport()
+    jest.advanceTimersByTime(20 * 1000)
+    resolveSave({ filePath: "wxfile://usr/privacy-late.csv", fileName: "privacy-late.csv" })
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(page.data.exportFilePath).toBe("")
+    expect(mockRemoveCsvFile).toHaveBeenCalledWith("wxfile://usr/privacy-late.csv")
   })
 
   test("清单不完整时页面不会请求导出", () => {

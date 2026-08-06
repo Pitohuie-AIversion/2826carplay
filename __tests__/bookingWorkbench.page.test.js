@@ -27,6 +27,7 @@ function createPage(definition, overrides) {
 
 describe("pages/booking-workbench", () => {
   afterEach(() => {
+    jest.useRealTimers()
     delete global.Page
     delete global.wx
   })
@@ -77,6 +78,67 @@ describe("pages/booking-workbench", () => {
     expect(page.data.summary.overdue).toBe(1)
     expect(page.data.queue[0].id).toBe("booking_1")
     expect(page.data.lastSyncedText).toMatch(/^\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)
+  })
+
+  test("列表请求超时后结束刷新并忽略迟到结果", () => {
+    jest.useFakeTimers()
+    let requestOptions = null
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn((options) => {
+          requestOptions = options
+        })
+      }
+    }
+    const page = createPage(loadPageDefinition(), {
+      allBookings: [{ id: "existing_booking" }]
+    })
+    const done = jest.fn()
+
+    page.fetchBookings(done)
+    jest.advanceTimersByTime(15 * 1000)
+
+    expect(page.data.loading).toBe(false)
+    expect(page.data.refreshing).toBe(false)
+    expect(page.data.loadError).toBe("待协调预约加载超时，请检查网络后重试")
+    expect(done).toHaveBeenCalledTimes(1)
+
+    requestOptions.success({
+      result: {
+        ok: true,
+        list: [{ id: "late_booking" }]
+      }
+    })
+    expect(page.data.allBookings).toEqual([{ id: "existing_booking" }])
+  })
+
+  test("新列表请求覆盖旧请求并保留最新队列", () => {
+    const requests = []
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn((options) => requests.push(options))
+      }
+    }
+    const page = createPage(loadPageDefinition())
+    const firstDone = jest.fn()
+
+    page.fetchBookings(firstDone)
+    page.fetchBookings()
+    requests[1].success({
+      result: {
+        ok: true,
+        list: [{ id: "latest_booking", status: "pending" }]
+      }
+    })
+    requests[0].success({
+      result: {
+        ok: true,
+        list: [{ id: "stale_booking", status: "pending" }]
+      }
+    })
+
+    expect(firstDone).toHaveBeenCalledTimes(1)
+    expect(page.data.allBookings[0].id).toBe("latest_booking")
   })
 
   test("支持切换队列、拨号和进入预约详情", () => {
@@ -396,6 +458,44 @@ describe("pages/booking-workbench", () => {
     expect(page.data.updatingId).toBe("")
   })
 
+  test("协调更新超时后解锁操作并忽略迟到回调", () => {
+    jest.useFakeTimers()
+    let requestOptions = null
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn((options) => {
+          requestOptions = options
+        })
+      },
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition())
+    page.fetchBookings = jest.fn()
+    const event = {
+      currentTarget: {
+        dataset: {
+          id: "booking_timeout",
+          schedulePriority: "normal",
+          coordinationStatus: "pending"
+        }
+      }
+    }
+
+    page.handleQuickCoordination(event)
+    page.handleQuickCoordination(event)
+    expect(global.wx.cloud.callFunction).toHaveBeenCalledTimes(1)
+
+    jest.advanceTimersByTime(20 * 1000)
+    expect(page.data.updatingId).toBe("")
+    expect(global.wx.showToast).toHaveBeenCalledWith({
+      title: "协调更新超时，请重试",
+      icon: "none"
+    })
+
+    requestOptions.success({ result: { ok: true } })
+    expect(page.fetchBookings).not.toHaveBeenCalled()
+  })
+
   test("可在工作台快速调整优先级并刷新重排", () => {
     global.wx = {
       cloud: {
@@ -508,6 +608,34 @@ describe("pages/booking-workbench", () => {
     expect(page.fetchBookings).toHaveBeenCalled()
   })
 
+  test("内部备注同步异常时立即结束保存状态", () => {
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(() => {
+          throw new Error("cloud down")
+        })
+      },
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition(), {
+      editingRemarkId: "booking_remark_error",
+      remarkDraft: "新备注",
+      allBookings: [
+        {
+          id: "booking_remark_error",
+          adminRemark: "旧备注"
+        }
+      ]
+    })
+
+    expect(() => page.handleSaveRemark()).not.toThrow()
+    expect(page.data.savingRemark).toBe(false)
+    expect(global.wx.showToast).toHaveBeenCalledWith({
+      title: "cloud down",
+      icon: "none"
+    })
+  })
+
   test("待联系预约确认后可标记已联系并反馈提醒结果", () => {
     global.wx = {
       cloud: {
@@ -597,6 +725,31 @@ describe("pages/booking-workbench", () => {
     expect(global.wx.showToast).not.toHaveBeenCalled()
     global.wx.showModal.mock.calls[0][0].complete()
     expect(page.fetchBookings).toHaveBeenCalled()
+  })
+
+  test("离开工作台后不再执行提醒弹窗的迟到刷新", () => {
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(({ success }) => {
+          success({
+            result: {
+              ok: true,
+              notificationStatus: "failed"
+            }
+          })
+        })
+      },
+      showModal: jest.fn(),
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition())
+    page.fetchBookings = jest.fn()
+
+    page.updateContactedStatus("booking_unloaded")
+    page.onUnload()
+    global.wx.showModal.mock.calls[0][0].complete()
+
+    expect(page.fetchBookings).not.toHaveBeenCalled()
   })
 
   test("协调中的预约确认后可标记为已协调", () => {

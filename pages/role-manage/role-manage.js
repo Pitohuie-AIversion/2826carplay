@@ -17,6 +17,8 @@ const PERMISSION_OPTIONS = [
   }
 ]
 const OPENID_PATTERN = /^[A-Za-z0-9_-]{6,128}$/
+const ROLE_LIST_TIMEOUT_MS = 15 * 1000
+const ROLE_SAVE_TIMEOUT_MS = 20 * 1000
 
 function normalizeStringArray(value) {
   if (!Array.isArray(value)) {
@@ -88,9 +90,20 @@ Page({
   },
 
   onPullDownRefresh() {
+    if (!this.data.pageAuthorized) {
+      wx.stopPullDownRefresh()
+      return
+    }
     this.fetchRoleList({ append: false }, () => {
       wx.stopPullDownRefresh()
     })
+  },
+
+  onUnload() {
+    this._roleListRequestId = Number(this._roleListRequestId || 0) + 1
+    this._roleSaveRequestId = Number(this._roleSaveRequestId || 0) + 1
+    this.finishRoleListRequestEffects()
+    this.finishRoleSaveRequestEffects()
   },
 
   fetchRoleList(input, done) {
@@ -101,6 +114,9 @@ Page({
 
     const append = Boolean(input && input.append)
     const nextPage = append ? this.data.page + 1 : 0
+    const requestId = Number(this._roleListRequestId || 0) + 1
+    this._roleListRequestId = requestId
+    this.finishRoleListRequestEffects()
 
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       wx.showToast({
@@ -117,15 +133,49 @@ Page({
       return
     }
 
+    this._roleListRequestDone = typeof done === "function" ? done : null
     this.setData({ loading: true })
 
-    wx.cloud.callFunction({
+    let settled = false
+    const finishRequest = () => {
+      if (settled || this._roleListRequestId !== requestId) {
+        return false
+      }
+      settled = true
+      this.finishRoleListRequestEffects()
+      return true
+    }
+    const handleFailure = (message) => {
+      if (!finishRequest()) {
+        return
+      }
+      wx.showToast({
+        title: message,
+        icon: "none"
+      })
+      this.setData({
+        initialLoading: false,
+        loading: false,
+        list: append ? this.data.list : [],
+        page: append ? this.data.page : 0,
+        hasMore: append ? this.data.hasMore : false
+      })
+    }
+
+    this._roleListRequestTimer = setTimeout(() => {
+      handleFailure("加载超时，请检查网络后重试")
+    }, ROLE_LIST_TIMEOUT_MS)
+
+    const requestOptions = {
       name: "roleList",
       data: {
         page: nextPage,
         pageSize: this.data.pageSize
       },
       success: (res) => {
+        if (!finishRequest()) {
+          return
+        }
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
           wx.showToast({
@@ -139,9 +189,6 @@ Page({
             page: append ? this.data.page : 0,
             hasMore: append ? this.data.hasMore : false
           })
-          if (typeof done === "function") {
-            done()
-          }
           return
         }
 
@@ -159,27 +206,22 @@ Page({
           hasMore: Boolean(result.hasMore),
           list: append ? this.data.list.concat(list) : list
         })
-        if (typeof done === "function") {
-          done()
-        }
       },
       fail: (error) => {
-        wx.showToast({
-          title: "加载失败",
-          icon: "none"
-        })
-        this.setData({
-          initialLoading: false,
-          loading: false,
-          list: append ? this.data.list : [],
-          page: append ? this.data.page : 0,
-          hasMore: append ? this.data.hasMore : false
-        })
-        if (typeof done === "function") {
-          done()
-        }
-      }
-    })
+        handleFailure(
+          formatToastTitle(error && (error.errMsg || error.message), "加载失败")
+        )
+      },
+      complete: () => {}
+    }
+
+    try {
+      wx.cloud.callFunction(requestOptions)
+    } catch (error) {
+      handleFailure(
+        formatToastTitle(error && (error.errMsg || error.message), "加载失败")
+      )
+    }
   },
 
   handleLoadMore() {
@@ -272,20 +314,51 @@ Page({
       return
     }
 
+    const permissions = normalizeStringArray(this.data.selectedPermissions)
+    const requestId = Number(this._roleSaveRequestId || 0) + 1
+    this._roleSaveRequestId = requestId
+    this.finishRoleSaveRequestEffects()
     this.setData({ saving: true })
     wx.showLoading({
       title: "保存中…",
       mask: true
     })
+    this._roleSaveLoadingVisible = true
 
-    wx.cloud.callFunction({
+    let settled = false
+    const finishRequest = () => {
+      if (settled || this._roleSaveRequestId !== requestId) {
+        return false
+      }
+      settled = true
+      this.finishRoleSaveRequestEffects()
+      return true
+    }
+    const handleFailure = (message) => {
+      if (!finishRequest()) {
+        return
+      }
+      wx.showToast({
+        title: message,
+        icon: "none"
+      })
+      this.setData({ saving: false })
+    }
+
+    this._roleSaveRequestTimer = setTimeout(() => {
+      handleFailure("保存超时，请检查网络后重试")
+    }, ROLE_SAVE_TIMEOUT_MS)
+
+    const requestOptions = {
       name: "roleUpsert",
       data: {
         openid,
-        permissions: this.data.selectedPermissions
+        permissions
       },
       success: (res) => {
-        wx.hideLoading()
+        if (!finishRequest()) {
+          return
+        }
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
           wx.showToast({
@@ -305,13 +378,42 @@ Page({
         this.fetchRoleList()
       },
       fail: (error) => {
-        wx.hideLoading()
-        wx.showToast({
-          title: "保存失败",
-          icon: "none"
-        })
-        this.setData({ saving: false })
-      }
-    })
+        handleFailure(
+          formatToastTitle(error && (error.errMsg || error.message), "保存失败")
+        )
+      },
+      complete: () => {}
+    }
+
+    try {
+      wx.cloud.callFunction(requestOptions)
+    } catch (error) {
+      handleFailure(
+        formatToastTitle(error && (error.errMsg || error.message), "保存失败")
+      )
+    }
+  },
+
+  finishRoleListRequestEffects() {
+    if (this._roleListRequestTimer) {
+      clearTimeout(this._roleListRequestTimer)
+      this._roleListRequestTimer = null
+    }
+    const done = this._roleListRequestDone
+    this._roleListRequestDone = null
+    if (typeof done === "function") {
+      done()
+    }
+  },
+
+  finishRoleSaveRequestEffects() {
+    if (this._roleSaveRequestTimer) {
+      clearTimeout(this._roleSaveRequestTimer)
+      this._roleSaveRequestTimer = null
+    }
+    if (this._roleSaveLoadingVisible) {
+      this._roleSaveLoadingVisible = false
+      wx.hideLoading()
+    }
   }
 })

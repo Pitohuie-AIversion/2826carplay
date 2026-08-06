@@ -113,7 +113,8 @@ describe("pages/garage 首页车辆筛选", () => {
     expect(wxml).toContain("garage-clear-native-icon")
     expect(wxml).toContain("garage-status-native-icon")
     expect(wxml).toContain("garage-complete-native-icon")
-    expect(wxml).toContain("{{loadingCars ? '正在加载' : '加载更多车辆'}}")
+    expect(wxml).toContain("disabled=\"{{loadingCars || searchDebouncing}}\"")
+    expect(wxml).toContain("{{searchDebouncing ? '正在搜索…' : loadingCars ? '正在加载' : '加载更多车辆'}}")
     expect(wxml).toContain("搜索会覆盖全部在库车辆")
     expect(wxml).not.toContain('bindtap="handleRetryLoad">重新加载</button>')
     expect(wxss).toContain(".garage-action-content")
@@ -287,6 +288,57 @@ describe("pages/garage 首页车辆筛选", () => {
     }))
     expect(page.data.filteredCars.map((item) => item.id)).toEqual(["remote-911"])
     expect(page.data.searchResultCount).toBe(1)
+  })
+
+  test("搜索防抖期间禁止加载旧分页并从第一页请求", () => {
+    jest.useFakeTimers()
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn()
+      },
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition())
+    page.data.page = 3
+    page.data.hasMore = true
+
+    page.handleSearchInput({ detail: { value: "Ferrari" } })
+    page.handleLoadMore()
+
+    expect(wx.cloud.callFunction).not.toHaveBeenCalled()
+    jest.advanceTimersByTime(350)
+    expect(wx.cloud.callFunction).toHaveBeenCalledTimes(1)
+    expect(wx.cloud.callFunction).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        page: 0,
+        keyword: "Ferrari"
+      })
+    }))
+  })
+
+  test("搜索防抖期间切换分类会接管请求且不重复搜索", () => {
+    jest.useFakeTimers()
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn()
+      },
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition())
+
+    page.handleSearchInput({ detail: { value: "Porsche" } })
+    page.handleCategoryTap({ currentTarget: { dataset: { categoryId: "supercar" } } })
+
+    expect(wx.cloud.callFunction).toHaveBeenCalledTimes(1)
+    expect(wx.cloud.callFunction).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        page: 0,
+        keyword: "Porsche",
+        category: "supercar"
+      })
+    }))
+    jest.advanceTimersByTime(350)
+    expect(wx.cloud.callFunction).toHaveBeenCalledTimes(1)
   })
 
   test("首页云函数无响应时结束骨架屏并提供重试入口", () => {

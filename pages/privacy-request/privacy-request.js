@@ -1,4 +1,6 @@
 const { formatToastTitle } = require("../../shared/uiFeedback")
+const PRIVACY_REQUEST_LIST_TIMEOUT_MS = 15 * 1000
+const PRIVACY_REQUEST_MUTATION_TIMEOUT_MS = 12 * 1000
 
 const TYPE_OPTIONS = [
   { value: "access", label: "查询信息", desc: "申请了解平台当前保存的个人信息" },
@@ -148,9 +150,24 @@ Page({
   },
 
   onPullDownRefresh() {
+    if (this.data.submitting || this.data.cancellingId) {
+      if (typeof wx.stopPullDownRefresh === "function") {
+        wx.stopPullDownRefresh()
+      }
+      return
+    }
     this.fetchList({
       done: () => wx.stopPullDownRefresh()
     })
+  },
+
+  onUnload() {
+    this._listRequestId = Number(this._listRequestId || 0) + 1
+    this._submitRequestSerial = Number(this._submitRequestSerial || 0) + 1
+    this._cancelRequestSerial = Number(this._cancelRequestSerial || 0) + 1
+    this.finishListRequestEffects()
+    this.clearSubmitRequestTimer()
+    this.clearCancelRequestTimer()
   },
 
   handleTypeTap(event) {
@@ -216,23 +233,59 @@ Page({
       return
     }
 
+    const requestType = String(this.data.currentType || "access")
+    const submitSerial = Number(this._submitRequestSerial || 0) + 1
+    this._submitRequestSerial = submitSerial
+    this.clearSubmitRequestTimer()
     this.setData({ submitting: true })
-    wx.cloud.callFunction({
+
+    let settled = false
+    const finishRequest = () => {
+      if (settled || submitSerial !== this._submitRequestSerial) {
+        return false
+      }
+      settled = true
+      this.clearSubmitRequestTimer()
+      return true
+    }
+    const handleFailure = (message) => {
+      if (!finishRequest()) {
+        return
+      }
+      this.setData({ submitting: false })
+      wx.showToast({
+        title: formatToastTitle(message, "提交失败"),
+        icon: "none"
+      })
+    }
+
+    this._submitRequestTimer = setTimeout(() => {
+      handleFailure("提交超时，请重试")
+    }, PRIVACY_REQUEST_MUTATION_TIMEOUT_MS)
+
+    const requestOptions = {
       name: "privacyRequestCreate",
       data: {
-        type: this.data.currentType,
+        type: requestType,
         description
       },
       success: (res) => {
+        if (!finishRequest()) {
+          return
+        }
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
+          this.setData({ submitting: false })
           wx.showToast({
-          title: formatToastTitle(result && result.message, "提交失败"),
+            title: formatToastTitle(result && result.message, "提交失败"),
             icon: "none"
           })
           return
         }
-        this.setData(buildDescriptionState(""))
+        this.setData({
+          ...buildDescriptionState(""),
+          submitting: false
+        })
         wx.showToast({
           title: "申请已提交",
           icon: "success"
@@ -240,15 +293,23 @@ Page({
         this.fetchList()
       },
       fail: (error) => {
-        wx.showToast({
-          title: "提交失败",
-          icon: "none"
-        })
-      },
-      complete: () => {
-        this.setData({ submitting: false })
+        handleFailure(error && (error.errMsg || error.message))
       }
-    })
+    }
+
+    try {
+      wx.cloud.callFunction(requestOptions)
+    } catch (error) {
+      handleFailure(error && (error.errMsg || error.message))
+    }
+  },
+
+  clearSubmitRequestTimer() {
+    if (!this._submitRequestTimer) {
+      return
+    }
+    clearTimeout(this._submitRequestTimer)
+    this._submitRequestTimer = null
   },
 
   handleRetry() {
@@ -256,7 +317,7 @@ Page({
   },
 
   handleLoadMore() {
-    if (this.data.loading || !this.data.hasMore) {
+    if (this.data.loading || this.data.submitting || this.data.cancellingId || !this.data.hasMore) {
       return
     }
     this.fetchList({ append: true })
@@ -290,15 +351,50 @@ Page({
       return
     }
 
-    this.setData({ cancellingId: id })
-    wx.cloud.callFunction({
+    const requestId = String(id || "").trim()
+    const cancelSerial = Number(this._cancelRequestSerial || 0) + 1
+    this._cancelRequestSerial = cancelSerial
+    this._listRequestId = Number(this._listRequestId || 0) + 1
+    this.finishListRequestEffects()
+    this.clearCancelRequestTimer()
+    this.setData({ cancellingId: requestId, loading: false })
+
+    let settled = false
+    const finishRequest = () => {
+      if (settled || cancelSerial !== this._cancelRequestSerial) {
+        return false
+      }
+      settled = true
+      this.clearCancelRequestTimer()
+      return true
+    }
+    const handleFailure = (message) => {
+      if (!finishRequest()) {
+        return
+      }
+      this.setData({ cancellingId: "" })
+      wx.showToast({
+        title: formatToastTitle(message, "撤回失败"),
+        icon: "none"
+      })
+    }
+
+    this._cancelRequestTimer = setTimeout(() => {
+      handleFailure("撤回超时，请重试")
+    }, PRIVACY_REQUEST_MUTATION_TIMEOUT_MS)
+
+    const requestOptions = {
       name: "privacyRequestCancel",
-      data: { id },
+      data: { id: requestId },
       success: (res) => {
+        if (!finishRequest()) {
+          return
+        }
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
+          this.setData({ cancellingId: "" })
           wx.showToast({
-          title: formatToastTitle(result && result.message, "撤回失败"),
+            title: formatToastTitle(result && result.message, "撤回失败"),
             icon: "none"
           })
           if (result && ["STATUS_CONFLICT", "STATUS_NOT_ALLOWED"].includes(result.code)) {
@@ -310,18 +406,27 @@ Page({
           title: "申请已撤回",
           icon: "none"
         })
+        this.setData({ cancellingId: "" })
         this.fetchList()
       },
       fail: (error) => {
-        wx.showToast({
-          title: "撤回失败",
-          icon: "none"
-        })
-      },
-      complete: () => {
-        this.setData({ cancellingId: "" })
+        handleFailure(error && (error.errMsg || error.message))
       }
-    })
+    }
+
+    try {
+      wx.cloud.callFunction(requestOptions)
+    } catch (error) {
+      handleFailure(error && (error.errMsg || error.message))
+    }
+  },
+
+  clearCancelRequestTimer() {
+    if (!this._cancelRequestTimer) {
+      return
+    }
+    clearTimeout(this._cancelRequestTimer)
+    this._cancelRequestTimer = null
   },
 
   applyRequestList(list, options) {
@@ -349,6 +454,9 @@ Page({
     const input = options && typeof options === "object" ? options : {}
     const append = Boolean(input.append)
     const nextPage = append ? this.data.page + 1 : 0
+    const requestId = Number(this._listRequestId || 0) + 1
+    this._listRequestId = requestId
+    this.finishListRequestEffects()
 
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       this.setData({
@@ -362,17 +470,53 @@ Page({
       return
     }
 
+    this._listRequestDone = typeof input.done === "function" ? input.done : null
     this.setData({
       loading: true,
       loadError: append ? this.data.loadError : ""
     })
-    wx.cloud.callFunction({
+
+    let settled = false
+    const finishRequest = () => {
+      if (settled || requestId !== this._listRequestId) {
+        return false
+      }
+      settled = true
+      this.finishListRequestEffects()
+      return true
+    }
+    const handleFailure = (message) => {
+      if (!finishRequest()) {
+        return
+      }
+      this.setData({
+        initialLoading: false,
+        loading: false,
+        loadError: String(message || "申请记录加载失败")
+      })
+      if (!append) {
+        this.applyRequestList([], {
+          filter: this.data.currentFilter,
+          page: 0,
+          hasMore: false
+        })
+      }
+    }
+
+    this._listRequestTimer = setTimeout(() => {
+      handleFailure("申请记录加载超时，请检查网络后重试")
+    }, PRIVACY_REQUEST_LIST_TIMEOUT_MS)
+
+    const requestOptions = {
       name: "privacyRequestMyList",
       data: {
         page: nextPage,
         pageSize: this.data.pageSize
       },
       success: (res) => {
+        if (!finishRequest()) {
+          return
+        }
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
           this.setData({
@@ -406,24 +550,26 @@ Page({
         })
       },
       fail: (error) => {
-        this.setData({
-          initialLoading: false,
-          loading: false,
-          loadError: (error && (error.errMsg || error.message)) || "申请记录加载失败"
-        })
-        if (!append) {
-          this.applyRequestList([], {
-            filter: this.data.currentFilter,
-            page: 0,
-            hasMore: false
-          })
-        }
-      },
-      complete: () => {
-        if (typeof input.done === "function") {
-          input.done()
-        }
+        handleFailure((error && (error.errMsg || error.message)) || "申请记录加载失败")
       }
-    })
+    }
+
+    try {
+      wx.cloud.callFunction(requestOptions)
+    } catch (error) {
+      handleFailure((error && (error.errMsg || error.message)) || "申请记录加载失败")
+    }
+  },
+
+  finishListRequestEffects() {
+    if (this._listRequestTimer) {
+      clearTimeout(this._listRequestTimer)
+      this._listRequestTimer = null
+    }
+    const done = this._listRequestDone
+    this._listRequestDone = null
+    if (typeof done === "function") {
+      done()
+    }
   }
 })

@@ -27,8 +27,146 @@ function createPage(definition, overrides) {
 
 describe("pages/booking-manage workflow filters", () => {
   afterEach(() => {
+    jest.useRealTimers()
     delete global.Page
     delete global.wx
+  })
+
+  test("预约管理列表无回调时超时收尾并忽略迟到结果", () => {
+    jest.useFakeTimers()
+    let lateSuccess
+    const done = jest.fn()
+    global.wx = {
+      showToast: jest.fn(),
+      cloud: {
+        callFunction: jest.fn(({ success }) => {
+          lateSuccess = success
+        })
+      }
+    }
+    const existingList = [{ id: "existing" }]
+    const page = createPage(loadPageDefinition(), {
+      list: existingList,
+      page: 2,
+      hasMore: true,
+      total: 60
+    })
+
+    page.fetchList({ append: true, done })
+    jest.advanceTimersByTime(15 * 1000)
+
+    expect(page.data.loading).toBe(false)
+    expect(page.data.list).toBe(existingList)
+    expect(page.data.page).toBe(2)
+    expect(page.data.hasMore).toBe(true)
+    expect(page.data.total).toBe(60)
+    expect(done).toHaveBeenCalledTimes(1)
+    expect(global.wx.showToast).toHaveBeenCalledWith({
+      title: "加载超时，请重试",
+      icon: "none"
+    })
+
+    lateSuccess({
+      result: {
+        ok: true,
+        page: 3,
+        hasMore: false,
+        list: [{ id: "late" }]
+      }
+    })
+    expect(page.data.list).toBe(existingList)
+    expect(page.data.page).toBe(2)
+  })
+
+  test("新预约筛选请求覆盖旧请求且固定筛选快照", () => {
+    const requests = []
+    global.wx = {
+      showToast: jest.fn(),
+      cloud: {
+        callFunction: jest.fn((options) => requests.push(options))
+      }
+    }
+    const page = createPage(loadPageDefinition(), { currentStatus: "pending" })
+
+    page.fetchList()
+    page.data.currentStatus = "contacted"
+    page.fetchList()
+    expect(requests[0].data.status).toBe("pending")
+    expect(requests[1].data.status).toBe("contacted")
+
+    requests[1].success({
+      result: {
+        ok: true,
+        page: 0,
+        hasMore: false,
+        list: [{ id: "fresh", status: "contacted" }]
+      }
+    })
+    requests[0].success({
+      result: {
+        ok: true,
+        page: 0,
+        hasMore: false,
+        list: [{ id: "stale", status: "pending" }]
+      }
+    })
+
+    expect(page.data.list).toHaveLength(1)
+    expect(page.data.list[0].id).toBe("fresh")
+  })
+
+  test("预约导出全链路超时后删除迟到写入的文件", () => {
+    jest.useFakeTimers()
+    let exportRequest
+    let writeOptions
+    const unlink = jest.fn(({ success }) => success())
+    const fileSystem = {
+      writeFile: jest.fn((options) => {
+        writeOptions = options
+      }),
+      unlink
+    }
+    global.wx = {
+      env: { USER_DATA_PATH: "/data" },
+      getFileSystemManager: jest.fn(() => fileSystem),
+      showToast: jest.fn(),
+      showModal: jest.fn(),
+      cloud: {
+        callFunction: jest.fn((options) => {
+          exportRequest = options
+        })
+      }
+    }
+    const page = createPage(loadPageDefinition(), {
+      currentStatus: "pending",
+      keyword: "booking_1"
+    })
+
+    page.handleExport()
+    expect(exportRequest.data).toMatchObject({
+      status: "pending",
+      keyword: "booking_1"
+    })
+    exportRequest.success({
+      result: {
+        ok: true,
+        fileName: "bookings.csv",
+        csvText: "id,status\nb1,pending"
+      }
+    })
+    jest.advanceTimersByTime(20 * 1000)
+
+    expect(page.data.loading).toBe(false)
+    expect(global.wx.showToast).toHaveBeenCalledWith({
+      title: "导出超时，请重试",
+      icon: "none"
+    })
+
+    writeOptions.success()
+    expect(unlink).toHaveBeenCalledWith(expect.objectContaining({
+      filePath: "/data/bookings.csv"
+    }))
+    expect(page.data.exportFilePath).toBe("")
   })
 
   test("列表分页请求携带优先级和协调进度", () => {
@@ -114,6 +252,7 @@ describe("pages/booking-manage workflow filters", () => {
       currentCoordination: "all"
     }))
     expect(page.fetchList).toHaveBeenCalledTimes(1)
+    page.onUnload()
   })
 
   test("预约状态映射为三阶段跟进轨迹与下一步提示", () => {

@@ -33,6 +33,7 @@ function createPage(definition, data) {
 
 describe("pages/booking availability advisory", () => {
   afterEach(() => {
+    jest.useRealTimers()
     delete global.Page
     delete global.wx
   })
@@ -102,6 +103,72 @@ describe("pages/booking availability advisory", () => {
 
     page.checkVehicleAvailability()
 
+    expect(page.data.availabilityState).toBe("unknown")
+    expect(page.data.availabilityText).toContain("仍可提交")
+  })
+
+  test("档期查询无响应时自动收口并忽略迟到结果", () => {
+    jest.useFakeTimers()
+    let lateSuccess
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(({ success }) => {
+          lateSuccess = success
+        })
+      }
+    }
+    const page = createPage(loadPageDefinition(), {
+      carId: "vehicle_1",
+      form: {
+        userName: "",
+        phone: "",
+        startDate: "2099-08-10",
+        endDate: "2099-08-12",
+        city: "",
+        note: ""
+      }
+    })
+
+    page.checkVehicleAvailability()
+    expect(page.data.availabilityState).toBe("checking")
+
+    jest.advanceTimersByTime(12 * 1000)
+    expect(page.data.availabilityState).toBe("unknown")
+    expect(page.data.availabilityText).toBe("档期查询超时，仍可提交并由顾问确认")
+
+    lateSuccess({
+      result: {
+        ok: true,
+        available: true,
+        conflictCount: 0,
+        message: "迟到的空闲结果"
+      }
+    })
+    expect(page.data.availabilityState).toBe("unknown")
+    expect(page.data.availabilityText).toBe("档期查询超时，仍可提交并由顾问确认")
+  })
+
+  test("档期查询同步异常时降级为顾问确认", () => {
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(() => {
+          throw new Error("cloud sdk crashed")
+        })
+      }
+    }
+    const page = createPage(loadPageDefinition(), {
+      carId: "vehicle_1",
+      form: {
+        userName: "",
+        phone: "",
+        startDate: "2099-08-10",
+        endDate: "2099-08-12",
+        city: "",
+        note: ""
+      }
+    })
+
+    expect(() => page.checkVehicleAvailability()).not.toThrow()
     expect(page.data.availabilityState).toBe("unknown")
     expect(page.data.availabilityText).toContain("仍可提交")
   })

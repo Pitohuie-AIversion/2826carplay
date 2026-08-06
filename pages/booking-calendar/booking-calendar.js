@@ -2,6 +2,7 @@ const { requirePagePermission } = require("../../shared/pageAuth")
 const { buildMonthView, normalizeMonthKey, shiftMonth } = require("../../shared/bookingCalendar")
 
 const CURRENT_MONTH_KEY = normalizeMonthKey("")
+const BOOKING_CALENDAR_LOAD_TIMEOUT_MS = 15 * 1000
 
 const STATUS_LABELS = {
   pending: "待联系",
@@ -57,6 +58,12 @@ Page({
       return
     }
     this.fetchBookings(() => wx.stopPullDownRefresh())
+  },
+
+  onUnload() {
+    this._bookingCalendarRequestId =
+      Number(this._bookingCalendarRequestId || 0) + 1
+    this.finishBookingCalendarRequestEffects()
   },
 
   handlePreviousMonth() {
@@ -137,27 +144,58 @@ Page({
   },
 
   fetchBookings(done) {
+    this.finishBookingCalendarRequestEffects()
+    const requestId = Number(this._bookingCalendarRequestId || 0) + 1
+    this._bookingCalendarRequestId = requestId
+    this._bookingCalendarRequestDone =
+      typeof done === "function" ? done : null
+
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       this.setData({
         loading: false,
         loadError: "云能力未初始化"
       })
-      if (typeof done === "function") {
-        done()
-      }
+      this.finishBookingCalendarRequestEffects()
       return
     }
 
+    const monthKey = String(this.data.monthKey || "")
     this.setData({
       loading: true,
       loadError: ""
     })
-    wx.cloud.callFunction({
+    let settled = false
+    const finishRequest = () => {
+      if (settled || this._bookingCalendarRequestId !== requestId) {
+        return false
+      }
+      settled = true
+      this.finishBookingCalendarRequestEffects()
+      return true
+    }
+    const handleFailure = (message) => {
+      if (!finishRequest()) {
+        return
+      }
+      this.setData({
+        loading: false,
+        loadError: message || "预约日历加载失败"
+      })
+    }
+
+    this._bookingCalendarRequestTimer = setTimeout(() => {
+      handleFailure("日历加载超时，请重试")
+    }, BOOKING_CALENDAR_LOAD_TIMEOUT_MS)
+
+    const requestOptions = {
       name: "bookingCalendarList",
       data: {
-        month: this.data.monthKey
+        month: monthKey
       },
       success: (res) => {
+        if (!finishRequest()) {
+          return
+        }
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
           this.setData({
@@ -175,16 +213,27 @@ Page({
         this.applyCalendar()
       },
       fail: (error) => {
-        this.setData({
-          loading: false,
-          loadError: (error && (error.errMsg || error.message)) || "预约日历加载失败"
-        })
+        handleFailure(error && (error.errMsg || error.message))
       },
-      complete: () => {
-        if (typeof done === "function") {
-          done()
-        }
-      }
-    })
+      complete: () => {}
+    }
+
+    try {
+      wx.cloud.callFunction(requestOptions)
+    } catch (error) {
+      handleFailure(error && (error.errMsg || error.message))
+    }
+  },
+
+  finishBookingCalendarRequestEffects() {
+    if (this._bookingCalendarRequestTimer) {
+      clearTimeout(this._bookingCalendarRequestTimer)
+      this._bookingCalendarRequestTimer = null
+    }
+    if (typeof this._bookingCalendarRequestDone === "function") {
+      const done = this._bookingCalendarRequestDone
+      this._bookingCalendarRequestDone = null
+      done()
+    }
   }
 })

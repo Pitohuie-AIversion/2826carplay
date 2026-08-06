@@ -26,6 +26,7 @@
         placeholder="搜索 OpenID 或申请 ID"
         aria-label="隐私申请搜索关键词"
         value="{{keyword}}"
+        disabled="{{updatingId}}"
         bindinput="handleKeywordInput"
         maxlength="40"
         confirm-type="search"
@@ -34,6 +35,7 @@
       <button
         wx:if="{{keyword}}"
         class="management-search-clear"
+        disabled="{{updatingId}}"
         bindtap="handleClearKeyword"
         hover-class="management-search-clear-pressed"
         aria-label="清空搜索关键词"
@@ -81,7 +83,7 @@
       </scroll-view>
       <view wx:if="{{typeOptions.length > 3}}" class="ui-scroll-cue" aria-hidden="true"></view>
     </view>
-    <button class="search-btn ui-btn ui-btn-primary" bindtap="handleSearch"><view class="search-native-icon" aria-hidden="true"></view>查询</button>
+    <button class="search-btn ui-btn ui-btn-primary" disabled="{{updatingId}}" bindtap="handleSearch"><view class="search-native-icon" aria-hidden="true"></view>查询</button>
     <view class="filter-result-bar">
       <view class="filter-result-state"><view class="filter-result-dot"></view><view>当前队列</view></view>
       <view class="filter-result-value">{{currentStatusLabel}} · {{currentTypeLabel}} · {{total}}{{truncated ? '+' : ''}} 条</view>
@@ -191,7 +193,7 @@
       wx:if="{{hasMore}}"
       class="load-more-btn ui-btn ui-btn-ghost"
       loading="{{loading}}"
-      disabled="{{loading}}"
+      disabled="{{loading || updatingId}}"
       bindtap="handleLoadMore"
     >
       <view wx:if="{{!loading}}" class="load-more-native-icon" aria-hidden="true"></view><text>{{loading ? '正在加载' : '加载更多'}}</text>
@@ -204,6 +206,6 @@
     <view class="manage-empty-kicker">NO PRIVACY REQUESTS</view>
     <view class="empty-title">暂无匹配申请</view>
     <view class="empty-desc">调整状态、类型或关键词后重试。</view>
-    <button wx:if="{{keyword || currentType !== 'all' || currentStatus !== 'pending'}}" class="empty-reset-btn ui-btn ui-btn-ghost" bindtap="handleResetFilters"><view class="reset-native-icon" aria-hidden="true"></view>重置筛选</button>
+    <button wx:if="{{keyword || currentType !== 'all' || currentStatus !== 'pending'}}" class="empty-reset-btn ui-btn ui-btn-ghost" disabled="{{updatingId}}" bindtap="handleResetFilters"><view class="reset-native-icon" aria-hidden="true"></view>重置筛选</button>
   </view>
 </view>

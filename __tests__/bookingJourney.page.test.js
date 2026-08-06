@@ -29,6 +29,7 @@ function createPage(definition) {
 
 describe("我的预约旅程状态", () => {
   afterEach(() => {
+    jest.useRealTimers()
     delete global.Page
     delete global.wx
   })
@@ -113,6 +114,291 @@ describe("我的预约旅程状态", () => {
       }
     })
     expect(page.data.visibleList.map((item) => item.id)).toEqual(["cancelled-1"])
+  })
+
+  test("预约列表无响应时退出骨架屏并忽略迟到结果", () => {
+    jest.useFakeTimers()
+    let lateSuccess
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(({ success }) => {
+          lateSuccess = success
+        })
+      },
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition("../pages/bookings/bookings"))
+
+    page.loadList()
+    expect(page.data.loading).toBe(true)
+
+    jest.advanceTimersByTime(15 * 1000)
+    expect(page.data.initialLoading).toBe(false)
+    expect(page.data.loading).toBe(false)
+    expect(page.data.loadFailed).toBe(true)
+    expect(page.data.loadErrorText).toBe("预约列表加载超时，请检查网络后重试")
+
+    lateSuccess({ result: { ok: true, list: [{ id: "late-booking" }], hasMore: false } })
+    expect(page.data.list).toEqual([])
+  })
+
+  test("预约列表刷新后忽略旧分页请求的迟到结果", () => {
+    const requests = []
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn((options) => {
+          requests.push(options)
+        })
+      },
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition("../pages/bookings/bookings"))
+    page.data.list = [{ id: "existing-booking", status: "pending" }]
+    page.data.visibleList = page.data.list.slice()
+    page.data.page = 0
+    page.data.hasMore = true
+
+    page.loadList({ append: true })
+    page.loadList()
+    requests[1].success({
+      result: { ok: true, page: 0, hasMore: false, list: [{ id: "fresh-booking", status: "pending" }] }
+    })
+    requests[0].success({
+      result: { ok: true, page: 1, hasMore: false, list: [{ id: "stale-booking", status: "pending" }] }
+    })
+
+    expect(page.data.list.map((item) => item.id)).toEqual(["fresh-booking"])
+    expect(page.data.loading).toBe(false)
+  })
+
+  test("预约列表调用同步异常时安全进入重试状态", () => {
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(() => {
+          throw new Error("cloud sdk crashed")
+        })
+      },
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition("../pages/bookings/bookings"))
+
+    expect(() => page.loadList()).not.toThrow()
+    expect(page.data.initialLoading).toBe(false)
+    expect(page.data.loading).toBe(false)
+    expect(page.data.loadFailed).toBe(true)
+    expect(page.data.loadErrorText).toBe("cloud sdk crashed")
+  })
+
+  test("预约追加加载失败时保留当前分页以便重试", () => {
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(({ success }) => {
+          success({ result: { ok: false, message: "暂时不可用" } })
+        })
+      },
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition("../pages/bookings/bookings"))
+    page.data.list = [{ id: "existing-booking", status: "pending" }]
+    page.data.visibleList = page.data.list.slice()
+    page.data.page = 2
+    page.data.hasMore = true
+
+    page.loadList({ append: true })
+
+    expect(page.data.list.map((item) => item.id)).toEqual(["existing-booking"])
+    expect(page.data.page).toBe(2)
+    expect(page.data.hasMore).toBe(true)
+    expect(page.data.loading).toBe(false)
+  })
+
+  test("取消预约无响应时恢复页面并忽略迟到成功", () => {
+    jest.useFakeTimers()
+    let lateSuccess
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(({ success }) => {
+          lateSuccess = success
+        })
+      },
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition("../pages/bookings/bookings"))
+    page.loadList = jest.fn()
+
+    page.cancelBooking("booking-timeout")
+    expect(page.data.loading).toBe(true)
+
+    jest.advanceTimersByTime(12 * 1000)
+    expect(page.data.loading).toBe(false)
+    expect(wx.showToast).toHaveBeenCalledWith({ title: "取消预约超时，请重试", icon: "none" })
+
+    lateSuccess({ result: { ok: true } })
+    expect(page.loadList).not.toHaveBeenCalled()
+  })
+
+  test("取消预约同步异常时安全恢复可重试状态", () => {
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(() => {
+          throw new Error("cloud sdk crashed")
+        })
+      },
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition("../pages/bookings/bookings"))
+
+    expect(() => page.cancelBooking("booking-error")).not.toThrow()
+    expect(page.data.loading).toBe(false)
+    expect(wx.showToast).toHaveBeenCalledWith({ title: "取消失败", icon: "none" })
+  })
+
+  test("预约详情无响应时退出骨架屏并忽略迟到结果", () => {
+    jest.useFakeTimers()
+    let lateSuccess
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(({ success }) => {
+          lateSuccess = success
+        })
+      },
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition("../pages/booking-detail/booking-detail"))
+    page.data.id = "detail-timeout"
+
+    page.loadDetail()
+    expect(page.data.loading).toBe(true)
+
+    jest.advanceTimersByTime(15 * 1000)
+    expect(page.data.initialLoading).toBe(false)
+    expect(page.data.loading).toBe(false)
+    expect(page.data.loadFailed).toBe(true)
+    expect(page.data.loadErrorText).toBe("预约详情加载超时，请检查网络后重试")
+
+    lateSuccess({ result: { ok: true, detail: { id: "detail-timeout", status: "pending" } } })
+    expect(page.data.booking).toEqual({})
+  })
+
+  test("预约详情调用同步异常时安全进入重试状态", () => {
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(() => {
+          throw new Error("cloud sdk crashed")
+        })
+      },
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition("../pages/booking-detail/booking-detail"))
+    page.data.id = "detail-error"
+
+    expect(() => page.loadDetail()).not.toThrow()
+    expect(page.data.loading).toBe(false)
+    expect(page.data.loadFailed).toBe(true)
+    expect(page.data.loadErrorText).toBe("cloud sdk crashed")
+  })
+
+  test("保存联系信息无响应时恢复按钮并忽略迟到成功", () => {
+    jest.useFakeTimers()
+    let lateSuccess
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(({ success }) => {
+          lateSuccess = success
+        })
+      },
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition("../pages/booking-detail/booking-detail"))
+    page.data.id = "save-timeout"
+    page.data.editing = true
+    page.data.editForm = {
+      userName: "张先生",
+      phone: "13800138000",
+      city: "杭州",
+      note: "原始备注"
+    }
+    page.loadDetail = jest.fn()
+
+    page.handleSaveEdit()
+    expect(page.data.saving).toBe(true)
+
+    jest.advanceTimersByTime(12 * 1000)
+    expect(page.data.saving).toBe(false)
+    expect(page.data.editing).toBe(true)
+    expect(wx.showToast).toHaveBeenCalledWith({ title: "保存超时，请重试", icon: "none" })
+
+    lateSuccess({ result: { ok: true, updated: true } })
+    expect(page.data.editing).toBe(true)
+    expect(page.loadDetail).not.toHaveBeenCalled()
+  })
+
+  test("保存联系信息同步异常时安全恢复可重试状态", () => {
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(() => {
+          throw new Error("cloud sdk crashed")
+        })
+      },
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition("../pages/booking-detail/booking-detail"))
+    page.data.id = "save-error"
+    page.data.editing = true
+    page.data.editForm = {
+      userName: "张先生",
+      phone: "13800138000",
+      city: "杭州",
+      note: ""
+    }
+
+    expect(() => page.handleSaveEdit()).not.toThrow()
+    expect(page.data.saving).toBe(false)
+    expect(page.data.editing).toBe(true)
+    expect(wx.showToast).toHaveBeenCalledWith({ title: "保存失败", icon: "none" })
+  })
+
+  test("详情页取消预约无响应时恢复按钮并忽略迟到成功", () => {
+    jest.useFakeTimers()
+    let lateSuccess
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(({ success }) => {
+          lateSuccess = success
+        })
+      },
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition("../pages/booking-detail/booking-detail"))
+    page.data.id = "cancel-detail-timeout"
+    page.loadDetail = jest.fn()
+
+    page.cancelBooking()
+    expect(page.data.loading).toBe(true)
+
+    jest.advanceTimersByTime(12 * 1000)
+    expect(page.data.loading).toBe(false)
+    expect(wx.showToast).toHaveBeenCalledWith({ title: "取消预约超时，请重试", icon: "none" })
+
+    lateSuccess({ result: { ok: true } })
+    expect(page.loadDetail).not.toHaveBeenCalled()
+  })
+
+  test("详情页取消预约同步异常时安全恢复可重试状态", () => {
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(() => {
+          throw new Error("cloud sdk crashed")
+        })
+      },
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition("../pages/booking-detail/booking-detail"))
+    page.data.id = "cancel-detail-error"
+
+    expect(() => page.cancelBooking()).not.toThrow()
+    expect(page.data.loading).toBe(false)
+    expect(wx.showToast).toHaveBeenCalledWith({ title: "取消失败", icon: "none" })
   })
 
   test("详情页状态变化时同步更新进度与下一步说明", () => {

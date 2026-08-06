@@ -267,7 +267,7 @@ function mapVehicle(vehicle) {
     transmission: String((vehicle && vehicle.transmission) || "").trim() || "unknown",
     fuelType,
     seats,
-    seatsText: seats ? `${seats} 座` : "--",
+    seatsText: seats ? `${seats} 座` : "—",
     cover,
     images,
     hasImages: images.length > 0,

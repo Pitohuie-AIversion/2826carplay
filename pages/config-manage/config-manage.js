@@ -2,6 +2,9 @@ const { requirePagePermission } = require("../../shared/pageAuth")
 const { formatToastTitle } = require("../../shared/uiFeedback")
 const { clearUnsaved, markUnsaved } = require("../../shared/unsavedChanges")
 
+const CONFIG_LOAD_TIMEOUT_MS = 15 * 1000
+const CONFIG_SAVE_TIMEOUT_MS = 20 * 1000
+
 const LEGACY_GARAGE_SUBTITLE = "后台车辆资料已接入首页展示，上传封面后会同步展示到车库首页"
 
 const DEFAULT_CONFIG = {
@@ -92,12 +95,34 @@ Page({
   },
 
   onPullDownRefresh() {
+    if (!this.data.pageAuthorized) {
+      wx.stopPullDownRefresh()
+      return
+    }
+    if (this.data.isDirty || this.data.saving) {
+      wx.stopPullDownRefresh()
+      wx.showToast({
+        title: this.data.saving ? "正在保存配置" : "请先保存或重置修改",
+        icon: "none"
+      })
+      return
+    }
     this.fetchConfig(() => {
       wx.stopPullDownRefresh()
     })
   },
 
+  onUnload() {
+    this._configLoadRequestId = Number(this._configLoadRequestId || 0) + 1
+    this._configSaveRequestId = Number(this._configSaveRequestId || 0) + 1
+    this.finishConfigLoadRequestEffects()
+    this.finishConfigSaveRequestEffects()
+  },
+
   fetchConfig(done) {
+    const requestId = Number(this._configLoadRequestId || 0) + 1
+    this._configLoadRequestId = requestId
+    this.finishConfigLoadRequestEffects()
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       this.setData({
         loading: false,
@@ -111,14 +136,43 @@ Page({
       return
     }
 
+    this._configLoadRequestDone = typeof done === "function" ? done : null
     this.setData({
       loading: true,
       loadFailed: false,
       loadErrorText: ""
     })
-    wx.cloud.callFunction({
+
+    let settled = false
+    const finishRequest = () => {
+      if (settled || this._configLoadRequestId !== requestId) {
+        return false
+      }
+      settled = true
+      this.finishConfigLoadRequestEffects()
+      return true
+    }
+    const handleFailure = (message) => {
+      if (!finishRequest()) {
+        return
+      }
+      this.setData({
+        loading: false,
+        loadFailed: true,
+        loadErrorText: String(message || "配置加载失败，请刷新后重试")
+      })
+    }
+
+    this._configLoadRequestTimer = setTimeout(() => {
+      handleFailure("配置加载超时，请检查网络后重试")
+    }, CONFIG_LOAD_TIMEOUT_MS)
+
+    const requestOptions = {
       name: "operationConfigGet",
       success: (res) => {
+        if (!finishRequest()) {
+          return
+        }
         const result = res && res.result ? res.result : null
         if (!result || !result.ok || !result.config) {
           this.setData({
@@ -126,9 +180,6 @@ Page({
             loadFailed: true,
             loadErrorText: (result && result.message) || "配置加载失败，请刷新后重试"
           })
-          if (typeof done === "function") {
-            done()
-          }
           return
         }
 
@@ -141,21 +192,18 @@ Page({
           form: buildForm(result.config)
         })
         clearUnsaved(this)
-        if (typeof done === "function") {
-          done()
-        }
       },
       fail: (error) => {
-        this.setData({
-          loading: false,
-          loadFailed: true,
-          loadErrorText: (error && (error.errMsg || error.message)) || "配置加载失败，请刷新后重试"
-        })
-        if (typeof done === "function") {
-          done()
-        }
-      }
-    })
+        handleFailure(error && (error.errMsg || error.message))
+      },
+      complete: () => {}
+    }
+
+    try {
+      wx.cloud.callFunction(requestOptions)
+    } catch (error) {
+      handleFailure(error && (error.errMsg || error.message))
+    }
   },
 
   handleInput(event) {
@@ -233,18 +281,48 @@ Page({
     }
 
     this.setData({ saving: true })
+    const requestId = Number(this._configSaveRequestId || 0) + 1
+    this._configSaveRequestId = requestId
+    this.finishConfigSaveRequestEffects()
     wx.showLoading({
       title: "保存中…",
       mask: true
     })
+    this._configSaveLoadingVisible = true
 
-    wx.cloud.callFunction({
+    let settled = false
+    const finishRequest = () => {
+      if (settled || this._configSaveRequestId !== requestId) {
+        return false
+      }
+      settled = true
+      this.finishConfigSaveRequestEffects()
+      return true
+    }
+    const handleFailure = (message) => {
+      if (!finishRequest()) {
+        return
+      }
+      wx.showToast({
+        title: formatToastTitle(message, "保存失败"),
+        icon: "none"
+      })
+      this.setData({ saving: false })
+    }
+
+    this._configSaveRequestTimer = setTimeout(() => {
+      handleFailure("保存超时，请重试")
+    }, CONFIG_SAVE_TIMEOUT_MS)
+
+    const requestOptions = {
       name: "operationConfigUpdate",
       data: {
         config: submitConfig
       },
       success: (res) => {
-        wx.hideLoading()
+        if (!finishRequest()) {
+          return
+        }
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
           wx.showToast({
@@ -267,13 +345,38 @@ Page({
         clearUnsaved(this)
       },
       fail: (error) => {
-        wx.hideLoading()
-        wx.showToast({
-          title: "保存失败",
-          icon: "none"
-        })
-        this.setData({ saving: false })
-      }
-    })
+        handleFailure(error && (error.errMsg || error.message))
+      },
+      complete: () => {}
+    }
+
+    try {
+      wx.cloud.callFunction(requestOptions)
+    } catch (error) {
+      handleFailure(error && (error.errMsg || error.message))
+    }
+  },
+
+  finishConfigLoadRequestEffects() {
+    if (this._configLoadRequestTimer) {
+      clearTimeout(this._configLoadRequestTimer)
+      this._configLoadRequestTimer = null
+    }
+    const done = this._configLoadRequestDone
+    this._configLoadRequestDone = null
+    if (typeof done === "function") {
+      done()
+    }
+  },
+
+  finishConfigSaveRequestEffects() {
+    if (this._configSaveRequestTimer) {
+      clearTimeout(this._configSaveRequestTimer)
+      this._configSaveRequestTimer = null
+    }
+    if (this._configSaveLoadingVisible) {
+      this._configSaveLoadingVisible = false
+      wx.hideLoading()
+    }
   }
 })

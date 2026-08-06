@@ -51,6 +51,9 @@ const COORDINATION_OPTIONS = [
 ]
 
 const DEFAULT_PAGE_SIZE = 20
+const BOOKING_MANAGE_LIST_TIMEOUT_MS = 15 * 1000
+const BOOKING_MANAGE_MUTATION_TIMEOUT_MS = 20 * 1000
+const BOOKING_MANAGE_EXPORT_TIMEOUT_MS = 20 * 1000
 
 function showStatusUpdateFeedback(result, done) {
   const notificationStatus = String((result && result.notificationStatus) || "")
@@ -329,9 +332,22 @@ Page({
   },
 
   onPullDownRefresh() {
+    if (!this.data.pageAuthorized) {
+      wx.stopPullDownRefresh()
+      return
+    }
     this.fetchList(() => {
       wx.stopPullDownRefresh()
     })
+  },
+
+  onUnload() {
+    this._bookingListRequestId = Number(this._bookingListRequestId || 0) + 1
+    this._bookingMutationRequestId = Number(this._bookingMutationRequestId || 0) + 1
+    this._bookingExportRequestId = Number(this._bookingExportRequestId || 0) + 1
+    this.finishBookingListRequestEffects()
+    this.clearBookingMutationTimer()
+    this.clearBookingExportTimer()
   },
 
   handleKeywordInput(event) {
@@ -417,27 +433,53 @@ Page({
       return
     }
 
-    this.setData({
-      loading: true
-    })
+    const filters = {
+      status: this.data.currentStatus,
+      schedulePriority: this.data.currentPriority,
+      coordinationStatus: this.data.currentCoordination,
+      keyword: String(this.data.keyword || ""),
+      limit: 500
+    }
+    const requestId = Number(this._bookingExportRequestId || 0) + 1
+    this._bookingExportRequestId = requestId
+    this.clearBookingExportTimer()
+    this.setData({ loading: true })
 
-    wx.cloud.callFunction({
+    let settled = false
+    const isActive = () => !settled && this._bookingExportRequestId === requestId
+    const finishRequest = () => {
+      if (!isActive()) {
+        return false
+      }
+      settled = true
+      this.clearBookingExportTimer()
+      return true
+    }
+    const handleFailure = (message, fallback = "导出失败") => {
+      if (!finishRequest()) {
+        return
+      }
+      this.setData({ loading: false })
+      wx.showToast({
+        title: formatToastTitle(message, fallback),
+        icon: "none"
+      })
+    }
+
+    this._bookingExportRequestTimer = setTimeout(() => {
+      handleFailure("导出超时，请重试")
+    }, BOOKING_MANAGE_EXPORT_TIMEOUT_MS)
+
+    const requestOptions = {
       name: "bookingExportCsv",
-      data: {
-        status: this.data.currentStatus,
-        schedulePriority: this.data.currentPriority,
-        coordinationStatus: this.data.currentCoordination,
-        keyword: this.data.keyword,
-        limit: 500
-      },
+      data: filters,
       success: (res) => {
+        if (!isActive()) {
+          return
+        }
         const result = res && res.result ? res.result : null
         if (!result || !result.ok || !result.csvText) {
-          wx.showToast({
-          title: formatToastTitle(result && result.message, "导出失败"),
-            icon: "none"
-          })
-          this.setData({ loading: false })
+          handleFailure(result && result.message)
           return
         }
 
@@ -447,38 +489,57 @@ Page({
           total: Number(result.total) || 0,
           matchedTotal: Number(result.matchedTotal) || 0,
           sourceTruncated: Boolean(result.sourceTruncated),
-          truncated: Boolean(result.truncated)
+          truncated: Boolean(result.truncated),
+          finishRequest,
+          handleFailure
         })
       },
       fail: (error) => {
-        wx.showToast({
-          title: "导出失败",
-          icon: "none"
-        })
-        this.setData({ loading: false })
+        handleFailure(error && (error.errMsg || error.message))
       }
-    })
+    }
+
+    try {
+      wx.cloud.callFunction(requestOptions)
+    } catch (error) {
+      handleFailure(error && (error.errMsg || error.message))
+    }
   },
 
-  saveExportedCsv({ fileName, csvText, total, matchedTotal, sourceTruncated, truncated }) {
-    const fs = wx.getFileSystemManager && wx.getFileSystemManager()
+  saveExportedCsv({
+    fileName,
+    csvText,
+    total,
+    matchedTotal,
+    sourceTruncated,
+    truncated,
+    finishRequest,
+    handleFailure
+  }) {
+    let fs
+    try {
+      fs = wx.getFileSystemManager && wx.getFileSystemManager()
+    } catch (error) {
+      handleFailure(error && (error.errMsg || error.message), "保存失败")
+      return
+    }
     if (!fs) {
-      wx.showToast({
-        title: "文件系统不可用",
-        icon: "none"
-      })
-      this.setData({ loading: false })
+      handleFailure("文件系统不可用", "保存失败")
       return
     }
 
     const basePath = wx.env && wx.env.USER_DATA_PATH ? wx.env.USER_DATA_PATH : ""
     const filePath = basePath ? `${basePath}/${fileName}` : fileName
 
-    fs.writeFile({
+    const writeOptions = {
       filePath,
       data: csvText,
       encoding: "utf8",
       success: () => {
+        if (!finishRequest()) {
+          removeCsvFile(filePath).catch(() => {})
+          return
+        }
         const previousFilePath = this.data.exportFilePath
         this.setData({
           loading: false,
@@ -506,13 +567,15 @@ Page({
         }
       },
       fail: (error) => {
-        wx.showToast({
-          title: "保存失败",
-          icon: "none"
-        })
-        this.setData({ loading: false })
+        handleFailure(error && (error.errMsg || error.message), "保存失败")
       }
-    })
+    }
+
+    try {
+      fs.writeFile(writeOptions)
+    } catch (error) {
+      handleFailure(error && (error.errMsg || error.message), "保存失败")
+    }
   },
 
   handleShareExportedFile() {
@@ -763,67 +826,42 @@ Page({
   },
 
   updateStatus(id, status) {
-    if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
-      wx.showToast({
-        title: "云能力未初始化",
-        icon: "none"
-      })
-      return
-    }
-
-    this.setData({
-      loading: true
-    })
-
-    wx.cloud.callFunction({
+    this.runBookingMutation({
       name: "bookingUpdateStatus",
       data: { id, status },
-      success: (res) => {
-        const result = res && res.result ? res.result : null
+      timeoutTitle: "更新超时，请重试",
+      failureFallback: "更新失败",
+      onResult: (result, isCurrent) => {
         if (!result || !result.ok) {
           wx.showToast({
-          title: formatToastTitle(result && result.message, "更新失败"),
+            title: formatToastTitle(result && result.message, "更新失败"),
             icon: "none"
           })
           this.setData({ loading: false })
           return
         }
 
+        this.setData({ loading: false })
         showStatusUpdateFeedback(result, () => {
+          if (!isCurrent()) {
+            return
+          }
           this.fetchList()
         })
-      },
-      fail: (error) => {
-        wx.showToast({
-          title: "更新失败",
-          icon: "none"
-        })
-        this.setData({ loading: false })
       }
     })
   },
 
   saveRemark(id, adminRemark) {
-    if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
-      wx.showToast({
-        title: "云能力未初始化",
-        icon: "none"
-      })
-      return
-    }
-
-    this.setData({
-      loading: true
-    })
-
-    wx.cloud.callFunction({
+    this.runBookingMutation({
       name: "bookingUpdateAdminRemark",
       data: { id, adminRemark },
-      success: (res) => {
-        const result = res && res.result ? res.result : null
+      timeoutTitle: "保存超时，请重试",
+      failureFallback: "保存失败",
+      onResult: (result) => {
         if (!result || !result.ok) {
           wx.showToast({
-          title: formatToastTitle(result && result.message, "保存失败"),
+            title: formatToastTitle(result && result.message, "保存失败"),
             icon: "none"
           })
           this.setData({ loading: false })
@@ -836,15 +874,75 @@ Page({
         })
 
         this.fetchList()
-      },
-      fail: (error) => {
-        wx.showToast({
-          title: "保存失败",
-          icon: "none"
-        })
-        this.setData({ loading: false })
       }
     })
+  },
+
+  runBookingMutation(options) {
+    const input = options && typeof options === "object" ? options : {}
+    if (this.data.loading) {
+      return
+    }
+    if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
+      wx.showToast({
+        title: "云能力未初始化",
+        icon: "none"
+      })
+      return
+    }
+
+    const requestId = Number(this._bookingMutationRequestId || 0) + 1
+    this._bookingMutationRequestId = requestId
+    this.clearBookingMutationTimer()
+    this.setData({ loading: true })
+
+    let settled = false
+    const isCurrent = () => this._bookingMutationRequestId === requestId
+    const finishRequest = () => {
+      if (settled || !isCurrent()) {
+        return false
+      }
+      settled = true
+      this.clearBookingMutationTimer()
+      return true
+    }
+    const handleFailure = (message) => {
+      if (!finishRequest()) {
+        return
+      }
+      this.setData({ loading: false })
+      wx.showToast({
+        title: formatToastTitle(message, input.failureFallback || "操作失败"),
+        icon: "none"
+      })
+    }
+
+    this._bookingMutationRequestTimer = setTimeout(() => {
+      handleFailure(input.timeoutTitle || "操作超时，请重试")
+    }, BOOKING_MANAGE_MUTATION_TIMEOUT_MS)
+
+    const requestOptions = {
+      name: input.name,
+      data: input.data,
+      success: (res) => {
+        if (!finishRequest()) {
+          return
+        }
+        const result = res && res.result ? res.result : null
+        if (typeof input.onResult === "function") {
+          input.onResult(result, isCurrent)
+        }
+      },
+      fail: (error) => {
+        handleFailure(error && (error.errMsg || error.message))
+      }
+    }
+
+    try {
+      wx.cloud.callFunction(requestOptions)
+    } catch (error) {
+      handleFailure(error && (error.errMsg || error.message))
+    }
   },
 
   fetchList(input) {
@@ -852,6 +950,9 @@ Page({
     const append = Boolean(input && typeof input === "object" && input.append)
     const nextPage = append ? this.data.page + 1 : 0
     const pageSize = this.data.pageSize || DEFAULT_PAGE_SIZE
+    const requestId = Number(this._bookingListRequestId || 0) + 1
+    this._bookingListRequestId = requestId
+    this.finishBookingListRequestEffects()
 
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       this.setData({
@@ -864,24 +965,78 @@ Page({
       return
     }
 
+    const filters = {
+      status: this.data.currentStatus,
+      schedulePriority: this.data.currentPriority,
+      coordinationStatus: this.data.currentCoordination,
+      keyword: String(this.data.keyword || ""),
+      limit: 2000,
+      page: nextPage,
+      pageSize
+    }
+    this._bookingListRequestDone = typeof done === "function" ? done : null
     this.setData({
       loading: true
     })
 
-    wx.cloud.callFunction({
+    let settled = false
+    const finishRequest = () => {
+      if (settled || this._bookingListRequestId !== requestId) {
+        return false
+      }
+      settled = true
+      this.finishBookingListRequestEffects()
+      return true
+    }
+    const handleFailure = (message) => {
+      if (!finishRequest()) {
+        return
+      }
+      wx.showToast({
+        title: formatToastTitle(message, "加载失败"),
+        icon: "none"
+      })
+      this.setData({
+        loading: false,
+        page: append ? this.data.page : 0,
+        hasMore: append ? this.data.hasMore : false,
+        total: append ? this.data.total : 0,
+        truncated: append ? this.data.truncated : false,
+        summaryItems: append ? this.data.summaryItems : buildStatusSummary({}),
+        statusRatioSegments: append
+          ? this.data.statusRatioSegments
+          : buildStatusRatioSegments({}),
+        recentCreatedList: append ? this.data.recentCreatedList : [],
+        list: append ? this.data.list : []
+      })
+    }
+
+    this._bookingListRequestTimer = setTimeout(() => {
+      handleFailure("加载超时，请重试")
+    }, BOOKING_MANAGE_LIST_TIMEOUT_MS)
+
+    const requestOptions = {
       name: "bookingList",
-      data: {
-        status: this.data.currentStatus,
-        schedulePriority: this.data.currentPriority,
-        coordinationStatus: this.data.currentCoordination,
-        keyword: this.data.keyword,
-        limit: 2000,
-        page: nextPage,
-        pageSize
-      },
+      data: filters,
       success: (res) => {
+        if (!finishRequest()) {
+          return
+        }
         const result = res && res.result ? res.result : null
-        const list = result && result.ok && Array.isArray(result.list) ? result.list : []
+        if (!result || !result.ok) {
+          wx.showToast({
+            title: formatToastTitle(result && result.message, "加载失败"),
+            icon: "none"
+          })
+          this.setData({
+            loading: false,
+            page: append ? this.data.page : 0,
+            hasMore: append ? this.data.hasMore : false,
+            list: append ? this.data.list : []
+          })
+          return
+        }
+        const list = Array.isArray(result.list) ? result.list : []
         const formatted = list.map((item) => {
           const status = item.status || "pending"
           const schedulePriority = PRIORITY_TEXT_MAP[item.schedulePriority]
@@ -915,39 +1070,53 @@ Page({
 
         this.setData({
           loading: false,
-          page: result && result.ok && Number.isInteger(result.page) ? result.page : nextPage,
-          hasMore: Boolean(result && result.ok && result.hasMore),
-          total: result && result.ok ? result.total || 0 : 0,
-          truncated: Boolean(result && result.ok && result.truncated),
-          summaryItems: buildStatusSummary((result && result.dashboard) || {}),
-          statusRatioSegments: buildStatusRatioSegments((result && result.dashboard) || {}),
-          recentCreatedList: buildRecentCreatedViewModel((result && result.recentCreatedList) || []),
+          page: Number.isInteger(result.page) ? result.page : nextPage,
+          hasMore: Boolean(result.hasMore),
+          total: result.total || 0,
+          truncated: Boolean(result.truncated),
+          summaryItems: buildStatusSummary(result.dashboard || {}),
+          statusRatioSegments: buildStatusRatioSegments(result.dashboard || {}),
+          recentCreatedList: buildRecentCreatedViewModel(result.recentCreatedList || []),
           list: nextList
         })
-        if (typeof done === "function") {
-          done()
-        }
       },
       fail: (error) => {
-        wx.showToast({
-          title: "加载失败",
-          icon: "none"
-        })
-        this.setData({
-          loading: false,
-          page: 0,
-          hasMore: false,
-          total: 0,
-          truncated: false,
-          summaryItems: buildStatusSummary({}),
-          statusRatioSegments: buildStatusRatioSegments({}),
-          recentCreatedList: [],
-          list: []
-        })
-        if (typeof done === "function") {
-          done()
-        }
+        handleFailure(error && (error.errMsg || error.message))
       }
-    })
+    }
+
+    try {
+      wx.cloud.callFunction(requestOptions)
+    } catch (error) {
+      handleFailure(error && (error.errMsg || error.message))
+    }
+  },
+
+  finishBookingListRequestEffects() {
+    if (this._bookingListRequestTimer) {
+      clearTimeout(this._bookingListRequestTimer)
+      this._bookingListRequestTimer = null
+    }
+    const done = this._bookingListRequestDone
+    this._bookingListRequestDone = null
+    if (typeof done === "function") {
+      done()
+    }
+  },
+
+  clearBookingMutationTimer() {
+    if (!this._bookingMutationRequestTimer) {
+      return
+    }
+    clearTimeout(this._bookingMutationRequestTimer)
+    this._bookingMutationRequestTimer = null
+  },
+
+  clearBookingExportTimer() {
+    if (!this._bookingExportRequestTimer) {
+      return
+    }
+    clearTimeout(this._bookingExportRequestTimer)
+    this._bookingExportRequestTimer = null
   }
 })

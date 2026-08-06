@@ -9,6 +9,9 @@ const {
   shareCsvFile
 } = require("../../shared/csvFile")
 
+const ERROR_LIST_TIMEOUT_MS = 15 * 1000
+const ERROR_EXPORT_TIMEOUT_MS = 20 * 1000
+
 const FUNC_OPTIONS = [
   { value: "all", label: "全部" },
   { value: "analyticsCleanup", label: "匿名数据清理" },
@@ -181,9 +184,20 @@ Page({
   },
 
   onPullDownRefresh() {
+    if (!this.data.pageAuthorized) {
+      wx.stopPullDownRefresh()
+      return
+    }
     this.fetchList(() => {
       wx.stopPullDownRefresh()
     })
+  },
+
+  onUnload() {
+    this._errorListRequestId = Number(this._errorListRequestId || 0) + 1
+    this._exportRequestSerial = Number(this._exportRequestSerial || 0) + 1
+    this.finishErrorListRequestEffects()
+    this.clearExportRequestTimer()
   },
 
   handleKeywordInput(event) {
@@ -247,34 +261,76 @@ Page({
     }
 
     const filter = this.data.currentFunc === "all" ? "" : this.data.currentFunc
+    const keyword = String(this.data.keyword || "")
+    const exportSerial = Number(this._exportRequestSerial || 0) + 1
+    this._exportRequestSerial = exportSerial
+    this.clearExportRequestTimer()
     this.setData({
       exporting: true
     })
-    wx.cloud.callFunction({
+
+    let settled = false
+    const isActive = () => !settled && exportSerial === this._exportRequestSerial
+    const finishRequest = () => {
+      if (!isActive()) {
+        return false
+      }
+      settled = true
+      this.clearExportRequestTimer()
+      return true
+    }
+    const handleFailure = (message, fallback = "导出失败") => {
+      if (!finishRequest()) {
+        return
+      }
+      this.setData({ exporting: false })
+      wx.showToast({
+        title: formatToastTitle(message, fallback),
+        icon: "none"
+      })
+    }
+
+    this._exportRequestTimer = setTimeout(() => {
+      handleFailure("导出超时，请重试")
+    }, ERROR_EXPORT_TIMEOUT_MS)
+
+    const requestOptions = {
       name: "logExportCsv",
       data: {
         logType: "error",
         filter,
-        keyword: this.data.keyword,
+        keyword,
         limit: 500
       },
       success: (res) => {
+        if (!isActive()) {
+          return
+        }
         const result = res && res.result ? res.result : null
         if (!result || !result.ok || !result.csvText) {
-          wx.showToast({
-              title: formatToastTitle(result && result.message, "导出失败"),
-            icon: "none"
-          })
-          this.setData({ exporting: false })
+          handleFailure(result && result.message)
           return
         }
 
-        saveCsvFile({
-          fileName: result.fileName,
-          fallbackFileName: "error-logs.csv",
-          csvText: result.csvText
-        })
+        let savePromise
+        try {
+          savePromise = saveCsvFile({
+            fileName: result.fileName,
+            fallbackFileName: "error-logs.csv",
+            csvText: result.csvText
+          })
+        } catch (error) {
+          handleFailure(error && (error.errMsg || error.message), "保存失败")
+          return
+        }
+        Promise.resolve(savePromise)
           .then(({ filePath, fileName }) => {
+            if (!finishRequest()) {
+              if (filePath) {
+                removeCsvFile(filePath).catch(() => {})
+              }
+              return
+            }
             const previousFilePath = this.data.exportFilePath
             this.setData({
               exporting: false,
@@ -302,21 +358,20 @@ Page({
             }
           })
           .catch((error) => {
-            wx.showToast({
-              title: "保存失败",
-              icon: "none"
-            })
-            this.setData({ exporting: false })
+            handleFailure(error && (error.errMsg || error.message), "保存失败")
           })
       },
       fail: (error) => {
-        wx.showToast({
-          title: "导出失败",
-          icon: "none"
-        })
-        this.setData({ exporting: false })
-      }
-    })
+        handleFailure(error && (error.errMsg || error.message))
+      },
+      complete: () => {}
+    }
+
+    try {
+      wx.cloud.callFunction(requestOptions)
+    } catch (error) {
+      handleFailure(error && (error.errMsg || error.message))
+    }
   },
 
   handleShareExportedFile() {
@@ -383,6 +438,10 @@ Page({
     const append = Boolean(input && typeof input === "object" && input.append)
     const nextPage = append ? this.data.page + 1 : 0
     const func = this.data.currentFunc === "all" ? "" : this.data.currentFunc
+    const keyword = String(this.data.keyword || "")
+    const requestId = Number(this._errorListRequestId || 0) + 1
+    this._errorListRequestId = requestId
+    this.finishErrorListRequestEffects()
 
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       this.setData({
@@ -396,19 +455,55 @@ Page({
       return
     }
 
+    this._errorListRequestDone = typeof done === "function" ? done : null
     this.setData({
       loading: true
     })
 
-    wx.cloud.callFunction({
+    let settled = false
+    const finishRequest = () => {
+      if (settled || this._errorListRequestId !== requestId) {
+        return false
+      }
+      settled = true
+      this.finishErrorListRequestEffects()
+      return true
+    }
+    const handleFailure = (message) => {
+      if (!finishRequest()) {
+        return
+      }
+      wx.showToast({
+        title: formatToastTitle(message, "加载失败"),
+        icon: "none"
+      })
+      this.setData({
+        initialLoading: false,
+        loading: false,
+        list: append ? this.data.list : [],
+        hasMore: append ? this.data.hasMore : false,
+        total: append ? this.data.total : 0,
+        truncated: append ? this.data.truncated : false,
+        page: append ? this.data.page : 0
+      })
+    }
+
+    this._errorListRequestTimer = setTimeout(() => {
+      handleFailure("加载超时，请重试")
+    }, ERROR_LIST_TIMEOUT_MS)
+
+    const requestOptions = {
       name: "errorLogList",
       data: {
         page: nextPage,
         pageSize: this.data.pageSize,
         func,
-        keyword: this.data.keyword
+        keyword
       },
       success: (res) => {
+        if (!finishRequest()) {
+          return
+        }
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
           wx.showToast({
@@ -424,9 +519,6 @@ Page({
             truncated: false,
             page: 0
           })
-          if (typeof done === "function") {
-            done()
-          }
           return
         }
 
@@ -453,23 +545,37 @@ Page({
           truncated: Boolean(result.truncated),
           list: append ? this.data.list.concat(list) : list
         })
-        if (typeof done === "function") {
-          done()
-        }
       },
       fail: (error) => {
-        wx.showToast({
-          title: "加载失败",
-          icon: "none"
-        })
-        this.setData({
-          initialLoading: false,
-          loading: false
-        })
-        if (typeof done === "function") {
-          done()
-        }
-      }
-    })
+        handleFailure(error && (error.errMsg || error.message))
+      },
+      complete: () => {}
+    }
+
+    try {
+      wx.cloud.callFunction(requestOptions)
+    } catch (error) {
+      handleFailure(error && (error.errMsg || error.message))
+    }
+  },
+
+  finishErrorListRequestEffects() {
+    if (this._errorListRequestTimer) {
+      clearTimeout(this._errorListRequestTimer)
+      this._errorListRequestTimer = null
+    }
+    const done = this._errorListRequestDone
+    this._errorListRequestDone = null
+    if (typeof done === "function") {
+      done()
+    }
+  },
+
+  clearExportRequestTimer() {
+    if (!this._exportRequestTimer) {
+      return
+    }
+    clearTimeout(this._exportRequestTimer)
+    this._exportRequestTimer = null
   }
 })

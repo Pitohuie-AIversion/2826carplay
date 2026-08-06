@@ -1,5 +1,7 @@
 const { formatToastTitle } = require("../../shared/uiFeedback")
 const { buildVehicleDisplayIdentity } = require("../../shared/vehicle")
+const BOOKING_DETAIL_LOAD_TIMEOUT_MS = 15 * 1000
+const BOOKING_DETAIL_MUTATION_TIMEOUT_MS = 12 * 1000
 
 function mapStatusText(status) {
   const value = String(status || "").trim()
@@ -215,6 +217,15 @@ Page({
     }
   },
 
+  onUnload() {
+    this._detailRequestId = Number(this._detailRequestId || 0) + 1
+    this._saveRequestSerial = Number(this._saveRequestSerial || 0) + 1
+    this._cancelRequestSerial = Number(this._cancelRequestSerial || 0) + 1
+    this.clearDetailLoadTimer()
+    this.clearSaveRequestTimer()
+    this.clearCancelRequestTimer()
+  },
+
   applyBooking(booking) {
     this.setData({
       booking,
@@ -320,6 +331,10 @@ Page({
   },
 
   loadDetail() {
+    const requestId = Number(this._detailRequestId || 0) + 1
+    this._detailRequestId = requestId
+    this.clearDetailLoadTimer()
+
     if (!this.data.id) {
       this.setData({
         initialLoading: false,
@@ -343,10 +358,43 @@ Page({
       loadFailed: false
     })
 
-    wx.cloud.callFunction({
+    let settled = false
+    const finishRequest = () => {
+      if (settled || requestId !== this._detailRequestId) {
+        return false
+      }
+      settled = true
+      this.clearDetailLoadTimer()
+      return true
+    }
+    const handleFailure = (message) => {
+      if (!finishRequest()) {
+        return
+      }
+      wx.showToast({
+        title: "加载失败",
+        icon: "none"
+      })
+      this.setData({
+        initialLoading: false,
+        loading: false,
+        loadFailed: true,
+        loadErrorText: String(message || "预约详情加载失败，请稍后重试")
+      })
+    }
+
+    this._detailLoadTimer = setTimeout(() => {
+      handleFailure("预约详情加载超时，请检查网络后重试")
+    }, BOOKING_DETAIL_LOAD_TIMEOUT_MS)
+
+    const bookingId = String(this.data.id || "").trim()
+    const requestOptions = {
       name: "bookingMyDetail",
-      data: { id: this.data.id },
+      data: { id: bookingId },
       success: (res) => {
+        if (!finishRequest()) {
+          return
+        }
         const result = res && res.result ? res.result : null
         const current = result && result.ok ? result.detail : null
 
@@ -368,18 +416,23 @@ Page({
         this.setData({ loading: false })
       },
       fail: (error) => {
-        wx.showToast({
-          title: "加载失败",
-          icon: "none"
-        })
-        this.setData({
-          initialLoading: false,
-          loading: false,
-          loadFailed: true,
-          loadErrorText: (error && (error.errMsg || error.message)) || "预约详情加载失败，请稍后重试"
-        })
+        handleFailure((error && (error.errMsg || error.message)) || "预约详情加载失败，请稍后重试")
       }
-    })
+    }
+
+    try {
+      wx.cloud.callFunction(requestOptions)
+    } catch (error) {
+      handleFailure((error && (error.errMsg || error.message)) || "预约详情加载失败，请稍后重试")
+    }
+  },
+
+  clearDetailLoadTimer() {
+    if (!this._detailLoadTimer) {
+      return
+    }
+    clearTimeout(this._detailLoadTimer)
+    this._detailLoadTimer = null
   },
 
   handleCancel() {
@@ -489,22 +542,57 @@ Page({
       return
     }
 
-    const form = this.data.editForm
+    const bookingId = String(this.data.id || "").trim()
+    const submittedForm = {
+      userName: String((this.data.editForm && this.data.editForm.userName) || "").trim(),
+      phone: String((this.data.editForm && this.data.editForm.phone) || "").trim(),
+      city: String((this.data.editForm && this.data.editForm.city) || "").trim(),
+      note: String((this.data.editForm && this.data.editForm.note) || "").trim()
+    }
+    const saveSerial = Number(this._saveRequestSerial || 0) + 1
+    this._saveRequestSerial = saveSerial
+    this.clearSaveRequestTimer()
     this.setData({ saving: true })
-    wx.cloud.callFunction({
+
+    let settled = false
+    const finishRequest = () => {
+      if (settled || saveSerial !== this._saveRequestSerial) {
+        return false
+      }
+      settled = true
+      this.clearSaveRequestTimer()
+      return true
+    }
+    const handleFailure = (message) => {
+      if (!finishRequest()) {
+        return
+      }
+      this.setData({ saving: false })
+      wx.showToast({
+        title: formatToastTitle(message, "保存失败"),
+        icon: "none"
+      })
+    }
+
+    this._saveRequestTimer = setTimeout(() => {
+      handleFailure("保存超时，请重试")
+    }, BOOKING_DETAIL_MUTATION_TIMEOUT_MS)
+
+    const requestOptions = {
       name: "bookingUpdateMyContact",
       data: {
-        id: this.data.id,
-        userName: String(form.userName || "").trim(),
-        phone: String(form.phone || "").trim(),
-        city: String(form.city || "").trim(),
-        note: String(form.note || "").trim()
+        id: bookingId,
+        ...submittedForm
       },
       success: (res) => {
+        if (!finishRequest()) {
+          return
+        }
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
+          this.setData({ saving: false })
           wx.showToast({
-          title: formatToastTitle(result && result.message, "保存失败"),
+            title: formatToastTitle(result && result.message, "保存失败"),
             icon: "none"
           })
           if (result && ["STATUS_CONFLICT", "STATUS_NOT_ALLOWED"].includes(result.code)) {
@@ -517,28 +605,75 @@ Page({
           title: result.updated ? "联系信息已更新" : "信息未发生变化",
           icon: "none"
         })
-        this.setData({ editing: false })
+        this.setData({ editing: false, saving: false })
         this.loadDetail()
       },
       fail: (error) => {
-        wx.showToast({
-          title: "保存失败",
-          icon: "none"
-        })
-      },
-      complete: () => {
-        this.setData({ saving: false })
+        handleFailure(error && (error.errMsg || error.message))
       }
-    })
+    }
+
+    try {
+      wx.cloud.callFunction(requestOptions)
+    } catch (error) {
+      handleFailure(error && (error.errMsg || error.message))
+    }
+  },
+
+  clearSaveRequestTimer() {
+    if (!this._saveRequestTimer) {
+      return
+    }
+    clearTimeout(this._saveRequestTimer)
+    this._saveRequestTimer = null
   },
 
   cancelBooking() {
+    if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
+      wx.showToast({
+        title: "云能力未初始化",
+        icon: "none"
+      })
+      return
+    }
+
+    const bookingId = String(this.data.id || "").trim()
+    const cancelSerial = Number(this._cancelRequestSerial || 0) + 1
+    this._cancelRequestSerial = cancelSerial
+    this.clearCancelRequestTimer()
     this.setData({ loading: true })
 
-    wx.cloud.callFunction({
+    let settled = false
+    const finishRequest = () => {
+      if (settled || cancelSerial !== this._cancelRequestSerial) {
+        return false
+      }
+      settled = true
+      this.clearCancelRequestTimer()
+      return true
+    }
+    const handleFailure = (message) => {
+      if (!finishRequest()) {
+        return
+      }
+      wx.showToast({
+        title: formatToastTitle(message, "取消失败"),
+        icon: "none"
+      })
+      this.setData({ loading: false })
+    }
+
+    this._cancelRequestTimer = setTimeout(() => {
+      handleFailure("取消预约超时，请重试")
+    }, BOOKING_DETAIL_MUTATION_TIMEOUT_MS)
+
+    const requestOptions = {
       name: "bookingCancel",
-      data: { id: this.data.id },
+      data: { id: bookingId },
       success: (res) => {
+        if (!finishRequest()) {
+          return
+        }
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
           wx.showToast({
@@ -556,13 +691,23 @@ Page({
         this.loadDetail()
       },
       fail: (error) => {
-        wx.showToast({
-          title: "取消失败",
-          icon: "none"
-        })
-        this.setData({ loading: false })
+        handleFailure(error && (error.errMsg || error.message))
       }
-    })
+    }
+
+    try {
+      wx.cloud.callFunction(requestOptions)
+    } catch (error) {
+      handleFailure(error && (error.errMsg || error.message))
+    }
+  },
+
+  clearCancelRequestTimer() {
+    if (!this._cancelRequestTimer) {
+      return
+    }
+    clearTimeout(this._cancelRequestTimer)
+    this._cancelRequestTimer = null
   },
 
   handleRetryLoad() {

@@ -856,4 +856,43 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
     expect(page.data.failedUploadPaths).toEqual(["/tmp/one.jpg", "/tmp/two.jpg"])
     expect(page.data.uploadProgressText).toContain("已取消")
   })
+
+  test("上传任务取消后没有 SDK 回调也会立即结束上传态", () => {
+    jest.useFakeTimers()
+    let definition = null
+    const abort = jest.fn()
+    global.Page = jest.fn((input) => {
+      definition = input
+    })
+    global.wx = {
+      cloud: {
+        uploadFile: jest.fn(() => ({ abort })),
+        deleteFile: jest.fn()
+      },
+      hideLoading: jest.fn(),
+      showToast: jest.fn()
+    }
+    jest.resetModules()
+    require("../pages/vehicle-detail-manage/vehicle-detail-manage")
+    const page = {
+      ...definition,
+      data: { ...definition.data, id: "car_1" }
+    }
+    page.setData = jest.fn((patch) => {
+      page.data = { ...page.data, ...patch }
+    })
+
+    page.uploadSelectedFiles(["/tmp/one.jpg", "/tmp/two.jpg"], 0)
+    page.handleCancelUpload()
+
+    expect(abort).toHaveBeenCalledTimes(1)
+    expect(page.data.uploading).toBe(false)
+    expect(page.data.failedUploadPaths).toEqual(["/tmp/one.jpg", "/tmp/two.jpg"])
+    expect(page.data.uploadItems.map((item) => item.status)).toEqual(["cancelled", "cancelled"])
+    expect(page.data.uploadProgressText).toBe("上传已取消，可重试未完成图片")
+    expect(wx.showToast).toHaveBeenCalledTimes(1)
+
+    jest.advanceTimersByTime(40 * 1000)
+    expect(wx.showToast).toHaveBeenCalledTimes(1)
+  })
 })

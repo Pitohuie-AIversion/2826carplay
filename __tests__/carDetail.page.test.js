@@ -33,6 +33,7 @@ function createPage(definition) {
 
 describe("pages/car-detail 客户侧车辆状态", () => {
   afterEach(() => {
+    jest.useRealTimers()
     delete global.Page
     delete global.wx
   })
@@ -162,6 +163,156 @@ describe("pages/car-detail 客户侧车辆状态", () => {
     page.loadOperationConfig()
 
     expect(page.data.servicePhone).toBe("15715710090")
+  })
+
+  test("车辆详情无响应时退出骨架屏并忽略迟到结果", () => {
+    jest.useFakeTimers()
+    let lateSuccess
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(({ success }) => {
+          lateSuccess = success
+        })
+      },
+      setNavigationBarTitle: jest.fn()
+    }
+    const page = createPage(loadPageDefinition())
+
+    page.loadCarDetail("vehicle-timeout")
+    expect(page.data.loading).toBe(true)
+
+    jest.advanceTimersByTime(15 * 1000)
+    expect(page.data.loading).toBe(false)
+    expect(page.data.loadError).toBe(true)
+    expect(page.data.loadErrorText).toBe("车辆详情加载超时，请检查网络后重试")
+
+    lateSuccess({
+      result: {
+        ok: true,
+        car: { id: "vehicle-timeout", name: "迟到车辆", status: "available", images: [] }
+      }
+    })
+    expect(page.data.loadError).toBe(true)
+    expect(page.data.car).toBeNull()
+  })
+
+  test("切换详情请求后忽略旧车辆的迟到结果", () => {
+    const requests = []
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn((options) => {
+          requests.push(options)
+        })
+      },
+      setNavigationBarTitle: jest.fn()
+    }
+    const page = createPage(loadPageDefinition())
+
+    page.loadCarDetail("vehicle-old")
+    page.loadCarDetail("vehicle-new")
+    requests[1].success({
+      result: {
+        ok: true,
+        car: { id: "vehicle-new", name: "新车辆", status: "available", images: [] }
+      }
+    })
+    requests[0].success({
+      result: {
+        ok: true,
+        car: { id: "vehicle-old", name: "旧车辆", status: "available", images: [] }
+      }
+    })
+
+    expect(page.data.car.id).toBe("vehicle-new")
+    expect(page.data.car.name).toBe("新车辆")
+  })
+
+  test("车辆详情调用同步异常时安全进入重试状态", () => {
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(() => {
+          throw new Error("cloud sdk crashed")
+        })
+      },
+      setNavigationBarTitle: jest.fn()
+    }
+    const page = createPage(loadPageDefinition())
+
+    expect(() => page.loadCarDetail("vehicle-error")).not.toThrow()
+    expect(page.data.loading).toBe(false)
+    expect(page.data.loadError).toBe(true)
+    expect(page.data.loadErrorText).toBe("cloud sdk crashed")
+  })
+
+  test("收藏操作无响应时恢复按钮并忽略迟到成功", () => {
+    jest.useFakeTimers()
+    let lateSuccess
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(({ success }) => {
+          lateSuccess = success
+        })
+      },
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition())
+    page.data.carId = "vehicle-favorite-timeout"
+
+    page.handleFavoriteTap()
+    expect(page.data.favoriteLoading).toBe(true)
+
+    jest.advanceTimersByTime(12 * 1000)
+    expect(page.data.favoriteLoading).toBe(false)
+    expect(page.data.favorited).toBe(false)
+    expect(wx.showToast).toHaveBeenCalledWith({ title: "收藏请求超时，请重试", icon: "none" })
+
+    lateSuccess({ result: { ok: true, favorited: true } })
+    expect(page.data.favorited).toBe(false)
+  })
+
+  test("收藏调用同步异常时安全恢复可重试状态", () => {
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(() => {
+          throw new Error("cloud sdk crashed")
+        })
+      },
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition())
+    page.data.carId = "vehicle-favorite-error"
+
+    expect(() => page.handleFavoriteTap()).not.toThrow()
+    expect(page.data.favoriteLoading).toBe(false)
+    expect(page.data.favorited).toBe(false)
+    expect(wx.showToast).toHaveBeenCalledWith({ title: "收藏操作失败", icon: "none" })
+  })
+
+  test("收藏更新完成后忽略初始状态查询的迟到结果", () => {
+    let statusSuccess
+    let updateSuccess
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(({ name, success }) => {
+          if (name === "favoriteStatus") {
+            statusSuccess = success
+          } else if (name === "favoriteSet") {
+            updateSuccess = success
+          }
+        })
+      },
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition())
+    page.data.carId = "vehicle-favorite-race"
+
+    page.loadFavoriteStatus(page.data.carId)
+    page.handleFavoriteTap()
+    updateSuccess({ result: { ok: true, favorited: true } })
+    statusSuccess({ result: { ok: true, favorited: false } })
+
+    expect(page.data.favoriteLoading).toBe(false)
+    expect(page.data.favorited).toBe(true)
   })
 
   test("收藏处理中隐藏心形图标并提供稳定状态文案", () => {

@@ -1,6 +1,9 @@
 const { requirePagePermission } = require("../../shared/pageAuth")
 const { formatToastTitle } = require("../../shared/uiFeedback")
 
+const PRIVACY_MANAGE_LIST_TIMEOUT_MS = 15 * 1000
+const PRIVACY_MANAGE_WRITE_TIMEOUT_MS = 20 * 1000
+
 const TYPE_OPTIONS = [
   { value: "all", label: "全部类型" },
   { value: "access", label: "查询" },
@@ -139,13 +142,28 @@ Page({
   },
 
   onShow() {
-    if (this.data.pageAuthorized && this.data.hasLoaded && !this.data.loading) {
+    if (
+      this.data.pageAuthorized &&
+      this.data.hasLoaded &&
+      !this.data.loading &&
+      !this.data.updatingId
+    ) {
       this.fetchList()
     }
   },
 
+  onUnload() {
+    this._privacyManageListRequestId =
+      Number(this._privacyManageListRequestId || 0) + 1
+    this._privacyManageWriteRequestId =
+      Number(this._privacyManageWriteRequestId || 0) + 1
+    this.finishPrivacyManageListEffects()
+    this.clearPrivacyManageWriteTimer()
+    this._privacyManageWriteActive = false
+  },
+
   onPullDownRefresh() {
-    if (!this.data.pageAuthorized) {
+    if (!this.data.pageAuthorized || this.data.updatingId) {
       wx.stopPullDownRefresh()
       return
     }
@@ -156,7 +174,11 @@ Page({
 
   handleTypeTap(event) {
     const value = String(event.currentTarget.dataset.value || "")
-    if (!TYPE_OPTIONS.some((item) => item.value === value) || value === this.data.currentType) {
+    if (
+      this.data.updatingId ||
+      !TYPE_OPTIONS.some((item) => item.value === value) ||
+      value === this.data.currentType
+    ) {
       return
     }
     this.setData({
@@ -168,7 +190,11 @@ Page({
 
   handleStatusTap(event) {
     const value = String(event.currentTarget.dataset.value || "")
-    if (!STATUS_OPTIONS.some((item) => item.value === value) || value === this.data.currentStatus) {
+    if (
+      this.data.updatingId ||
+      !STATUS_OPTIONS.some((item) => item.value === value) ||
+      value === this.data.currentStatus
+    ) {
       return
     }
     this.setData({
@@ -185,18 +211,26 @@ Page({
   },
 
   handleClearKeyword() {
-    if (!this.data.keyword) {
+    if (!this.data.keyword || this.data.updatingId) {
       return
     }
     this.setData({ keyword: "" }, () => this.fetchList())
   },
 
   handleSearch() {
+    if (this.data.updatingId) {
+      return
+    }
     this.fetchList()
   },
 
   handleResetFilters() {
-    if (!this.data.keyword && this.data.currentType === "all" && this.data.currentStatus === "pending") {
+    if (
+      this.data.updatingId ||
+      (!this.data.keyword &&
+        this.data.currentType === "all" &&
+        this.data.currentStatus === "pending")
+    ) {
       return
     }
     this.setData({
@@ -209,7 +243,7 @@ Page({
   },
 
   handleLoadMore() {
-    if (!this.data.loading && this.data.hasMore) {
+    if (!this.data.loading && !this.data.updatingId && this.data.hasMore) {
       this.fetchList({ append: true })
     }
   },
@@ -259,7 +293,7 @@ Page({
   handleRequestAction(event) {
     const id = String(event.currentTarget.dataset.id || "")
     const item = this.data.list.find((record) => record.id === id)
-    if (!item || !item.canHandle || this.data.updatingId) {
+    if (!item || !item.canHandle || this.data.loading || this.data.updatingId) {
       return
     }
 
@@ -317,7 +351,55 @@ Page({
   },
 
   updateStatus(item, status, resolutionNote) {
+    if (
+      !item ||
+      !item.id ||
+      this.data.loading ||
+      this.data.updatingId ||
+      this._privacyManageWriteActive
+    ) {
+      return
+    }
+
+    const payload = {
+      id: String(item.id),
+      status: String(status || ""),
+      resolutionNote: String(resolutionNote || "")
+    }
+    this.runPrivacyManageWrite({
+      name: "privacyRequestUpdateStatus",
+      data: payload,
+      updatingId: payload.id,
+      timeoutTitle: "更新超时，请重试",
+      failureFallback: "更新失败",
+      onResult: (result, isCurrent) => {
+        if (!result || !result.ok) {
+          wx.showToast({
+            title: formatToastTitle(result && result.message, "更新失败"),
+            icon: "none"
+          })
+          this.setData({ updatingId: "" })
+          return
+        }
+        this.setData({ updatingId: "" })
+        wx.showToast({
+          title: "状态已更新",
+          icon: "success"
+        })
+        if (isCurrent()) {
+          this.fetchList()
+        }
+      }
+    })
+  },
+
+  runPrivacyManageWrite(options) {
+    const input = options && typeof options === "object" ? options : {}
+    if (this._privacyManageWriteActive) {
+      return
+    }
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
+      this.setData({ updatingId: "" })
       wx.showToast({
         title: "云能力未初始化",
         icon: "none"
@@ -325,45 +407,77 @@ Page({
       return
     }
 
-    this.setData({ updatingId: item.id })
-    wx.cloud.callFunction({
-      name: "privacyRequestUpdateStatus",
-      data: {
-        id: item.id,
-        status,
-        resolutionNote
-      },
+    const requestId = Number(this._privacyManageWriteRequestId || 0) + 1
+    this._privacyManageWriteRequestId = requestId
+    this._privacyManageWriteActive = true
+    this.clearPrivacyManageWriteTimer()
+    this.setData({ updatingId: String(input.updatingId || "") })
+
+    let settled = false
+    const isCurrent = () => this._privacyManageWriteRequestId === requestId
+    const finishRequest = () => {
+      if (settled || !isCurrent()) {
+        return false
+      }
+      settled = true
+      this._privacyManageWriteActive = false
+      this.clearPrivacyManageWriteTimer()
+      return true
+    }
+    const handleFailure = (message) => {
+      if (!finishRequest()) {
+        return
+      }
+      this.setData({ updatingId: "" })
+      wx.showToast({
+        title: formatToastTitle(message, input.failureFallback || "操作失败"),
+        icon: "none"
+      })
+    }
+
+    this._privacyManageWriteTimer = setTimeout(() => {
+      handleFailure(input.timeoutTitle || "操作超时，请重试")
+    }, PRIVACY_MANAGE_WRITE_TIMEOUT_MS)
+
+    const requestOptions = {
+      name: input.name,
+      data: input.data,
       success: (res) => {
-        const result = res && res.result ? res.result : null
-        if (!result || !result.ok) {
-          wx.showToast({
-          title: formatToastTitle(result && result.message, "更新失败"),
-            icon: "none"
-          })
+        if (!finishRequest()) {
           return
         }
-        wx.showToast({
-          title: "状态已更新",
-          icon: "success"
-        })
-        this.fetchList()
+        const result = res && res.result ? res.result : null
+        if (typeof input.onResult === "function") {
+          input.onResult(result, isCurrent)
+        }
       },
       fail: (error) => {
-        wx.showToast({
-          title: "更新失败",
-          icon: "none"
-        })
+        handleFailure(error && (error.errMsg || error.message))
       },
-      complete: () => {
-        this.setData({ updatingId: "" })
-      }
-    })
+      complete: () => {}
+    }
+
+    try {
+      wx.cloud.callFunction(requestOptions)
+    } catch (error) {
+      handleFailure(error && (error.errMsg || error.message))
+    }
   },
 
   fetchList(options) {
     const input = options && typeof options === "object" ? options : {}
     const append = Boolean(input.append)
     const nextPage = append ? this.data.page + 1 : 0
+    this.finishPrivacyManageListEffects()
+    const requestId = Number(this._privacyManageListRequestId || 0) + 1
+    this._privacyManageListRequestId = requestId
+    this._privacyManageListDone =
+      typeof input.done === "function" ? input.done : null
+
+    if (this.data.updatingId) {
+      this.finishPrivacyManageListEffects()
+      return
+    }
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       this.setData({
         initialLoading: false,
@@ -371,36 +485,73 @@ Page({
         hasLoaded: true,
         list: []
       })
-      if (typeof input.done === "function") {
-        input.done()
-      }
+      this.finishPrivacyManageListEffects()
       return
     }
 
+    const filters = {
+      page: nextPage,
+      pageSize: this.data.pageSize,
+      type: this.data.currentType === "all" ? "" : this.data.currentType,
+      status: this.data.currentStatus === "all" ? "" : this.data.currentStatus,
+      keyword: String(this.data.keyword || "")
+    }
     this.setData({ loading: true })
-    wx.cloud.callFunction({
+    let settled = false
+    const finishRequest = () => {
+      if (settled || this._privacyManageListRequestId !== requestId) {
+        return false
+      }
+      settled = true
+      this.finishPrivacyManageListEffects()
+      return true
+    }
+    const handleFailure = (message) => {
+      if (!finishRequest()) {
+        return
+      }
+      wx.showToast({
+        title: formatToastTitle(message, "加载失败"),
+        icon: "none"
+      })
+      this.setData({
+        initialLoading: false,
+        loading: false,
+        hasLoaded: true,
+        page: append ? this.data.page : 0,
+        list: append ? this.data.list : [],
+        total: append ? this.data.total : 0,
+        hasMore: append ? this.data.hasMore : false,
+        truncated: append ? this.data.truncated : false
+      })
+    }
+
+    this._privacyManageListTimer = setTimeout(() => {
+      handleFailure("加载超时，请重试")
+    }, PRIVACY_MANAGE_LIST_TIMEOUT_MS)
+
+    const requestOptions = {
       name: "privacyRequestList",
-      data: {
-        page: nextPage,
-        pageSize: this.data.pageSize,
-        type: this.data.currentType === "all" ? "" : this.data.currentType,
-        status: this.data.currentStatus === "all" ? "" : this.data.currentStatus,
-        keyword: this.data.keyword
-      },
+      data: filters,
       success: (res) => {
+        if (!finishRequest()) {
+          return
+        }
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
           wx.showToast({
-          title: formatToastTitle(result && result.message, "加载失败"),
+            title: formatToastTitle(result && result.message, "加载失败"),
             icon: "none"
           })
           this.setData({
             initialLoading: false,
             loading: false,
             hasLoaded: true,
+            page: append ? this.data.page : 0,
             list: append ? this.data.list : [],
-            total: 0,
-            hasMore: false
+            total: append ? this.data.total : 0,
+            hasMore: append ? this.data.hasMore : false,
+            truncated: append ? this.data.truncated : false
           })
           return
         }
@@ -440,21 +591,34 @@ Page({
         })
       },
       fail: (error) => {
-        wx.showToast({
-          title: "加载失败",
-          icon: "none"
-        })
-        this.setData({
-          initialLoading: false,
-          loading: false,
-          hasLoaded: true
-        })
+        handleFailure(error && (error.errMsg || error.message))
       },
-      complete: () => {
-        if (typeof input.done === "function") {
-          input.done()
-        }
-      }
-    })
+      complete: () => {}
+    }
+
+    try {
+      wx.cloud.callFunction(requestOptions)
+    } catch (error) {
+      handleFailure(error && (error.errMsg || error.message))
+    }
+  },
+
+  finishPrivacyManageListEffects() {
+    if (this._privacyManageListTimer) {
+      clearTimeout(this._privacyManageListTimer)
+      this._privacyManageListTimer = null
+    }
+    if (typeof this._privacyManageListDone === "function") {
+      const done = this._privacyManageListDone
+      this._privacyManageListDone = null
+      done()
+    }
+  },
+
+  clearPrivacyManageWriteTimer() {
+    if (this._privacyManageWriteTimer) {
+      clearTimeout(this._privacyManageWriteTimer)
+      this._privacyManageWriteTimer = null
+    }
   }
 })

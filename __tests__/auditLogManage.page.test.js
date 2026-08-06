@@ -8,6 +8,7 @@ const path = require("path")
 jest.mock("../shared/csvFile", () => ({
   canShareCsvFile: jest.fn(() => true),
   getErrorMessage: jest.fn(() => ""),
+  isUserCancelError: jest.fn(() => false),
   openCsvFile: jest.fn(),
   removeCsvFile: jest.fn(),
   saveCsvFile: jest.fn(),
@@ -24,11 +25,12 @@ function loadPageDefinition() {
   return definition
 }
 
-function createPage(definition) {
+function createPage(definition, data) {
   const page = {
     ...definition,
     data: {
-      ...definition.data
+      ...definition.data,
+      ...(data || {})
     }
   }
   page.setData = jest.fn((patch, callback) => {
@@ -45,8 +47,164 @@ function createPage(definition) {
 
 describe("pages/audit-log-manage 安全摘要展示", () => {
   afterEach(() => {
+    jest.useRealTimers()
+    jest.clearAllMocks()
     delete global.Page
     delete global.wx
+  })
+
+  test("审计列表无回调时超时收尾并忽略迟到结果", () => {
+    jest.useFakeTimers()
+    let lateSuccess
+    const done = jest.fn()
+    global.wx = {
+      showToast: jest.fn(),
+      cloud: {
+        callFunction: jest.fn(({ success }) => {
+          lateSuccess = success
+        })
+      }
+    }
+    const existingList = [{ id: "existing" }]
+    const page = createPage(loadPageDefinition(), {
+      initialLoading: false,
+      list: existingList,
+      page: 2,
+      hasMore: true,
+      total: 60,
+      truncated: true
+    })
+
+    page.fetchList({ append: true, done })
+    jest.advanceTimersByTime(15 * 1000)
+
+    expect(page.data.loading).toBe(false)
+    expect(page.data.list).toBe(existingList)
+    expect(page.data.page).toBe(2)
+    expect(page.data.hasMore).toBe(true)
+    expect(page.data.total).toBe(60)
+    expect(done).toHaveBeenCalledTimes(1)
+    expect(global.wx.showToast).toHaveBeenCalledWith({
+      title: "加载超时，请重试",
+      icon: "none"
+    })
+
+    lateSuccess({
+      result: {
+        ok: true,
+        page: 3,
+        hasMore: false,
+        list: [{ id: "late", action: "roleUpsert" }]
+      }
+    })
+    expect(page.data.list).toBe(existingList)
+    expect(page.data.page).toBe(2)
+  })
+
+  test("新审计列表请求覆盖旧请求且旧结果不会回写", () => {
+    const requests = []
+    global.wx = {
+      showToast: jest.fn(),
+      cloud: {
+        callFunction: jest.fn((options) => requests.push(options))
+      }
+    }
+    const page = createPage(loadPageDefinition())
+
+    page.fetchList()
+    page.fetchList()
+    requests[1].success({
+      result: {
+        ok: true,
+        page: 0,
+        hasMore: false,
+        list: [{ id: "fresh", action: "vehicleCreate" }]
+      }
+    })
+    requests[0].success({
+      result: {
+        ok: true,
+        page: 0,
+        hasMore: false,
+        list: [{ id: "stale", action: "roleUpsert" }]
+      }
+    })
+
+    expect(page.data.list).toHaveLength(1)
+    expect(page.data.list[0].id).toBe("fresh")
+  })
+
+  test("审计导出全链路超时后清理迟到生成的文件", async () => {
+    jest.useFakeTimers()
+    let exportRequest
+    let resolveSave
+    global.wx = {
+      showToast: jest.fn(),
+      showModal: jest.fn(),
+      cloud: {
+        callFunction: jest.fn((options) => {
+          exportRequest = options
+        })
+      }
+    }
+    const definition = loadPageDefinition()
+    const csvFile = require("../shared/csvFile")
+    csvFile.saveCsvFile.mockReturnValue(
+      new Promise((resolve) => {
+        resolveSave = resolve
+      })
+    )
+    csvFile.removeCsvFile.mockResolvedValue()
+    const page = createPage(definition, {
+      keyword: "booking_1",
+      currentAction: "bookingCreate"
+    })
+
+    page.handleExport()
+    expect(exportRequest.data).toMatchObject({
+      logType: "audit",
+      filter: "bookingCreate",
+      keyword: "booking_1"
+    })
+    exportRequest.success({
+      result: {
+        ok: true,
+        csvText: "id,action\na1,bookingCreate",
+        fileName: "audit.csv"
+      }
+    })
+    jest.advanceTimersByTime(20 * 1000)
+
+    expect(page.data.exporting).toBe(false)
+    expect(global.wx.showToast).toHaveBeenCalledWith({
+      title: "导出超时，请重试",
+      icon: "none"
+    })
+
+    resolveSave({ filePath: "/data/audit.csv", fileName: "audit.csv" })
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(csvFile.removeCsvFile).toHaveBeenCalledWith("/data/audit.csv")
+    expect(page.data.exportFilePath).toBe("")
+  })
+
+  test("审计导出遇到云 SDK 同步异常时安全结束", () => {
+    global.wx = {
+      showToast: jest.fn(),
+      cloud: {
+        callFunction: jest.fn(() => {
+          throw new Error("cloud down")
+        })
+      }
+    }
+    const page = createPage(loadPageDefinition())
+
+    expect(() => page.handleExport()).not.toThrow()
+    expect(page.data.exporting).toBe(false)
+    expect(global.wx.showToast).toHaveBeenCalledWith({
+      title: "cloud down",
+      icon: "none"
+    })
   })
 
   test("协调、备注和导出审计展示安全摘要字段", () => {

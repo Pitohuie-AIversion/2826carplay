@@ -27,6 +27,7 @@ function createPage(definition, overrides) {
 
 describe("pages/booking-manage-detail conflict handling", () => {
   afterEach(() => {
+    jest.useRealTimers()
     delete global.Page
     delete global.wx
   })
@@ -81,6 +82,71 @@ describe("pages/booking-manage-detail conflict handling", () => {
       statusText: "已联系",
       statusClass: "status-contacted"
     }))
+  })
+
+  test("详情加载超时后退出等待并忽略迟到结果", () => {
+    jest.useFakeTimers()
+    let requestOptions = null
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn((options) => {
+          requestOptions = options
+        })
+      },
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition(), {
+      id: "booking_timeout",
+      booking: { id: "existing_booking" }
+    })
+
+    page.loadDetail()
+    jest.advanceTimersByTime(15 * 1000)
+
+    expect(page.data.loading).toBe(false)
+    expect(page.data.loadFailed).toBe(true)
+    expect(page.data.loadErrorText).toBe("详情加载超时，请重试")
+
+    requestOptions.success({
+      result: {
+        ok: true,
+        detail: { id: "late_booking", status: "pending" }
+      }
+    })
+    expect(page.data.booking.id).toBe("existing_booking")
+  })
+
+  test("切换预约后旧详情结果不会覆盖新预约", () => {
+    const requests = []
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn((options) => requests.push(options))
+      },
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition(), {
+      id: "booking_old"
+    })
+
+    page.loadDetail()
+    page.data.id = "booking_new"
+    page.loadDetail()
+    requests[1].success({
+      result: {
+        ok: true,
+        detail: { id: "booking_new", status: "pending" }
+      }
+    })
+    requests[0].success({
+      result: {
+        ok: true,
+        detail: { id: "booking_old", status: "pending" }
+      }
+    })
+
+    expect(requests[0].data.id).toBe("booking_old")
+    expect(requests[1].data.id).toBe("booking_new")
+    expect(page.data.booking.id).toBe("booking_new")
   })
 
   test("冲突卡片可拨号并进入对应预约", () => {
@@ -169,6 +235,75 @@ describe("pages/booking-manage-detail conflict handling", () => {
     expect(page.loadDetail).toHaveBeenCalledTimes(1)
   })
 
+  test("协调更新超时后解除互斥并忽略迟到结果", () => {
+    jest.useFakeTimers()
+    let requestOptions = null
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn((options) => {
+          requestOptions = options
+        })
+      },
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition(), {
+      id: "booking_coordination_timeout",
+      coordinationEditable: true,
+      booking: {
+        schedulePriority: "normal",
+        coordinationStatus: "pending",
+        adminRemarkDraft: "待确认"
+      }
+    })
+    page.loadDetail = jest.fn()
+
+    page.handleUpdateCoordination({
+      currentTarget: {
+        dataset: {
+          field: "schedulePriority",
+          value: "priority"
+        }
+      }
+    })
+    page.handleSaveRemark()
+    page.updateStatus("contacted")
+    expect(global.wx.cloud.callFunction).toHaveBeenCalledTimes(1)
+
+    jest.advanceTimersByTime(20 * 1000)
+    expect(page.data.coordinationLoading).toBe(false)
+    expect(global.wx.showToast).toHaveBeenCalledWith({
+      title: "协调更新超时，请重试",
+      icon: "none"
+    })
+
+    requestOptions.success({ result: { ok: true, changed: true } })
+    expect(page.loadDetail).not.toHaveBeenCalled()
+  })
+
+  test("备注保存同步异常时安全恢复页面状态", () => {
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(() => {
+          throw new Error("cloud down")
+        })
+      },
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition(), {
+      id: "booking_remark_error",
+      booking: {
+        adminRemarkDraft: "已确认到店时间"
+      }
+    })
+
+    expect(() => page.handleSaveRemark()).not.toThrow()
+    expect(page.data.loading).toBe(false)
+    expect(global.wx.showToast).toHaveBeenCalledWith({
+      title: "cloud down",
+      icon: "none"
+    })
+  })
+
   test("管理详情使用日期路线、冲突反馈和原生操作图标", () => {
     const pageDir = path.resolve(__dirname, "../pages/booking-manage-detail")
     const wxml = fs.readFileSync(path.join(pageDir, "booking-manage-detail.wxml"), "utf8")
@@ -195,6 +330,10 @@ describe("pages/booking-manage-detail conflict handling", () => {
     expect(wxml).toContain("coordination-option-pressed")
     expect(wxml).toContain("manage-detail-button-pressed")
     expect(wxml).toContain('aria-pressed="{{booking.schedulePriority ===')
+    expect(wxml).toContain(
+      'disabled="{{loading || coordinationLoading || !coordinationEditable}}"'
+    )
+    expect(wxml).toContain('disabled="{{loading || coordinationLoading}}"')
     expect(wxss).toContain(".coordination-option-pressed")
     expect(wxss).toContain(".manage-detail-button-pressed")
   })

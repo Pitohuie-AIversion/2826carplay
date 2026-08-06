@@ -203,11 +203,11 @@
     <button
       wx:if="{{hasMore}}"
       class="garage-load-more ui-btn ui-btn-ghost"
-      loading="{{loadingCars}}"
-      disabled="{{loadingCars}}"
+      loading="{{loadingCars || searchDebouncing}}"
+      disabled="{{loadingCars || searchDebouncing}}"
       bindtap="handleLoadMore"
     >
-      <view class="garage-action-content"><view wx:if="{{!loadingCars}}" class="garage-action-native-icon garage-more-native-icon" aria-hidden="true"></view><text>{{loadingCars ? '正在加载' : '加载更多车辆'}}</text></view>
+      <view class="garage-action-content"><view wx:if="{{!loadingCars && !searchDebouncing}}" class="garage-action-native-icon garage-more-native-icon" aria-hidden="true"></view><text>{{searchDebouncing ? '正在搜索…' : loadingCars ? '正在加载' : '加载更多车辆'}}</text></view>
     </button>
     <view wx:elif="{{!truncated}}" class="garage-list-end"><view class="garage-complete-native-icon" aria-hidden="true"></view><text>已展示当前全部车辆</text></view>
     <view wx:if="{{truncated}}" class="garage-capacity-tip">当前最多展示 2000 辆，请联系管理员缩小车辆范围。</view>

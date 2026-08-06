@@ -15,13 +15,14 @@ function loadPageDefinition() {
   return definition
 }
 
-function createPage(definition) {
+function createPage(definition, overrides) {
   const page = {
     ...definition,
     data: {
       ...definition.data,
       summaryItems: definition.data.summaryItems.map((item) => ({ ...item })),
-      statusRatioSegments: definition.data.statusRatioSegments.map((item) => ({ ...item }))
+      statusRatioSegments: definition.data.statusRatioSegments.map((item) => ({ ...item })),
+      ...(overrides || {})
     }
   }
   page.setData = jest.fn((patch, done) => {
@@ -47,8 +48,121 @@ describe("pages/vehicle-manage 车辆管理列表体验", () => {
   })
 
   afterEach(() => {
+    jest.useRealTimers()
     delete global.Page
     delete global.wx
+  })
+
+  test("车辆列表无回调时超时收尾并忽略迟到结果", () => {
+    jest.useFakeTimers()
+    let lateSuccess
+    const done = jest.fn()
+    wx.cloud.callFunction.mockImplementation(({ success }) => {
+      lateSuccess = success
+    })
+    const existingList = [{ id: "existing" }]
+    const page = createPage(loadPageDefinition(), {
+      list: existingList,
+      page: 2,
+      hasMore: true
+    })
+
+    page.fetchList({ append: true, done })
+    jest.advanceTimersByTime(15 * 1000)
+
+    expect(page.data.loading).toBe(false)
+    expect(page.data.list).toBe(existingList)
+    expect(page.data.page).toBe(2)
+    expect(page.data.hasMore).toBe(true)
+    expect(done).toHaveBeenCalledTimes(1)
+    expect(wx.showToast).toHaveBeenCalledWith({
+      title: "查询超时，请重试",
+      icon: "none"
+    })
+
+    lateSuccess({
+      result: {
+        ok: true,
+        page: 3,
+        hasMore: false,
+        list: [{ id: "late" }]
+      }
+    })
+    expect(page.data.list).toBe(existingList)
+    expect(page.data.page).toBe(2)
+  })
+
+  test("新车辆列表请求覆盖旧请求且旧结果不会回写", () => {
+    const requests = []
+    wx.cloud.callFunction.mockImplementation((options) => requests.push(options))
+    const page = createPage(loadPageDefinition())
+
+    page.fetchList()
+    page.data.keyword = "fresh"
+    page.fetchList()
+    expect(requests[0].data.keyword).toBe("")
+    expect(requests[1].data.keyword).toBe("fresh")
+
+    requests[1].success({
+      result: {
+        ok: true,
+        page: 0,
+        hasMore: false,
+        list: [{ id: "fresh" }]
+      }
+    })
+    requests[0].success({
+      result: {
+        ok: true,
+        page: 0,
+        hasMore: false,
+        list: [{ id: "stale" }]
+      }
+    })
+
+    expect(page.data.list).toHaveLength(1)
+    expect(page.data.list[0].id).toBe("fresh")
+  })
+
+  test("车辆写操作超时后恢复状态并阻止重复操作与迟到成功", () => {
+    jest.useFakeTimers()
+    let lateSuccess
+    wx.cloud.callFunction.mockImplementation(({ success }) => {
+      lateSuccess = success
+    })
+    const page = createPage(loadPageDefinition())
+    page.fetchList = jest.fn()
+
+    page.updateVehicleStatus("car_1", "active")
+    page.retireVehicle("car_2")
+    expect(wx.cloud.callFunction).toHaveBeenCalledTimes(1)
+    expect(page.data.updatingId).toBe("car_1")
+
+    jest.advanceTimersByTime(20 * 1000)
+    expect(page.data.updatingId).toBe("")
+    expect(wx.hideLoading).toHaveBeenCalledTimes(1)
+    expect(wx.showToast).toHaveBeenCalledWith({
+      title: "更新超时，请重试",
+      icon: "none"
+    })
+
+    lateSuccess({ result: { ok: true, message: "状态已更新" } })
+    expect(page.fetchList).not.toHaveBeenCalled()
+  })
+
+  test("车辆写操作遇到云 SDK 同步异常时安全结束", () => {
+    wx.cloud.callFunction.mockImplementation(() => {
+      throw new Error("cloud down")
+    })
+    const page = createPage(loadPageDefinition())
+
+    expect(() => page.restoreVehicle("car_1")).not.toThrow()
+    expect(page.data.updatingId).toBe("")
+    expect(wx.hideLoading).toHaveBeenCalledTimes(1)
+    expect(wx.showToast).toHaveBeenCalledWith({
+      title: "cloud down",
+      icon: "none"
+    })
   })
 
   test("封面与图片数量组合生成素材完整度", () => {

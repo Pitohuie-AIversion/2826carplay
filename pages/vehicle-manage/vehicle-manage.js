@@ -51,6 +51,8 @@ const FUEL_TYPE_LABEL_MAP = {
 }
 
 const DEFAULT_PAGE_SIZE = 20
+const VEHICLE_LIST_TIMEOUT_MS = 15 * 1000
+const VEHICLE_MUTATION_TIMEOUT_MS = 20 * 1000
 
 function formatDisplayTime(value) {
   if (!value) {
@@ -188,6 +190,7 @@ function buildRecentAddedViewModel(list) {
 Page({
   data: {
     loading: false,
+    updatingId: "",
     deletingId: "",
     pageAuthorized: false,
     keyword: "",
@@ -226,9 +229,20 @@ Page({
   },
 
   onPullDownRefresh() {
+    if (!this.data.pageAuthorized) {
+      wx.stopPullDownRefresh()
+      return
+    }
     this.fetchList(() => {
       wx.stopPullDownRefresh()
     })
+  },
+
+  onUnload() {
+    this._vehicleListRequestId = Number(this._vehicleListRequestId || 0) + 1
+    this._vehicleMutationRequestId = Number(this._vehicleMutationRequestId || 0) + 1
+    this.finishVehicleListRequestEffects()
+    this.finishVehicleMutationEffects()
   },
 
   handleKeywordInput(event) {
@@ -360,7 +374,7 @@ Page({
   },
 
   handleUpdateStatus(event) {
-    if (this.data.loading) {
+    if (this.data.loading || this.data.updatingId || this.data.deletingId) {
       return
     }
 
@@ -406,6 +420,10 @@ Page({
       return
     }
 
+    if (this.data.updatingId || this.data.deletingId) {
+      return
+    }
+
     wx.showModal({
       title: "停用车辆",
       content: `确认将车辆 ${plateNumber || id} 标记为停用？`,
@@ -430,6 +448,10 @@ Page({
         title: "车辆编号缺失",
         icon: "none"
       })
+      return
+    }
+
+    if (this.data.updatingId || this.data.deletingId) {
       return
     }
 
@@ -460,7 +482,7 @@ Page({
       return
     }
 
-    if (this.data.deletingId) {
+    if (this.data.updatingId || this.data.deletingId) {
       return
     }
 
@@ -480,28 +502,18 @@ Page({
   },
 
   updateVehicleStatus(id, status) {
-    if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
-      wx.showToast({
-        title: "云能力未初始化",
-        icon: "none"
-      })
-      return
-    }
-
-    wx.showLoading({
-      title: "更新中…",
-      mask: true
-    })
-
-    wx.cloud.callFunction({
+    this.runVehicleMutation({
+      id,
+      stateField: "updatingId",
       name: "vehicleUpdateStatus",
       data: { id, status },
-      success: (res) => {
-        wx.hideLoading()
-        const result = res && res.result ? res.result : null
+      loadingTitle: "更新中…",
+      timeoutTitle: "更新超时，请重试",
+      failureFallback: "更新失败",
+      onResult: (result) => {
         if (!result || !result.ok) {
           wx.showToast({
-          title: formatToastTitle(result && result.message, "更新失败"),
+            title: formatToastTitle(result && result.message, "更新失败"),
             icon: "none"
           })
           return
@@ -512,41 +524,23 @@ Page({
           icon: "success"
         })
         this.fetchList()
-      },
-      fail: (error) => {
-        wx.hideLoading()
-        wx.showToast({
-          title: "更新失败",
-          icon: "none"
-        })
       }
     })
   },
 
   retireVehicle(id) {
-    if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
-      wx.showToast({
-        title: "云能力未初始化",
-        icon: "none"
-      })
-      return
-    }
-
-    wx.showLoading({
-      title: "停用中…",
-      mask: true
-    })
-
-    wx.cloud.callFunction({
+    this.runVehicleMutation({
+      id,
+      stateField: "updatingId",
       name: "vehicleRetire",
       data: { id },
-      success: (res) => {
-        wx.hideLoading()
-
-        const result = res && res.result ? res.result : null
+      loadingTitle: "停用中…",
+      timeoutTitle: "停用超时，请重试",
+      failureFallback: "停用失败",
+      onResult: (result) => {
         if (!result || !result.ok) {
           wx.showToast({
-          title: formatToastTitle(result && result.message, "停用失败"),
+            title: formatToastTitle(result && result.message, "停用失败"),
             icon: "none"
           })
           return
@@ -558,41 +552,23 @@ Page({
         })
 
         this.fetchList()
-      },
-      fail: (error) => {
-        wx.hideLoading()
-        wx.showToast({
-          title: "停用失败",
-          icon: "none"
-        })
       }
     })
   },
 
   restoreVehicle(id) {
-    if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
-      wx.showToast({
-        title: "云能力未初始化",
-        icon: "none"
-      })
-      return
-    }
-
-    wx.showLoading({
-      title: "恢复中…",
-      mask: true
-    })
-
-    wx.cloud.callFunction({
+    this.runVehicleMutation({
+      id,
+      stateField: "updatingId",
       name: "vehicleRestore",
       data: { id },
-      success: (res) => {
-        wx.hideLoading()
-
-        const result = res && res.result ? res.result : null
+      loadingTitle: "恢复中…",
+      timeoutTitle: "恢复超时，请重试",
+      failureFallback: "恢复失败",
+      onResult: (result) => {
         if (!result || !result.ok) {
           wx.showToast({
-          title: formatToastTitle(result && result.message, "恢复失败"),
+            title: formatToastTitle(result && result.message, "恢复失败"),
             icon: "none"
           })
           return
@@ -604,13 +580,6 @@ Page({
         })
 
         this.fetchList()
-      },
-      fail: (error) => {
-        wx.hideLoading()
-        wx.showToast({
-          title: "恢复失败",
-          icon: "none"
-        })
       }
     })
   },
@@ -620,29 +589,15 @@ Page({
       return
     }
 
-    if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
-      wx.showToast({
-        title: "云能力未初始化",
-        icon: "none"
-      })
-      return
-    }
-
-    this.setData({ deletingId: id })
-
-    wx.showLoading({
-      title: "删除中…",
-      mask: true
-    })
-
-    wx.cloud.callFunction({
+    this.runVehicleMutation({
+      id,
+      stateField: "deletingId",
       name: "vehicleDelete",
       data: { id },
-      success: (res) => {
-        wx.hideLoading()
-        this.setData({ deletingId: "" })
-
-        const result = res && res.result ? res.result : null
+      loadingTitle: "删除中…",
+      timeoutTitle: "删除超时，请重试",
+      failureFallback: "删除失败",
+      onResult: (result) => {
         if (!result || !result.ok) {
           this.showDeleteFailure(id, result)
           return
@@ -655,12 +610,89 @@ Page({
 
         this.fetchList()
       },
-      fail: (error) => {
-        wx.hideLoading()
-        this.setData({ deletingId: "" })
+      onFailure: () => {
         this.showDeleteFailure(id, null)
       }
     })
+  },
+
+  runVehicleMutation(options) {
+    const input = options && typeof options === "object" ? options : {}
+    const id = String(input.id || "").trim()
+    if (!id || this.data.loading || this.data.updatingId || this.data.deletingId) {
+      return
+    }
+    if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
+      wx.showToast({
+        title: "云能力未初始化",
+        icon: "none"
+      })
+      return
+    }
+
+    const requestId = Number(this._vehicleMutationRequestId || 0) + 1
+    this._vehicleMutationRequestId = requestId
+    this.finishVehicleMutationEffects()
+    const stateField = input.stateField === "deletingId" ? "deletingId" : "updatingId"
+    this.setData({ [stateField]: id })
+    wx.showLoading({
+      title: input.loadingTitle || "处理中…",
+      mask: true
+    })
+    this._vehicleMutationLoadingVisible = true
+
+    let settled = false
+    const finishRequest = () => {
+      if (settled || this._vehicleMutationRequestId !== requestId) {
+        return false
+      }
+      settled = true
+      this.finishVehicleMutationEffects()
+      return true
+    }
+    const handleFailure = (message) => {
+      if (!finishRequest()) {
+        return
+      }
+      this.setData({ [stateField]: "" })
+      if (typeof input.onFailure === "function") {
+        input.onFailure(message)
+        return
+      }
+      wx.showToast({
+        title: formatToastTitle(message, input.failureFallback || "操作失败"),
+        icon: "none"
+      })
+    }
+
+    this._vehicleMutationRequestTimer = setTimeout(() => {
+      handleFailure(input.timeoutTitle || "操作超时，请重试")
+    }, VEHICLE_MUTATION_TIMEOUT_MS)
+
+    const requestOptions = {
+      name: input.name,
+      data: input.data,
+      success: (res) => {
+        if (!finishRequest()) {
+          return
+        }
+        this.setData({ [stateField]: "" })
+        const result = res && res.result ? res.result : null
+        if (typeof input.onResult === "function") {
+          input.onResult(result)
+        }
+      },
+      fail: (error) => {
+        handleFailure(error && (error.errMsg || error.message))
+      },
+      complete: () => {}
+    }
+
+    try {
+      wx.cloud.callFunction(requestOptions)
+    } catch (error) {
+      handleFailure(error && (error.errMsg || error.message))
+    }
   },
 
   showDeleteFailure(id, result) {
@@ -719,6 +751,9 @@ Page({
     const append = Boolean(input && typeof input === "object" && input.append)
     const nextPage = append ? this.data.page + 1 : 0
     const pageSize = this.data.pageSize || DEFAULT_PAGE_SIZE
+    const requestId = Number(this._vehicleListRequestId || 0) + 1
+    this._vehicleListRequestId = requestId
+    this.finishVehicleListRequestEffects()
 
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       wx.showToast({
@@ -739,14 +774,47 @@ Page({
       pageSize
     }
 
+    this._vehicleListRequestDone = typeof done === "function" ? done : null
     this.setData({
       loading: true
     })
 
-    wx.cloud.callFunction({
+    let settled = false
+    const finishRequest = () => {
+      if (settled || this._vehicleListRequestId !== requestId) {
+        return false
+      }
+      settled = true
+      this.finishVehicleListRequestEffects()
+      return true
+    }
+    const handleFailure = (message) => {
+      if (!finishRequest()) {
+        return
+      }
+      wx.showToast({
+        title: formatToastTitle(message, "查询失败"),
+        icon: "none"
+      })
+      this.setData({
+        loading: false,
+        page: append ? this.data.page : 0,
+        hasMore: append ? this.data.hasMore : false,
+        list: append ? this.data.list : []
+      })
+    }
+
+    this._vehicleListRequestTimer = setTimeout(() => {
+      handleFailure("查询超时，请重试")
+    }, VEHICLE_LIST_TIMEOUT_MS)
+
+    const requestOptions = {
       name: "vehicleList",
       data: filters,
       success: (res) => {
+        if (!finishRequest()) {
+          return
+        }
         const result = res && res.result ? res.result : null
 
         if (!result || !result.ok) {
@@ -758,10 +826,6 @@ Page({
           this.setData({
             loading: false
           })
-
-          if (typeof done === "function") {
-            done()
-          }
           return
         }
 
@@ -796,28 +860,40 @@ Page({
           hasMore: Boolean(result.hasMore),
           list: nextList
         })
-
-        if (typeof done === "function") {
-          done()
-        }
       },
       fail: (error) => {
-        wx.showToast({
-          title: "查询失败",
-          icon: "none"
-        })
+        handleFailure(error && (error.errMsg || error.message))
+      },
+      complete: () => {}
+    }
 
-        this.setData({
-          loading: false,
-          page: 0,
-          hasMore: false,
-          list: []
-        })
+    try {
+      wx.cloud.callFunction(requestOptions)
+    } catch (error) {
+      handleFailure(error && (error.errMsg || error.message))
+    }
+  },
 
-        if (typeof done === "function") {
-          done()
-        }
-      }
-    })
+  finishVehicleListRequestEffects() {
+    if (this._vehicleListRequestTimer) {
+      clearTimeout(this._vehicleListRequestTimer)
+      this._vehicleListRequestTimer = null
+    }
+    const done = this._vehicleListRequestDone
+    this._vehicleListRequestDone = null
+    if (typeof done === "function") {
+      done()
+    }
+  },
+
+  finishVehicleMutationEffects() {
+    if (this._vehicleMutationRequestTimer) {
+      clearTimeout(this._vehicleMutationRequestTimer)
+      this._vehicleMutationRequestTimer = null
+    }
+    if (this._vehicleMutationLoadingVisible) {
+      this._vehicleMutationLoadingVisible = false
+      wx.hideLoading()
+    }
   }
 })

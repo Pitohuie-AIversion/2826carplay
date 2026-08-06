@@ -34,6 +34,7 @@ function createPage(definition, data) {
 
 describe("pages/system-health", () => {
   afterEach(() => {
+    jest.useRealTimers()
     delete global.Page
     delete global.wx
   })
@@ -116,6 +117,88 @@ describe("pages/system-health", () => {
 
     expect(page.data.loading).toBe(false)
     expect(page.data.loadError).toBe("仅管理员可执行上线检查")
+  })
+
+  test("健康检查无回调时超时收尾并忽略迟到结果", () => {
+    jest.useFakeTimers()
+    let lateSuccess
+    const done = jest.fn()
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(({ success }) => {
+          lateSuccess = success
+        })
+      }
+    }
+    const page = createPage(loadPageDefinition())
+
+    page.loadHealth({ refreshing: true, done })
+    jest.advanceTimersByTime(20 * 1000)
+
+    expect(page.data.loading).toBe(false)
+    expect(page.data.refreshing).toBe(false)
+    expect(page.data.loadError).toBe("上线检查超时，请检查网络后重试")
+    expect(done).toHaveBeenCalledTimes(1)
+
+    lateSuccess({
+      result: {
+        ok: true,
+        checkedAt: "2026-08-06T08:30:00.000Z",
+        summary: { total: 1, passed: 1, warnings: 0, failed: 0 },
+        checks: [{ key: "late", status: "pass" }]
+      }
+    })
+    expect(page.data.checks).toEqual([])
+    expect(page.data.loadError).toBe("上线检查超时，请检查网络后重试")
+  })
+
+  test("新一轮刷新覆盖旧请求且旧结果不会回写", () => {
+    const requests = []
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn((options) => requests.push(options))
+      }
+    }
+    const page = createPage(loadPageDefinition())
+
+    page.loadHealth()
+    page.loadHealth({ refreshing: true })
+    requests[1].success({
+      result: {
+        ok: true,
+        checkedAt: "2026-08-06T08:30:00.000Z",
+        summary: { total: 1, passed: 1, warnings: 0, failed: 0 },
+        checks: [{ key: "fresh", label: "最新结果", status: "pass" }]
+      }
+    })
+    requests[0].success({
+      result: {
+        ok: true,
+        checkedAt: "2026-08-05T08:30:00.000Z",
+        summary: { total: 1, passed: 0, warnings: 0, failed: 1 },
+        checks: [{ key: "stale", label: "过期结果", status: "fail" }]
+      }
+    })
+
+    expect(page.data.checks).toHaveLength(1)
+    expect(page.data.checks[0].key).toBe("fresh")
+    expect(page.data.summary.failed).toBe(0)
+  })
+
+  test("云 SDK 同步异常时安全结束加载", () => {
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(() => {
+          throw new Error("cloud sdk crashed")
+        })
+      }
+    }
+    const page = createPage(loadPageDefinition())
+
+    expect(() => page.loadHealth()).not.toThrow()
+    expect(page.data.loading).toBe(false)
+    expect(page.data.refreshing).toBe(false)
+    expect(page.data.loadError).toBe("cloud sdk crashed")
   })
 
   test("人工确认保存在当前设备当天并实时更新完成度", () => {

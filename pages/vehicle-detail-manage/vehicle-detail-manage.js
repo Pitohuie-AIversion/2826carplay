@@ -778,6 +778,7 @@ Page({
 
     const finishBatch = () => {
       this._activeUploadTask = null
+      this._cancelActiveUpload = null
       const failedUploadPaths = failedFiles.map((item) => item.filePath)
       if (uploadedFileIds.length) {
         this.setData({
@@ -843,6 +844,8 @@ Page({
           return
         }
         uploadSettled = true
+        this._activeUploadTask = null
+        this._cancelActiveUpload = null
         if (uploadTimeoutId) {
           clearTimeout(uploadTimeoutId)
           uploadTimeoutId = null
@@ -864,9 +867,12 @@ Page({
       uploadTimeoutId = setTimeout(() => {
         handleUploadFailure({ errMsg: "uploadFile:fail timeout" })
       }, CLOUD_UPLOAD_TIMEOUT_MS)
+      this._cancelActiveUpload = () => {
+        handleUploadFailure({ errMsg: "uploadFile:fail cancel" })
+      }
 
       try {
-        this._activeUploadTask = wx.cloud.uploadFile({
+        const uploadTask = wx.cloud.uploadFile({
           cloudPath,
           filePath,
           success: (uploadRes) => {
@@ -882,6 +888,9 @@ Page({
           },
           fail: handleUploadFailure
         })
+        if (!uploadSettled) {
+          this._activeUploadTask = uploadTask
+        }
       } catch (error) {
         handleUploadFailure(error)
       }
@@ -898,10 +907,15 @@ Page({
     this.setData({
       uploadProgressText: "正在取消上传…"
     })
-    if (this._activeUploadTask && typeof this._activeUploadTask.abort === "function") {
+    const activeUploadTask = this._activeUploadTask
+    const cancelActiveUpload = this._cancelActiveUpload
+    if (activeUploadTask && typeof activeUploadTask.abort === "function") {
       try {
-        this._activeUploadTask.abort()
+        activeUploadTask.abort()
       } catch (error) {}
+    }
+    if (typeof cancelActiveUpload === "function") {
+      cancelActiveUpload()
     }
   },
 

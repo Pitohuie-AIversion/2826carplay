@@ -13,6 +13,9 @@ const BOOKING_DETAIL_WRITE_TIMEOUT_MS = 20 * 1000
 const STATUS_TEXT_MAP = {
   pending: "待联系",
   contacted: "已联系",
+  quoted: "已报价",
+  adjustment_requested: "待调整",
+  confirmed: "已确认",
   completed: "已完成",
   cancelled: "已取消"
 }
@@ -20,6 +23,9 @@ const STATUS_TEXT_MAP = {
 const STATUS_CLASS_MAP = {
   pending: "status-pending",
   contacted: "status-contacted",
+  quoted: "status-quoted",
+  adjustment_requested: "status-adjustment-requested",
+  confirmed: "status-confirmed",
   completed: "status-completed",
   cancelled: "status-cancelled"
 }
@@ -114,6 +120,63 @@ function normalizePhone(value) {
   return phone
 }
 
+function formatYuan(cents) {
+  const value = Math.max(0, Number(cents || 0))
+  return (value / 100).toFixed(2)
+}
+
+function normalizeQuote(item) {
+  const quote = item && typeof item === "object" ? item : {}
+  return {
+    id: quote.id || "",
+    bookingId: quote.bookingId || "",
+    startDate: quote.startDate || "",
+    endDate: quote.endDate || "",
+    rentalDays: Math.max(0, Number(quote.rentalDays || 0)),
+    baseRentalCents: Math.max(0, Number(quote.baseRentalCents || 0)),
+    protectionCents: Math.max(0, Number(quote.protectionCents || 0)),
+    serviceFeeCents: Math.max(0, Number(quote.serviceFeeCents || 0)),
+    deliveryFeeCents: Math.max(0, Number(quote.deliveryFeeCents || 0)),
+    otherFeeCents: Math.max(0, Number(quote.otherFeeCents || 0)),
+    totalCents: Math.max(0, Number(quote.totalCents || 0)),
+    totalText: formatYuan(quote.totalCents),
+    depositText: quote.depositText || "",
+    validUntil: quote.validUntil || "",
+    customerNote: quote.customerNote || "",
+    adjustmentNote: quote.adjustmentNote || "",
+    version: Math.max(0, Number(quote.version || 0)),
+    status: quote.status || "",
+    statusText: {
+      sent: "已发送",
+      confirmed: "用户已确认",
+      adjustment_requested: "用户申请调整",
+      expired: "已失效"
+    }[quote.status] || "草稿",
+    sentAtText: formatDisplayTime(quote.sentAt),
+    confirmedAtText: formatDisplayTime(quote.confirmedAt),
+    adjustmentRequestedAtText: formatDisplayTime(quote.adjustmentRequestedAt),
+    expiredAtText: formatDisplayTime(quote.expiredAt)
+  }
+}
+
+function createQuoteForm(quote) {
+  const source = quote && typeof quote === "object" ? quote : {}
+  return {
+    baseRentalAmount: formatYuan(source.baseRentalCents),
+    protectionAmount: formatYuan(source.protectionCents),
+    serviceFeeAmount: formatYuan(source.serviceFeeCents),
+    deliveryFeeAmount: formatYuan(source.deliveryFeeCents),
+    otherFeeAmount: formatYuan(source.otherFeeCents),
+    depositText: source.depositText || "",
+    validUntil: source.validUntil || "",
+    customerNote: source.customerNote || ""
+  }
+}
+
+function getChinaToday() {
+  return new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10)
+}
+
 function normalizeBooking(item) {
   const booking = item && typeof item === "object" ? item : {}
   const status = String(booking.status || "pending").trim() || "pending"
@@ -142,6 +205,8 @@ function normalizeBooking(item) {
       : "normal",
     coordinationStatus,
     coordinationUpdatedAt: booking.coordinationUpdatedAt || "",
+    latestQuoteId: booking.latestQuoteId || "",
+    latestQuoteVersion: Math.max(0, Number(booking.latestQuoteVersion || 0)),
     status,
     createdAt: booking.createdAt || "",
     updatedAt: booking.updatedAt || ""
@@ -201,7 +266,14 @@ Page({
     conflictCheckSkipped: false,
     coordinationLoading: false,
     coordinationEditable: false,
-    coordinationUpdatedAtText: ""
+    coordinationUpdatedAtText: "",
+    quoteLoading: false,
+    quoteDirty: false,
+    quoteDraft: {},
+    quoteHistory: [],
+    quotesUnavailable: false,
+    quoteMinDate: getChinaToday(),
+    quoteForm: createQuoteForm()
   },
 
   onLoad(options) {
@@ -272,6 +344,7 @@ Page({
     return Boolean(
       this.data.loading ||
       this.data.coordinationLoading ||
+      this.data.quoteLoading ||
       this._bookingDetailMutationActive ||
       this._bookingDetailStatusFeedbackPending
     )
@@ -301,10 +374,15 @@ Page({
     this._bookingDetailStatusFeedbackPending = false
   },
 
-  applyBooking(booking, conflictResult) {
+  applyBooking(booking, conflictResult, quoteResult) {
     const conflictData = conflictResult && typeof conflictResult === "object"
       ? conflictResult
       : {}
+    const quoteData = quoteResult && typeof quoteResult === "object" ? quoteResult : {}
+    const quoteDraft = normalizeQuote(quoteData.draft)
+    const quoteHistory = Array.isArray(quoteData.history)
+      ? quoteData.history.map(normalizeQuote)
+      : []
     this.setData({
       booking,
       remarkDirty: false,
@@ -316,8 +394,14 @@ Page({
       updatedAtText: formatDisplayTime(booking.updatedAt),
       adminRemarkUpdatedAtText: formatDisplayTime(booking.adminRemarkUpdatedAt),
       coordinationUpdatedAtText: formatDisplayTime(booking.coordinationUpdatedAt),
-      coordinationEditable: booking.status === "pending" || booking.status === "contacted",
+      coordinationEditable: !["completed", "cancelled"].includes(booking.status),
       coordinationLoading: false,
+      quoteLoading: false,
+      quoteDirty: false,
+      quoteDraft,
+      quoteHistory,
+      quotesUnavailable: Boolean(quoteData.unavailable),
+      quoteForm: createQuoteForm(quoteDraft),
       conflicts: Array.isArray(conflictData.list)
         ? conflictData.list.map(normalizeConflictBooking)
         : [],
@@ -426,6 +510,10 @@ Page({
           truncated: result.conflictsTruncated,
           unavailable: result.conflictsUnavailable,
           skipped: result.conflictCheckSkipped
+        }, {
+          draft: result.quoteDraft,
+          history: result.quoteHistory,
+          unavailable: result.quotesUnavailable
         })
         this.setData({ loading: false })
       },
@@ -500,10 +588,116 @@ Page({
     })
   },
 
+  handleQuoteInput(event) {
+    if (this.isBookingDetailInteractionBusy()) return
+    const field = String(event.currentTarget.dataset.field || "")
+    const allowed = ["baseRentalAmount", "protectionAmount", "serviceFeeAmount", "deliveryFeeAmount", "otherFeeAmount", "depositText", "customerNote"]
+    if (!allowed.includes(field)) return
+    const maxLength = field === "customerNote" ? 300 : field === "depositText" ? 200 : 20
+    this.setData({ [`quoteForm.${field}`]: String(event.detail && event.detail.value || "").slice(0, maxLength), quoteDirty: true })
+  },
+
+  handleQuoteValidUntilChange(event) {
+    if (this.isBookingDetailInteractionBusy()) return
+    this.setData({ "quoteForm.validUntil": String(event.detail && event.detail.value || ""), quoteDirty: true })
+  },
+
+  buildQuotePayload(action) {
+    const form = this.data.quoteForm || {}
+    return {
+      action,
+      bookingId: String(this.data.id || ""),
+      baseRentalAmount: form.baseRentalAmount,
+      protectionAmount: form.protectionAmount,
+      serviceFeeAmount: form.serviceFeeAmount,
+      deliveryFeeAmount: form.deliveryFeeAmount,
+      otherFeeAmount: form.otherFeeAmount,
+      depositText: form.depositText,
+      validUntil: form.validUntil,
+      customerNote: form.customerNote
+    }
+  },
+
+  handleSaveQuoteDraft() {
+    if (this.isBookingDetailInteractionBusy() || !this.data.id) return
+    this.runBookingDetailMutation({
+      name: "bookingQuoteManage",
+      data: this.buildQuotePayload("saveDraft"),
+      startState: { quoteLoading: true },
+      endState: { quoteLoading: false },
+      timeoutTitle: "报价保存超时，请重试",
+      failureFallback: "报价保存失败",
+      onResult: (result, isCurrent) => {
+        if (!result || !result.ok) {
+          wx.showToast({ title: formatToastTitle(result && result.message, "报价保存失败"), icon: "none" })
+          this.setData({ quoteLoading: false })
+          return
+        }
+        wx.showToast({ title: "报价草稿已保存", icon: "none" })
+        this.setData({ quoteLoading: false, quoteDirty: false })
+        if (isCurrent()) this.loadDetail()
+      }
+    })
+  },
+
+  handleSendQuote() {
+    if (this.isBookingDetailInteractionBusy() || this.data.quoteDirty || !this.data.quoteDraft.id) return
+    const action = beginPageNativeAction(this, { exclusiveKey: "quote-send-confirmation" })
+    wx.showModal({
+      title: "发送报价",
+      content: `确认发送报价 v${this.data.quoteDraft.version}？发送后该版本不可修改。`,
+      confirmText: "确认发送",
+      confirmColor: "#528fff",
+      success: (res) => {
+        if (!isPageNativeActionActive(this, action) || !res || !res.confirm) return
+        const requestId = `quote_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+        this.runBookingDetailMutation({
+          name: "bookingQuoteManage",
+          data: { action: "send", bookingId: this.data.id, requestId },
+          startState: { quoteLoading: true },
+          endState: { quoteLoading: false },
+          timeoutTitle: "报价发送超时，请重试",
+          failureFallback: "报价发送失败",
+          onResult: (result, isCurrent) => {
+            if (!result || !result.ok) {
+              wx.showToast({ title: formatToastTitle(result && result.message, "报价发送失败"), icon: "none" })
+              this.setData({ quoteLoading: false })
+              return
+            }
+            showStatusUpdateFeedback(result, () => {
+              this.setData({ quoteLoading: false })
+              if (isCurrent()) this.loadDetail()
+            })
+          }
+        })
+      }
+    })
+  },
+
+  handleExpireQuote(event) {
+    if (this.isBookingDetailInteractionBusy()) return
+    const quoteId = String(event.currentTarget.dataset.id || "")
+    if (!quoteId) return
+    this.runBookingDetailMutation({
+      name: "bookingQuoteManage",
+      data: { action: "expire", bookingId: this.data.id, quoteId },
+      startState: { quoteLoading: true },
+      endState: { quoteLoading: false },
+      timeoutTitle: "报价失效操作超时",
+      failureFallback: "报价失效操作失败",
+      onResult: (result, isCurrent) => {
+        wx.showToast({ title: formatToastTitle(result && result.message, result && result.ok ? "报价已失效" : "操作失败"), icon: "none" })
+        this.setData({ quoteLoading: false })
+        if (result && result.ok && isCurrent()) this.loadDetail()
+      }
+    })
+  },
+
   handleUpdateCoordination(event) {
     if (
       this.data.loading ||
       this.data.coordinationLoading ||
+      this.data.quoteLoading ||
       this._bookingDetailMutationActive ||
       this.data.remarkDirty ||
       !this.data.coordinationEditable ||
@@ -678,6 +872,7 @@ Page({
     if (
       this.data.loading ||
       this.data.coordinationLoading ||
+      this.data.quoteLoading ||
       this._bookingDetailMutationActive ||
       this.data.remarkDirty ||
       !this.data.id

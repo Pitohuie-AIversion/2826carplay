@@ -16,7 +16,10 @@ const WORKBENCH_WRITE_TIMEOUT_MS = 20 * 1000
 
 const STATUS_LABELS = {
   pending: "待联系",
-  contacted: "已联系"
+  contacted: "已联系",
+  quoted: "已报价",
+  adjustment_requested: "待调整",
+  confirmed: "已确认"
 }
 
 const FILTER_OPTIONS = [

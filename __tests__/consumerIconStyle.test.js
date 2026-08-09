@@ -157,9 +157,9 @@ describe("用户主流程原生图标", () => {
     const wxmlFiles = listWxmlFiles("pages")
     const textareaCounterExpressions = {
       "pages/booking/booking.wxml": ["form.note.length"],
-      "pages/booking-detail/booking-detail.wxml": ["editForm.note.length"],
+      "pages/booking-detail/booking-detail.wxml": ["editForm.note.length", "adjustmentNote.length"],
       "pages/booking-manage/booking-manage.wxml": ["item.adminRemarkDraft.length"],
-      "pages/booking-manage-detail/booking-manage-detail.wxml": ["booking.adminRemarkDraft.length"],
+      "pages/booking-manage-detail/booking-manage-detail.wxml": ["booking.adminRemarkDraft.length", "quoteForm.depositText.length", "quoteForm.customerNote.length"],
       "pages/booking-workbench/booking-workbench.wxml": ["remarkDraft.length"],
       "pages/config-manage/config-manage.wxml": [
         "form.mineUserDesc.length",
@@ -214,9 +214,9 @@ describe("用户主流程原生图标", () => {
       })
     })
 
-    expect(inputControlCount).toBe(57)
-    expect(singleLineInputCount).toBe(32)
-    expect(textareaCount).toBe(25)
+    expect(inputControlCount).toBe(65)
+    expect(singleLineInputCount).toBe(37)
+    expect(textareaCount).toBe(28)
     expect(Object.values(textareaCounterExpressions).flat()).toHaveLength(textareaCount)
     Object.entries(textareaCounterExpressions).forEach(([relativePath, expressions]) => {
       const source = read(relativePath)
@@ -245,7 +245,7 @@ describe("用户主流程原生图标", () => {
     const privacyCheckbox = bookingMarkup.match(/<checkbox\b[^>]*\/>/)[0]
     const bookingStyle = read("pages/booking/booking.wxss")
 
-    expect(pickerCount).toBe(13)
+    expect(pickerCount).toBe(14)
     expect(privacyGroup).toContain("privacy-agreement-complete")
     expect(privacyGroup).toContain('aria-required="{{true}}"')
     expect(privacyCheckbox).toContain('aria-label="同意隐私政策"')
@@ -513,7 +513,7 @@ describe("用户主流程原生图标", () => {
       })
     })
 
-    expect(confirmationCount).toBe(28)
+    expect(confirmationCount).toBe(30)
   })
 
   test("原生操作菜单统一使用品牌色与顶部说明", () => {

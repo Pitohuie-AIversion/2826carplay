@@ -17,7 +17,13 @@ const BOOKING_COORDINATION_FIELDS = {
 }
 const PRIORITY_VALUES = ["priority", "normal", "standby"]
 const COORDINATION_VALUES = ["pending", "coordinating", "resolved"]
-const EDITABLE_BOOKING_STATUSES = ["pending", "contacted"]
+const EDITABLE_BOOKING_STATUSES = [
+  "pending",
+  "contacted",
+  "quoted",
+  "adjustment_requested",
+  "confirmed"
+]
 
 function createError(code, message, details) {
   const result = {

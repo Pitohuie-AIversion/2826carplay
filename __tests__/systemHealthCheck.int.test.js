@@ -3,6 +3,7 @@ jest.mock("wx-server-sdk")
 const REQUIRED_COLLECTIONS = [
   "vehicles",
   "bookings",
+  "booking_quotes",
   "roles",
   "app_configs",
   "audit_logs",
@@ -136,8 +137,8 @@ describe("cloudfunctions/systemHealthCheck integration", () => {
 
     expect(res.ok).toBe(true)
     expect(res.summary).toEqual({
-      total: 20,
-      passed: 20,
+      total: 21,
+      passed: 21,
       warnings: 0,
       failed: 0,
       ready: true

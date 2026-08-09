@@ -108,6 +108,9 @@ describe("cloudfunctions/bookingList integration", () => {
       total: 2,
       pending: 1,
       contacted: 0,
+      quoted: 0,
+      adjustmentRequested: 0,
+      confirmed: 0,
       completed: 1,
       cancelled: 0,
       recentCreated7d: 1

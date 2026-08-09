@@ -30,7 +30,7 @@ const BOOKING_MANAGE_LIST_FIELDS = {
   updatedAt: true
 }
 
-const BOOKING_STATUSES = ["pending", "contacted", "completed", "cancelled"]
+const BOOKING_STATUSES = ["pending", "contacted", "quoted", "adjustment_requested", "confirmed", "completed", "cancelled"]
 const PRIORITY_VALUES = ["priority", "normal", "standby"]
 const COORDINATION_VALUES = ["pending", "coordinating", "resolved"]
 const BOOKING_BATCH_SIZE = 100
@@ -255,6 +255,9 @@ function buildDashboardStats(list) {
     total: list.length,
     pending: list.filter((item) => item.status === "pending").length,
     contacted: list.filter((item) => item.status === "contacted").length,
+    quoted: list.filter((item) => item.status === "quoted").length,
+    adjustmentRequested: list.filter((item) => item.status === "adjustment_requested").length,
+    confirmed: list.filter((item) => item.status === "confirmed").length,
     completed: list.filter((item) => item.status === "completed").length,
     cancelled: list.filter((item) => item.status === "cancelled").length,
     recentCreated7d: list.filter((item) => {

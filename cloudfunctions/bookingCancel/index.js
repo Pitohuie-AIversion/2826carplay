@@ -3,7 +3,13 @@ const cloud = require("wx-server-sdk")
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
-const CANCELLABLE_STATUSES = ["pending", "contacted"]
+const CANCELLABLE_STATUSES = [
+  "pending",
+  "contacted",
+  "quoted",
+  "adjustment_requested",
+  "confirmed"
+]
 const BOOKING_CANCEL_FIELDS = {
   openid: true,
   vehicleId: true,

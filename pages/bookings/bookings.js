@@ -14,6 +14,9 @@ function mapStatusText(status) {
   if (value === "contacted") {
     return "已联系"
   }
+  if (value === "quoted") return "已报价"
+  if (value === "adjustment_requested") return "待调整"
+  if (value === "confirmed") return "已确认"
   if (value === "completed") {
     return "已完成"
   }
@@ -28,6 +31,9 @@ function mapStatusClass(status) {
   if (value === "contacted") {
     return "status-contacted"
   }
+  if (value === "quoted") return "status-quoted"
+  if (value === "adjustment_requested") return "status-adjustment-requested"
+  if (value === "confirmed") return "status-confirmed"
   if (value === "completed") {
     return "status-completed"
   }
@@ -39,7 +45,7 @@ function mapStatusClass(status) {
 
 function canCancelBooking(status) {
   const value = String(status || "").trim()
-  return value === "pending" || value === "contacted"
+  return ["pending", "contacted", "quoted", "adjustment_requested", "confirmed"].includes(value)
 }
 
 function buildStatusGuidance(status) {
@@ -55,6 +61,9 @@ function buildStatusGuidance(status) {
       desc: "顾问已联系，请按沟通结果确认档期、价格与取还车安排。",
       tone: "contacted"
     },
+    quoted: { title: "报价待确认", desc: "请进入详情核对费用并确认或申请调整。", tone: "quoted" },
+    adjustment_requested: { title: "报价调整中", desc: "顾问正在根据你的说明重新报价。", tone: "adjustment" },
+    confirmed: { title: "报价已确认", desc: "当前方案已确认但尚未付款，请关注后续安排。", tone: "confirmed" },
     completed: {
       title: "本次行程已完成",
       desc: "预约流程已结束，可返回车库继续浏览其他车辆。",
@@ -87,6 +96,30 @@ function buildJourneyProgress(status) {
       stepOneClass: "journey-step-complete",
       stepTwoClass: "journey-step-current",
       stepThreeClass: "journey-step-upcoming"
+    },
+    quoted: {
+      stageText: "第 2 阶段 · 报价确认",
+      width: "67%",
+      tone: "quoted",
+      stepOneClass: "journey-step-complete",
+      stepTwoClass: "journey-step-current",
+      stepThreeClass: "journey-step-upcoming"
+    },
+    adjustment_requested: {
+      stageText: "第 2 阶段 · 报价调整",
+      width: "67%",
+      tone: "adjustment",
+      stepOneClass: "journey-step-complete",
+      stepTwoClass: "journey-step-current",
+      stepThreeClass: "journey-step-upcoming"
+    },
+    confirmed: {
+      stageText: "第 3 阶段 · 方案已确认",
+      width: "90%",
+      tone: "confirmed",
+      stepOneClass: "journey-step-complete",
+      stepTwoClass: "journey-step-complete",
+      stepThreeClass: "journey-step-current"
     },
     completed: {
       stageText: "第 3 阶段 · 行程完成",

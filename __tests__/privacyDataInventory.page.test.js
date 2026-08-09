@@ -96,6 +96,7 @@ describe("pages/privacy-data-inventory", () => {
                     }
                   ]
                 },
+                quotes: { count: 0, truncated: false, list: [] },
                 favorites: {
                   count: 0,
                   truncated: false,
@@ -129,8 +130,8 @@ describe("pages/privacy-data-inventory", () => {
       dateText: "2026-08-01 至 2026-08-02"
     })
     expect(page.data.privacyRequests.list[0].statusLabel).toBe("处理中")
-    expect(page.data.verifiedCategoryCount).toBe(1)
-    expect(page.data.inventoryProgress).toBe(33)
+    expect(page.data.verifiedCategoryCount).toBe(2)
+    expect(page.data.inventoryProgress).toBe(50)
     expect(page.data.inventoryStatusClass).toBe("inventory-status-partial")
     expect(page.data.totalRecordCount).toBe(2)
     expect(page.data.bookings).toMatchObject({
@@ -392,7 +393,7 @@ describe("pages/privacy-data-inventory", () => {
     })
   })
 
-  test("三类数据完整时显示百分百核验覆盖", () => {
+  test("四类数据完整时显示百分百核验覆盖", () => {
     global.wx = {
       cloud: {
         callFunction: jest.fn(({ success, complete }) => {
@@ -405,6 +406,7 @@ describe("pages/privacy-data-inventory", () => {
               request: { id: "request_2", type: "deletion", status: "pending" },
               categories: {
                 bookings: { count: 2, list: [] },
+                quotes: { count: 2, list: [] },
                 favorites: { count: 1, list: [] },
                 privacyRequests: { count: 3, list: [] }
               }
@@ -418,11 +420,11 @@ describe("pages/privacy-data-inventory", () => {
 
     page.loadInventory()
 
-    expect(page.data.verifiedCategoryCount).toBe(3)
+    expect(page.data.verifiedCategoryCount).toBe(4)
     expect(page.data.inventoryProgress).toBe(100)
     expect(page.data.inventoryStatusLabel).toBe("核验完整")
     expect(page.data.inventoryStatusClass).toBe("inventory-status-complete")
-    expect(page.data.totalRecordCount).toBe(6)
+    expect(page.data.totalRecordCount).toBe(8)
     expect(page.data.request.typeIconClass).toBe("request-type-icon-deletion")
   })
 
@@ -448,7 +450,7 @@ describe("pages/privacy-data-inventory", () => {
     expect(wxmlSource).toContain('class="record-native-chevron"')
     expect(wxmlSource).toContain('hover-class="record-link-pressed"')
     expect(wxmlSource).toContain('aria-label="查看预约 {{item.vehicleName || item.vehicleId || \'未命名车辆\'}}')
-    expect(wxmlSource.match(/class="inventory-empty-native-icon"/g)).toHaveLength(3)
+    expect(wxmlSource.match(/class="inventory-empty-native-icon"/g)).toHaveLength(4)
     expect(`${wxmlSource}\n${wxssSource}`).not.toMatch(/[›✓✔]/)
     expect(wxssSource).toContain(".inventory-progress-value")
     expect(wxssSource).toContain(".metric-state-unavailable")

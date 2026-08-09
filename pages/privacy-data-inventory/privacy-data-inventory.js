@@ -63,6 +63,9 @@ const REQUEST_STATUS_CLASS = {
 const BOOKING_STATUS_LABELS = {
   pending: "待联系",
   contacted: "已联系",
+  quoted: "已报价",
+  adjustment_requested: "待调整",
+  confirmed: "已确认",
   completed: "已完成",
   cancelled: "已取消"
 }
@@ -116,6 +119,7 @@ function buildViewData(result) {
   const truncated = Array.isArray(result && result.truncated) ? result.truncated : []
   const unavailableLabels = {
     bookings: "预约数据",
+    quotes: "报价数据",
     favorites: "收藏数据",
     privacyRequests: "隐私申请"
   }
@@ -144,6 +148,17 @@ function buildViewData(result) {
     truncated,
     "metric-native-icon-favorite"
   )
+  const quotes = decorateCategory(
+    "quotes",
+    normalizeCategory(categories.quotes, (item) => ({
+      ...item,
+      totalText: (Math.max(0, Number(item.totalCents || 0)) / 100).toFixed(2),
+      createdAtText: formatDisplayTime(item.createdAt)
+    })),
+    unavailable,
+    truncated,
+    "metric-native-icon-booking"
+  )
   const privacyRequests = decorateCategory(
     "privacyRequests",
     normalizeCategory(categories.privacyRequests, (item) => ({
@@ -156,7 +171,7 @@ function buildViewData(result) {
     truncated,
     "metric-native-icon-privacy"
   )
-  const categoryList = [bookings, favorites, privacyRequests]
+  const categoryList = [bookings, quotes, favorites, privacyRequests]
   const verifiedCategoryCount = categoryList.filter((item) => item.isComplete).length
   const totalRecordCount = categoryList.reduce((total, item) => total + item.count, 0)
   const requestTypeMeta = REQUEST_TYPE_META[request.type] || {
@@ -197,6 +212,7 @@ function buildViewData(result) {
       createdAtText: formatDisplayTime(request.createdAt)
     },
     bookings,
+    quotes,
     favorites,
     privacyRequests
   }
@@ -225,6 +241,7 @@ Page({
     totalRecordCount: 0,
     request: {},
     bookings: { count: 0, truncated: false, list: [] },
+    quotes: { count: 0, truncated: false, list: [] },
     favorites: { count: 0, truncated: false, list: [] },
     privacyRequests: { count: 0, truncated: false, list: [] }
   },

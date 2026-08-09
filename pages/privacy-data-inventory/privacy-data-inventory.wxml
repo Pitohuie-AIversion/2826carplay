@@ -28,7 +28,7 @@
       <view class="inventory-skeleton-track manage-skeleton-pulse"></view>
       <view class="inventory-skeleton-progress-foot"><view class="inventory-skeleton-progress-meta manage-skeleton-pulse"></view><view class="inventory-skeleton-progress-meta manage-skeleton-pulse"></view></view>
     </view>
-    <view class="inventory-skeleton-metrics"><view class="inventory-skeleton-metric ui-card" wx:for="{{[1, 2, 3]}}" wx:key="*this"><view class="inventory-skeleton-metric-icon manage-skeleton-pulse"></view><view class="inventory-skeleton-metric-value manage-skeleton-pulse"></view><view class="inventory-skeleton-metric-label manage-skeleton-pulse"></view><view class="inventory-skeleton-metric-state manage-skeleton-pulse"></view></view></view>
+    <view class="inventory-skeleton-metrics"><view class="inventory-skeleton-metric ui-card" wx:for="{{[1, 2, 3, 4]}}" wx:key="*this"><view class="inventory-skeleton-metric-icon manage-skeleton-pulse"></view><view class="inventory-skeleton-metric-value manage-skeleton-pulse"></view><view class="inventory-skeleton-metric-label manage-skeleton-pulse"></view><view class="inventory-skeleton-metric-state manage-skeleton-pulse"></view></view></view>
     <view class="inventory-skeleton-section ui-card">
       <view class="inventory-skeleton-heading"><view><view class="inventory-skeleton-kicker manage-skeleton-pulse"></view><view class="inventory-skeleton-title manage-skeleton-pulse"></view></view><view class="inventory-skeleton-index manage-skeleton-pulse"></view></view>
       <view class="inventory-skeleton-record"><view class="inventory-skeleton-record-title manage-skeleton-pulse"></view><view class="inventory-skeleton-line manage-skeleton-pulse"></view><view class="inventory-skeleton-line inventory-skeleton-line-short manage-skeleton-pulse"></view></view>
@@ -78,7 +78,7 @@
         </view>
         <view class="export-security"><view class="lock-native-icon" aria-hidden="true"></view>敏感文件</view>
       </view>
-      <view class="export-desc"><view class="shield-native-icon" aria-hidden="true"></view><view>生成包含预约、收藏和隐私申请的 CSV。匿名分析数据不保存身份信息，不包含在导出文件中。</view></view>
+      <view class="export-desc"><view class="shield-native-icon" aria-hidden="true"></view><view>生成包含预约、报价、收藏和隐私申请的 CSV。匿名分析数据不保存身份信息，不包含在导出文件中。</view></view>
       <view wx:if="{{partial}}" class="export-blocked"><view class="blocked-native-icon" aria-hidden="true"></view><view>当前清单不完整，已禁止导出残缺文件。</view></view>
       <button
         wx:elif="{{!exportFilePath}}"
@@ -110,10 +110,10 @@
       </view>
     </view>
 
-    <view class="inventory-progress-card ui-card {{inventoryStatusClass}}" aria-role="group" aria-label="数据核验覆盖 {{inventoryProgress}}%，{{verifiedCategoryCount}} / 3 类完整，{{inventoryStatusLabel}}">
+    <view class="inventory-progress-card ui-card {{inventoryStatusClass}}" aria-role="group" aria-label="数据核验覆盖 {{inventoryProgress}}%，{{verifiedCategoryCount}} / 4 类完整，{{inventoryStatusLabel}}">
       <view class="inventory-progress-head"><view><view class="section-eyebrow">VERIFICATION COVERAGE</view><view class="inventory-progress-title">核验覆盖</view></view><view class="inventory-status-pill"><view class="inventory-status-dot"></view>{{inventoryStatusLabel}}</view></view>
       <view class="inventory-progress-track" aria-hidden="true"><view class="inventory-progress-value" style="width: {{inventoryProgress}}%;"></view></view>
-      <view class="inventory-progress-foot"><view>{{verifiedCategoryCount}} / 3 类完整</view><view>共关联 {{totalRecordCount}} 条记录</view></view>
+      <view class="inventory-progress-foot"><view>{{verifiedCategoryCount}} / 4 类完整</view><view>共关联 {{totalRecordCount}} 条记录</view></view>
     </view>
 
     <view class="metric-grid">
@@ -129,12 +129,37 @@
         <view class="metric-label">收藏记录</view>
         <view class="metric-state"><view class="metric-state-dot"></view>{{favorites.stateLabel}}</view>
       </view>
+      <view class="metric-card ui-card {{quotes.stateClass}}">
+        <view class="metric-native-icon {{quotes.iconClass}}" aria-hidden="true"></view>
+        <view class="metric-value">{{quotes.count}}{{quotes.truncated ? '+' : ''}}</view>
+        <view class="metric-label">报价记录</view>
+        <view class="metric-state"><view class="metric-state-dot"></view>{{quotes.stateLabel}}</view>
+      </view>
       <view class="metric-card ui-card {{privacyRequests.stateClass}}">
         <view class="metric-native-icon {{privacyRequests.iconClass}}" aria-hidden="true"></view>
         <view class="metric-value">{{privacyRequests.count}}{{privacyRequests.truncated ? '+' : ''}}</view>
         <view class="metric-label">隐私申请</view>
         <view class="metric-state"><view class="metric-state-dot"></view>{{privacyRequests.stateLabel}}</view>
       </view>
+    </view>
+
+    <view class="section-card ui-card">
+      <view class="section-heading">
+        <view class="section-heading-icon-wrap">
+          <view class="section-native-icon booking-section-native-icon" aria-hidden="true"></view>
+          <view><view class="section-eyebrow">QUOTES</view><view class="section-title">报价数据</view></view>
+        </view>
+        <view class="section-index">{{quotes.count}}{{quotes.truncated ? '+' : ''}}</view>
+      </view>
+      <view wx:if="{{quotes.list.length}}" class="record-list">
+        <view class="record-item" wx:for="{{quotes.list}}" wx:key="id">
+          <view class="record-head"><view class="record-title">报价 v{{item.version}} · ￥{{item.totalText}}</view><view class="record-status">{{item.status}}</view></view>
+          <view class="record-meta">{{item.startDate}} 至 {{item.endDate}} · 有效至 {{item.validUntil}}</view>
+          <view wx:if="{{item.customerNote}}" class="record-note">报价备注：{{item.customerNote}}</view>
+          <view wx:if="{{item.adjustmentNote}}" class="record-note">调整说明：{{item.adjustmentNote}}</view>
+        </view>
+      </view>
+      <view wx:else class="empty-text"><view class="inventory-empty-native-icon" aria-hidden="true"></view><text>未发现报价记录</text></view>
     </view>
 
     <view class="section-card ui-card">

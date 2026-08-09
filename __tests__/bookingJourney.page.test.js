@@ -529,7 +529,7 @@ describe("我的预约旅程状态", () => {
       title: "本次行程已完成",
       tone: "completed"
     })
-    expect(page.data.progressSteps[2]).toMatchObject({
+    expect(page.data.progressSteps[4]).toMatchObject({
       label: "行程完成",
       stateClass: "progress-current"
     })

@@ -21,16 +21,30 @@ const STATUS_TEMPLATE_CONFIG_FIELDS = {
 }
 
 const CONFIG_KEY = "operation_settings"
-const BOOKING_STATUSES = ["pending", "contacted", "completed", "cancelled"]
+const BOOKING_STATUSES = [
+  "pending",
+  "contacted",
+  "quoted",
+  "adjustment_requested",
+  "confirmed",
+  "completed",
+  "cancelled"
+]
 const STATUS_LABELS = {
   pending: "待联系",
   contacted: "已联系",
+  quoted: "已报价",
+  adjustment_requested: "待调整",
+  confirmed: "已确认",
   completed: "已完成",
   cancelled: "已取消"
 }
 const STATUS_TRANSITIONS = {
   pending: ["contacted", "cancelled"],
-  contacted: ["completed", "cancelled"],
+  contacted: ["cancelled"],
+  quoted: ["cancelled"],
+  adjustment_requested: ["cancelled"],
+  confirmed: ["completed", "cancelled"],
   completed: [],
   cancelled: []
 }
@@ -373,7 +387,7 @@ exports.main = async (event) => {
     if (!BOOKING_STATUSES.includes(input.status)) {
       return createError("VALIDATION_ERROR", "预约状态不合法", {
         errors: [
-          { field: "status", message: "仅支持 pending/contacted/completed/cancelled", value: input.status }
+          { field: "status", message: "预约状态不合法", value: input.status, allowed: BOOKING_STATUSES }
         ]
       })
     }

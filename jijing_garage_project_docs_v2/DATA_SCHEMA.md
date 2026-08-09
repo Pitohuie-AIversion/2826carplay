@@ -232,3 +232,60 @@ cancelled    已取消
 - 不使用车辆名称作为唯一查询条件
 - mock 车辆数量控制在 4-10 辆
 - 图片路径允许先使用占位路径
+
+## 9. Phase 12 报价版本 `booking_quotes`
+
+报价使用独立集合保存；草稿文档 ID 为 `{bookingId}__draft`，已发送版本为 `{bookingId}__v{version}`。草稿可以覆盖保存，已发送版本不可静默修改。
+
+```js
+{
+  _id: "booking_001__v1",
+  bookingId: "booking_001",
+  vehicleId: "car_001",
+  vehicleName: "MX-5 ND2",
+  startDate: "2026-08-10",
+  endDate: "2026-08-12",
+  rentalDays: 2,
+  baseRentalCents: 120000,
+  protectionCents: 10000,
+  serviceFeeCents: 2000,
+  deliveryFeeCents: 3000,
+  otherFeeCents: 0,
+  totalCents: 135000,
+  depositText: "车辆押金与违章押金按规则退还",
+  validUntil: "2026-08-11",
+  customerNote: "用户可见报价说明",
+  adjustmentNote: "用户申请调整时填写，最多 200 字",
+  version: 1,
+  status: "sent",
+  responseStatus: "pending",
+  sendRequestId: "幂等请求标识",
+  createdAt: "服务端时间",
+  sentAt: "服务端时间",
+  updatedAt: "服务端时间"
+}
+```
+
+所有金额以分为单位保存。`rentalDays` 根据预约日期计算，`totalCents` 由服务端对五项费用求和，客户端不提交或决定总额。
+
+预约状态扩展为：
+
+```text
+pending                待联系
+contacted              已联系
+quoted                 已报价
+adjustment_requested   用户申请调整
+confirmed              用户已确认报价（尚未付款）
+completed              已完成
+cancelled              已取消
+```
+
+`bookings` 同步保存 `latestQuoteId`、`latestQuoteVersion`、`quotedAt`、`confirmedAt` 或 `adjustmentRequestedAt`，旧预约缺失这些字段时按空值和版本 0 读取。
+
+访问和隐私规则：
+
+- 用户报价详情必须先验证预约 `openid`，且只能读取 `latestQuoteId` 指向的版本；草稿不会返回用户端。
+- 顾问报价操作必须具备 `booking_manage` 或管理员权限。
+- 报价、用户可见备注和调整说明已纳入现有个人数据清单与 CSV 导出。
+- 审计日志只保存预约 ID、报价 ID、版本、状态和金额摘要，不保存调整正文、手机号或其他表单内容。
+- 确认报价不创建支付单、合同、押金冻结或车辆库存锁定。

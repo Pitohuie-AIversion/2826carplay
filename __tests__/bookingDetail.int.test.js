@@ -120,6 +120,11 @@ describe("cloudfunctions/bookingDetail integration", () => {
         schedulePriority: "normal",
         coordinationStatus: "pending",
         coordinationUpdatedAt: "",
+        latestQuoteId: "",
+        latestQuoteVersion: 0,
+        quotedAt: "",
+        confirmedAt: "",
+        adjustmentRequestedAt: "",
         status: "contacted",
         createdAt: "2026-07-18T10:00:00.000Z",
         updatedAt: "2026-07-18T11:00:00.000Z"
@@ -128,7 +133,10 @@ describe("cloudfunctions/bookingDetail integration", () => {
       conflictTotal: 0,
       conflictsTruncated: false,
       conflictsUnavailable: false,
-      conflictCheckSkipped: false
+      conflictCheckSkipped: false,
+      quoteDraft: null,
+      quoteHistory: [],
+      quotesUnavailable: false
     })
     expect(mocks.rolesWhere).toHaveBeenCalledWith({ openid: "admin_openid" })
     expect(mocks.bookingsDoc).toHaveBeenCalledWith("booking_1")

@@ -14,9 +14,40 @@ const BOOKING_MY_DETAIL_FIELDS = {
   endDate: true,
   city: true,
   note: true,
+  latestQuoteId: true,
+  latestQuoteVersion: true,
+  quotedAt: true,
+  confirmedAt: true,
+  adjustmentRequestedAt: true,
   status: true,
   createdAt: true,
   updatedAt: true
+}
+const BOOKING_MY_QUOTE_FIELDS = {
+  _id: true,
+  bookingId: true,
+  vehicleId: true,
+  vehicleName: true,
+  startDate: true,
+  endDate: true,
+  rentalDays: true,
+  baseRentalCents: true,
+  protectionCents: true,
+  serviceFeeCents: true,
+  deliveryFeeCents: true,
+  otherFeeCents: true,
+  totalCents: true,
+  depositText: true,
+  validUntil: true,
+  customerNote: true,
+  adjustmentNote: true,
+  version: true,
+  status: true,
+  responseStatus: true,
+  sentAt: true,
+  confirmedAt: true,
+  adjustmentRequestedAt: true,
+  expiredAt: true
 }
 
 function createError(code, message, details) {
@@ -60,6 +91,51 @@ function buildVehicleDisplayIdentity(value) {
   return isPlateNumber
     ? { vehicleName: "预约车辆", vehicleReference: `车牌尾号 ${normalized.slice(-2)}` }
     : { vehicleName: vehicleName || "预约车辆", vehicleReference: "" }
+}
+
+function mapQuote(item) {
+  if (!item) return null
+  return {
+    id: String(item._id || item.id || ""),
+    bookingId: String(item.bookingId || ""),
+    vehicleId: String(item.vehicleId || ""),
+    vehicleName: String(item.vehicleName || ""),
+    startDate: String(item.startDate || ""),
+    endDate: String(item.endDate || ""),
+    rentalDays: Math.max(0, Number(item.rentalDays || 0)),
+    baseRentalCents: Math.max(0, Number(item.baseRentalCents || 0)),
+    protectionCents: Math.max(0, Number(item.protectionCents || 0)),
+    serviceFeeCents: Math.max(0, Number(item.serviceFeeCents || 0)),
+    deliveryFeeCents: Math.max(0, Number(item.deliveryFeeCents || 0)),
+    otherFeeCents: Math.max(0, Number(item.otherFeeCents || 0)),
+    totalCents: Math.max(0, Number(item.totalCents || 0)),
+    depositText: String(item.depositText || ""),
+    validUntil: String(item.validUntil || ""),
+    customerNote: String(item.customerNote || ""),
+    adjustmentNote: String(item.adjustmentNote || ""),
+    version: Math.max(0, Number(item.version || 0)),
+    status: String(item.status || ""),
+    responseStatus: String(item.responseStatus || ""),
+    sentAt: formatTime(item.sentAt),
+    confirmedAt: formatTime(item.confirmedAt),
+    adjustmentRequestedAt: formatTime(item.adjustmentRequestedAt),
+    expiredAt: formatTime(item.expiredAt)
+  }
+}
+
+async function readLatestQuote(item) {
+  const quoteId = String((item && item.latestQuoteId) || "").trim()
+  if (!quoteId) return null
+  try {
+    const res = await db.collection("booking_quotes").doc(quoteId).field(BOOKING_MY_QUOTE_FIELDS).get()
+    const quote = res && res.data ? res.data : null
+    if (!quote || String(quote.bookingId || "") !== String(item._id || item.id || "")) return null
+    return mapQuote(quote)
+  } catch (error) {
+    const message = String(error && (error.message || error.errMsg) || error)
+    if (message.includes("Unexpected collection:") || message.includes("not exist") || message.includes("not found")) return null
+    throw error
+  }
 }
 
 async function writeErrorLogBestEffort(payload) {
@@ -112,6 +188,7 @@ exports.main = async (event) => {
     }
 
     const vehicleIdentity = buildVehicleDisplayIdentity(item.vehicleName)
+    const latestQuote = await readLatestQuote(item)
 
     return {
       ok: true,
@@ -125,10 +202,16 @@ exports.main = async (event) => {
         endDate: item.endDate || "",
         city: item.city || "",
         note: item.note || "",
+        latestQuoteId: item.latestQuoteId || "",
+        latestQuoteVersion: Math.max(0, Number(item.latestQuoteVersion || 0)),
+        quotedAt: formatTime(item.quotedAt),
+        confirmedAt: formatTime(item.confirmedAt),
+        adjustmentRequestedAt: formatTime(item.adjustmentRequestedAt),
         status: item.status || "pending",
         createdAt: formatTime(item.createdAt),
         updatedAt: formatTime(item.updatedAt)
-      }
+      },
+      latestQuote
     }
   } catch (error) {
     const errorMessage = String(

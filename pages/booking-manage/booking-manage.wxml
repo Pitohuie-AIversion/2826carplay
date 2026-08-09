@@ -125,7 +125,7 @@
     <view class="ratio-card">
       <view class="ratio-head">
         <view class="dashboard-title">跟进进度占比</view>
-        <view class="dashboard-desc">口径：待联系 / 已联系 / 已完成（不含已取消）</view>
+        <view class="dashboard-desc">口径：待联系 / 已联系 / 已报价 / 已确认 / 已完成（不含已取消）</view>
       </view>
       <view class="ratio-bar">
         <view
@@ -242,10 +242,10 @@
         <button class="remark-save-btn ui-btn ui-btn-primary" data-id="{{item.id}}" data-index="{{index}}" bindtap="handleSaveRemark"><view class="booking-action-content"><view class="save-native-icon" aria-hidden="true"></view><text>保存备注</text></view></button>
       </view>
 
-      <view class="op-panel" wx:if="{{item.status === 'pending' || item.status === 'contacted'}}">
+      <view class="op-panel" wx:if="{{item.status !== 'completed' && item.status !== 'cancelled'}}">
         <view class="op-panel-head"><view><view class="op-panel-title">推进预约状态</view><view class="op-panel-desc">状态更新后将尝试发送订阅提醒</view></view><view class="op-panel-current">{{item.statusText}}</view></view>
         <button wx:if="{{item.status === 'pending'}}" class="op-main-btn ui-btn ui-btn-primary" data-id="{{item.id}}" data-status="contacted" bindtap="handleUpdateStatus"><view class="booking-action-content"><view class="advance-native-icon" aria-hidden="true"></view><text>标记已联系</text></view></button>
-        <button wx:if="{{item.status === 'contacted'}}" class="op-main-btn ui-btn ui-btn-success" data-id="{{item.id}}" data-status="completed" bindtap="handleUpdateStatus"><view class="booking-action-content"><view class="complete-native-icon" aria-hidden="true"></view><text>标记已完成</text></view></button>
+        <button wx:if="{{item.status === 'confirmed'}}" class="op-main-btn ui-btn ui-btn-success" data-id="{{item.id}}" data-status="completed" bindtap="handleUpdateStatus"><view class="booking-action-content"><view class="complete-native-icon" aria-hidden="true"></view><text>标记已完成</text></view></button>
         <view class="op-danger-row"><view><view class="op-danger-title">取消预约</view><view class="op-danger-desc">取消后将结束本次跟进。</view></view><button class="op-cancel-btn ui-btn ui-btn-danger-ghost" data-id="{{item.id}}" data-status="cancelled" bindtap="handleUpdateStatus"><view class="booking-action-content"><view class="cancel-native-icon" aria-hidden="true"></view><text>取消</text></view></button></view>
       </view>
     </view>

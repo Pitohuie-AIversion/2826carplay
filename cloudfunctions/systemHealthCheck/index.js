@@ -20,6 +20,7 @@ const CONFIG_KEY = "operation_settings"
 const REQUIRED_COLLECTIONS = [
   { key: "vehicles", label: "车辆数据" },
   { key: "bookings", label: "预约数据" },
+  { key: "booking_quotes", label: "报价版本" },
   { key: "roles", label: "权限数据" },
   { key: "app_configs", label: "运营配置" },
   { key: "audit_logs", label: "审计日志" },

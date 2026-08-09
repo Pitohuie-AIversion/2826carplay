@@ -20,6 +20,7 @@ function createMockDb({
   roles,
   request,
   bookings = [],
+  quotes = [],
   favorites = [],
   privacyRequests = [],
   unavailable = []
@@ -39,6 +40,17 @@ function createMockDb({
     favorites,
     unavailable.includes("favorites") ? new Error("collection not found") : null
   )
+  const quotesWhere = jest.fn((filter) => ({
+    field: jest.fn(() => ({
+      limit: jest.fn((limit) => ({
+        get: unavailable.includes("booking_quotes")
+          ? jest.fn().mockRejectedValue(new Error("collection not found"))
+          : jest.fn().mockResolvedValue({
+              data: quotes.filter((item) => item.bookingId === filter.bookingId).slice(0, limit)
+            })
+      }))
+    }))
+  }))
   const requestsWhere = createPagedWhere(
     privacyRequests,
     unavailable.includes("privacy_requests") ? new Error("collection not found") : null
@@ -65,6 +77,9 @@ function createMockDb({
     }
     if (name === "favorites") {
       return { where: favoritesWhere }
+    }
+    if (name === "booking_quotes") {
+      return { where: quotesWhere }
     }
     if (name === "privacy_requests") {
       return {
@@ -132,6 +147,20 @@ describe("cloudfunctions/privacyRequestDataInventory integration", () => {
           handledBy: "should_not_return"
         }
       ],
+      quotes: [
+        {
+          _id: "quote_1",
+          bookingId: "booking_1",
+          vehicleId: "vehicle_1",
+          vehicleName: "示例车辆",
+          totalCents: 128000,
+          customerNote: "用户可见说明",
+          adjustmentNote: "取消取送车",
+          version: 1,
+          status: "adjustment_requested",
+          createdAt: "2026-07-21T01:00:00.000Z"
+        }
+      ],
       favorites: [
         {
           _id: "favorite_1",
@@ -158,6 +187,12 @@ describe("cloudfunctions/privacyRequestDataInventory integration", () => {
     expect(res.ok).toBe(true)
     expect(res.partial).toBe(false)
     expect(res.categories.bookings.count).toBe(1)
+    expect(res.categories.quotes.count).toBe(1)
+    expect(res.categories.quotes.list[0]).toMatchObject({
+      id: "quote_1",
+      totalCents: 128000,
+      adjustmentNote: "取消取送车"
+    })
     expect(res.categories.bookings.list[0]).toMatchObject({
       id: "booking_1",
       userName: "用户甲",

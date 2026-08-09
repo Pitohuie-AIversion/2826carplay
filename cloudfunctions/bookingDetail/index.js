@@ -26,9 +26,42 @@ const BOOKING_MANAGE_DETAIL_FIELDS = {
   schedulePriority: true,
   coordinationStatus: true,
   coordinationUpdatedAt: true,
+  latestQuoteId: true,
+  latestQuoteVersion: true,
+  quotedAt: true,
+  confirmedAt: true,
+  adjustmentRequestedAt: true,
   status: true,
   createdAt: true,
   updatedAt: true
+}
+const BOOKING_QUOTE_DETAIL_FIELDS = {
+  _id: true,
+  bookingId: true,
+  vehicleId: true,
+  vehicleName: true,
+  startDate: true,
+  endDate: true,
+  rentalDays: true,
+  baseRentalCents: true,
+  protectionCents: true,
+  serviceFeeCents: true,
+  deliveryFeeCents: true,
+  otherFeeCents: true,
+  totalCents: true,
+  depositText: true,
+  validUntil: true,
+  customerNote: true,
+  adjustmentNote: true,
+  version: true,
+  status: true,
+  responseStatus: true,
+  createdAt: true,
+  updatedAt: true,
+  sentAt: true,
+  confirmedAt: true,
+  adjustmentRequestedAt: true,
+  expiredAt: true
 }
 const BOOKING_CONFLICT_FIELDS = {
   _id: true,
@@ -145,6 +178,61 @@ function formatTime(input) {
 
 function getBookingId(item) {
   return String((item && (item._id || item.id)) || "").trim()
+}
+
+function mapQuote(item) {
+  return {
+    id: String((item && (item._id || item.id)) || ""),
+    bookingId: String((item && item.bookingId) || ""),
+    vehicleId: String((item && item.vehicleId) || ""),
+    vehicleName: String((item && item.vehicleName) || ""),
+    startDate: String((item && item.startDate) || ""),
+    endDate: String((item && item.endDate) || ""),
+    rentalDays: Math.max(0, Number((item && item.rentalDays) || 0)),
+    baseRentalCents: Math.max(0, Number((item && item.baseRentalCents) || 0)),
+    protectionCents: Math.max(0, Number((item && item.protectionCents) || 0)),
+    serviceFeeCents: Math.max(0, Number((item && item.serviceFeeCents) || 0)),
+    deliveryFeeCents: Math.max(0, Number((item && item.deliveryFeeCents) || 0)),
+    otherFeeCents: Math.max(0, Number((item && item.otherFeeCents) || 0)),
+    totalCents: Math.max(0, Number((item && item.totalCents) || 0)),
+    depositText: String((item && item.depositText) || ""),
+    validUntil: String((item && item.validUntil) || ""),
+    customerNote: String((item && item.customerNote) || ""),
+    adjustmentNote: String((item && item.adjustmentNote) || ""),
+    version: Math.max(0, Number((item && item.version) || 0)),
+    status: String((item && item.status) || "draft"),
+    responseStatus: String((item && item.responseStatus) || ""),
+    createdAt: formatTime(item && item.createdAt),
+    updatedAt: formatTime(item && item.updatedAt),
+    sentAt: formatTime(item && item.sentAt),
+    confirmedAt: formatTime(item && item.confirmedAt),
+    adjustmentRequestedAt: formatTime(item && item.adjustmentRequestedAt),
+    expiredAt: formatTime(item && item.expiredAt)
+  }
+}
+
+async function readBookingQuotes(bookingId) {
+  try {
+    const res = await db
+      .collection("booking_quotes")
+      .where({ bookingId })
+      .field(BOOKING_QUOTE_DETAIL_FIELDS)
+      .limit(50)
+      .get()
+    const list = res && Array.isArray(res.data) ? res.data.map(mapQuote) : []
+    const draft = list.find((item) => item.status === "draft") || null
+    const history = list
+      .filter((item) => item.status !== "draft")
+      .sort((prev, next) => next.version - prev.version)
+      .slice(0, 20)
+    return { draft, history, unavailable: false }
+  } catch (error) {
+    const message = String(error && (error.message || error.errMsg) || error)
+    if (message.includes("Unexpected collection:") || message.includes("not exist")) {
+      return { draft: null, history: [], unavailable: false }
+    }
+    throw error
+  }
 }
 
 function hasValidDateRange(item) {
@@ -334,6 +422,7 @@ exports.main = async (event) => {
     }
 
     const conflictResult = await findBookingConflicts(item, id)
+    const quoteResult = await readBookingQuotes(id)
 
     return {
       ok: true,
@@ -360,6 +449,11 @@ exports.main = async (event) => {
               ? item.coordinationStatus
               : "pending",
         coordinationUpdatedAt: formatTime(item.coordinationUpdatedAt),
+        latestQuoteId: item.latestQuoteId || "",
+        latestQuoteVersion: Math.max(0, Number(item.latestQuoteVersion || 0)),
+        quotedAt: formatTime(item.quotedAt),
+        confirmedAt: formatTime(item.confirmedAt),
+        adjustmentRequestedAt: formatTime(item.adjustmentRequestedAt),
         status: item.status || "pending",
         createdAt: formatTime(item.createdAt),
         updatedAt: formatTime(item.updatedAt)
@@ -369,6 +463,9 @@ exports.main = async (event) => {
       conflictsTruncated: conflictResult.truncated,
       conflictsUnavailable: conflictResult.unavailable,
       conflictCheckSkipped: conflictResult.skipped
+      ,quoteDraft: quoteResult.draft
+      ,quoteHistory: quoteResult.history
+      ,quotesUnavailable: quoteResult.unavailable
     }
   } catch (error) {
     const errorMessage = String(

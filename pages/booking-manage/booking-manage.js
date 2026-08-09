@@ -18,6 +18,9 @@ const STATUS_OPTIONS = [
   { value: "all", label: "全部" },
   { value: "pending", label: "待联系" },
   { value: "contacted", label: "已联系" },
+  { value: "quoted", label: "已报价" },
+  { value: "adjustment_requested", label: "待调整" },
+  { value: "confirmed", label: "已确认" },
   { value: "completed", label: "已完成" },
   { value: "cancelled", label: "已取消" }
 ]
@@ -25,6 +28,9 @@ const STATUS_OPTIONS = [
 const STATUS_TEXT_MAP = {
   pending: "待联系",
   contacted: "已联系",
+  quoted: "已报价",
+  adjustment_requested: "待调整",
+  confirmed: "已确认",
   completed: "已完成",
   cancelled: "已取消"
 }
@@ -32,6 +38,9 @@ const STATUS_TEXT_MAP = {
 const STATUS_CLASS_MAP = {
   pending: "status-pending",
   contacted: "status-contacted",
+  quoted: "status-quoted",
+  adjustment_requested: "status-adjustment-requested",
+  confirmed: "status-confirmed",
   completed: "status-completed",
   cancelled: "status-cancelled"
 }
@@ -118,6 +127,8 @@ function buildStatusSummary(stats) {
   return [
     { key: "pending", label: "待联系", value: stats.pending || 0 },
     { key: "contacted", label: "已联系", value: stats.contacted || 0 },
+    { key: "quoted", label: "已报价", value: stats.quoted || 0 },
+    { key: "confirmed", label: "已确认", value: stats.confirmed || 0 },
     { key: "completed", label: "已完成", value: stats.completed || 0 },
     { key: "recentCreated7d", label: "近 7 天新增", value: stats.recentCreated7d || 0 }
   ]
@@ -126,12 +137,16 @@ function buildStatusSummary(stats) {
 function buildStatusRatioSegments(stats) {
   const pending = Number(stats && stats.pending) || 0
   const contacted = Number(stats && stats.contacted) || 0
+  const quoted = Number(stats && stats.quoted) || 0
+  const confirmed = Number(stats && stats.confirmed) || 0
   const completed = Number(stats && stats.completed) || 0
-  const total = pending + contacted + completed
+  const total = pending + contacted + quoted + confirmed + completed
 
   const base = [
     { key: "pending", label: "待联系", value: pending, className: "ratio-pending" },
     { key: "contacted", label: "已联系", value: contacted, className: "ratio-contacted" },
+    { key: "quoted", label: "已报价", value: quoted, className: "ratio-contacted" },
+    { key: "confirmed", label: "已确认", value: confirmed, className: "ratio-completed" },
     { key: "completed", label: "已完成", value: completed, className: "ratio-completed" }
   ]
 
@@ -234,6 +249,22 @@ function buildJourneyView(status) {
       journeyProgress: 67,
       journeyHint: "下一步：完成协调并确认行程",
       journeyClass: "booking-journey-contacted"
+    }
+  }
+  if (current === "quoted" || current === "adjustment_requested") {
+    return {
+      journeyStage: 2,
+      journeyProgress: 67,
+      journeyHint: current === "quoted" ? "下一步：等待用户确认报价" : "下一步：按用户说明重新报价",
+      journeyClass: "booking-journey-contacted"
+    }
+  }
+  if (current === "confirmed") {
+    return {
+      journeyStage: 3,
+      journeyProgress: 90,
+      journeyHint: "报价已确认（尚未付款）",
+      journeyClass: "booking-journey-completed"
     }
   }
   if (current === "completed") {

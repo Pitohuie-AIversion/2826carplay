@@ -1337,3 +1337,114 @@
     background-position: -70% 0;
   }
 }
+.customer-quote-card {
+  margin-top: 24rpx;
+}
+
+.quote-valid {
+  border: 1rpx solid rgba(82, 143, 255, 0.4);
+  border-radius: 999rpx;
+  padding: 8rpx 14rpx;
+  color: #b9ceff;
+  font-size: 21rpx;
+}
+
+.quote-rental-meta {
+  margin-top: 20rpx;
+  color: #8f98a7;
+  font-size: 23rpx;
+}
+
+.quote-breakdown {
+  margin-top: 22rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.09);
+  border-radius: 18rpx;
+  overflow: hidden;
+  background: rgba(6, 8, 12, 0.58);
+}
+
+.quote-row,
+.quote-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rpx;
+  padding: 20rpx 22rpx;
+  color: #bac1cc;
+  font-size: 24rpx;
+}
+
+.quote-row + .quote-row {
+  border-top: 1rpx solid rgba(255, 255, 255, 0.055);
+}
+
+.quote-total {
+  border-top: 1rpx solid rgba(82, 143, 255, 0.3);
+  background: rgba(82, 143, 255, 0.08);
+  color: #fff;
+  font-size: 29rpx;
+  font-weight: 700;
+}
+
+.quote-rule,
+.quote-adjustment-summary,
+.quote-boundary,
+.quote-response-state {
+  margin-top: 18rpx;
+  border-radius: 15rpx;
+  padding: 18rpx 20rpx;
+  background: rgba(255, 255, 255, 0.04);
+  color: #b2bac7;
+  font-size: 23rpx;
+  line-height: 1.65;
+}
+
+.quote-rule-label {
+  margin-bottom: 8rpx;
+  color: #eef2f8;
+  font-size: 23rpx;
+  font-weight: 600;
+}
+
+.quote-adjustment-summary,
+.quote-response-adjustment {
+  color: #f0c887;
+  background: rgba(225, 164, 72, 0.08);
+}
+
+.quote-boundary {
+  border: 1rpx solid rgba(255, 255, 255, 0.09);
+  color: #9099a7;
+}
+
+.quote-response { margin-top: 24rpx; }
+.quote-confirm-btn,
+.quote-adjust-btn { width: 100%; margin: 0; }
+.quote-adjustment-form { margin-top: 22rpx; }
+
+.quote-adjustment-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 150rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.12);
+  border-radius: 15rpx;
+  padding: 18rpx 20rpx 42rpx;
+  background: rgba(6, 8, 12, 0.65);
+  color: #fff;
+  font-size: 24rpx;
+  line-height: 1.6;
+}
+
+.quote-adjustment-count {
+  margin-top: -38rpx;
+  margin-bottom: 18rpx;
+  padding-right: 16rpx;
+  color: #707987;
+  font-size: 20rpx;
+  text-align: right;
+}
+
+.quote-response-confirmed {
+  color: #8ad5b2;
+  background: rgba(77, 184, 132, 0.08);
+}

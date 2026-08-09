@@ -56,6 +56,16 @@ function buildDecisionItems(metrics) {
   ]
 }
 
+function buildQuoteMetrics(metrics) {
+  const source = metrics && typeof metrics === "object" ? metrics : {}
+  return [
+    { key: "sent", label: "报价发送率", value: `${Number(source.quoteSentRate) || 0}%`, meta: `${Number(source.quotedBookings) || 0} / ${Number(source.submittedBookings) || 0} 个预约` },
+    { key: "confirmed", label: "报价确认率", value: `${Number(source.quoteConfirmationRate) || 0}%`, meta: `${Number(source.confirmedQuoteVersions) || 0} / ${Number(source.sentQuoteVersions) || 0} 个版本` },
+    { key: "duration", label: "平均确认耗时", value: `${Number(source.averageConfirmationHours) || 0} 小时`, meta: "从报价发送到用户确认" },
+    { key: "adjustment", label: "调整申请", value: Number(source.adjustmentRequests) || 0, meta: "用户主动申请调整次数" }
+  ]
+}
+
 function buildTrend(trend) {
   const list = Array.isArray(trend) ? trend : []
   const max = Math.max(...list.map((item) => Number(item.value) || 0), 1)
@@ -82,6 +92,7 @@ Page({
     metricItems: [],
     funnelItems: [],
     decisionItems: [],
+    quoteMetricItems: [],
     trendItems: [],
     topVehicles: [],
     truncated: false,
@@ -332,9 +343,10 @@ Page({
           metricItems: buildMetrics(result.metrics, result.conversionRate),
           funnelItems: buildFunnel(result.metrics),
           decisionItems: buildDecisionItems(result.metrics),
+          quoteMetricItems: buildQuoteMetrics(result.quoteMetrics),
           trendItems: buildTrend(result.trend),
           topVehicles: Array.isArray(result.topVehicles) ? result.topVehicles : [],
-          truncated: Boolean(result.truncated)
+          truncated: Boolean(result.truncated || result.quoteDataTruncated)
         })
       },
       fail: (error) => {

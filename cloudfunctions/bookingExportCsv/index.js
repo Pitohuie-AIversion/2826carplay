@@ -11,7 +11,7 @@ const AUTH_ROLE_FIELDS = {
   admin: true
 }
 
-const BOOKING_STATUSES = ["pending", "contacted", "completed", "cancelled"]
+const BOOKING_STATUSES = ["pending", "contacted", "quoted", "adjustment_requested", "confirmed", "completed", "cancelled"]
 const BOOKING_BATCH_SIZE = 100
 const MAX_EXPORT_SOURCE_RECORDS = 2000
 const BOOKING_EXPORT_FIELDS = {

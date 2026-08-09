@@ -205,6 +205,42 @@
     </view>
   </view>
 
+  <view wx:if="{{latestQuote.id}}" class="customer-quote-card ui-card">
+    <view class="section-heading">
+      <view>
+        <view class="section-kicker">QUOTE v{{latestQuote.version}}</view>
+        <view class="section-title">费用报价</view>
+      </view>
+      <view class="quote-valid">有效至 {{latestQuote.validUntil || '—'}}</view>
+    </view>
+    <view class="quote-rental-meta">{{latestQuote.rentalDays}} 个计费日 · {{booking.startDate}} 至 {{booking.endDate}}</view>
+    <view class="quote-breakdown">
+      <view class="quote-row"><text>基础租金</text><text>￥{{latestQuote.baseRentalText}}</text></view>
+      <view class="quote-row"><text>保障 / 保险</text><text>￥{{latestQuote.protectionText}}</text></view>
+      <view class="quote-row"><text>服务费</text><text>￥{{latestQuote.serviceFeeText}}</text></view>
+      <view class="quote-row"><text>取送车费</text><text>￥{{latestQuote.deliveryFeeText}}</text></view>
+      <view class="quote-row"><text>其他费用</text><text>￥{{latestQuote.otherFeeText}}</text></view>
+      <view class="quote-total"><text>应付预估总额</text><text>￥{{latestQuote.totalText}}</text></view>
+    </view>
+    <view class="quote-rule"><view class="quote-rule-label">押金说明</view><view>{{latestQuote.depositText || '以顾问最终说明为准'}}</view></view>
+    <view wx:if="{{latestQuote.customerNote}}" class="quote-rule"><view class="quote-rule-label">报价备注</view><view>{{latestQuote.customerNote}}</view></view>
+    <view wx:if="{{latestQuote.adjustmentNote}}" class="quote-adjustment-summary"><view class="quote-rule-label">我的调整说明</view><view>{{latestQuote.adjustmentNote}}</view></view>
+    <view class="quote-boundary">确认报价仅表示认可当前费用方案，不代表已经付款、签署合同或锁定车辆。</view>
+
+    <view wx:if="{{booking.status === 'quoted' && latestQuote.status === 'sent'}}" class="quote-response">
+      <button class="quote-confirm-btn ui-btn ui-btn-primary" loading="{{quoteResponding}}" disabled="{{loading || quoteResponding}}" bindtap="handleConfirmQuote">确认报价（尚未付款）</button>
+      <view class="quote-adjustment-form">
+        <view class="quote-rule-label">需要调整？</view>
+        <textarea class="quote-adjustment-input" maxlength="200" value="{{adjustmentNote}}" disabled="{{loading || quoteResponding}}" bindinput="handleAdjustmentInput" placeholder="请说明需要调整的费用或安排" aria-label="报价调整说明" />
+        <view class="quote-adjustment-count">{{adjustmentNote.length || 0}} / 200</view>
+        <button class="quote-adjust-btn ui-btn ui-btn-ghost" loading="{{quoteResponding}}" disabled="{{loading || quoteResponding || !adjustmentNote}}" bindtap="handleRequestQuoteAdjustment">申请调整报价</button>
+      </view>
+    </view>
+    <view wx:elif="{{booking.status === 'confirmed'}}" class="quote-response-state quote-response-confirmed">当前报价已确认，尚未付款。</view>
+    <view wx:elif="{{booking.status === 'adjustment_requested'}}" class="quote-response-state quote-response-adjustment">调整申请已提交，请等待顾问重新报价。</view>
+    <view wx:elif="{{latestQuote.status === 'expired'}}" class="quote-response-state">当前报价已失效，请联系顾问重新报价。</view>
+  </view>
+
   <view wx:if="{{booking.note && !editing}}" class="note-card ui-card">
     <view class="section-heading">
       <view>

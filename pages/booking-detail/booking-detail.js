@@ -11,6 +11,9 @@ function mapStatusText(status) {
   if (value === "contacted") {
     return "已联系"
   }
+  if (value === "quoted") return "已报价"
+  if (value === "adjustment_requested") return "待调整"
+  if (value === "confirmed") return "已确认"
   if (value === "completed") {
     return "已完成"
   }
@@ -25,6 +28,9 @@ function mapStatusClass(status) {
   if (value === "contacted") {
     return "status-contacted"
   }
+  if (value === "quoted") return "status-quoted"
+  if (value === "adjustment_requested") return "status-adjustment-requested"
+  if (value === "confirmed") return "status-confirmed"
   if (value === "completed") {
     return "status-completed"
   }
@@ -36,7 +42,7 @@ function mapStatusClass(status) {
 
 function canCancelBooking(status) {
   const value = String(status || "").trim()
-  return value === "pending" || value === "contacted"
+  return ["pending", "contacted", "quoted", "adjustment_requested", "confirmed"].includes(value)
 }
 
 function canEditBooking(status) {
@@ -57,6 +63,21 @@ function buildStatusGuidance(status) {
       desc: "顾问已联系，请按沟通结果确认车辆档期、价格与取还车安排。",
       tone: "contacted"
     },
+    quoted: {
+      title: "报价等待确认",
+      desc: "顾问已发送费用明细，请核对报价后确认或提出调整；确认不代表付款。",
+      tone: "quoted"
+    },
+    adjustment_requested: {
+      title: "顾问正在调整报价",
+      desc: "调整申请已提交，顾问重新发送报价后可再次确认。",
+      tone: "adjustment"
+    },
+    confirmed: {
+      title: "报价已确认",
+      desc: "你已确认当前费用方案，但尚未付款，后续安排仍以顾问沟通为准。",
+      tone: "confirmed"
+    },
     completed: {
       title: "本次行程已完成",
       desc: "预约流程已经结束，感谢使用极境车库服务。",
@@ -74,8 +95,11 @@ function buildStatusGuidance(status) {
 function buildProgressSteps(status) {
   const value = String(status || "pending").trim() || "pending"
   const cancelled = value === "cancelled"
-  const activeIndex = value === "completed" ? 2 : value === "contacted" || cancelled ? 1 : 0
-  const labels = cancelled ? ["预约已提交", "预约已取消", "流程已结束"] : ["预约已提交", "顾问联系", "行程完成"]
+  const indexMap = { pending: 0, contacted: 1, quoted: 2, adjustment_requested: 2, confirmed: 3, completed: 4 }
+  const activeIndex = cancelled ? 1 : (indexMap[value] === undefined ? 0 : indexMap[value])
+  const labels = cancelled
+    ? ["预约已提交", "预约已取消", "流程已结束"]
+    : ["预约已提交", "顾问联系", "收到报价", "确认方案", "行程完成"]
 
   return labels.map((label, index) => {
     let stateClass = "progress-upcoming"
@@ -95,6 +119,34 @@ function buildProgressSteps(status) {
       isLast: index === labels.length - 1
     }
   })
+}
+
+function formatYuan(cents) {
+  return (Math.max(0, Number(cents || 0)) / 100).toFixed(2)
+}
+
+function normalizeQuote(item) {
+  const quote = item && typeof item === "object" ? item : {}
+  return {
+    id: quote.id || "",
+    rentalDays: Math.max(0, Number(quote.rentalDays || 0)),
+    baseRentalText: formatYuan(quote.baseRentalCents),
+    protectionText: formatYuan(quote.protectionCents),
+    serviceFeeText: formatYuan(quote.serviceFeeCents),
+    deliveryFeeText: formatYuan(quote.deliveryFeeCents),
+    otherFeeText: formatYuan(quote.otherFeeCents),
+    totalText: formatYuan(quote.totalCents),
+    depositText: quote.depositText || "",
+    validUntil: quote.validUntil || "",
+    customerNote: quote.customerNote || "",
+    adjustmentNote: quote.adjustmentNote || "",
+    version: Math.max(0, Number(quote.version || 0)),
+    status: quote.status || "",
+    sentAtText: formatDisplayTime(quote.sentAt),
+    confirmedAtText: formatDisplayTime(quote.confirmedAt),
+    adjustmentRequestedAtText: formatDisplayTime(quote.adjustmentRequestedAt),
+    expiredAtText: formatDisplayTime(quote.expiredAt)
+  }
 }
 
 function formatDisplayTime(value) {
@@ -145,6 +197,8 @@ function normalizeBooking(item) {
     endDate: booking.endDate || "",
     city: booking.city || "",
     note: booking.note || "",
+    latestQuoteId: booking.latestQuoteId || "",
+    latestQuoteVersion: Math.max(0, Number(booking.latestQuoteVersion || 0)),
     status,
     createdAt: booking.createdAt || "",
     updatedAt: booking.updatedAt || ""
@@ -175,6 +229,9 @@ Page({
     bookingStatusTemplateId: "",
     subscriptionEnabled: false,
     subscriptionRequesting: false,
+    quoteResponding: false,
+    latestQuote: {},
+    adjustmentNote: "",
     editForm: {
       userName: "",
       phone: "",
@@ -235,7 +292,8 @@ Page({
       !this.data.editing &&
       !this.data.saving &&
       !this.data.subscriptionRequesting &&
-      !this.data.cancelling
+      !this.data.cancelling &&
+      !this.data.quoteResponding
     ) {
       this.loadDetail()
     }
@@ -260,14 +318,17 @@ Page({
     this._saveRequestSerial = Number(this._saveRequestSerial || 0) + 1
     this._cancelRequestSerial = Number(this._cancelRequestSerial || 0) + 1
     this._subscriptionRequestId = Number(this._subscriptionRequestId || 0) + 1
+    this._quoteResponseRequestId = Number(this._quoteResponseRequestId || 0) + 1
     this.cancelOperationConfigRequest()
     this.clearDetailLoadTimer()
     this.clearSaveRequestTimer()
     this.clearCancelRequestTimer()
     this.clearSubscriptionRequestTimer()
+    this.clearQuoteResponseTimer()
   },
 
-  applyBooking(booking) {
+  applyBooking(booking, latestQuote) {
+    const quote = normalizeQuote(latestQuote)
     this.setData({
       booking,
       initialLoading: false,
@@ -285,6 +346,9 @@ Page({
       editing: false,
       saving: false,
       cancelling: false,
+      quoteResponding: false,
+      latestQuote: quote,
+      adjustmentNote: quote.status === "adjustment_requested" ? quote.adjustmentNote : "",
       editForm: {
         userName: booking.userName,
         phone: booking.phone,
@@ -495,7 +559,7 @@ Page({
           return
         }
 
-        this.applyBooking(normalizeBooking(current))
+        this.applyBooking(normalizeBooking(current), result.latestQuote)
         this.setData({ loading: false })
       },
       fail: (error) => {
@@ -516,6 +580,87 @@ Page({
     }
     clearTimeout(this._detailLoadTimer)
     this._detailLoadTimer = null
+  },
+
+  handleAdjustmentInput(event) {
+    if (this.data.quoteResponding || this.data.loading) return
+    this.setData({ adjustmentNote: String(event.detail && event.detail.value || "").slice(0, 200) })
+  },
+
+  handleConfirmQuote() {
+    if (this.data.quoteResponding || this.data.loading || this.data.booking.status !== "quoted" || !this.data.latestQuote.id) return
+    wx.showModal({
+      title: "确认报价",
+      content: "确认当前费用方案？本操作不代表付款，也不会自动锁定车辆。",
+      confirmText: "确认方案",
+      confirmColor: "#528fff",
+      success: (res) => {
+        if (res && res.confirm) this.respondToQuote("confirm")
+      }
+    })
+  },
+
+  handleRequestQuoteAdjustment() {
+    if (this.data.quoteResponding || this.data.loading || this.data.booking.status !== "quoted" || !this.data.latestQuote.id) return
+    if (!String(this.data.adjustmentNote || "").trim()) {
+      wx.showToast({ title: "请填写需要调整的内容", icon: "none" })
+      return
+    }
+    this.respondToQuote("requestAdjustment")
+  },
+
+  respondToQuote(action) {
+    if (!wx.cloud || typeof wx.cloud.callFunction !== "function" || this.data.quoteResponding) return
+    const requestId = Number(this._quoteResponseRequestId || 0) + 1
+    this._quoteResponseRequestId = requestId
+    this.clearQuoteResponseTimer()
+    this.setData({ quoteResponding: true })
+    let settled = false
+    const finish = () => {
+      if (settled || requestId !== this._quoteResponseRequestId) return false
+      settled = true
+      this.clearQuoteResponseTimer()
+      return true
+    }
+    const fail = (message) => {
+      if (!finish()) return
+      this.setData({ quoteResponding: false })
+      wx.showToast({ title: formatToastTitle(message, "报价操作失败"), icon: "none" })
+    }
+    this._quoteResponseTimer = setTimeout(() => fail("报价操作超时，请重试"), BOOKING_DETAIL_MUTATION_TIMEOUT_MS)
+    try {
+      wx.cloud.callFunction({
+        name: "bookingQuoteRespond",
+        data: {
+          bookingId: this.data.id,
+          quoteId: this.data.latestQuote.id,
+          action,
+          adjustmentNote: action === "requestAdjustment" ? String(this.data.adjustmentNote || "").trim() : ""
+        },
+        success: (res) => {
+          if (!finish()) return
+          const result = res && res.result
+          if (!result || !result.ok) {
+            this.setData({ quoteResponding: false })
+            wx.showToast({ title: formatToastTitle(result && result.message, "报价操作失败"), icon: "none" })
+            if (result && result.code === "QUOTE_EXPIRED") this.loadDetail()
+            return
+          }
+          wx.showToast({ title: action === "confirm" ? "报价已确认（尚未付款）" : "调整申请已提交", icon: "none" })
+          this.setData({ quoteResponding: false })
+          this.loadDetail()
+        },
+        fail: (error) => fail(error && (error.errMsg || error.message))
+      })
+    } catch (error) {
+      fail(error && (error.errMsg || error.message))
+    }
+  },
+
+  clearQuoteResponseTimer() {
+    if (!this._quoteResponseTimer) return
+    clearTimeout(this._quoteResponseTimer)
+    this._quoteResponseTimer = null
   },
 
   handleCancel() {

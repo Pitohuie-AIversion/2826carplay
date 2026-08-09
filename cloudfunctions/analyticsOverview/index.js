@@ -18,6 +18,17 @@ const ANALYTICS_EVENT_FIELDS = {
   vehicleId: true,
   createdAt: true
 }
+const QUOTE_ANALYTICS_FIELDS = {
+  bookingId: true,
+  status: true,
+  sentAt: true,
+  confirmedAt: true,
+  adjustmentRequestedAt: true
+}
+const BOOKING_ANALYTICS_FIELDS = {
+  status: true,
+  createdAt: true
+}
 const MAX_EVENTS = 5000
 const EVENT_BATCH_SIZE = 100
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -136,6 +147,56 @@ async function readEvents() {
   }
 }
 
+async function readCollectionRecords(collectionName, fields) {
+  const list = []
+  try {
+    for (let offset = 0; offset <= MAX_EVENTS; offset += EVENT_BATCH_SIZE) {
+      const remaining = MAX_EVENTS + 1 - list.length
+      const batchSize = Math.min(EVENT_BATCH_SIZE, remaining)
+      const res = await db.collection(collectionName).field(fields).skip(offset).limit(batchSize).get()
+      const batch = res && Array.isArray(res.data) ? res.data : []
+      list.push(...batch)
+      if (batch.length < batchSize || list.length > MAX_EVENTS) break
+    }
+  } catch (error) {
+    const message = String(error && (error.message || error.errMsg) || error)
+    if (!message.includes("Unexpected collection:") && !message.includes("not exist")) throw error
+  }
+  return { list: list.slice(0, MAX_EVENTS), truncated: list.length > MAX_EVENTS }
+}
+
+function buildQuoteMetrics(bookings, quotes, start, now) {
+  const periodBookings = bookings.filter((item) => {
+    const timestamp = toTimestamp(item.createdAt)
+    return timestamp >= start && timestamp <= now
+  })
+  const periodSentQuotes = quotes.filter((item) => {
+    const timestamp = toTimestamp(item.sentAt)
+    return timestamp >= start && timestamp <= now
+  })
+  const quotedBookingIds = new Set(periodSentQuotes.map((item) => String(item.bookingId || "")).filter(Boolean))
+  const confirmedQuotes = periodSentQuotes.filter((item) => Boolean(toTimestamp(item.confirmedAt)))
+  const adjustmentRequests = quotes.filter((item) => {
+    const timestamp = toTimestamp(item.adjustmentRequestedAt)
+    return timestamp >= start && timestamp <= now
+  })
+  const confirmDurations = confirmedQuotes
+    .map((item) => toTimestamp(item.confirmedAt) - toTimestamp(item.sentAt))
+    .filter((value) => value >= 0)
+  return {
+    submittedBookings: periodBookings.length,
+    quotedBookings: quotedBookingIds.size,
+    sentQuoteVersions: periodSentQuotes.length,
+    confirmedQuoteVersions: confirmedQuotes.length,
+    adjustmentRequests: adjustmentRequests.length,
+    quoteSentRate: periodBookings.length ? Math.round((quotedBookingIds.size / periodBookings.length) * 1000) / 10 : 0,
+    quoteConfirmationRate: periodSentQuotes.length ? Math.round((confirmedQuotes.length / periodSentQuotes.length) * 1000) / 10 : 0,
+    averageConfirmationHours: confirmDurations.length
+      ? Math.round((confirmDurations.reduce((sum, value) => sum + value, 0) / confirmDurations.length / 3600000) * 10) / 10
+      : 0
+  }
+}
+
 async function readVehicleName(vehicleId) {
   try {
     const res = await db
@@ -188,7 +249,11 @@ exports.main = async (event) => {
 
     const now = Date.now()
     const start = startOfChinaDay(now) - (days - 1) * DAY_MS
-    const records = await readEvents()
+    const [records, bookingRecords, quoteRecords] = await Promise.all([
+      readEvents(),
+      readCollectionRecords("bookings", BOOKING_ANALYTICS_FIELDS),
+      readCollectionRecords("booking_quotes", QUOTE_ANALYTICS_FIELDS)
+    ])
     const events = records.list.filter((item) => {
       const timestamp = toTimestamp(item.createdAt)
       return timestamp >= start && timestamp <= now && EVENT_TYPES.includes(String(item.eventType || ""))
@@ -244,6 +309,7 @@ exports.main = async (event) => {
       days,
       truncated: records.truncated,
       metrics,
+      quoteMetrics: buildQuoteMetrics(bookingRecords.list, quoteRecords.list, start, now),
       conversionRate:
         metrics.vehicle_detail > 0
           ? Math.round((metrics.booking_submit / metrics.vehicle_detail) * 1000) / 10
@@ -252,7 +318,8 @@ exports.main = async (event) => {
       topVehicles: topVehicles.map((item, index) => ({
         ...item,
         name: names[index]
-      }))
+      })),
+      quoteDataTruncated: bookingRecords.truncated || quoteRecords.truncated
     }
   } catch (error) {
     console.error({

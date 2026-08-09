@@ -16,6 +16,7 @@ describe("production security rules", () => {
       "analytics_events",
       "app_configs",
       "audit_logs",
+      "booking_quotes",
       "bookings",
       "error_logs",
       "favorites",

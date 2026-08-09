@@ -9,6 +9,9 @@ const {
 const BOOKING_STATUS_LABELS = {
   pending: "待联系",
   contacted: "已联系",
+  quoted: "已报价",
+  adjustment_requested: "待调整",
+  confirmed: "已确认",
   completed: "已完成",
   cancelled: "已取消"
 }

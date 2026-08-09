@@ -208,6 +208,52 @@
     </view>
   </view>
 
+  <view class="quote-card ui-card">
+    <view class="quote-heading">
+      <view>
+        <view class="quote-kicker">FORMAL ESTIMATE</view>
+        <view class="quote-title">报价与确认</view>
+      </view>
+      <view class="quote-version">下一版本 v{{(booking.latestQuoteVersion || 0) + 1}}</view>
+    </view>
+
+    <view wx:if="{{booking.status === 'pending'}}" class="quote-guidance">请先完成联系并标记“已联系”，报价草稿可提前保存，发送前不会展示给用户。</view>
+    <view wx:elif="{{booking.status === 'quoted'}}" class="quote-guidance quote-guidance-highlight">报价已发送，等待用户确认或申请调整；已发送版本不可修改。</view>
+    <view wx:elif="{{booking.status === 'adjustment_requested'}}" class="quote-guidance quote-guidance-warning">用户已申请调整，请参考历史版本中的调整说明创建新报价。</view>
+    <view wx:elif="{{booking.status === 'confirmed'}}" class="quote-guidance quote-guidance-success">用户已确认报价。确认不代表付款，可在实际行程结束后标记完成。</view>
+
+    <view wx:if="{{booking.status === 'pending' || booking.status === 'contacted' || booking.status === 'adjustment_requested'}}" class="quote-form">
+      <view class="quote-form-grid">
+        <view class="quote-field"><view class="quote-label">基础租金（元）</view><input class="quote-input" type="digit" maxlength="12" value="{{quoteForm.baseRentalAmount}}" data-field="baseRentalAmount" disabled="{{quoteLoading || loading}}" bindinput="handleQuoteInput" aria-label="基础租金" placeholder="0.00" confirm-type="done" /></view>
+        <view class="quote-field"><view class="quote-label">保障/保险（元）</view><input class="quote-input" type="digit" maxlength="12" value="{{quoteForm.protectionAmount}}" data-field="protectionAmount" disabled="{{quoteLoading || loading}}" bindinput="handleQuoteInput" aria-label="保障或保险费用" placeholder="0.00" confirm-type="done" /></view>
+        <view class="quote-field"><view class="quote-label">服务费（元）</view><input class="quote-input" type="digit" maxlength="12" value="{{quoteForm.serviceFeeAmount}}" data-field="serviceFeeAmount" disabled="{{quoteLoading || loading}}" bindinput="handleQuoteInput" aria-label="服务费" placeholder="0.00" confirm-type="done" /></view>
+        <view class="quote-field"><view class="quote-label">取送车费（元）</view><input class="quote-input" type="digit" maxlength="12" value="{{quoteForm.deliveryFeeAmount}}" data-field="deliveryFeeAmount" disabled="{{quoteLoading || loading}}" bindinput="handleQuoteInput" aria-label="取送车费" placeholder="0.00" confirm-type="done" /></view>
+        <view class="quote-field"><view class="quote-label">其他费用（元）</view><input class="quote-input" type="digit" maxlength="12" value="{{quoteForm.otherFeeAmount}}" data-field="otherFeeAmount" disabled="{{quoteLoading || loading}}" bindinput="handleQuoteInput" aria-label="其他费用" placeholder="0.00" confirm-type="done" /></view>
+        <view class="quote-field"><view class="quote-label">报价有效期</view><picker mode="date" value="{{quoteForm.validUntil}}" start="{{quoteMinDate}}" disabled="{{quoteLoading || loading}}" bindchange="handleQuoteValidUntilChange" aria-label="报价有效期" hover-class="quote-picker-pressed"><view class="quote-input quote-date"><text>{{quoteForm.validUntil || '请选择有效期'}}</text><view class="picker-chevron" aria-hidden="true"></view></view></picker></view>
+      </view>
+      <view class="quote-field quote-field-full"><view class="quote-label">押金说明</view><textarea class="quote-textarea" maxlength="200" value="{{quoteForm.depositText}}" data-field="depositText" disabled="{{quoteLoading || loading}}" bindinput="handleQuoteInput" placeholder="说明车辆押金、违章押金及退还规则" aria-label="押金说明" /><view class="quote-count">{{quoteForm.depositText.length || 0}} / 200</view></view>
+      <view class="quote-field quote-field-full"><view class="quote-label">用户可见备注</view><textarea class="quote-textarea" maxlength="300" value="{{quoteForm.customerNote}}" data-field="customerNote" disabled="{{quoteLoading || loading}}" bindinput="handleQuoteInput" placeholder="可填写取还车安排或费用补充说明" aria-label="用户可见报价备注" /><view class="quote-count">{{quoteForm.customerNote.length || 0}} / 300</view></view>
+      <view class="quote-actions">
+        <button class="quote-action ui-btn ui-btn-ghost" loading="{{quoteLoading}}" disabled="{{quoteLoading || loading}}" bindtap="handleSaveQuoteDraft">保存草稿</button>
+        <button wx:if="{{booking.status === 'contacted' || booking.status === 'adjustment_requested'}}" class="quote-action ui-btn ui-btn-primary" loading="{{quoteLoading}}" disabled="{{quoteLoading || loading || quoteDirty || !quoteDraft.id}}" bindtap="handleSendQuote">发送报价 v{{quoteDraft.version || ((booking.latestQuoteVersion || 0) + 1)}}</button>
+      </view>
+      <view class="quote-help">合计由服务端根据五项费用重新计算；租期和计费天数来自预约日期，客户端不能篡改。</view>
+    </view>
+
+    <view wx:if="{{quotesUnavailable}}" class="quote-empty">报价记录暂时无法加载，请稍后重试。</view>
+    <view wx:elif="{{quoteHistory.length}}" class="quote-history">
+      <view class="quote-history-title">版本记录</view>
+      <view class="quote-history-item" wx:for="{{quoteHistory}}" wx:key="id">
+        <view class="quote-history-top"><text>报价 v{{item.version}}</text><text class="quote-status quote-status-{{item.status}}">{{item.statusText}}</text></view>
+        <view class="quote-history-total">￥{{item.totalText}}</view>
+        <view class="quote-history-meta">{{item.rentalDays}} 个计费日 · 有效至 {{item.validUntil || '—'}}</view>
+        <view wx:if="{{item.adjustmentNote}}" class="quote-adjustment-note">用户调整说明：{{item.adjustmentNote}}</view>
+        <button wx:if="{{booking.status === 'quoted' && booking.latestQuoteId === item.id && item.status === 'sent'}}" class="quote-expire-btn ui-btn ui-btn-danger-ghost" data-id="{{item.id}}" disabled="{{quoteLoading || loading}}" bindtap="handleExpireQuote">标记当前报价失效</button>
+      </view>
+    </view>
+    <view wx:else class="quote-empty">尚无已发送报价版本。</view>
+  </view>
+
   <view wx:if="{{booking.note}}" class="note-card ui-card">
     <view class="note-title note-title-with-icon"><view class="note-native-icon note-native-icon-user" aria-hidden="true"><view class="note-native-line"></view></view><text>用户备注</text></view>
     <view class="note-content">{{booking.note}}</view>
@@ -233,13 +279,13 @@
     <button class="save-btn ui-btn ui-btn-primary action-with-icon" loading="{{loading}}" disabled="{{loading || coordinationLoading}}" bindtap="handleSaveRemark"><view wx:if="{{!loading}}" class="save-native-icon" aria-hidden="true"><view class="save-native-line"></view></view><text>{{loading ? '正在保存' : '保存备注'}}</text></button>
   </view>
 
-  <view class="action-card ui-card" wx:if="{{booking.status === 'pending' || booking.status === 'contacted'}}">
+  <view class="action-card ui-card" wx:if="{{booking.status !== 'completed' && booking.status !== 'cancelled'}}">
     <view class="action-title note-title-with-icon"><view class="status-operation-native-icon" aria-hidden="true"><view class="status-operation-dot"></view></view><text>状态操作</text></view>
     <view class="action-tip"><view class="help-native-icon" aria-hidden="true"><view class="help-info-mark"></view></view><view>拨号不会自动改变状态，请在实际沟通完成后再标记“已联系”。</view></view>
     <view class="status-actions">
       <button wx:if="{{booking.status === 'pending'}}" class="status-btn status-btn-alt action-with-icon" disabled="{{loading || coordinationLoading || remarkDirty}}" data-status="contacted" bindtap="handleUpdateStatus" hover-class="{{loading || coordinationLoading || remarkDirty ? 'none' : 'manage-detail-button-pressed'}}"><view class="status-contact-native-icon" aria-hidden="true"></view><text>标记已联系</text></button>
-      <button wx:if="{{booking.status === 'contacted'}}" class="status-btn action-with-icon" disabled="{{loading || coordinationLoading || remarkDirty}}" data-status="completed" bindtap="handleUpdateStatus" hover-class="{{loading || coordinationLoading || remarkDirty ? 'none' : 'manage-detail-button-pressed'}}"><view class="status-complete-native-icon" aria-hidden="true"></view><text>标记已完成</text></button>
-      <button class="status-btn status-btn-alt status-btn-danger status-btn-last action-with-icon" disabled="{{loading || coordinationLoading || remarkDirty}}" data-status="cancelled" bindtap="handleUpdateStatus" hover-class="{{loading || coordinationLoading || remarkDirty ? 'none' : 'manage-detail-button-pressed'}}"><view class="status-cancel-native-icon" aria-hidden="true"></view><text>取消预约</text></button>
+      <button wx:if="{{booking.status === 'confirmed'}}" class="status-btn action-with-icon" disabled="{{loading || coordinationLoading || quoteLoading || remarkDirty}}" data-status="completed" bindtap="handleUpdateStatus" hover-class="{{loading || coordinationLoading || quoteLoading || remarkDirty ? 'none' : 'manage-detail-button-pressed'}}"><view class="status-complete-native-icon" aria-hidden="true"></view><text>标记已完成</text></button>
+      <button class="status-btn status-btn-alt status-btn-danger status-btn-last action-with-icon" disabled="{{loading || coordinationLoading || quoteLoading || remarkDirty}}" data-status="cancelled" bindtap="handleUpdateStatus" hover-class="{{loading || coordinationLoading || quoteLoading || remarkDirty ? 'none' : 'manage-detail-button-pressed'}}"><view class="status-cancel-native-icon" aria-hidden="true"></view><text>取消预约</text></button>
     </view>
   </view>
   </block>

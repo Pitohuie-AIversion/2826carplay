@@ -104,6 +104,23 @@
     <view class="section-card ui-card">
       <view class="section-heading">
         <view>
+          <view class="section-eyebrow">QUOTE LOOP</view>
+          <view class="section-title">报价确认闭环</view>
+        </view>
+        <view class="section-index">03</view>
+      </view>
+      <view class="decision-grid">
+        <view class="decision-item" wx:for="{{quoteMetricItems}}" wx:key="key">
+          <view class="decision-label">{{item.label}}</view>
+          <view class="decision-value">{{item.value}}</view>
+          <view class="decision-meta">{{item.meta}}</view>
+        </view>
+      </view>
+    </view>
+
+    <view class="section-card ui-card">
+      <view class="section-heading">
+        <view>
           <view class="section-eyebrow">CONVERSION FUNNEL</view>
           <view class="section-title">预约转化漏斗</view>
         </view>

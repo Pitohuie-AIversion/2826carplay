@@ -37,6 +37,24 @@ const INVENTORY_FIELDS = {
     createdAt: true,
     updatedAt: true
   },
+  booking_quotes: {
+    _id: true,
+    bookingId: true,
+    vehicleId: true,
+    vehicleName: true,
+    startDate: true,
+    endDate: true,
+    rentalDays: true,
+    totalCents: true,
+    depositText: true,
+    validUntil: true,
+    customerNote: true,
+    adjustmentNote: true,
+    version: true,
+    status: true,
+    createdAt: true,
+    updatedAt: true
+  },
   favorites: {
     _id: true,
     vehicleId: true,
@@ -159,6 +177,27 @@ function buildCsvText(subjectOpenid, categories) {
       "",
       "",
       "",
+      trimText(item.createdAt, 50),
+      trimText(item.updatedAt, 50)
+    ])
+  })
+  categories.quotes.list.forEach((item) => {
+    rows.push([
+      "报价记录",
+      safeOpenid,
+      trimText(item.id, 128),
+      trimText(item.vehicleId, 128),
+      limitText(item.vehicleName, 100),
+      "",
+      "",
+      "",
+      limitText([item.customerNote, item.adjustmentNote].filter(Boolean).join("；调整说明："), 500),
+      trimText(item.startDate, 30),
+      trimText(item.endDate, 30),
+      trimText(`${item.status} / v${item.version}`, 50),
+      "",
+      limitText(item.depositText, 500),
+      `预估总额：${Number(item.totalCents || 0) / 100} 元；有效至：${trimText(item.validUntil, 30)}`,
       trimText(item.createdAt, 50),
       trimText(item.updatedAt, 50)
     ])
@@ -288,6 +327,44 @@ async function readByOpenid(collectionName, openid) {
   }
 }
 
+async function readQuotesByBookingIds(bookingIds) {
+  const records = []
+  try {
+    const ids = Array.from(
+      new Set(
+        (Array.isArray(bookingIds) ? bookingIds : [])
+          .map((item) => String(item || "").trim())
+          .filter(Boolean)
+      )
+    )
+    for (let index = 0; index < ids.length && records.length <= MAX_RECORDS; index += 1) {
+      const remaining = MAX_RECORDS + 1 - records.length
+      const res = await db
+        .collection("booking_quotes")
+        .where({ bookingId: ids[index] })
+        .field(INVENTORY_FIELDS.booking_quotes)
+        .limit(remaining)
+        .get()
+      const list = res && Array.isArray(res.data) ? res.data : []
+      records.push(...list)
+    }
+    return {
+      available: true,
+      list: sortByCreatedAtDesc(records.slice(0, MAX_RECORDS)),
+      truncated: records.length > MAX_RECORDS
+    }
+  } catch (error) {
+    console.warn({
+      function: "privacyRequestDataInventory",
+      stage: "readCategory",
+      category: "booking_quotes",
+      errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
+      createdAt: new Date().toISOString()
+    })
+    return { available: false, list: [], truncated: false }
+  }
+}
+
 function normalizeBooking(item) {
   return {
     id: trimText(item && item._id, 128),
@@ -309,6 +386,27 @@ function normalizeFavorite(item) {
   return {
     id: trimText(item && item._id, 128),
     vehicleId: trimText(item && item.vehicleId, 128),
+    createdAt: formatTime(item && item.createdAt),
+    updatedAt: formatTime(item && item.updatedAt)
+  }
+}
+
+function normalizeQuote(item) {
+  return {
+    id: trimText(item && item._id, 128),
+    bookingId: trimText(item && item.bookingId, 128),
+    vehicleId: trimText(item && item.vehicleId, 128),
+    vehicleName: limitText(item && item.vehicleName, 100),
+    startDate: trimText(item && item.startDate, 30),
+    endDate: trimText(item && item.endDate, 30),
+    rentalDays: Math.max(0, Number((item && item.rentalDays) || 0)),
+    totalCents: Math.max(0, Number((item && item.totalCents) || 0)),
+    depositText: limitText(item && item.depositText, 500),
+    validUntil: trimText(item && item.validUntil, 30),
+    customerNote: limitText(item && item.customerNote, 500),
+    adjustmentNote: limitText(item && item.adjustmentNote, 500),
+    version: Math.max(0, Number((item && item.version) || 0)),
+    status: trimText(item && item.status, 50),
     createdAt: formatTime(item && item.createdAt),
     updatedAt: formatTime(item && item.updatedAt)
   }
@@ -395,12 +493,18 @@ exports.main = async (event) => {
       readByOpenid("favorites", subjectOpenid),
       readByOpenid("privacy_requests", subjectOpenid)
     ])
+    const quotesResult = await readQuotesByBookingIds(
+      bookingsResult.list.map((item) => item && item._id)
+    )
     const unavailable = []
     if (!bookingsResult.available) {
       unavailable.push("bookings")
     }
     if (!favoritesResult.available) {
       unavailable.push("favorites")
+    }
+    if (!quotesResult.available) {
+      unavailable.push("quotes")
     }
     if (!requestsResult.available) {
       unavailable.push("privacyRequests")
@@ -412,6 +516,9 @@ exports.main = async (event) => {
     if (favoritesResult.truncated) {
       truncated.push("favorites")
     }
+    if (quotesResult.truncated) {
+      truncated.push("quotes")
+    }
     if (requestsResult.truncated) {
       truncated.push("privacyRequests")
     }
@@ -421,6 +528,11 @@ exports.main = async (event) => {
         count: bookingsResult.list.length,
         truncated: bookingsResult.truncated,
         list: bookingsResult.list.map(normalizeBooking)
+      },
+      quotes: {
+        count: quotesResult.list.length,
+        truncated: quotesResult.truncated,
+        list: quotesResult.list.map(normalizeQuote)
       },
       favorites: {
         count: favoritesResult.list.length,
@@ -459,6 +571,7 @@ exports.main = async (event) => {
         requestId,
         requestType: String(request.type || ""),
         bookingCount: categories.bookings.count,
+        quoteCount: categories.quotes.count,
         favoriteCount: categories.favorites.count,
         privacyRequestCount: categories.privacyRequests.count,
         partial: false
@@ -468,6 +581,7 @@ exports.main = async (event) => {
         fileName,
         csvText,
         bookingCount: categories.bookings.count,
+        quoteCount: categories.quotes.count,
         favoriteCount: categories.favorites.count,
         privacyRequestCount: categories.privacyRequests.count
       }
@@ -479,6 +593,7 @@ exports.main = async (event) => {
       requestId,
       requestType: String(request.type || ""),
       bookingCount: bookingsResult.list.length,
+      quoteCount: quotesResult.list.length,
       favoriteCount: favoritesResult.list.length,
       privacyRequestCount: requestsResult.list.length,
       partial

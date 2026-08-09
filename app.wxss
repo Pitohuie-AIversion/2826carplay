@@ -217,6 +217,30 @@ textarea {
   background: #2f80ed;
 }
 
+.status-quoted {
+  background: #765cc9;
+}
+
+.status-adjustment-requested {
+  background: #c38a38;
+}
+
+.status-confirmed {
+  background: #27865d;
+}
+
+.status-quoted {
+  background: #765cc9;
+}
+
+.status-adjustment-requested {
+  background: #c38a38;
+}
+
+.status-confirmed {
+  background: #27865d;
+}
+
 .status-idle,
 .status-completed {
   background: #27ae60;

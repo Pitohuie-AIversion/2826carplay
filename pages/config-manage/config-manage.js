@@ -1,4 +1,4 @@
-const { requirePagePermission } = require("../../shared/pageAuth")
+const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
 const { formatToastTitle } = require("../../shared/uiFeedback")
 const { clearUnsaved, markUnsaved } = require("../../shared/unsavedChanges")
 
@@ -107,12 +107,17 @@ Page({
       })
       return
     }
+    if (this.data.loading) {
+      wx.stopPullDownRefresh()
+      return
+    }
     this.fetchConfig(() => {
       wx.stopPullDownRefresh()
     })
   },
 
   onUnload() {
+    cancelPagePermissionCheck(this)
     this._configLoadRequestId = Number(this._configLoadRequestId || 0) + 1
     this._configSaveRequestId = Number(this._configSaveRequestId || 0) + 1
     this.finishConfigLoadRequestEffects()
@@ -120,6 +125,12 @@ Page({
   },
 
   fetchConfig(done) {
+    if (this.data.saving || this.data.isDirty) {
+      if (typeof done === "function") {
+        done()
+      }
+      return
+    }
     const requestId = Number(this._configLoadRequestId || 0) + 1
     this._configLoadRequestId = requestId
     this.finishConfigLoadRequestEffects()
@@ -207,6 +218,9 @@ Page({
   },
 
   handleInput(event) {
+    if (this.data.loading || this.data.saving) {
+      return
+    }
     const field = String(event.currentTarget.dataset.field || "").trim()
     if (!field) {
       return
@@ -220,6 +234,9 @@ Page({
   },
 
   handleReset() {
+    if (this.data.loading || this.data.saving) {
+      return
+    }
     if (!this.data.hasLoadedConfig || this.data.loadFailed) {
       wx.showToast({
         title: "请先成功加载线上配置",
@@ -236,11 +253,14 @@ Page({
   },
 
   handleRetryLoad() {
+    if (this.data.loading || this.data.saving || this.data.isDirty) {
+      return
+    }
     this.fetchConfig()
   },
 
   handleSubmit() {
-    if (this.data.saving) {
+    if (this.data.loading || this.data.saving) {
       return
     }
 

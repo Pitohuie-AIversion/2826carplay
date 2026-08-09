@@ -83,6 +83,10 @@
   transform: scale(0.98);
 }
 
+.permission-option-disabled {
+  opacity: 0.52;
+}
+
 .permission-option-icon {
   display: flex;
   align-items: center;

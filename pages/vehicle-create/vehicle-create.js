@@ -1,8 +1,10 @@
 const vehicleUtils = require("../../shared/vehicle")
 const { buildVehicleFormProgress } = require("../../shared/vehicleFormProgress")
-const { requirePagePermission } = require("../../shared/pageAuth")
+const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
 const { formatToastTitle } = require("../../shared/uiFeedback")
 const { clearUnsaved, markUnsaved } = require("../../shared/unsavedChanges")
+
+const VEHICLE_CREATE_TIMEOUT_MS = 20 * 1000
 
 const VEHICLE_TYPE_LABEL_MAP = {
   sedan: "轿车",
@@ -98,6 +100,9 @@ Page({
   },
 
   navigateToImageManage(id) {
+    if (!this.isVehicleCreateActive()) {
+      return
+    }
     if (!id) {
       this.finishSubmitFlow()
       return
@@ -106,10 +111,15 @@ Page({
     wx.redirectTo({
       url: `/pages/vehicle-detail-manage/vehicle-detail-manage?id=${id}`,
       fail: () => {
+        if (!this.isVehicleCreateActive()) {
+          return
+        }
         wx.navigateTo({
           url: `/pages/vehicle-detail-manage/vehicle-detail-manage?id=${id}`,
           fail: () => {
-            this.finishSubmitFlow()
+            if (this.isVehicleCreateActive()) {
+              this.finishSubmitFlow()
+            }
           }
         })
       }
@@ -117,17 +127,30 @@ Page({
   },
 
   finishSubmitFlow() {
+    if (!this.isVehicleCreateActive()) {
+      return
+    }
     const pages = getCurrentPages()
     if (pages.length > 1) {
       wx.navigateBack({
         delta: 1,
         fail: () => {
+          if (!this.isVehicleCreateActive()) {
+            return
+          }
           wx.redirectTo({
             url: "/pages/mine/mine",
             fail: () => {
+              if (!this.isVehicleCreateActive()) {
+                return
+              }
               wx.reLaunch({
                 url: "/pages/mine/mine",
                 fail: () => {
+                  if (!this.isVehicleCreateActive()) {
+                    return
+                  }
+                  this.setData({ isSubmitting: false })
                   wx.showToast({
                     title: "返回我的页面失败",
                     icon: "none"
@@ -144,9 +167,16 @@ Page({
     wx.redirectTo({
       url: "/pages/mine/mine",
       fail: () => {
+        if (!this.isVehicleCreateActive()) {
+          return
+        }
         wx.reLaunch({
           url: "/pages/mine/mine",
           fail: () => {
+            if (!this.isVehicleCreateActive()) {
+              return
+            }
+            this.setData({ isSubmitting: false })
             wx.showToast({
               title: "返回我的页面失败",
               icon: "none"
@@ -158,6 +188,7 @@ Page({
   },
 
   onLoad() {
+    this._vehicleCreateUnloaded = false
     const app = getApp()
     const env =
       app &&
@@ -182,7 +213,17 @@ Page({
     })
   },
 
+  onUnload() {
+    cancelPagePermissionCheck(this)
+    this._vehicleCreateUnloaded = true
+    this._vehicleCreateRequestId = Number(this._vehicleCreateRequestId || 0) + 1
+    this.clearVehicleCreateTimer()
+  },
+
   handlePlateInput(event) {
+    if (this.data.isSubmitting) {
+      return
+    }
     let value = vehicleUtils.normalizePlateNumber(event.detail.value)
     value = value.replace(/\s/g, "")
     value = value.replace(/[^0-9A-Z\u4e00-\u9fa5]/g, "").slice(0, 8)
@@ -195,6 +236,9 @@ Page({
   },
 
   handleTextInput(event) {
+    if (this.data.isSubmitting) {
+      return
+    }
     const { field } = event.currentTarget.dataset
     if (!field) {
       return
@@ -242,6 +286,9 @@ Page({
   },
 
   handleVehicleTypeChange(event) {
+    if (this.data.isSubmitting) {
+      return
+    }
     const index = Number(event.detail.value) || 0
     const value = vehicleUtils.VEHICLE_TYPES[index] || ""
     const label = VEHICLE_TYPE_LABEL_MAP[value] || ""
@@ -256,6 +303,9 @@ Page({
   },
 
   handleStatusChange(event) {
+    if (this.data.isSubmitting) {
+      return
+    }
     const index = Number(event.detail.value) || 0
     const value = vehicleUtils.VEHICLE_STATUSES[index] || ""
     const label = STATUS_LABEL_MAP[value] || ""
@@ -270,6 +320,9 @@ Page({
   },
 
   handleDateChange(event) {
+    if (this.data.isSubmitting) {
+      return
+    }
     const value = event.detail.value
 
     this.setData({
@@ -280,6 +333,9 @@ Page({
   },
 
   handleTransmissionChange(event) {
+    if (this.data.isSubmitting) {
+      return
+    }
     const index = Number(event.detail.value) || 0
     const value = vehicleUtils.TRANSMISSION_TYPES[index] || ""
     const label = TRANSMISSION_LABEL_MAP[value] || ""
@@ -293,6 +349,9 @@ Page({
   },
 
   handleFuelTypeChange(event) {
+    if (this.data.isSubmitting) {
+      return
+    }
     const index = Number(event.detail.value) || 0
     const value = vehicleUtils.FUEL_TYPES[index] || ""
     const label = FUEL_TYPE_LABEL_MAP[value] || ""
@@ -341,21 +400,46 @@ Page({
       return
     }
 
-    this.setData({
-      isSubmitting: true
-    })
+    const requestId = Number(this._vehicleCreateRequestId || 0) + 1
+    this._vehicleCreateRequestId = requestId
+    this.clearVehicleCreateTimer()
+    this.setData({ isSubmitting: true })
+    let settled = false
+    const isCurrent = () => this._vehicleCreateRequestId === requestId
+    const finishRequest = () => {
+      if (settled || !isCurrent()) {
+        return false
+      }
+      settled = true
+      this.clearVehicleCreateTimer()
+      return true
+    }
+    const handleFailure = (message) => {
+      if (!finishRequest()) {
+        return
+      }
+      this.setData({ isSubmitting: false })
+      wx.showToast({
+        title: formatToastTitle(message, "新增失败"),
+        icon: "none"
+      })
+    }
 
-    wx.cloud.callFunction({
+    this._vehicleCreateTimer = setTimeout(() => {
+      handleFailure("新增超时，请重试")
+    }, VEHICLE_CREATE_TIMEOUT_MS)
+
+    const requestOptions = {
       name: "vehicleCreate",
       data: check.value,
       success: (res) => {
+        if (!finishRequest()) {
+          return
+        }
         const result = res && res.result ? res.result : null
 
         if (result && result.ok) {
           clearUnsaved(this)
-          this.setData({
-            isSubmitting: false
-          })
 
           wx.showModal({
             title: "新增成功",
@@ -364,6 +448,9 @@ Page({
             confirmColor: "#528fff",
             cancelText: "稍后",
             success: (modalRes) => {
+              if (!isCurrent()) {
+                return
+              }
               if (modalRes.confirm) {
                 this.navigateToImageManage(result.id)
                 return
@@ -372,7 +459,9 @@ Page({
               this.finishSubmitFlow()
             },
             fail: () => {
-              this.finishSubmitFlow()
+              if (isCurrent()) {
+                this.finishSubmitFlow()
+              }
             }
           })
           return
@@ -396,15 +485,25 @@ Page({
         })
       },
       fail: (error) => {
-        wx.showToast({
-          title: "新增失败",
-          icon: "none"
-        })
-
-        this.setData({
-          isSubmitting: false
-        })
+        handleFailure(error && (error.errMsg || error.message))
       }
-    })
+    }
+
+    try {
+      wx.cloud.callFunction(requestOptions)
+    } catch (error) {
+      handleFailure(error && (error.errMsg || error.message))
+    }
+  },
+
+  clearVehicleCreateTimer() {
+    if (this._vehicleCreateTimer) {
+      clearTimeout(this._vehicleCreateTimer)
+      this._vehicleCreateTimer = null
+    }
+  },
+
+  isVehicleCreateActive() {
+    return this._vehicleCreateUnloaded !== true
   }
 })

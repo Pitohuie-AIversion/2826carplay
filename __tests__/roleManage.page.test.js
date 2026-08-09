@@ -2,6 +2,7 @@ const fs = require("fs")
 const path = require("path")
 
 jest.mock("../shared/pageAuth", () => ({
+  cancelPagePermissionCheck: jest.fn(),
   requirePagePermission: jest.fn()
 }))
 
@@ -36,7 +37,10 @@ describe("pages/role-manage 权限视觉与选择", () => {
   })
 
   test("权限选项包含功能图标与说明并可切换选中态", () => {
-    const page = createPage(loadPageDefinition())
+    const page = createPage(loadPageDefinition(), {
+      initialLoading: false,
+      loading: false
+    })
 
     expect(page.data.permissionOptions).toEqual([
       expect.objectContaining({ value: "vehicle_manage", icon: "car", active: false }),
@@ -141,6 +145,8 @@ describe("pages/role-manage 权限视觉与选择", () => {
       }
     }
     const page = createPage(loadPageDefinition(), {
+      initialLoading: false,
+      loading: false,
       formOpenid: "member_1",
       selectedPermissions: ["vehicle_manage"]
     })
@@ -176,6 +182,8 @@ describe("pages/role-manage 权限视觉与选择", () => {
       }
     }
     const page = createPage(loadPageDefinition(), {
+      initialLoading: false,
+      loading: false,
       formOpenid: "member_1",
       selectedPermissions: ["booking_manage"]
     })
@@ -216,11 +224,84 @@ describe("pages/role-manage 权限视觉与选择", () => {
     expect(wxml).toContain("role-complete-native-icon")
     expect(wxml).toContain('aria-label="保存当前成员权限"')
     expect(wxml).toContain('aria-label="清空权限表单"')
-    expect(wxml).toContain('loading="{{saving}}" disabled="{{saving}}"')
+    expect(wxml).toContain(
+      'loading="{{saving}}" disabled="{{initialLoading || loading || saving}}"'
+    )
+    expect(wxml).toContain('disabled="{{initialLoading || loading || saving || !!editingOpenid}}"')
+    expect(wxml).toContain('aria-disabled="{{initialLoading || loading || saving}}"')
     expect(wxml).toContain("{{saving ? '正在保存' : '保存权限'}}")
     expect(wxml).toContain("{{loading ? '正在加载' : '加载更多'}}")
     expect(wxml).not.toContain('bindtap="handleResetForm">清空表单</button>')
     expect(wxss).toContain(".role-action-content")
     expect(wxss).toContain(".role-list-end")
+    expect(wxss).toContain(".permission-option-disabled")
+  })
+
+  test("角色列表读取期间冻结表单和成员操作", () => {
+    global.wx = {
+      stopPullDownRefresh: jest.fn(),
+      showLoading: jest.fn(),
+      showToast: jest.fn(),
+      cloud: {
+        callFunction: jest.fn()
+      }
+    }
+    const page = createPage(loadPageDefinition(), {
+      pageAuthorized: true,
+      initialLoading: false,
+      loading: true,
+      formOpenid: "member_original",
+      selectedPermissions: ["vehicle_manage"],
+      editingOpenid: "",
+      list: [
+        {
+          openid: "member_edit",
+          permissions: ["booking_manage"]
+        }
+      ]
+    })
+
+    page.handleOpenidInput({ detail: { value: "member_changed" } })
+    page.handleTogglePermission({
+      currentTarget: { dataset: { value: "booking_manage" } }
+    })
+    page.handleEditRole({
+      currentTarget: {
+        dataset: {
+          openid: "member_edit",
+          permissions: ["booking_manage"]
+        }
+      }
+    })
+    page.handleResetForm()
+    page.handleSubmit()
+    page.onPullDownRefresh()
+
+    expect(page.data.formOpenid).toBe("member_original")
+    expect(page.data.selectedPermissions).toEqual(["vehicle_manage"])
+    expect(page.data.editingOpenid).toBe("")
+    expect(global.wx.cloud.callFunction).not.toHaveBeenCalled()
+    expect(global.wx.showLoading).not.toHaveBeenCalled()
+    expect(global.wx.stopPullDownRefresh).toHaveBeenCalledTimes(1)
+  })
+
+  test("权限保存期间底层角色读取入口直接收尾", () => {
+    const done = jest.fn()
+    global.wx = {
+      showToast: jest.fn(),
+      cloud: {
+        callFunction: jest.fn()
+      }
+    }
+    const page = createPage(loadPageDefinition(), {
+      initialLoading: false,
+      loading: false,
+      saving: true
+    })
+
+    page.fetchRoleList(done)
+
+    expect(global.wx.cloud.callFunction).not.toHaveBeenCalled()
+    expect(done).toHaveBeenCalledTimes(1)
   })
 })

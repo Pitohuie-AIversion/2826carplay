@@ -51,6 +51,7 @@ describe("后台页面前置鉴权", () => {
     const rootTag = wxmlSource.split(/\r?\n/, 1)[0]
 
     expect(jsSource).toMatch(/pageAuthorized\s*:\s*false/)
+    expect(jsSource).toContain("cancelPagePermissionCheck(this)")
     expect(rootTag).toContain('wx:if="{{pageAuthorized}}"')
   })
 })
@@ -288,6 +289,73 @@ describe("shared/pageAuth", () => {
     expect(wx.showToast).not.toHaveBeenCalled()
     expect(page.data.pageAuthorized).toBe(false)
     expect(onAuthorized).not.toHaveBeenCalled()
+  })
+
+  test("权限拒绝后页面离开会取消延迟返回", () => {
+    wx.cloud.callFunction.mockImplementation(({ success }) => {
+      success({ result: { ok: true, canManageRoles: false } })
+    })
+    const page = createPage()
+    const {
+      cancelPagePermissionCheck,
+      requirePagePermission
+    } = require("../shared/pageAuth")
+
+    requirePagePermission(page, { required: "canManageRoles" })
+    cancelPagePermissionCheck(page)
+    jest.advanceTimersByTime(700)
+
+    expect(wx.navigateBack).not.toHaveBeenCalled()
+    expect(wx.redirectTo).not.toHaveBeenCalled()
+    expect(wx.reLaunch).not.toHaveBeenCalled()
+  })
+
+  test("返回上一页失败后若已离页则不再执行重定向降级", () => {
+    let navigateOptions = null
+    global.getCurrentPages.mockReturnValue([{}, {}])
+    wx.navigateBack.mockImplementation((options) => {
+      navigateOptions = options
+    })
+    wx.cloud.callFunction.mockImplementation(({ success }) => {
+      success({ result: { ok: true, canManageRoles: false } })
+    })
+    const page = createPage()
+    const {
+      cancelPagePermissionCheck,
+      requirePagePermission
+    } = require("../shared/pageAuth")
+
+    requirePagePermission(page, { required: "canManageRoles" })
+    jest.advanceTimersByTime(700)
+    cancelPagePermissionCheck(page)
+    navigateOptions.fail()
+
+    expect(wx.redirectTo).not.toHaveBeenCalled()
+    expect(wx.reLaunch).not.toHaveBeenCalled()
+  })
+
+  test("同页重新校验权限会自动取消旧请求", () => {
+    const requests = []
+    wx.cloud.callFunction.mockImplementation((options) => requests.push(options))
+    const page = createPage()
+    const firstAuthorized = jest.fn()
+    const secondAuthorized = jest.fn()
+    const { requirePagePermission } = require("../shared/pageAuth")
+
+    requirePagePermission(page, {
+      required: "canManageRoles",
+      onAuthorized: firstAuthorized
+    })
+    requirePagePermission(page, {
+      required: "canManageRoles",
+      onAuthorized: secondAuthorized
+    })
+    requests[0].success({ result: { ok: true, canManageRoles: true } })
+    requests[1].success({ result: { ok: true, canManageRoles: true } })
+
+    expect(firstAuthorized).not.toHaveBeenCalled()
+    expect(secondAuthorized).toHaveBeenCalledTimes(1)
+    expect(page.data.pageAuthorized).toBe(true)
   })
 
   test("存在上一页时优先返回上一页", () => {

@@ -78,6 +78,10 @@
   transform: scale(0.975);
 }
 
+.period-chip-disabled {
+  opacity: 0.48;
+}
+
 .period-chip-active {
   border-color: rgba(95, 151, 242, 0.35);
   background: rgba(84, 143, 255, 0.12);

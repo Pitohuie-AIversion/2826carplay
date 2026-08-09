@@ -64,8 +64,8 @@
             class="status-op-btn {{detail.status === op.value ? 'status-op-btn-active' : ''}}"
             data-status="{{op.value}}"
             bindtap="handleUpdateStatus"
-            disabled="{{updatingStatus}}"
-            hover-class="{{updatingStatus ? 'none' : 'status-op-btn-pressed'}}"
+            disabled="{{loading || updatingStatus || uploading}}"
+            hover-class="{{loading || updatingStatus || uploading ? 'none' : 'status-op-btn-pressed'}}"
             aria-pressed="{{detail.status === op.value}}"
           >
             <view class="status-op-content"><view class="status-op-dot status-op-dot-{{op.value}}"></view><text>{{op.label}}</text><view wx:if="{{detail.status === op.value}}" class="status-op-check" aria-hidden="true"></view></view>
@@ -73,11 +73,11 @@
         </view>
         <view class="danger-zone">
           <view class="danger-zone-copy"><view class="danger-zone-title">停用车辆</view><view class="danger-zone-desc">停用后车辆不再对客户开放，可稍后恢复。</view></view>
-          <button class="retire-inline-btn ui-btn ui-btn-danger" bindtap="handleRetire" disabled="{{updatingStatus}}"><view class="danger-button-content"><view class="retire-native-icon" aria-hidden="true"></view><text>确认停用</text></view></button>
+          <button class="retire-inline-btn ui-btn ui-btn-danger" bindtap="handleRetire" disabled="{{loading || updatingStatus || uploading}}"><view class="danger-button-content"><view class="retire-native-icon" aria-hidden="true"></view><text>确认停用</text></view></button>
         </view>
       </view>
       <view wx:else>
-        <button class="restore-inline-btn ui-btn ui-btn-primary" bindtap="handleRestore" disabled="{{updatingStatus}}"><view class="danger-button-content"><view class="restore-native-icon" aria-hidden="true"></view><text>恢复启用</text></view></button>
+        <button class="restore-inline-btn ui-btn ui-btn-primary" bindtap="handleRestore" disabled="{{loading || updatingStatus || uploading}}"><view class="danger-button-content"><view class="restore-native-icon" aria-hidden="true"></view><text>恢复启用</text></view></button>
       </view>
     </view>
 
@@ -203,7 +203,7 @@
             <view class="image-desc">已上传 {{detail.imageCount}} / 9 张，可设置封面。</view>
           </view>
         </view>
-        <button class="upload-button ui-btn ui-btn-primary" bindtap="handleUploadImages" loading="{{uploading}}" disabled="{{uploading}}">
+        <button class="upload-button ui-btn ui-btn-primary" bindtap="handleUploadImages" loading="{{uploading}}" disabled="{{loading || updatingStatus || uploading}}">
           <view class="upload-button-content"><view wx:if="{{!uploading}}" class="upload-native-icon" aria-hidden="true"></view><text>{{uploading ? "处理中…" : "上传图片"}}</text></view>
         </button>
       </view>
@@ -215,7 +215,7 @@
             <view class="upload-progress-desc">{{uploadProgressText}}</view>
           </view>
           <button wx:if="{{uploading}}" class="upload-progress-action" bindtap="handleCancelUpload">取消</button>
-          <button wx:else class="upload-progress-action upload-progress-retry" bindtap="handleRetryFailedUploads">重试失败项</button>
+          <button wx:else class="upload-progress-action upload-progress-retry" disabled="{{loading || updatingStatus || uploading}}" bindtap="handleRetryFailedUploads">重试失败项</button>
         </view>
         <view class="upload-progress-list">
           <view wx:for="{{uploadItems}}" wx:key="id" class="upload-progress-item upload-progress-item-{{item.status}}">
@@ -243,13 +243,14 @@
               wx:if="{{!item.isCover && !item.imageFailed}}"
               data-file-id="{{item.fileId}}"
               bindtap="handleSetCover"
-              hover-class="vehicle-detail-button-pressed"
+              disabled="{{loading || updatingStatus || uploading}}"
+              hover-class="{{loading || updatingStatus || uploading ? 'none' : 'vehicle-detail-button-pressed'}}"
             >
               <view class="mini-button-content"><view class="cover-native-icon" aria-hidden="true"></view><text>设为封面</text></view>
             </button>
             <view wx:elif="{{item.imageFailed}}" class="mini-placeholder mini-placeholder-warning"><view class="mini-placeholder-warning-mark" aria-hidden="true"></view><text>文件异常</text></view>
             <view wx:else class="mini-placeholder"><view class="mini-placeholder-check" aria-hidden="true"></view><text>已设封面</text></view>
-            <button class="mini-button danger-mini-button" data-file-id="{{item.fileId}}" bindtap="handleRemoveImage" hover-class="vehicle-detail-button-pressed">
+            <button class="mini-button danger-mini-button" data-file-id="{{item.fileId}}" disabled="{{loading || updatingStatus || uploading}}" bindtap="handleRemoveImage" hover-class="{{loading || updatingStatus || uploading ? 'none' : 'vehicle-detail-button-pressed'}}">
               <view class="mini-button-content"><view class="trash-native-icon" aria-hidden="true"></view><text>移除图片</text></view>
             </button>
           </view>
@@ -266,7 +267,7 @@
     <view class="detail-action-dock ui-card">
       <view class="action-row">
         <button class="secondary-button ui-btn ui-btn-ghost" bindtap="handleBackList"><view class="detail-action-content"><view class="back-native-icon" aria-hidden="true"></view><text>返回列表</text></view></button>
-        <button class="primary-button ui-btn ui-btn-primary" bindtap="handleEdit"><view class="detail-action-content"><view class="edit-native-icon" aria-hidden="true"></view><text>编辑车辆</text></view></button>
+        <button class="primary-button ui-btn ui-btn-primary" disabled="{{loading || updatingStatus || uploading}}" bindtap="handleEdit"><view class="detail-action-content"><view class="edit-native-icon" aria-hidden="true"></view><text>编辑车辆</text></view></button>
       </view>
     </view>
   </view>

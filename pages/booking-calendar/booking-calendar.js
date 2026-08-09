@@ -1,5 +1,11 @@
-const { requirePagePermission } = require("../../shared/pageAuth")
+const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
 const { buildMonthView, normalizeMonthKey, shiftMonth } = require("../../shared/bookingCalendar")
+const {
+  activatePageNativeActions,
+  beginPageNativeAction,
+  cancelPageNativeActions,
+  isPageNativeActionActive
+} = require("../../shared/pageNativeAction")
 
 const CURRENT_MONTH_KEY = normalizeMonthKey("")
 const BOOKING_CALENDAR_LOAD_TIMEOUT_MS = 15 * 1000
@@ -44,6 +50,7 @@ Page({
   },
 
   onLoad() {
+    activatePageNativeActions(this)
     this.setData({ monthKey: this.data.currentMonthKey, isCurrentMonth: true })
     requirePagePermission(this, {
       required: "canManageBookings",
@@ -61,6 +68,8 @@ Page({
   },
 
   onUnload() {
+    cancelPagePermissionCheck(this)
+    cancelPageNativeActions(this)
     this._bookingCalendarRequestId =
       Number(this._bookingCalendarRequestId || 0) + 1
     this.finishBookingCalendarRequestEffects()
@@ -110,9 +119,13 @@ Page({
     if (!id) {
       return
     }
+    const action = beginPageNativeAction(this)
     wx.navigateTo({
       url: `/pages/booking-manage-detail/booking-manage-detail?id=${id}`,
       fail: () => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         wx.showToast({
           title: "预约详情打开失败",
           icon: "none"

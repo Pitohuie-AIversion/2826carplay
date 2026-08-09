@@ -79,18 +79,18 @@
 
     <view class="form-item">
       <view class="form-label">品牌名称</view>
-      <input class="form-input ui-input" value="{{form.brandName}}" data-field="brandName" bindinput="handleInput" maxlength="20" confirm-type="done" placeholder="例如 极境车库" aria-label="品牌名称" />
+      <input class="form-input ui-input" value="{{form.brandName}}" data-field="brandName" disabled="{{loading || saving}}" bindinput="handleInput" maxlength="20" confirm-type="done" placeholder="例如 极境车库" aria-label="品牌名称" />
     </view>
 
     <view class="form-item">
       <view class="form-label">客服电话</view>
-      <input class="form-input ui-input" maxlength="20" value="{{form.servicePhone}}" data-field="servicePhone" bindinput="handleInput" confirm-type="done" placeholder="请输入客服电话" aria-label="客服电话" />
+      <input class="form-input ui-input" maxlength="20" value="{{form.servicePhone}}" data-field="servicePhone" disabled="{{loading || saving}}" bindinput="handleInput" confirm-type="done" placeholder="请输入客服电话" aria-label="客服电话" />
       <view class="form-tip">支持手机号、带区号座机或以 + 开头的国际号码。</view>
     </view>
 
     <view class="form-item">
       <view class="form-label">我的页简介</view>
-      <textarea class="form-textarea ui-input" value="{{form.mineUserDesc}}" data-field="mineUserDesc" bindinput="handleInput" maxlength="80" placeholder="填写个人中心品牌简介" aria-label="我的页简介" />
+      <textarea class="form-textarea ui-input" value="{{form.mineUserDesc}}" data-field="mineUserDesc" disabled="{{loading || saving}}" bindinput="handleInput" maxlength="80" placeholder="填写个人中心品牌简介" aria-label="我的页简介" />
       <view class="field-meta"><view class="form-tip">显示在个人中心品牌信息区域。</view><view class="field-counter">{{form.mineUserDesc.length}} / 80</view></view>
     </view>
   </view>
@@ -109,18 +109,18 @@
 
     <view class="form-item">
       <view class="form-label">首页标题</view>
-      <input class="form-input ui-input" value="{{form.garagePageTitle}}" data-field="garagePageTitle" bindinput="handleInput" maxlength="20" confirm-type="done" placeholder="例如 探索极境座驾" aria-label="首页标题" />
+      <input class="form-input ui-input" value="{{form.garagePageTitle}}" data-field="garagePageTitle" disabled="{{loading || saving}}" bindinput="handleInput" maxlength="20" confirm-type="done" placeholder="例如 探索极境座驾" aria-label="首页标题" />
     </view>
 
     <view class="form-item">
       <view class="form-label">首页副标题</view>
-      <textarea class="form-textarea ui-input" value="{{form.garagePageSubtitle}}" data-field="garagePageSubtitle" bindinput="handleInput" maxlength="80" placeholder="填写首页品牌说明" aria-label="首页副标题" />
+      <textarea class="form-textarea ui-input" value="{{form.garagePageSubtitle}}" data-field="garagePageSubtitle" disabled="{{loading || saving}}" bindinput="handleInput" maxlength="80" placeholder="填写首页品牌说明" aria-label="首页副标题" />
       <view class="field-meta"><view class="form-tip">建议用一句话说明车库定位或当前服务状态。</view><view class="field-counter">{{form.garagePageSubtitle.length}} / 80</view></view>
     </view>
 
     <view class="form-item">
       <view class="form-label">城市列表</view>
-      <textarea class="form-textarea ui-input" value="{{form.cityOptionsText}}" data-field="cityOptionsText" bindinput="handleInput" maxlength="300" placeholder="每行填写一个城市" aria-label="城市列表" />
+      <textarea class="form-textarea ui-input" value="{{form.cityOptionsText}}" data-field="cityOptionsText" disabled="{{loading || saving}}" bindinput="handleInput" maxlength="300" placeholder="每行填写一个城市" aria-label="城市列表" />
       <view class="field-meta"><view class="form-tip">每行一个城市，预约页会展示为可选列表。</view><view class="field-counter">{{form.cityOptionsText.length}} / 300</view></view>
     </view>
   </view>
@@ -138,13 +138,13 @@
     </view>
     <view class="form-item">
       <view class="form-label">常见问题</view>
-      <textarea class="form-textarea form-textarea-lg ui-input" value="{{form.faqContent}}" data-field="faqContent" bindinput="handleInput" maxlength="1000" placeholder="填写常见问题内容" aria-label="常见问题内容" />
+      <textarea class="form-textarea form-textarea-lg ui-input" value="{{form.faqContent}}" data-field="faqContent" disabled="{{loading || saving}}" bindinput="handleInput" maxlength="1000" placeholder="填写常见问题内容" aria-label="常见问题内容" />
       <view class="field-meta"><view class="form-tip">按主题分段，便于用户快速定位答案。</view><view class="field-counter">{{form.faqContent.length}} / 1000</view></view>
     </view>
 
     <view class="form-item">
       <view class="form-label">平台规则</view>
-      <textarea class="form-textarea form-textarea-lg ui-input" value="{{form.rulesContent}}" data-field="rulesContent" bindinput="handleInput" maxlength="1000" placeholder="填写平台规则内容" aria-label="平台规则内容" />
+      <textarea class="form-textarea form-textarea-lg ui-input" value="{{form.rulesContent}}" data-field="rulesContent" disabled="{{loading || saving}}" bindinput="handleInput" maxlength="1000" placeholder="填写平台规则内容" aria-label="平台规则内容" />
       <view class="field-meta"><view class="form-tip">修改后会同步服务指南中的平台规则。</view><view class="field-counter">{{form.rulesContent.length}} / 1000</view></view>
     </view>
   </view>
@@ -162,7 +162,7 @@
     </view>
     <view class="form-item">
       <view class="form-label">预约说明文案</view>
-      <textarea class="form-textarea form-textarea-lg ui-input" value="{{form.bookingPrivacyTip}}" data-field="bookingPrivacyTip" bindinput="handleInput" maxlength="300" placeholder="填写预约联系与隐私说明" aria-label="预约说明文案" />
+      <textarea class="form-textarea form-textarea-lg ui-input" value="{{form.bookingPrivacyTip}}" data-field="bookingPrivacyTip" disabled="{{loading || saving}}" bindinput="handleInput" maxlength="300" placeholder="填写预约联系与隐私说明" aria-label="预约说明文案" />
       <view class="field-meta"><view class="form-tip">提交前展示，请清晰说明联系用途与用户权利。</view><view class="field-counter">{{form.bookingPrivacyTip.length}} / 300</view></view>
     </view>
     <view class="form-item">
@@ -171,6 +171,7 @@
         class="form-input ui-input"
         value="{{form.bookingStatusTemplateId}}"
         data-field="bookingStatusTemplateId"
+        disabled="{{loading || saving}}"
         bindinput="handleInput"
         maxlength="128"
         confirm-type="done"
@@ -194,10 +195,10 @@
       </view>
     </view>
     <view class="action-row">
-      <button class="action-btn action-btn-save ui-btn ui-btn-primary" loading="{{saving}}" disabled="{{saving || loadFailed || !hasLoadedConfig}}" bindtap="handleSubmit">
+      <button class="action-btn action-btn-save ui-btn ui-btn-primary" loading="{{saving}}" disabled="{{loading || saving || loadFailed || !hasLoadedConfig}}" bindtap="handleSubmit">
         <view class="action-btn-content"><view wx:if="{{!saving}}" class="save-native-icon" aria-hidden="true"></view><text>{{saving ? '正在保存' : '保存配置'}}</text></view>
       </button>
-      <button class="action-btn ui-btn ui-btn-ghost action-btn-offset" disabled="{{saving || loadFailed || !hasLoadedConfig}}" bindtap="handleReset">
+      <button class="action-btn ui-btn ui-btn-ghost action-btn-offset" disabled="{{loading || saving || loadFailed || !hasLoadedConfig}}" bindtap="handleReset">
         <view class="action-btn-content"><view class="config-action-native-icon config-reset-native-icon" aria-hidden="true"></view><text>恢复默认</text></view>
       </button>
     </view>

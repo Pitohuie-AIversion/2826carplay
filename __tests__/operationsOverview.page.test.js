@@ -1,4 +1,5 @@
 jest.mock("../shared/pageAuth", () => ({
+  cancelPagePermissionCheck: jest.fn(),
   requirePagePermission: jest.fn()
 }))
 
@@ -269,6 +270,78 @@ describe("pages/operations-overview", () => {
     expect(page.data.loadError).toBe("数据请求超时，请稍后刷新")
     expect(page.data.vehicleLoaded).toBe(false)
     expect(page.data.vehicleMetrics).toEqual([])
+  })
+
+  test("重叠刷新时旧聚合结果不会覆盖最新概览", async () => {
+    const requests = []
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn((options) => requests.push(options))
+      }
+    }
+    const page = createPage(loadPageDefinition(), {
+      canManageVehicles: true,
+      canManageBookings: false,
+      canManageRoles: false
+    })
+    const firstDone = jest.fn()
+
+    page.loadOverview({ refreshing: true, done: firstDone })
+    page.loadOverview({ refreshing: true })
+    expect(firstDone).toHaveBeenCalledTimes(1)
+
+    requests[1].success({
+      result: {
+        ok: true,
+        stats: { total: 2 },
+        dashboard: { idle: 2, active: 0, maintenance: 0 }
+      }
+    })
+    await flushPromises()
+    requests[0].success({
+      result: {
+        ok: true,
+        stats: { total: 99 },
+        dashboard: { idle: 99, active: 0, maintenance: 0 }
+      }
+    })
+    await flushPromises()
+
+    expect(page.data.vehicleMetrics.find((item) => item.key === "total").value).toBe(2)
+    expect(page.data.refreshing).toBe(false)
+  })
+
+  test("离开总览后聚合回调不再更新页面并结束刷新", async () => {
+    let lateSuccess = null
+    const done = jest.fn()
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(({ success }) => {
+          lateSuccess = success
+        })
+      }
+    }
+    const existingMetrics = [{ key: "total", value: 7 }]
+    const page = createPage(loadPageDefinition(), {
+      canManageVehicles: true,
+      canManageBookings: false,
+      canManageRoles: false,
+      vehicleMetrics: existingMetrics
+    })
+
+    page.loadOverview({ refreshing: true, done })
+    page.onUnload()
+    lateSuccess({
+      result: {
+        ok: true,
+        stats: { total: 88 },
+        dashboard: { idle: 88 }
+      }
+    })
+    await flushPromises()
+
+    expect(done).toHaveBeenCalledTimes(1)
+    expect(page.data.vehicleMetrics).toBe(existingMetrics)
   })
 
   test("云能力缺失时立即结束加载并调用完成回调", () => {

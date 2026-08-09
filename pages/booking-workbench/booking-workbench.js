@@ -1,5 +1,11 @@
-const { requirePagePermission } = require("../../shared/pageAuth")
+const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
 const { formatToastTitle } = require("../../shared/uiFeedback")
+const {
+  activatePageNativeActions,
+  beginPageNativeAction,
+  cancelPageNativeActions,
+  isPageNativeActionActive
+} = require("../../shared/pageNativeAction")
 const {
   buildBookingWorkbench,
   normalizeUsablePhone
@@ -173,6 +179,7 @@ Page({
   },
 
   onLoad() {
+    activatePageNativeActions(this)
     requirePagePermission(this, {
       required: "canManageBookings",
       noPermissionMessage: "无权访问待协调工作台",
@@ -181,7 +188,7 @@ Page({
   },
 
   onPullDownRefresh() {
-    if (!this.data.pageAuthorized) {
+    if (!this.data.pageAuthorized || this.isWorkbenchWriteBusy()) {
       wx.stopPullDownRefresh()
       return
     }
@@ -189,12 +196,38 @@ Page({
   },
 
   onShow() {
-    if (this.data.pageAuthorized && this.data.allBookings.length) {
+    if (
+      this.data.pageAuthorized &&
+      this.data.allBookings.length &&
+      !this.data.loading &&
+      !this.data.refreshing &&
+      !this.isWorkbenchWriteBusy()
+    ) {
       this.fetchBookings()
     }
   },
 
+  isWorkbenchWriteBusy() {
+    return Boolean(
+      this._workbenchWriteActive ||
+      this._workbenchStatusFeedbackPending ||
+      this.data.updatingId ||
+      this.data.savingRemark ||
+      this.data.statusUpdatingId
+    )
+  },
+
+  isWorkbenchInteractionBusy() {
+    return Boolean(
+      this.data.loading ||
+      this.data.refreshing ||
+      this.isWorkbenchWriteBusy()
+    )
+  },
+
   onUnload() {
+    cancelPagePermissionCheck(this)
+    cancelPageNativeActions(this)
     this._workbenchLoadRequestId =
       Number(this._workbenchLoadRequestId || 0) + 1
     this._workbenchWriteRequestId =
@@ -202,6 +235,7 @@ Page({
     this.finishWorkbenchLoadRequestEffects()
     this.clearWorkbenchWriteTimer()
     this._workbenchWriteActive = false
+    this._workbenchStatusFeedbackPending = false
   },
 
   applyWorkbench(mode) {
@@ -306,12 +340,16 @@ Page({
 
   handleViewDetail(event) {
     const id = String(event.currentTarget.dataset.id || "").trim()
-    if (!id) {
+    if (this.isWorkbenchInteractionBusy() || !id) {
       return
     }
+    const action = beginPageNativeAction(this)
     wx.navigateTo({
       url: `/pages/booking-manage-detail/booking-manage-detail?id=${id}`,
       fail: () => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         wx.showToast({
           title: "预约详情打开失败",
           icon: "none"
@@ -321,6 +359,9 @@ Page({
   },
 
   handleCallPhone(event) {
+    if (this.isWorkbenchInteractionBusy()) {
+      return
+    }
     const phone = normalizeUsablePhone(event.currentTarget.dataset.phone)
     if (!phone) {
       wx.showToast({
@@ -329,9 +370,13 @@ Page({
       })
       return
     }
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.makePhoneCall({
       phoneNumber: phone,
       fail: (error) => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         const message = error && (error.errMsg || error.message)
         if (!message || !String(message).includes("cancel")) {
           wx.showToast({
@@ -344,6 +389,9 @@ Page({
   },
 
   handleCopyPhone(event) {
+    if (this.isWorkbenchInteractionBusy()) {
+      return
+    }
     const phone = normalizeUsablePhone(event.currentTarget.dataset.phone)
     if (!phone) {
       wx.showToast({
@@ -359,15 +407,22 @@ Page({
       })
       return
     }
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.setClipboardData({
       data: phone,
       success: () => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         wx.showToast({
           title: "手机号已复制",
           icon: "none"
         })
       },
       fail: () => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         wx.showToast({
           title: "手机号复制失败",
           icon: "none"
@@ -383,18 +438,20 @@ Page({
     const coordinationStatus = String(dataset.coordinationStatus || "pending")
     if (
       !id ||
-      this.data.updatingId ||
-      this.data.savingRemark ||
-      this.data.statusUpdatingId
+      this.isWorkbenchInteractionBusy()
     ) {
       return
     }
 
+    const action = beginPageNativeAction(this)
     wx.showActionSheet({
       alertText: "调整预约优先级",
       itemList: PRIORITY_OPTIONS.map((item) => item.label),
       itemColor: "#528fff",
       success: (res) => {
+        if (!isPageNativeActionActive(this, action) || !res) {
+          return
+        }
         const option = PRIORITY_OPTIONS[Number(res.tapIndex)]
         if (!option) {
           return
@@ -423,9 +480,7 @@ Page({
     const id = String(dataset.id || "").trim()
     if (
       !id ||
-      this.data.updatingId ||
-      this.data.savingRemark ||
-      this.data.statusUpdatingId
+      this.isWorkbenchInteractionBusy()
     ) {
       return
     }
@@ -456,9 +511,7 @@ Page({
     const adminRemark = String(this.data.remarkDraft || "").trim()
     if (
       !id ||
-      this.data.savingRemark ||
-      this.data.updatingId ||
-      this.data.statusUpdatingId
+      this.isWorkbenchInteractionBusy()
     ) {
       return
     }
@@ -522,9 +575,7 @@ Page({
     if (
       !id ||
       status !== "pending" ||
-      this.data.statusUpdatingId ||
-      this.data.updatingId ||
-      this.data.savingRemark
+      this.isWorkbenchInteractionBusy()
     ) {
       return
     }
@@ -532,13 +583,17 @@ Page({
     this.setData({
       statusUpdatingId: id
     })
+    const action = beginPageNativeAction(this)
     wx.showModal({
       title: "确认已联系客户？",
       content: "预约将更新为「已联系」；如客户已订阅，系统会发送状态提醒。",
       confirmText: "确认更新",
       confirmColor: "#528fff",
       success: (res) => {
-        if (res.confirm) {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
+        if (res && res.confirm) {
           this.updateContactedStatus(id)
           return
         }
@@ -547,6 +602,9 @@ Page({
         })
       },
       fail: () => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         this.setData({
           statusUpdatingId: ""
         })
@@ -555,13 +613,26 @@ Page({
   },
 
   updateContactedStatus(id) {
+    const bookingId = String(id || "").trim()
+    if (
+      !bookingId ||
+      this.data.loading ||
+      this.data.refreshing ||
+      this._workbenchWriteActive ||
+      this._workbenchStatusFeedbackPending ||
+      this.data.updatingId ||
+      this.data.savingRemark ||
+      (this.data.statusUpdatingId && this.data.statusUpdatingId !== bookingId)
+    ) {
+      return
+    }
     this.setData({
-      statusUpdatingId: id
+      statusUpdatingId: bookingId
     })
     this.runWorkbenchWrite({
       name: "bookingUpdateStatus",
       data: {
-        id,
+        id: bookingId,
         status: "contacted"
       },
       timeoutTitle: "状态更新超时，请重试",
@@ -579,25 +650,43 @@ Page({
           return
         }
 
-        this.setData({
-          statusUpdatingId: ""
-        })
         if (result.notificationStatus === "failed") {
-          wx.showModal({
-            title: "状态已更新",
-            content: "客户状态已更新，但提醒发送失败。可在错误日志中查看原因。",
-            confirmText: "知道了",
-            confirmColor: "#528fff",
-            showCancel: false,
-            complete: () => {
-              if (isCurrent()) {
-                this.fetchBookings()
-              }
+          this._workbenchStatusFeedbackPending = true
+          let feedbackSettled = false
+          const finishFeedback = () => {
+            if (feedbackSettled) {
+              return
             }
-          })
+            feedbackSettled = true
+            this._workbenchStatusFeedbackPending = false
+            if (!isCurrent()) {
+              return
+            }
+            this.setData({ statusUpdatingId: "" })
+            this.fetchBookings()
+          }
+          if (typeof wx.showModal !== "function") {
+            finishFeedback()
+            return
+          }
+          try {
+            wx.showModal({
+              title: "状态已更新",
+              content: "客户状态已更新，但提醒发送失败。可在错误日志中查看原因。",
+              confirmText: "知道了",
+              confirmColor: "#528fff",
+              showCancel: false,
+              complete: finishFeedback
+            })
+          } catch (error) {
+            finishFeedback()
+          }
           return
         }
 
+        this.setData({
+          statusUpdatingId: ""
+        })
         const title =
           result.notificationStatus === "sent"
             ? "已联系，提醒已发送"
@@ -630,9 +719,7 @@ Page({
     if (
       !id ||
       !nextStatus ||
-      this.data.updatingId ||
-      this.data.savingRemark ||
-      this.data.statusUpdatingId
+      this.isWorkbenchInteractionBusy()
     ) {
       return
     }
@@ -649,13 +736,17 @@ Page({
       this.setData({
         updatingId: id
       })
+      const action = beginPageNativeAction(this)
       wx.showModal({
         title: "确认完成协调？",
         content: "完成后，该预约将从待协调队列中移除。",
         confirmText: "确认完成",
         confirmColor: "#528fff",
         success: (res) => {
-          if (res.confirm) {
+          if (!isPageNativeActionActive(this, action)) {
+            return
+          }
+          if (res && res.confirm) {
             update()
             return
           }
@@ -664,6 +755,9 @@ Page({
           })
         },
         fail: () => {
+          if (!isPageNativeActionActive(this, action)) {
+            return
+          }
           this.setData({
             updatingId: ""
           })
@@ -684,6 +778,22 @@ Page({
       coordinationStatus: String(
         (payload && payload.coordinationStatus) || "pending"
       )
+    }
+
+    if (!coordinationPayload.id) {
+      return
+    }
+
+    if (
+      this.data.loading ||
+      this.data.refreshing ||
+      this._workbenchWriteActive ||
+      this._workbenchStatusFeedbackPending ||
+      this.data.savingRemark ||
+      this.data.statusUpdatingId ||
+      (this.data.updatingId && this.data.updatingId !== coordinationPayload.id)
+    ) {
+      return
     }
 
     this.setData({
@@ -735,12 +845,17 @@ Page({
 
   runWorkbenchWrite(options) {
     const input = options || {}
-    if (this._workbenchWriteActive) {
-      return
-    }
-
     const clearState =
       typeof input.clearState === "function" ? input.clearState : () => {}
+    if (
+      this._workbenchWriteActive ||
+      this._workbenchStatusFeedbackPending ||
+      this.data.loading ||
+      this.data.refreshing
+    ) {
+      clearState()
+      return
+    }
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       clearState()
       wx.showToast({
@@ -805,9 +920,16 @@ Page({
   },
 
   handleOpenBookingManage() {
+    if (this.isWorkbenchInteractionBusy()) {
+      return
+    }
+    const action = beginPageNativeAction(this)
     wx.navigateTo({
       url: "/pages/booking-manage/booking-manage",
       fail: () => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         wx.showToast({
           title: "预约管理打开失败",
           icon: "none"
@@ -817,6 +939,9 @@ Page({
   },
 
   handleRetry() {
+    if (this.data.loading || this.data.refreshing || this.isWorkbenchWriteBusy()) {
+      return
+    }
     this.fetchBookings()
   },
 

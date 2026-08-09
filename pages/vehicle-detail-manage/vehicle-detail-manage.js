@@ -1,5 +1,11 @@
-const { requirePagePermission } = require("../../shared/pageAuth")
+const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
 const { formatToastTitle } = require("../../shared/uiFeedback")
+const {
+  activatePageNativeActions,
+  beginPageNativeAction,
+  cancelPageNativeActions,
+  isPageNativeActionActive
+} = require("../../shared/pageNativeAction")
 
 const MAX_IMAGE_UPLOAD_BYTES = 10 * 1024 * 1024
 const MAX_IMAGE_COUNT = 9
@@ -7,6 +13,8 @@ const ALLOWED_IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp"])
 const MAX_UPLOAD_RETRY_COUNT = 1
 const CLOUD_UPLOAD_TIMEOUT_MS = 20 * 1000
 const IMAGE_CHANGE_TIMEOUT_MS = 15 * 1000
+const DETAIL_LOAD_TIMEOUT_MS = 15 * 1000
+const STATUS_ACTION_TIMEOUT_MS = 20 * 1000
 
 const STATUS_LABEL_MAP = {
   active: "在用",
@@ -255,6 +263,8 @@ Page({
   },
 
   onLoad(options) {
+    activatePageNativeActions(this)
+    this._vehicleDetailUnloaded = false
     const app = getApp()
     const env =
       app &&
@@ -294,8 +304,49 @@ Page({
     })
   },
 
+  onUnload() {
+    cancelPagePermissionCheck(this)
+    cancelPageNativeActions(this)
+    this._vehicleDetailUnloaded = true
+    this._vehicleDetailLoadRequestId =
+      Number(this._vehicleDetailLoadRequestId || 0) + 1
+    this._vehicleStatusRequestId = Number(this._vehicleStatusRequestId || 0) + 1
+    this._vehicleImageChangeRequestId =
+      Number(this._vehicleImageChangeRequestId || 0) + 1
+    this._vehicleUploadSessionId = Number(this._vehicleUploadSessionId || 0) + 1
+    this.clearVehicleDetailLoadTimer()
+    this.clearVehicleStatusTimer()
+    this.clearVehicleImageChangeTimer()
+    this.finishVehicleDetailLoadDone()
+    this._imageChangePending = false
+    if (this._pendingImageCleanupFileIds && this._pendingImageCleanupFileIds.length) {
+      requestUploadedFileCleanup(
+        this._pendingImageVehicleId,
+        this._pendingImageCleanupFileIds
+      )
+    }
+    this._pendingImageCleanupFileIds = []
+    this._pendingImageVehicleId = ""
+    this._uploadCancelled = true
+    const activeUploadTask = this._activeUploadTask
+    const cancelActiveUpload = this._cancelActiveUpload
+    if (activeUploadTask && typeof activeUploadTask.abort === "function") {
+      try {
+        activeUploadTask.abort()
+      } catch (error) {}
+    }
+    if (typeof cancelActiveUpload === "function") {
+      cancelActiveUpload()
+    }
+    this._activeUploadTask = null
+    this._cancelActiveUpload = null
+    if (typeof wx.hideLoading === "function") {
+      wx.hideLoading()
+    }
+  },
+
   onPullDownRefresh() {
-    if (!this.data.pageAuthorized) {
+    if (!this.data.pageAuthorized || this.isVehicleDetailInteractionBusy()) {
       wx.stopPullDownRefresh()
       return
     }
@@ -305,6 +356,24 @@ Page({
   },
 
   fetchDetail(id, done) {
+    if (!this.isVehicleDetailActive()) {
+      if (typeof done === "function") {
+        done()
+      }
+      return
+    }
+    if (this.isVehicleDetailMutationBusy()) {
+      if (typeof done === "function") {
+        done()
+      }
+      return
+    }
+    const vehicleId = String(id || "").trim()
+    this.finishVehicleDetailLoadDone()
+    const requestId = Number(this._vehicleDetailLoadRequestId || 0) + 1
+    this._vehicleDetailLoadRequestId = requestId
+    this._vehicleDetailLoadDone = typeof done === "function" ? done : null
+    this.clearVehicleDetailLoadTimer()
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       wx.showToast({
         title: "云能力未初始化",
@@ -313,9 +382,7 @@ Page({
       this.setData({
         loading: false
       })
-      if (typeof done === "function") {
-        done()
-      }
+      this.finishVehicleDetailLoadDone()
       return
     }
 
@@ -323,22 +390,51 @@ Page({
       loading: true
     })
 
-    wx.cloud.callFunction({
+    let settled = false
+    const finishRequest = () => {
+      if (
+        settled ||
+        this._vehicleDetailLoadRequestId !== requestId ||
+        !this.isVehicleDetailActive()
+      ) {
+        return false
+      }
+      settled = true
+      this.clearVehicleDetailLoadTimer()
+      this.finishVehicleDetailLoadDone()
+      return true
+    }
+    const handleFailure = (message) => {
+      if (!finishRequest()) {
+        return
+      }
+      wx.showToast({
+        title: formatToastTitle(message, "加载失败"),
+        icon: "none"
+      })
+      this.setData({ loading: false })
+    }
+
+    this._vehicleDetailLoadTimer = setTimeout(() => {
+      handleFailure("档案加载超时，请重试")
+    }, DETAIL_LOAD_TIMEOUT_MS)
+
+    const requestOptions = {
       name: "vehicleDetail",
-      data: { id },
+      data: { id: vehicleId },
       success: (res) => {
+        if (!finishRequest()) {
+          return
+        }
         const result = res && res.result ? res.result : null
         if (!result || !result.ok || !result.detail) {
           wx.showToast({
-          title: formatToastTitle(result && result.message, "加载失败"),
+            title: formatToastTitle(result && result.message, "加载失败"),
             icon: "none"
           })
           this.setData({
             loading: false
           })
-          if (typeof done === "function") {
-            done()
-          }
           return
         }
 
@@ -348,33 +444,31 @@ Page({
           detail: formatDetail(detail)
         })
 
-        if (typeof done === "function") {
-          done()
-        }
       },
       fail: (error) => {
-        wx.showToast({
-          title: "加载失败",
-          icon: "none"
-        })
-        this.setData({
-          loading: false
-        })
-        if (typeof done === "function") {
-          done()
-        }
+        handleFailure(error && (error.errMsg || error.message))
       }
-    })
+    }
+
+    try {
+      wx.cloud.callFunction(requestOptions)
+    } catch (error) {
+      handleFailure(error && (error.errMsg || error.message))
+    }
   },
 
   handleEdit() {
-    if (!this.data.id) {
+    if (this.isVehicleDetailInteractionBusy() || !this.data.id) {
       return
     }
 
+    const action = beginPageNativeAction(this)
     wx.navigateTo({
       url: `/pages/vehicle-edit/vehicle-edit?id=${this.data.id}`,
       fail: () => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         wx.showToast({
           title: "编辑页面打开失败",
           icon: "none"
@@ -384,7 +478,7 @@ Page({
   },
 
   handleUpdateStatus(event) {
-    if (this.data.updatingStatus || this.data.loading) {
+    if (this.isVehicleDetailInteractionBusy()) {
       return
     }
 
@@ -404,13 +498,21 @@ Page({
 
     const statusText = STATUS_LABEL_MAP[status] || status
 
+    const action = beginPageNativeAction(this, {
+      exclusiveKey: "vehicle-write-confirmation"
+    })
     wx.showModal({
       title: "更新状态",
       content: `确认将车辆 ${plateNumber || id} 状态更新为「${statusText}」？`,
       confirmText: "确认更新",
       confirmColor: "#528fff",
       success: (modalRes) => {
-        if (!modalRes.confirm) {
+        if (
+          !isPageNativeActionActive(this, action) ||
+          !modalRes.confirm ||
+          !this.isVehicleDetailActive() ||
+          this.isVehicleDetailInteractionBusy()
+        ) {
           return
         }
 
@@ -424,17 +526,25 @@ Page({
     const id = this.data.id
     const plateNumber = String(detail.plateNumber || "").trim()
 
-    if (!id || this.data.updatingStatus) {
+    if (!id || this.isVehicleDetailInteractionBusy()) {
       return
     }
 
+    const action = beginPageNativeAction(this, {
+      exclusiveKey: "vehicle-write-confirmation"
+    })
     wx.showModal({
       title: "停用车辆",
       content: `确认将车辆 ${plateNumber || id} 标记为停用？`,
       confirmText: "确认停用",
       confirmColor: "#d46868",
       success: (modalRes) => {
-        if (!modalRes.confirm) {
+        if (
+          !isPageNativeActionActive(this, action) ||
+          !modalRes.confirm ||
+          !this.isVehicleDetailActive() ||
+          this.isVehicleDetailInteractionBusy()
+        ) {
           return
         }
 
@@ -448,17 +558,25 @@ Page({
     const id = this.data.id
     const plateNumber = String(detail.plateNumber || "").trim()
 
-    if (!id || this.data.updatingStatus) {
+    if (!id || this.isVehicleDetailInteractionBusy()) {
       return
     }
 
+    const action = beginPageNativeAction(this, {
+      exclusiveKey: "vehicle-write-confirmation"
+    })
     wx.showModal({
       title: "恢复启用",
       content: `确认将车辆 ${plateNumber || id} 恢复为可管理状态？`,
       confirmText: "确认恢复",
       confirmColor: "#528fff",
       success: (modalRes) => {
-        if (!modalRes.confirm) {
+        if (
+          !isPageNativeActionActive(this, action) ||
+          !modalRes.confirm ||
+          !this.isVehicleDetailActive() ||
+          this.isVehicleDetailInteractionBusy()
+        ) {
           return
         }
 
@@ -468,110 +586,45 @@ Page({
   },
 
   updateVehicleStatus(id, status) {
-    if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
-      wx.showToast({
-        title: "云能力未初始化",
-        icon: "none"
-      })
-      return
-    }
-
-    this.setData({
-      updatingStatus: true
-    })
-
-    wx.showLoading({
-      title: "更新中…",
-      mask: true
-    })
-
-    wx.cloud.callFunction({
+    this.runVehicleStatusOperation({
       name: "vehicleUpdateStatus",
       data: { id, status },
-      success: (res) => {
-        wx.hideLoading()
-        const result = res && res.result ? res.result : null
-        if (!result || !result.ok) {
-          this.setData({ updatingStatus: false })
-          wx.showToast({
-          title: formatToastTitle(result && result.message, "更新失败"),
-            icon: "none"
-          })
-          return
-        }
-
-        wx.showToast({
-        title: formatToastTitle(result.message, "状态已更新"),
-          icon: "success"
-        })
-        this.fetchDetail(id, () => {
-          this.setData({ updatingStatus: false })
-        })
-      },
-      fail: (error) => {
-        wx.hideLoading()
-        this.setData({ updatingStatus: false })
-        wx.showToast({
-          title: "更新失败",
-          icon: "none"
-        })
-      }
+      id,
+      loadingTitle: "更新中…",
+      timeoutTitle: "状态更新超时，请重试",
+      failureTitle: "更新失败",
+      successTitle: "状态已更新"
     })
   },
 
   retireVehicle(id) {
-    if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
-      wx.showToast({
-        title: "云能力未初始化",
-        icon: "none"
-      })
-      return
-    }
-
-    this.setData({
-      updatingStatus: true
-    })
-
-    wx.showLoading({
-      title: "停用中…",
-      mask: true
-    })
-
-    wx.cloud.callFunction({
+    this.runVehicleStatusOperation({
       name: "vehicleRetire",
       data: { id },
-      success: (res) => {
-        wx.hideLoading()
-        const result = res && res.result ? res.result : null
-        if (!result || !result.ok) {
-          this.setData({ updatingStatus: false })
-          wx.showToast({
-          title: formatToastTitle(result && result.message, "停用失败"),
-            icon: "none"
-          })
-          return
-        }
-
-        wx.showToast({
-        title: formatToastTitle(result.message, "停用成功"),
-          icon: "success"
-        })
-        this.fetchDetail(id, () => {
-          this.setData({ updatingStatus: false })
-        })
-      },
-      fail: (error) => {
-        wx.hideLoading()
-        this.setData({ updatingStatus: false })
-        wx.showToast({
-          title: "停用失败",
-          icon: "none"
-        })
-      }
+      id,
+      loadingTitle: "停用中…",
+      timeoutTitle: "停用超时，请重试",
+      failureTitle: "停用失败",
+      successTitle: "停用成功"
     })
   },
 
   restoreVehicle(id) {
+    this.runVehicleStatusOperation({
+      name: "vehicleRestore",
+      data: { id },
+      id,
+      loadingTitle: "恢复中…",
+      timeoutTitle: "恢复超时，请重试",
+      failureTitle: "恢复失败",
+      successTitle: "恢复成功"
+    })
+  },
+
+  runVehicleStatusOperation(input) {
+    if (this.isVehicleDetailInteractionBusy() || !this.isVehicleDetailActive()) {
+      return
+    }
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       wx.showToast({
         title: "云能力未初始化",
@@ -580,59 +633,108 @@ Page({
       return
     }
 
+    const requestId = Number(this._vehicleStatusRequestId || 0) + 1
+    this._vehicleStatusRequestId = requestId
+    this.clearVehicleStatusTimer()
     this.setData({
       updatingStatus: true
     })
 
     wx.showLoading({
-      title: "恢复中…",
+      title: input.loadingTitle || "处理中…",
       mask: true
     })
+    let settled = false
+    const finishRequest = () => {
+      if (
+        settled ||
+        this._vehicleStatusRequestId !== requestId ||
+        !this.isVehicleDetailActive()
+      ) {
+        return false
+      }
+      settled = true
+      this.clearVehicleStatusTimer()
+      wx.hideLoading()
+      return true
+    }
+    const handleFailure = (message) => {
+      if (!finishRequest()) {
+        return
+      }
+      this.setData({ updatingStatus: false })
+      wx.showToast({
+        title: formatToastTitle(message, input.failureTitle || "操作失败"),
+        icon: "none"
+      })
+    }
 
-    wx.cloud.callFunction({
-      name: "vehicleRestore",
-      data: { id },
+    this._vehicleStatusTimer = setTimeout(() => {
+      handleFailure(input.timeoutTitle || "操作超时，请重试")
+    }, STATUS_ACTION_TIMEOUT_MS)
+
+    const requestOptions = {
+      name: input.name,
+      data: { ...(input.data || {}) },
       success: (res) => {
-        wx.hideLoading()
+        if (!finishRequest()) {
+          return
+        }
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
           this.setData({ updatingStatus: false })
           wx.showToast({
-          title: formatToastTitle(result && result.message, "恢复失败"),
+            title: formatToastTitle(
+              result && result.message,
+              input.failureTitle || "操作失败"
+            ),
             icon: "none"
           })
           return
         }
 
-        wx.showToast({
-        title: formatToastTitle(result.message, "恢复成功"),
-          icon: "success"
-        })
-        this.fetchDetail(id, () => {
-          this.setData({ updatingStatus: false })
-        })
-      },
-      fail: (error) => {
-        wx.hideLoading()
         this.setData({ updatingStatus: false })
         wx.showToast({
-          title: "恢复失败",
-          icon: "none"
+          title: formatToastTitle(result.message, input.successTitle || "操作成功"),
+          icon: "success"
         })
+        this.fetchDetail(input.id)
+      },
+      fail: (error) => {
+        handleFailure(error && (error.errMsg || error.message))
       }
-    })
+    }
+
+    try {
+      wx.cloud.callFunction(requestOptions)
+    } catch (error) {
+      handleFailure(error && (error.errMsg || error.message))
+    }
   },
 
   handleBackList() {
+    const action = beginPageNativeAction(this)
     wx.navigateBack({
       delta: 1,
       fail: () => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         wx.redirectTo({
           url: "/pages/vehicle-manage/vehicle-manage",
           fail: () => {
+            if (!isPageNativeActionActive(this, action)) {
+              return
+            }
             wx.reLaunch({
               url: "/pages/vehicle-manage/vehicle-manage",
               fail: () => {
+                if (!isPageNativeActionActive(this, action)) {
+                  return
+                }
                 wx.showToast({
                   title: "返回车辆管理失败",
                   icon: "none"
@@ -646,6 +748,9 @@ Page({
   },
 
   handlePreviewImage(event) {
+    if (this.isVehicleDetailInteractionBusy()) {
+      return
+    }
     const fileId = String(event.currentTarget.dataset.fileId || "").trim()
     const detail = this.data.detail
     const urls = detail && Array.isArray(detail.imageList) ? detail.imageList : []
@@ -654,10 +759,14 @@ Page({
       return
     }
 
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.previewImage({
       current: fileId,
       urls,
       fail: () => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         wx.showToast({
           title: "图片预览失败",
           icon: "none"
@@ -687,7 +796,7 @@ Page({
 
   handleUploadImages() {
     const detail = this.data.detail
-    if (!detail || this.data.uploading) {
+    if (!detail || this.isVehicleDetailInteractionBusy()) {
       return
     }
 
@@ -705,6 +814,9 @@ Page({
       sizeType: ["compressed"],
       sourceType: ["album", "camera"],
       success: (chooseRes) => {
+        if (!this.isVehicleDetailActive()) {
+          return
+        }
         const selection = normalizeChosenImages(chooseRes)
         if (!selection.filePaths.length) {
           if (selection.rejectedCount) {
@@ -719,6 +831,9 @@ Page({
         this.uploadSelectedFiles(selection.filePaths, selection.rejectedCount)
       },
       fail: (error) => {
+        if (!this.isVehicleDetailActive()) {
+          return
+        }
         if (isUserCancelError(error)) {
           return
         }
@@ -731,6 +846,12 @@ Page({
   },
 
   uploadSelectedFiles(filePaths, skippedCount) {
+    if (
+      !this.isVehicleDetailActive() ||
+      this.isVehicleDetailInteractionBusy()
+    ) {
+      return
+    }
     if (!wx.cloud || typeof wx.cloud.uploadFile !== "function") {
       wx.showToast({
         title: "云上传能力未初始化",
@@ -746,8 +867,13 @@ Page({
 
     const uploadedFileIds = []
     const failedFiles = []
-    const vehicleId = this.data.id
+    const vehicleId = String(this.data.id || "").trim()
+    const sessionId = Number(this._vehicleUploadSessionId || 0) + 1
+    this._vehicleUploadSessionId = sessionId
     this._uploadCancelled = false
+    const isSameSession = () => this._vehicleUploadSessionId === sessionId
+    const isUploadCurrent = () =>
+      isSameSession() && this.isVehicleDetailActive()
     const uploadItems = selectedPaths.map((filePath, index) => ({
       id: `${index}-${filePath}`,
       filePath,
@@ -764,6 +890,9 @@ Page({
     })
 
     const updateItem = (index, status, statusText) => {
+      if (!isUploadCurrent()) {
+        return
+      }
       const nextItems = this.data.uploadItems.slice()
       nextItems[index] = {
         ...nextItems[index],
@@ -777,8 +906,14 @@ Page({
     }
 
     const finishBatch = () => {
-      this._activeUploadTask = null
-      this._cancelActiveUpload = null
+      if (isSameSession()) {
+        this._activeUploadTask = null
+        this._cancelActiveUpload = null
+      }
+      if (!isUploadCurrent()) {
+        requestUploadedFileCleanup(vehicleId, uploadedFileIds)
+        return
+      }
       const failedUploadPaths = failedFiles.map((item) => item.filePath)
       if (uploadedFileIds.length) {
         this.setData({
@@ -815,6 +950,10 @@ Page({
     }
 
     const uploadNext = (index, retryCount = 0) => {
+      if (!isUploadCurrent()) {
+        finishBatch()
+        return
+      }
       if (index >= selectedPaths.length) {
         finishBatch()
         return
@@ -844,8 +983,10 @@ Page({
           return
         }
         uploadSettled = true
-        this._activeUploadTask = null
-        this._cancelActiveUpload = null
+        if (isSameSession()) {
+          this._activeUploadTask = null
+          this._cancelActiveUpload = null
+        }
         if (uploadTimeoutId) {
           clearTimeout(uploadTimeoutId)
           uploadTimeoutId = null
@@ -888,7 +1029,7 @@ Page({
           },
           fail: handleUploadFailure
         })
-        if (!uploadSettled) {
+        if (!uploadSettled && isSameSession()) {
           this._activeUploadTask = uploadTask
         }
       } catch (error) {
@@ -921,7 +1062,7 @@ Page({
 
   handleRetryFailedUploads() {
     const filePaths = Array.isArray(this.data.failedUploadPaths) ? this.data.failedUploadPaths.slice() : []
-    if (!filePaths.length || this.data.uploading) {
+    if (!filePaths.length || this.isVehicleDetailInteractionBusy()) {
       return
     }
     this.uploadSelectedFiles(filePaths, 0)
@@ -929,7 +1070,7 @@ Page({
 
   handleSetCover(event) {
     const fileId = String(event.currentTarget.dataset.fileId || "").trim()
-    if (!fileId || this.data.uploading) {
+    if (!fileId || this.isVehicleDetailInteractionBusy()) {
       return
     }
 
@@ -941,17 +1082,25 @@ Page({
 
   handleRemoveImage(event) {
     const fileId = String(event.currentTarget.dataset.fileId || "").trim()
-    if (!fileId || this.data.uploading) {
+    if (!fileId || this.isVehicleDetailInteractionBusy()) {
       return
     }
 
+    const action = beginPageNativeAction(this, {
+      exclusiveKey: "vehicle-write-confirmation"
+    })
     wx.showModal({
       title: "移除图片",
       content: "确认将该图片从车辆资料中移除？",
       confirmText: "确认移除",
       confirmColor: "#d46868",
       success: (modalRes) => {
-        if (!modalRes.confirm) {
+        if (
+          !isPageNativeActionActive(this, action) ||
+          !modalRes.confirm ||
+          !this.isVehicleDetailActive() ||
+          this.isVehicleDetailInteractionBusy()
+        ) {
           return
         }
 
@@ -964,7 +1113,32 @@ Page({
   },
 
   persistImageChange(payload, cleanupFileIds, skippedCount, uploadSummary) {
-    const getRetryUploadItems = () => payload.action === "add"
+    const actionPayload = {
+      ...(payload || {})
+    }
+    if (Array.isArray(actionPayload.fileIds)) {
+      actionPayload.fileIds = actionPayload.fileIds.slice()
+    }
+    const vehicleId = String(this.data.id || "").trim()
+    const cleanupIds = normalizeStringArray(cleanupFileIds)
+    if (!this.isVehicleDetailActive()) {
+      requestUploadedFileCleanup(vehicleId, cleanupIds)
+      return
+    }
+    if (
+      !vehicleId ||
+      this.data.loading ||
+      this.data.updatingStatus ||
+      this._imageChangePending ||
+      (this.data.uploading && actionPayload.action !== "add")
+    ) {
+      requestUploadedFileCleanup(vehicleId, cleanupIds)
+      if (actionPayload.action === "add" && this.data.uploading) {
+        this.setData({ uploading: false })
+      }
+      return
+    }
+    const getRetryUploadItems = () => actionPayload.action === "add"
       ? (Array.isArray(this.data.uploadItems) ? this.data.uploadItems : []).map((item) => ({
           ...item,
           status: "failed",
@@ -978,7 +1152,7 @@ Page({
         uploadItems: getRetryUploadItems(),
         failedUploadPaths: uploadSummary && uploadSummary.allFilePaths ? uploadSummary.allFilePaths : this.data.failedUploadPaths
       })
-      deleteCloudFilesDirectBestEffort(cleanupFileIds)
+      deleteCloudFilesDirectBestEffort(cleanupIds)
       wx.showToast({
         title: "云能力未初始化",
         icon: "none"
@@ -986,26 +1160,36 @@ Page({
       return
     }
 
-    const showLoading = payload.action === "remove" || payload.action === "setCover"
+    const requestId = Number(this._vehicleImageChangeRequestId || 0) + 1
+    this._vehicleImageChangeRequestId = requestId
+    this._imageChangePending = true
+    this._pendingImageCleanupFileIds = cleanupIds.slice()
+    this._pendingImageVehicleId = vehicleId
+    this.clearVehicleImageChangeTimer()
+    const showLoading = actionPayload.action === "remove" || actionPayload.action === "setCover"
     if (showLoading) {
       wx.showLoading({
-        title: payload.action === "setCover" ? "设置中…" : payload.action === "remove" ? "处理中…" : "上传中…",
+        title: actionPayload.action === "setCover" ? "设置中…" : "处理中…",
         mask: true
       })
     }
 
     let settled = false
-    let timeoutId = null
     const finish = (callback) => {
-      if (settled) {
-        return
+      if (
+        settled ||
+        this._vehicleImageChangeRequestId !== requestId ||
+        !this.isVehicleDetailActive()
+      ) {
+        return false
       }
       settled = true
-      if (timeoutId) {
-        clearTimeout(timeoutId)
-        timeoutId = null
-      }
+      this.clearVehicleImageChangeTimer()
+      this._imageChangePending = false
+      this._pendingImageCleanupFileIds = []
+      this._pendingImageVehicleId = ""
       callback()
+      return true
     }
     const handleFailure = () => {
       finish(() => {
@@ -1014,9 +1198,9 @@ Page({
           uploading: false,
           uploadItems: getRetryUploadItems(),
           failedUploadPaths: uploadSummary && uploadSummary.allFilePaths ? uploadSummary.allFilePaths : this.data.failedUploadPaths,
-          uploadProgressText: payload.action === "add" ? "保存失败，可重试本次图片" : this.data.uploadProgressText
+          uploadProgressText: actionPayload.action === "add" ? "保存失败，可重试本次图片" : this.data.uploadProgressText
         })
-        requestUploadedFileCleanup(this.data.id, cleanupFileIds)
+        requestUploadedFileCleanup(vehicleId, cleanupIds)
         wx.showToast({
           title: "图片操作失败",
           icon: "none"
@@ -1024,13 +1208,16 @@ Page({
       })
     }
 
-    timeoutId = setTimeout(handleFailure, IMAGE_CHANGE_TIMEOUT_MS)
+    this._vehicleImageChangeTimer = setTimeout(
+      handleFailure,
+      IMAGE_CHANGE_TIMEOUT_MS
+    )
 
     const requestOptions = {
       name: "vehicleImageUpdate",
       data: {
-        id: this.data.id,
-        ...payload
+        id: vehicleId,
+        ...actionPayload
       },
       success: (res) => {
         const result = res && res.result ? res.result : null
@@ -1041,9 +1228,9 @@ Page({
               uploading: false,
               uploadItems: getRetryUploadItems(),
               failedUploadPaths: uploadSummary && uploadSummary.allFilePaths ? uploadSummary.allFilePaths : this.data.failedUploadPaths,
-              uploadProgressText: payload.action === "add" ? "保存失败，可重试本次图片" : this.data.uploadProgressText
+              uploadProgressText: actionPayload.action === "add" ? "保存失败，可重试本次图片" : this.data.uploadProgressText
             })
-            requestUploadedFileCleanup(this.data.id, cleanupFileIds)
+            requestUploadedFileCleanup(vehicleId, cleanupIds)
             wx.showToast({
               title: formatToastTitle(result && result.message, "图片操作失败"),
               icon: "none"
@@ -1058,7 +1245,7 @@ Page({
           this.setData({
             uploading: false,
             failedUploadPaths: uploadSummary && uploadSummary.failedUploadPaths ? uploadSummary.failedUploadPaths : [],
-            uploadProgressText: payload.action === "add"
+            uploadProgressText: actionPayload.action === "add"
               ? uploadSummary && uploadSummary.failedUploadPaths && uploadSummary.failedUploadPaths.length
                 ? `已上传 ${uploadSummary.uploadedCount} 张，${uploadSummary.failedUploadPaths.length} 张可重试`
                 : "图片上传完成"
@@ -1071,15 +1258,15 @@ Page({
             })
           })
 
-          const partialUpload = payload.action === "add" && Number(skippedCount) > 0
+          const partialUpload = actionPayload.action === "add" && Number(skippedCount) > 0
           const failedCount = uploadSummary && Array.isArray(uploadSummary.failedUploadPaths)
             ? uploadSummary.failedUploadPaths.length
             : 0
           wx.showToast({
             title:
-              payload.action === "setCover"
+              actionPayload.action === "setCover"
                 ? "封面已更新"
-                : payload.action === "remove"
+                : actionPayload.action === "remove"
                   ? "图片已移除"
                   : partialUpload
                     ? failedCount
@@ -1098,6 +1285,56 @@ Page({
       wx.cloud.callFunction(requestOptions)
     } catch (error) {
       handleFailure()
+    }
+  },
+
+  isVehicleDetailActive() {
+    return this._vehicleDetailUnloaded !== true
+  },
+
+  isVehicleDetailInteractionBusy() {
+    return Boolean(
+      this.data.loading ||
+      this.isVehicleDetailMutationBusy()
+    )
+  },
+
+  isVehicleDetailMutationBusy() {
+    return Boolean(
+      this.data.updatingStatus ||
+      this.data.uploading ||
+      this._imageChangePending
+    )
+  },
+
+  finishVehicleDetailLoadDone() {
+    const done = this._vehicleDetailLoadDone
+    this._vehicleDetailLoadDone = null
+    if (typeof done === "function") {
+      try {
+        done()
+      } catch (error) {}
+    }
+  },
+
+  clearVehicleDetailLoadTimer() {
+    if (this._vehicleDetailLoadTimer) {
+      clearTimeout(this._vehicleDetailLoadTimer)
+      this._vehicleDetailLoadTimer = null
+    }
+  },
+
+  clearVehicleStatusTimer() {
+    if (this._vehicleStatusTimer) {
+      clearTimeout(this._vehicleStatusTimer)
+      this._vehicleStatusTimer = null
+    }
+  },
+
+  clearVehicleImageChangeTimer() {
+    if (this._vehicleImageChangeTimer) {
+      clearTimeout(this._vehicleImageChangeTimer)
+      this._vehicleImageChangeTimer = null
     }
   }
 })

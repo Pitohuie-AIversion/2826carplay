@@ -136,7 +136,14 @@ describe("pages/mine 运营待办角标", () => {
     let permissionShouldFail = true
     global.wx = {
       cloud: {
-        callFunction: jest.fn(({ name, success }) => {
+        callFunction: jest.fn(({ name, success, complete }) => {
+          if (name === "operationSummaryGet") {
+            success({ result: { ok: true, counts: {} } })
+            if (typeof complete === "function") {
+              complete()
+            }
+            return
+          }
           if (name !== "getMyPermissions") {
             return
           }
@@ -233,6 +240,117 @@ describe("pages/mine 运营待办角标", () => {
     expect(page.data.roleLabel).toBe("身份确认失败")
   })
 
+  test("权限重试时旧结果不会覆盖最新身份", () => {
+    const requests = []
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn((options) => requests.push(options))
+      }
+    }
+    const page = createPage(loadPageDefinition())
+
+    page.loadMyPermissions()
+    page.loadMyPermissions()
+    requests[1].success({
+      result: {
+        ok: true,
+        isAdmin: false,
+        canManageBookings: false,
+        canManageRoles: false,
+        canManageVehicles: false
+      }
+    })
+    requests[0].success({
+      result: {
+        ok: true,
+        isAdmin: true,
+        canManageRoles: true,
+        canManageVehicles: true
+      }
+    })
+
+    expect(page.data.permissionsReady).toBe(true)
+    expect(page.data.roleLabel).toBe("私人会员")
+    expect(page.data.menuItems.find((item) => item.key === "roleManage")).toBeUndefined()
+  })
+
+  test("离开页面后权限和配置迟到结果不再写入", () => {
+    const requests = []
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn((options) => requests.push(options))
+      }
+    }
+    const page = createPage(loadPageDefinition())
+
+    page.loadMyPermissions()
+    page.loadOperationConfig()
+    page.onUnload()
+    requests.find((item) => item.name === "getMyPermissions").success({
+      result: {
+        ok: true,
+        isAdmin: true,
+        canManageRoles: true
+      }
+    })
+    requests.find((item) => item.name === "operationConfigGet").success({
+      result: {
+        ok: true,
+        config: { brandName: "迟到品牌" }
+      }
+    })
+
+    expect(page.data.permissionsReady).toBe(false)
+    expect(page.data.brandName).toBe("极境车库")
+  })
+
+  test("运营摘要超时后恢复入口并忽略迟到结果", () => {
+    jest.useFakeTimers()
+    let lateSuccess = null
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(({ success }) => {
+          lateSuccess = success
+        })
+      }
+    }
+    const page = createPage(loadPageDefinition())
+    page.data.myPermissions = {
+      canManageBookings: true,
+      canManageRoles: false
+    }
+
+    page.loadOperationSummary()
+    jest.advanceTimersByTime(15 * 1000)
+    expect(page.data.summaryLoading).toBe(false)
+
+    lateSuccess({
+      result: {
+        ok: true,
+        counts: { bookingCoordinationPending: 99 }
+      }
+    })
+    expect(page.data.operationPulse.visible).toBe(false)
+  })
+
+  test("运营摘要同步异常时安全结束加载", () => {
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(() => {
+          throw new Error("cloud down")
+        })
+      }
+    }
+    const page = createPage(loadPageDefinition())
+    page.data.myPermissions = {
+      canManageBookings: true,
+      canManageRoles: false
+    }
+
+    expect(() => page.loadOperationSummary()).not.toThrow()
+    expect(page.data.summaryLoading).toBe(false)
+  })
+
   test("云能力缺失时显示初始化失败并允许后续重试", () => {
     global.wx = {}
     const page = createPage(loadPageDefinition())
@@ -314,5 +432,91 @@ describe("pages/mine 运营待办角标", () => {
       confirmColor: "#528fff",
       showCancel: false
     })
+  })
+
+  test("账号查询超时后关闭遮罩并忽略重复操作和迟到结果", () => {
+    jest.useFakeTimers()
+    let lateSuccess = null
+    global.wx = {
+      showLoading: jest.fn(),
+      hideLoading: jest.fn(),
+      showToast: jest.fn(),
+      setClipboardData: jest.fn(),
+      cloud: {
+        callFunction: jest.fn(({ success }) => {
+          lateSuccess = success
+        })
+      }
+    }
+    const page = createPage(loadPageDefinition())
+    const event = {
+      currentTarget: { dataset: { key: "getOpenid", title: "查询 OpenID" } }
+    }
+
+    page.handleMenuTap(event)
+    page.handleMenuTap(event)
+    expect(wx.cloud.callFunction).toHaveBeenCalledTimes(1)
+
+    jest.advanceTimersByTime(20 * 1000)
+    expect(wx.hideLoading).toHaveBeenCalledTimes(1)
+    expect(wx.showToast).toHaveBeenCalledWith({
+      title: "查询超时，请重试",
+      icon: "none"
+    })
+
+    lateSuccess({ result: { ok: true, openid: "late_openid" } })
+    expect(wx.setClipboardData).not.toHaveBeenCalled()
+  })
+
+  test("工具云函数同步异常时安全关闭全局遮罩", () => {
+    global.wx = {
+      showLoading: jest.fn(),
+      hideLoading: jest.fn(),
+      showToast: jest.fn(),
+      cloud: {
+        callFunction: jest.fn(() => {
+          throw new Error("cloud down")
+        })
+      }
+    }
+    const page = createPage(loadPageDefinition())
+
+    expect(() => {
+      page.handleMenuTap({
+        currentTarget: { dataset: { key: "getOpenid", title: "查询 OpenID" } }
+      })
+    }).not.toThrow()
+    expect(wx.hideLoading).toHaveBeenCalledTimes(1)
+    expect(wx.showToast).toHaveBeenCalledWith({
+      title: "cloud down",
+      icon: "none"
+    })
+  })
+
+  test("离开页面后工具迟到结果不再触发复制或弹窗", () => {
+    let lateSuccess = null
+    global.wx = {
+      showLoading: jest.fn(),
+      hideLoading: jest.fn(),
+      showToast: jest.fn(),
+      showModal: jest.fn(),
+      setClipboardData: jest.fn(),
+      cloud: {
+        callFunction: jest.fn(({ success }) => {
+          lateSuccess = success
+        })
+      }
+    }
+    const page = createPage(loadPageDefinition())
+
+    page.handleMenuTap({
+      currentTarget: { dataset: { key: "getOpenid", title: "查询 OpenID" } }
+    })
+    page.onUnload()
+    lateSuccess({ result: { ok: true, openid: "late_openid" } })
+
+    expect(wx.hideLoading).toHaveBeenCalledTimes(1)
+    expect(wx.setClipboardData).not.toHaveBeenCalled()
+    expect(wx.showModal).not.toHaveBeenCalled()
   })
 })

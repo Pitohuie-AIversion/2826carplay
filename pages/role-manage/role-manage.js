@@ -1,4 +1,4 @@
-const { requirePagePermission } = require("../../shared/pageAuth")
+const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
 const { formatToastTitle } = require("../../shared/uiFeedback")
 const { clearUnsaved, markUnsaved } = require("../../shared/unsavedChanges")
 
@@ -90,7 +90,7 @@ Page({
   },
 
   onPullDownRefresh() {
-    if (!this.data.pageAuthorized) {
+    if (!this.data.pageAuthorized || this.isRoleInteractionBusy()) {
       wx.stopPullDownRefresh()
       return
     }
@@ -100,16 +100,32 @@ Page({
   },
 
   onUnload() {
+    cancelPagePermissionCheck(this)
     this._roleListRequestId = Number(this._roleListRequestId || 0) + 1
     this._roleSaveRequestId = Number(this._roleSaveRequestId || 0) + 1
     this.finishRoleListRequestEffects()
     this.finishRoleSaveRequestEffects()
   },
 
+  isRoleInteractionBusy() {
+    return Boolean(
+      this.data.initialLoading ||
+      this.data.loading ||
+      this.data.saving
+    )
+  },
+
   fetchRoleList(input, done) {
     if (typeof input === "function") {
       done = input
       input = null
+    }
+
+    if (this.data.saving) {
+      if (typeof done === "function") {
+        done()
+      }
+      return
     }
 
     const append = Boolean(input && input.append)
@@ -225,7 +241,7 @@ Page({
   },
 
   handleLoadMore() {
-    if (this.data.loading || !this.data.hasMore) {
+    if (this.data.loading || this.data.saving || !this.data.hasMore) {
       return
     }
 
@@ -233,7 +249,7 @@ Page({
   },
 
   handleOpenidInput(event) {
-    if (this.data.editingOpenid) {
+    if (this.isRoleInteractionBusy() || this.data.editingOpenid) {
       return
     }
 
@@ -244,6 +260,9 @@ Page({
   },
 
   handleTogglePermission(event) {
+    if (this.isRoleInteractionBusy()) {
+      return
+    }
     const value = String(event.currentTarget.dataset.value || "").trim()
     if (!value) {
       return
@@ -259,6 +278,9 @@ Page({
   },
 
   handleEditRole(event) {
+    if (this.isRoleInteractionBusy()) {
+      return
+    }
     const openid = String(event.currentTarget.dataset.openid || "").trim()
     const permissions = normalizeStringArray(event.currentTarget.dataset.permissions)
     if (!openid) {
@@ -283,6 +305,9 @@ Page({
   },
 
   handleResetForm() {
+    if (this.isRoleInteractionBusy()) {
+      return
+    }
     this.setData({
       editingOpenid: "",
       formOpenid: "",
@@ -293,7 +318,7 @@ Page({
   },
 
   handleSubmit() {
-    if (this.data.saving) {
+    if (this.isRoleInteractionBusy()) {
       return
     }
 

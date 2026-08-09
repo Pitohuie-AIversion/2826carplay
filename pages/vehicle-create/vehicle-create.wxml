@@ -55,6 +55,7 @@
           placeholder-class="input-placeholder"
           value="{{form.plateNumber}}"
           maxlength="8"
+          disabled="{{isSubmitting}}"
           bindinput="handlePlateInput"
           confirm-type="next"
           aria-label="填写车牌号"
@@ -64,7 +65,7 @@
 
       <view class="form-item form-item-half">
         <view class="form-label field-label-row"><text>车辆类型</text><text class="field-required">必填</text></view>
-        <picker mode="selector" range="{{vehicleTypeLabels}}" value="{{vehicleTypeIndex}}" bindchange="handleVehicleTypeChange" aria-label="选择车辆类型" aria-required="{{true}}">
+        <picker mode="selector" range="{{vehicleTypeLabels}}" value="{{vehicleTypeIndex}}" disabled="{{isSubmitting}}" bindchange="handleVehicleTypeChange" aria-label="选择车辆类型" aria-required="{{true}}">
           <view class="form-picker {{form.vehicleType ? 'form-picker-filled' : ''}} {{formProgress.vehicleTypeComplete ? 'vehicle-form-control-complete' : ''}}" hover-class="vehicle-picker-pressed">
             <text>{{vehicleTypeLabel || '选择类型'}}</text>
             <view class="picker-arrow" aria-hidden="true"><view class="picker-chevron"></view></view>
@@ -82,6 +83,7 @@
         value="{{form.brandModel}}"
         maxlength="50"
         data-field="brandModel"
+        disabled="{{isSubmitting}}"
         bindinput="handleTextInput"
         confirm-type="done"
         aria-label="填写车辆品牌型号"
@@ -92,7 +94,7 @@
     <view class="form-row">
       <view class="form-item form-item-half">
         <view class="form-label field-label-row"><text>注册日期</text><text class="field-required">必填</text></view>
-        <picker mode="date" value="{{form.registerDate}}" end="{{today}}" bindchange="handleDateChange" aria-label="选择注册日期" aria-required="{{true}}">
+        <picker mode="date" value="{{form.registerDate}}" end="{{today}}" disabled="{{isSubmitting}}" bindchange="handleDateChange" aria-label="选择注册日期" aria-required="{{true}}">
           <view class="form-picker {{form.registerDate ? 'form-picker-filled' : ''}} {{formProgress.registerDateComplete ? 'vehicle-form-control-complete' : ''}}" hover-class="vehicle-picker-pressed">
             <text>{{form.registerDate || '选择日期'}}</text>
             <view class="picker-arrow" aria-hidden="true"><view class="picker-chevron"></view></view>
@@ -102,7 +104,7 @@
 
       <view class="form-item form-item-half">
         <view class="form-label field-label-row"><text>使用状态</text><text class="field-required">必填</text></view>
-        <picker mode="selector" range="{{statusLabels}}" value="{{statusIndex}}" bindchange="handleStatusChange" aria-label="选择使用状态" aria-required="{{true}}">
+        <picker mode="selector" range="{{statusLabels}}" value="{{statusIndex}}" disabled="{{isSubmitting}}" bindchange="handleStatusChange" aria-label="选择使用状态" aria-required="{{true}}">
           <view class="form-picker {{form.status ? 'form-picker-filled' : ''}} {{formProgress.statusComplete ? 'vehicle-form-control-complete' : ''}}" hover-class="vehicle-picker-pressed">
             <text>{{statusLabel || '选择状态'}}</text>
             <view class="picker-arrow" aria-hidden="true"><view class="picker-chevron"></view></view>
@@ -129,18 +131,18 @@
     <view class="form-row">
       <view class="form-item form-item-half">
         <view class="form-label">取车城市</view>
-        <input class="form-input" placeholder="例如 杭州" placeholder-class="input-placeholder" value="{{form.location}}" maxlength="20" data-field="location" bindinput="handleTextInput" confirm-type="done" aria-label="所在城市" />
+        <input class="form-input" placeholder="例如 杭州" placeholder-class="input-placeholder" value="{{form.location}}" maxlength="20" data-field="location" disabled="{{isSubmitting}}" bindinput="handleTextInput" confirm-type="done" aria-label="所在城市" />
       </view>
       <view class="form-item form-item-half">
         <view class="form-label">日租金</view>
-        <input class="form-input" type="number" placeholder="例如 699" placeholder-class="input-placeholder" value="{{form.priceDay}}" maxlength="5" data-field="priceDay" bindinput="handleTextInput" confirm-type="done" aria-label="日租价格" />
+        <input class="form-input" type="number" placeholder="例如 699" placeholder-class="input-placeholder" value="{{form.priceDay}}" maxlength="5" data-field="priceDay" disabled="{{isSubmitting}}" bindinput="handleTextInput" confirm-type="done" aria-label="日租价格" />
       </view>
     </view>
 
     <view class="form-row">
       <view class="form-item form-item-half">
         <view class="form-label">变速箱</view>
-        <picker mode="selector" range="{{transmissionLabels}}" value="{{transmissionIndex}}" bindchange="handleTransmissionChange" aria-label="选择变速箱类型">
+        <picker mode="selector" range="{{transmissionLabels}}" value="{{transmissionIndex}}" disabled="{{isSubmitting}}" bindchange="handleTransmissionChange" aria-label="选择变速箱类型">
           <view class="form-picker {{form.transmission ? 'form-picker-filled' : ''}}" hover-class="vehicle-picker-pressed">
             <text>{{transmissionLabel || '选择类型'}}</text>
             <view class="picker-arrow" aria-hidden="true"><view class="picker-chevron"></view></view>
@@ -149,7 +151,7 @@
       </view>
       <view class="form-item form-item-half">
         <view class="form-label">燃油类型</view>
-        <picker mode="selector" range="{{fuelTypeLabels}}" value="{{fuelTypeIndex}}" bindchange="handleFuelTypeChange" aria-label="选择燃油类型">
+        <picker mode="selector" range="{{fuelTypeLabels}}" value="{{fuelTypeIndex}}" disabled="{{isSubmitting}}" bindchange="handleFuelTypeChange" aria-label="选择燃油类型">
           <view class="form-picker {{form.fuelType ? 'form-picker-filled' : ''}}" hover-class="vehicle-picker-pressed">
             <text>{{fuelTypeLabel || '选择类型'}}</text>
             <view class="picker-arrow" aria-hidden="true"><view class="picker-chevron"></view></view>
@@ -160,7 +162,7 @@
 
     <view class="form-item">
       <view class="form-label">座位数</view>
-      <input class="form-input" type="number" placeholder="例如 5" placeholder-class="input-placeholder" value="{{form.seats}}" maxlength="1" data-field="seats" bindinput="handleTextInput" confirm-type="done" aria-label="座位数" />
+      <input class="form-input" type="number" placeholder="例如 5" placeholder-class="input-placeholder" value="{{form.seats}}" maxlength="1" data-field="seats" disabled="{{isSubmitting}}" bindinput="handleTextInput" confirm-type="done" aria-label="座位数" />
     </view>
 
     <view class="form-item">
@@ -172,6 +174,7 @@
         value="{{form.publicDescription}}"
         maxlength="200"
         data-field="publicDescription"
+        disabled="{{isSubmitting}}"
         bindinput="handleTextInput"
         aria-label="公开说明"
       />
@@ -195,12 +198,12 @@
 
     <view class="form-item">
       <view class="form-label">VIN</view>
-      <input class="form-input" placeholder="选填，最多 32 位" placeholder-class="input-placeholder" value="{{form.vin}}" maxlength="32" data-field="vin" bindinput="handleTextInput" confirm-type="done" aria-label="车辆识别码 VIN" />
+      <input class="form-input" placeholder="选填，最多 32 位" placeholder-class="input-placeholder" value="{{form.vin}}" maxlength="32" data-field="vin" disabled="{{isSubmitting}}" bindinput="handleTextInput" confirm-type="done" aria-label="车辆识别码 VIN" />
     </view>
 
     <view class="form-item">
       <view class="form-label">发动机号</view>
-      <input class="form-input" placeholder="选填，最多 32 位" placeholder-class="input-placeholder" value="{{form.engineNumber}}" maxlength="32" data-field="engineNumber" bindinput="handleTextInput" confirm-type="done" aria-label="发动机号" />
+      <input class="form-input" placeholder="选填，最多 32 位" placeholder-class="input-placeholder" value="{{form.engineNumber}}" maxlength="32" data-field="engineNumber" disabled="{{isSubmitting}}" bindinput="handleTextInput" confirm-type="done" aria-label="发动机号" />
     </view>
 
     <view class="form-item">
@@ -212,6 +215,7 @@
         value="{{form.note}}"
         maxlength="200"
         data-field="note"
+        disabled="{{isSubmitting}}"
         bindinput="handleTextInput"
         aria-label="内部备注"
       />

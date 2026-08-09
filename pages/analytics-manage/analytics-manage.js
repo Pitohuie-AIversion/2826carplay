@@ -1,5 +1,11 @@
-const { requirePagePermission } = require("../../shared/pageAuth")
+const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
 const { formatToastTitle } = require("../../shared/uiFeedback")
+const {
+  activatePageNativeActions,
+  beginPageNativeAction,
+  cancelPageNativeActions,
+  isPageNativeActionActive
+} = require("../../shared/pageNativeAction")
 
 const ANALYTICS_OVERVIEW_TIMEOUT_MS = 15 * 1000
 const ANALYTICS_CLEANUP_TIMEOUT_MS = 20 * 1000
@@ -64,6 +70,7 @@ Page({
   },
 
   onLoad() {
+    activatePageNativeActions(this)
     requirePagePermission(this, {
       required: (result) =>
         Boolean(result.canManageVehicles || result.canManageBookings || result.canManageRoles),
@@ -78,7 +85,7 @@ Page({
   },
 
   onPullDownRefresh() {
-    if (!this.data.pageAuthorized) {
+    if (!this.data.pageAuthorized || this.data.cleanupLoading) {
       wx.stopPullDownRefresh()
       return
     }
@@ -86,6 +93,8 @@ Page({
   },
 
   onUnload() {
+    cancelPagePermissionCheck(this)
+    cancelPageNativeActions(this)
     this._overviewRequestId = Number(this._overviewRequestId || 0) + 1
     this._cleanupRequestId = Number(this._cleanupRequestId || 0) + 1
     this.finishOverviewRequestEffects()
@@ -94,7 +103,12 @@ Page({
 
   handlePeriodTap(event) {
     const days = Number(event.currentTarget.dataset.days)
-    if (![7, 30].includes(days) || days === this.data.days || this.data.loading) {
+    if (
+      ![7, 30].includes(days) ||
+      days === this.data.days ||
+      this.data.loading ||
+      this.data.cleanupLoading
+    ) {
       return
     }
     this.setData({ days })
@@ -102,21 +116,27 @@ Page({
   },
 
   handleRetry() {
+    if (this.data.loading || this.data.cleanupLoading) {
+      return
+    }
     this.fetchOverview()
   },
 
   handleCleanup() {
-    if (this.data.cleanupLoading || !this.data.canCleanup) {
+    if (this.data.loading || this.data.cleanupLoading || !this.data.canCleanup) {
       return
     }
 
+    const action = beginPageNativeAction(this, {
+      exclusiveKey: "analytics-cleanup-confirmation"
+    })
     wx.showModal({
       title: "清理过期匿名数据",
       content: "将永久删除 90 天前的匿名行为事件，每次最多 100 条。该操作不会删除预约、车辆或用户资料。确认继续？",
       confirmText: "确认清理",
       confirmColor: "#d46868",
       success: (res) => {
-        if (res.confirm) {
+        if (isPageNativeActionActive(this, action) && res && res.confirm) {
           this.runCleanup()
         }
       }
@@ -125,6 +145,7 @@ Page({
 
   runCleanup() {
     if (
+      this.data.loading ||
       this.data.cleanupLoading ||
       !this.data.canCleanup ||
       !wx.cloud ||
@@ -141,8 +162,9 @@ Page({
     this._cleanupLoadingVisible = true
 
     let settled = false
+    const isCurrent = () => this._cleanupRequestId === requestId
     const finishRequest = () => {
-      if (settled || this._cleanupRequestId !== requestId) {
+      if (settled || !isCurrent()) {
         return false
       }
       settled = true
@@ -173,9 +195,9 @@ Page({
         if (!finishRequest()) {
           return
         }
-        this.setData({ cleanupLoading: false })
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
+          this.setData({ cleanupLoading: false })
           wx.showToast({
           title: formatToastTitle(result && result.message, "清理失败"),
             icon: "none"
@@ -183,13 +205,31 @@ Page({
           return
         }
 
-        wx.showModal({
-          title: "清理完成",
-          content: `处理 ${result.processed || 0} 条，成功删除 ${result.deleted || 0} 条，失败 ${result.failed || 0} 条。${result.hasMore ? "可能仍有过期数据，可再次执行清理。" : "已处理完当前过期数据。"}`,
-          confirmText: "知道了",
-          confirmColor: "#528fff",
-          showCancel: false
-        })
+        let cleanupResultSettled = false
+        const finishCleanupResult = () => {
+          if (cleanupResultSettled || !isCurrent()) {
+            return
+          }
+          cleanupResultSettled = true
+          this.setData({ cleanupLoading: false })
+          this.fetchOverview()
+        }
+        if (typeof wx.showModal !== "function") {
+          finishCleanupResult()
+          return
+        }
+        try {
+          wx.showModal({
+            title: "清理完成",
+            content: `处理 ${result.processed || 0} 条，成功删除 ${result.deleted || 0} 条，失败 ${result.failed || 0} 条。${result.hasMore ? "可能仍有过期数据，可再次执行清理。" : "已处理完当前过期数据。"}`,
+            confirmText: "知道了",
+            confirmColor: "#528fff",
+            showCancel: false,
+            complete: finishCleanupResult
+          })
+        } catch (error) {
+          finishCleanupResult()
+        }
       },
       fail: (error) => {
         handleFailure(error && (error.errMsg || error.message))

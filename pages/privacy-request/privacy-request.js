@@ -1,4 +1,10 @@
 const { formatToastTitle } = require("../../shared/uiFeedback")
+const {
+  activatePageNativeActions,
+  beginPageNativeAction,
+  cancelPageNativeActions,
+  isPageNativeActionActive
+} = require("../../shared/pageNativeAction")
 const PRIVACY_REQUEST_LIST_TIMEOUT_MS = 15 * 1000
 const PRIVACY_REQUEST_MUTATION_TIMEOUT_MS = 12 * 1000
 
@@ -146,6 +152,7 @@ Page({
   },
 
   onLoad() {
+    activatePageNativeActions(this)
     this.fetchList()
   },
 
@@ -162,6 +169,7 @@ Page({
   },
 
   onUnload() {
+    cancelPageNativeActions(this)
     this._listRequestId = Number(this._listRequestId || 0) + 1
     this._submitRequestSerial = Number(this._submitRequestSerial || 0) + 1
     this._cancelRequestSerial = Number(this._cancelRequestSerial || 0) + 1
@@ -171,6 +179,9 @@ Page({
   },
 
   handleTypeTap(event) {
+    if (this.data.submitting) {
+      return
+    }
     const value = String(event.currentTarget.dataset.value || "")
     if (!TYPE_LABELS[value]) {
       return
@@ -185,6 +196,9 @@ Page({
   },
 
   handleDescriptionInput(event) {
+    if (this.data.submitting) {
+      return
+    }
     this.setData(buildDescriptionState((event.detail && event.detail.value) || ""))
   },
 
@@ -313,6 +327,9 @@ Page({
   },
 
   handleRetry() {
+    if (this.data.loading || this.data.submitting || this.data.cancellingId) {
+      return
+    }
     this.fetchList()
   },
 
@@ -325,17 +342,20 @@ Page({
 
   handleCancelRequest(event) {
     const id = String(event.currentTarget.dataset.id || "")
-    if (!id || this.data.cancellingId) {
+    if (!id || this.data.loading || this.data.submitting || this.data.cancellingId) {
       return
     }
 
+    const action = beginPageNativeAction(this, {
+      exclusiveKey: "privacy-request-cancel-confirmation"
+    })
     wx.showModal({
       title: "撤回隐私申请",
       content: "仅待处理申请可以撤回。撤回后如仍有需要，可稍后重新提交。",
       confirmText: "确认撤回",
       confirmColor: "#d46868",
       success: (res) => {
-        if (res.confirm) {
+        if (isPageNativeActionActive(this, action) && res && res.confirm) {
           this.cancelRequest(id)
         }
       }
@@ -343,6 +363,15 @@ Page({
   },
 
   cancelRequest(id) {
+    const requestId = String(id || "").trim()
+    if (
+      !requestId ||
+      this.data.loading ||
+      this.data.submitting ||
+      this.data.cancellingId
+    ) {
+      return
+    }
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       wx.showToast({
         title: "云能力未初始化",
@@ -351,7 +380,6 @@ Page({
       return
     }
 
-    const requestId = String(id || "").trim()
     const cancelSerial = Number(this._cancelRequestSerial || 0) + 1
     this._cancelRequestSerial = cancelSerial
     this._listRequestId = Number(this._listRequestId || 0) + 1

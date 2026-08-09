@@ -515,11 +515,11 @@ describe("用户主流程原生图标", () => {
     let actionSheetCount = 0
 
     actionSheetSources.forEach((source) => {
-      const matches = source.match(/wx\.showActionSheet\(\{[\s\S]*?\n\s*success:/g) || []
-      matches.forEach((markup) => {
+      extractBalancedCallBodies(source, "wx.showActionSheet({").forEach((body) => {
         actionSheetCount += 1
-        expect(markup).toMatch(/alertText:\s*"[^"]+"/)
-        expect(markup).toContain('itemColor: "#528fff"')
+        expect(body).toMatch(/alertText:\s*"[^"]+"/)
+        expect(body).toContain('itemColor: "#528fff"')
+        expect(body).toMatch(/isPageNativeActionActive\(this, (?:action|nativeAction)\)/)
       })
     })
 
@@ -541,7 +541,7 @@ describe("用户主流程原生图标", () => {
       })
     })
 
-    expect(toastCount).toBeGreaterThanOrEqual(277)
+    expect(toastCount).toBeGreaterThanOrEqual(273)
   })
 
   test("全站原生轻提示使用短业务文案且不展示技术错误原文", () => {
@@ -566,7 +566,7 @@ describe("用户主流程原生图标", () => {
       })
     })
 
-    expect(toastCount).toBeGreaterThanOrEqual(300)
+    expect(toastCount).toBeGreaterThanOrEqual(275)
     expect(literalTitleCount).toBeGreaterThan(0)
   })
 
@@ -630,11 +630,30 @@ describe("用户主流程原生图标", () => {
         expect(body).toMatch(/success:/)
         expect(body).toMatch(/fail:/)
         expect(body).toContain("wx.showToast({")
+        expect(body).toMatch(/isPageNativeActionActive\(this, action\)|this\.isBookingDetailActive\(\)/)
         expect(body).not.toMatch(/^\s*showToast:/m)
       })
     })
 
     expect(clipboardCount).toBe(6)
+  })
+
+  test("轻量系统反馈只在操作来源仍是当前页面时展示", () => {
+    const appConfig = JSON.parse(read("app.json"))
+    const pageSources = appConfig.pages.map((route) => read(`${route}.js`))
+    const currentOnlyActionCount = pageSources.reduce(
+      (count, source) =>
+        count +
+        (source.match(/beginPageNativeAction\(this, \{ requireCurrent: true \}\)/g) || [])
+          .length,
+      0
+    )
+    const bookingDetailSource = read("pages/booking-detail/booking-detail.js")
+
+    expect(currentOnlyActionCount).toBe(15)
+    expect(bookingDetailSource).toContain("isPageCurrent(this)")
+    expect(read("app.js")).toContain("nativeActionAppVisible = false")
+    expect(read("app.js")).toContain("nativeActionAppVisible = true")
   })
 
   test("全站拨号入口仅在真实失败时提示并静默处理用户取消", () => {
@@ -653,6 +672,7 @@ describe("用户主流程原生图标", () => {
         phoneCallCount += 1
         expect(body).toMatch(/fail:/)
         expect(body).toContain("cancel")
+        expect(body).toContain("isPageNativeActionActive(this, action)")
         expect(body).not.toMatch(/\bsuccess\s*:/)
       })
     })
@@ -668,30 +688,63 @@ describe("用户主流程原生图标", () => {
     expect(phoneCallCount).toBe(7)
   })
 
-  test("全站页面跳转、返回兜底和图片预览入口均提供失败反馈", () => {
+  test("全站页面跳转、返回兜底、滚动定位和图片预览入口均提供失败反馈", () => {
     const appConfig = JSON.parse(read("app.json"))
     const componentScripts = ["components/core-nav/core-nav.js"]
     const scripts = appConfig.pages.map((route) => `${route}.js`).concat(componentScripts)
     const expectedCounts = {
-      navigateTo: 44,
+      navigateTo: 25,
       redirectTo: 19,
       reLaunch: 17,
       navigateBack: 9,
+      pageScrollTo: 1,
       previewImage: 2
     }
     const actualCounts = {}
 
     scripts.forEach((relativePath) => {
       const source = read(relativePath)
+      const usesNativeLifecycle = source.includes("activatePageNativeActions(this)")
       Object.keys(expectedCounts).forEach((method) => {
         extractBalancedCallBodies(source, `wx.${method}({`).forEach((body) => {
           actualCounts[method] = (actualCounts[method] || 0) + 1
           expect(body).toMatch(/fail:/)
+          if (usesNativeLifecycle) {
+            expect(body).toMatch(
+              /isPageNativeActionActive\(this, action\)|isCurrent\(\)|isVehicleEditActive\(\)|fail:\s*fallback/
+            )
+          }
+          if (method === "previewImage") {
+            expect(body).toContain("isPageNativeActionActive(this, action)")
+          }
         })
       })
     })
 
     expect(actualCounts).toEqual(expectedCounts)
+  })
+
+  test("接入原生生命周期守卫的确认弹窗不会在离页后启动操作", () => {
+    const appConfig = JSON.parse(read("app.json"))
+    let guardedCallbackCount = 0
+
+    appConfig.pages.forEach((route) => {
+      const source = read(`${route}.js`)
+      if (!source.includes("activatePageNativeActions(this)")) {
+        return
+      }
+      extractBalancedCallBodies(source, "wx.showModal({").forEach((body) => {
+        if (!/success:/.test(body)) {
+          return
+        }
+        guardedCallbackCount += 1
+        expect(body).toMatch(
+          /isPageNativeActionActive\(|isPageCsvFileActionActive\(|isBookingDetailActive\(|isVehicleDetailActive\(|isVehicleCreateActive\(|isVehicleEditActive\(|isCurrent\(\)/
+        )
+      })
+    })
+
+    expect(guardedCallbackCount).toBeGreaterThanOrEqual(20)
   })
 
   test("图片选择与文件分享会静默处理用户主动取消", () => {
@@ -729,12 +782,24 @@ describe("用户主流程原生图标", () => {
       })
     })
 
-    expect(loadingCount).toBeGreaterThanOrEqual(10)
+    expect(loadingCount).toBeGreaterThanOrEqual(7)
     const vehicleManageSource = read("pages/vehicle-manage/vehicle-manage.js")
     const mutationLoadingTitles = ["更新中…", "停用中…", "恢复中…", "删除中…"]
     expect(vehicleManageSource).toContain("runVehicleMutation(options)")
     mutationLoadingTitles.forEach((title) => {
       expect(vehicleManageSource).toContain(`loadingTitle: "${title}"`)
+    })
+    const mineSource = read("pages/mine/mine.js")
+    const mineLoadingTitles = ["清理中…", "初始化中…", "查询中…"]
+    expect(mineSource).toContain("runMineTool(options)")
+    mineLoadingTitles.forEach((title) => {
+      expect(mineSource).toContain(`loadingTitle: "${title}"`)
+    })
+    const vehicleDetailSource = read("pages/vehicle-detail-manage/vehicle-detail-manage.js")
+    const vehicleDetailLoadingTitles = ["更新中…", "停用中…", "恢复中…"]
+    expect(vehicleDetailSource).toContain("runVehicleStatusOperation(input)")
+    vehicleDetailLoadingTitles.forEach((title) => {
+      expect(vehicleDetailSource).toContain(`loadingTitle: "${title}"`)
     })
     expect(read("pages/vehicle-detail-manage/vehicle-detail-manage.wxml")).toContain("upload-progress-panel")
   })

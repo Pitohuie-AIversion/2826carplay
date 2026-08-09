@@ -1,4 +1,10 @@
 const { formatToastTitle } = require("../../shared/uiFeedback")
+const {
+  activatePageNativeActions,
+  beginPageNativeAction,
+  cancelPageNativeActions,
+  isPageNativeActionActive
+} = require("../../shared/pageNativeAction")
 const FAVORITES_LOAD_TIMEOUT_MS = 15 * 1000
 const FAVORITE_MUTATION_TIMEOUT_MS = 12 * 1000
 
@@ -83,6 +89,7 @@ Page({
   },
 
   onLoad() {
+    activatePageNativeActions(this)
     this.fetchList()
   },
 
@@ -110,6 +117,7 @@ Page({
   },
 
   onUnload() {
+    cancelPageNativeActions(this)
     this._favoritesRequestId = Number(this._favoritesRequestId || 0) + 1
     this._favoriteRemoveSerial = Number(this._favoriteRemoveSerial || 0) + 1
     this._favoriteUndoSerial = Number(this._favoriteUndoSerial || 0) + 1
@@ -123,6 +131,9 @@ Page({
   },
 
   handleRetry() {
+    if (this.data.loading || this.data.removingId || this.data.undoingFavorite) {
+      return
+    }
     this.fetchList()
   },
 
@@ -158,9 +169,13 @@ Page({
   },
 
   handleBrowseGarage() {
+    const action = beginPageNativeAction(this)
     wx.navigateTo({
       url: "/pages/garage/garage",
       fail: () => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         wx.showToast({
           title: "车库打开失败",
           icon: "none"
@@ -175,9 +190,13 @@ Page({
     if (!carId) {
       return
     }
+    const action = beginPageNativeAction(this)
     wx.navigateTo({
       url: `/pages/car-detail/car-detail?carId=${carId}`,
       fail: () => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         wx.showToast({
           title: "车辆详情打开失败",
           icon: "none"
@@ -188,16 +207,19 @@ Page({
 
   handleRemove(event) {
     const vehicleId = String(event.currentTarget.dataset.id || "").trim()
-    if (!vehicleId || this.data.removingId) {
+    if (!vehicleId || this.data.loading || this.data.removingId) {
       return
     }
+    const action = beginPageNativeAction(this, {
+      exclusiveKey: "favorite-remove-confirmation"
+    })
     wx.showModal({
       title: "取消收藏",
       content: "确定将这辆车移出收藏吗？",
       confirmText: "确认取消",
       confirmColor: "#d46868",
       success: (res) => {
-        if (res && res.confirm) {
+        if (isPageNativeActionActive(this, action) && res && res.confirm) {
           this.removeFavorite(vehicleId)
         }
       }
@@ -205,6 +227,10 @@ Page({
   },
 
   removeFavorite(vehicleId) {
+    const targetVehicleId = String(vehicleId || "").trim()
+    if (!targetVehicleId || this.data.loading || this.data.removingId) {
+      return
+    }
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       wx.showToast({
         title: "云能力未初始化",
@@ -213,14 +239,14 @@ Page({
       return
     }
 
-    const removedIndex = this.data.list.findIndex((item) => item.id === vehicleId)
+    const removedIndex = this.data.list.findIndex((item) => item.id === targetVehicleId)
     const removedCar = removedIndex >= 0 ? this.data.list[removedIndex] : null
     const mutationSerial = Number(this._favoriteRemoveSerial || 0) + 1
     this._favoriteRemoveSerial = mutationSerial
     this._favoritesRequestId = Number(this._favoritesRequestId || 0) + 1
     this.finishFavoritesLoadEffects()
     this.clearFavoriteRemoveTimer()
-    this.setData({ removingId: vehicleId, loading: false })
+    this.setData({ removingId: targetVehicleId, loading: false })
 
     let settled = false
     const finishRequest = () => {
@@ -249,7 +275,7 @@ Page({
     const requestOptions = {
       name: "favoriteSet",
       data: {
-        vehicleId,
+        vehicleId: targetVehicleId,
         favorited: false
       },
       success: (res) => {
@@ -265,7 +291,7 @@ Page({
           })
           return
         }
-        this.applyFavoriteList(this.data.list.filter((item) => item.id !== vehicleId), {
+        this.applyFavoriteList(this.data.list.filter((item) => item.id !== targetVehicleId), {
           availableOnly: this.data.availableOnly
         })
         if (this._undoFavoriteTimer) {

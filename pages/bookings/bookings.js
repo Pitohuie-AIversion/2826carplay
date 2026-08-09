@@ -1,5 +1,11 @@
 const { formatToastTitle } = require("../../shared/uiFeedback")
 const { buildVehicleDisplayIdentity } = require("../../shared/vehicle")
+const {
+  activatePageNativeActions,
+  beginPageNativeAction,
+  cancelPageNativeActions,
+  isPageNativeActionActive
+} = require("../../shared/pageNativeAction")
 const BOOKINGS_LOAD_TIMEOUT_MS = 15 * 1000
 const BOOKING_CANCEL_TIMEOUT_MS = 12 * 1000
 
@@ -165,6 +171,7 @@ Page({
   },
 
   onLoad() {
+    activatePageNativeActions(this)
     const app = getApp()
     const env =
       app &&
@@ -184,10 +191,14 @@ Page({
   },
 
   onShow() {
+    if (this.data.loading || this._bookingCancelTimer) {
+      return
+    }
     this.loadList()
   },
 
   onUnload() {
+    cancelPageNativeActions(this)
     this._bookingsRequestId = Number(this._bookingsRequestId || 0) + 1
     this._bookingCancelSerial = Number(this._bookingCancelSerial || 0) + 1
     this.clearBookingsLoadTimer()
@@ -389,9 +400,13 @@ Page({
 
     const current = this.data.list.find((item) => item.id === id)
 
+    const action = beginPageNativeAction(this)
     wx.navigateTo({
       url: `/pages/booking-detail/booking-detail?id=${id}`,
       success: (res) => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         if (current && res && res.eventChannel) {
           res.eventChannel.emit("acceptBookingDetail", {
             booking: current
@@ -399,6 +414,9 @@ Page({
         }
       },
       fail: () => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         wx.showToast({
           title: "页面跳转失败",
           icon: "none"
@@ -413,13 +431,16 @@ Page({
       return
     }
 
+    const action = beginPageNativeAction(this, {
+      exclusiveKey: "booking-cancel-confirmation"
+    })
     wx.showModal({
       title: "取消预约",
       content: "已完成的预约不可取消。确认取消当前预约吗？",
       confirmText: "确认取消",
       confirmColor: "#d46868",
       success: (res) => {
-        if (!res.confirm) {
+        if (!isPageNativeActionActive(this, action) || !res || !res.confirm) {
           return
         }
 
@@ -429,6 +450,10 @@ Page({
   },
 
   cancelBooking(id) {
+    const bookingId = String(id || "").trim()
+    if (!bookingId || this.data.loading) {
+      return
+    }
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       wx.showToast({
         title: "云能力未初始化",
@@ -437,7 +462,6 @@ Page({
       return
     }
 
-    const bookingId = String(id || "").trim()
     const cancelSerial = Number(this._bookingCancelSerial || 0) + 1
     this._bookingCancelSerial = cancelSerial
     this.clearBookingCancelTimer()
@@ -517,12 +541,19 @@ Page({
   },
 
   handleBackGarage() {
+    const action = beginPageNativeAction(this)
     wx.redirectTo({
       url: "/pages/garage/garage",
       fail: () => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         wx.reLaunch({
           url: "/pages/garage/garage",
           fail: () => {
+            if (!isPageNativeActionActive(this, action)) {
+              return
+            }
             wx.showToast({
               title: "返回车库失败",
               icon: "none"
@@ -534,6 +565,9 @@ Page({
   },
 
   handleRetryLoad() {
+    if (this.data.loading || this._bookingCancelTimer) {
+      return
+    }
     this.loadList()
   }
 })

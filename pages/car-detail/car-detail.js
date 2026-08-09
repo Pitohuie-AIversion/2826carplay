@@ -1,6 +1,14 @@
 const { trackEvent } = require("../../shared/analytics")
 const { formatToastTitle } = require("../../shared/uiFeedback")
+const { requestOperationConfig } = require("../../shared/operationConfigRequest")
+const {
+  activatePageNativeActions,
+  beginPageNativeAction,
+  cancelPageNativeActions,
+  isPageNativeActionActive
+} = require("../../shared/pageNativeAction")
 const CAR_DETAIL_LOAD_TIMEOUT_MS = 15 * 1000
+const FAVORITE_STATUS_TIMEOUT_MS = 10 * 1000
 const FAVORITE_UPDATE_TIMEOUT_MS = 12 * 1000
 
 function getStatusText(status, fallbackText) {
@@ -114,6 +122,7 @@ Page({
   },
 
   onLoad(options) {
+    activatePageNativeActions(this)
     const app = getApp()
     const env =
       app &&
@@ -143,42 +152,49 @@ Page({
   },
 
   loadOperationConfig() {
-    if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
-      return
-    }
-
-    wx.cloud.callFunction({
-      name: "operationConfigGet",
-      success: (res) => {
-        const result = res && res.result ? res.result : null
+    this.cancelOperationConfigRequest()
+    this._cancelOperationConfigRequest = requestOperationConfig({
+      onSuccess: (config) => {
         const servicePhone =
-          result && result.ok && result.config
-            ? String(result.config.servicePhone || "").trim()
-            : ""
+          String(config.servicePhone || "").trim()
 
         if (servicePhone) {
           this.setData({
             servicePhone
           })
         }
-      },
-      fail: () => {}
+      }
     })
   },
 
   loadFavoriteStatus(carId) {
+    const requestId = Number(this._favoriteStatusRequestId || 0) + 1
+    this._favoriteStatusRequestId = requestId
+    this.clearFavoriteStatusTimer()
     if (!carId || !wx.cloud || typeof wx.cloud.callFunction !== "function") {
       return
     }
-    const requestId = Number(this._favoriteStatusRequestId || 0) + 1
-    this._favoriteStatusRequestId = requestId
-    wx.cloud.callFunction({
+    let settled = false
+    const finishRequest = () => {
+      if (settled || requestId !== this._favoriteStatusRequestId) {
+        return false
+      }
+      settled = true
+      this.clearFavoriteStatusTimer()
+      return true
+    }
+
+    this._favoriteStatusTimer = setTimeout(() => {
+      finishRequest()
+    }, FAVORITE_STATUS_TIMEOUT_MS)
+
+    const requestOptions = {
       name: "favoriteStatus",
       data: {
         vehicleId: carId
       },
       success: (res) => {
-        if (requestId !== this._favoriteStatusRequestId) {
+        if (!finishRequest()) {
           return
         }
         const result = res && res.result ? res.result : null
@@ -188,8 +204,16 @@ Page({
           })
         }
       },
-      fail: () => {}
-    })
+      fail: () => {
+        finishRequest()
+      }
+    }
+
+    try {
+      wx.cloud.callFunction(requestOptions)
+    } catch (error) {
+      finishRequest()
+    }
   },
 
   loadCarDetail(carId) {
@@ -276,11 +300,28 @@ Page({
   },
 
   onUnload() {
+    cancelPageNativeActions(this)
     this._carDetailRequestId = Number(this._carDetailRequestId || 0) + 1
     this._favoriteStatusRequestId = Number(this._favoriteStatusRequestId || 0) + 1
     this._favoriteUpdateSerial = Number(this._favoriteUpdateSerial || 0) + 1
+    this.cancelOperationConfigRequest()
     this.clearCarDetailLoadTimer()
+    this.clearFavoriteStatusTimer()
     this.clearFavoriteUpdateTimer()
+  },
+
+  cancelOperationConfigRequest() {
+    if (typeof this._cancelOperationConfigRequest === "function") {
+      this._cancelOperationConfigRequest()
+      this._cancelOperationConfigRequest = null
+    }
+  },
+
+  clearFavoriteStatusTimer() {
+    if (this._favoriteStatusTimer) {
+      clearTimeout(this._favoriteStatusTimer)
+      this._favoriteStatusTimer = null
+    }
   },
 
   setLoadError(message) {
@@ -369,10 +410,14 @@ Page({
         : this.data.currentImageIndex
     const current = car.images[currentIndex] || car.images[0]
 
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.previewImage({
       current,
       urls: car.images,
       fail: () => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         wx.showToast({
           title: "图片预览失败",
           icon: "none"
@@ -398,6 +443,7 @@ Page({
     const updateSerial = Number(this._favoriteUpdateSerial || 0) + 1
     this._favoriteUpdateSerial = updateSerial
     this._favoriteStatusRequestId = Number(this._favoriteStatusRequestId || 0) + 1
+    this.clearFavoriteStatusTimer()
     this.clearFavoriteUpdateTimer()
     this.setData({ favoriteLoading: true })
 
@@ -481,9 +527,13 @@ Page({
       return
     }
 
+    const action = beginPageNativeAction(this)
     wx.navigateTo({
       url: `/pages/booking/booking?carId=${this.data.carId}`,
       fail: () => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         wx.showToast({
           title: "预约页面打开失败",
           icon: "none"
@@ -502,9 +552,13 @@ Page({
       return
     }
 
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.makePhoneCall({
       phoneNumber: phone,
       fail: (error) => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         const message = error && (error.errMsg || error.message)
         if (message && String(message).includes("cancel")) {
           return
@@ -521,18 +575,28 @@ Page({
   },
 
   handleBackGarage() {
+    const action = beginPageNativeAction(this)
     const pages = getCurrentPages()
 
     if (pages.length > 1) {
       wx.navigateBack({
         delta: 1,
         fail: () => {
+          if (!isPageNativeActionActive(this, action)) {
+            return
+          }
           wx.redirectTo({
             url: "/pages/garage/garage",
             fail: () => {
+              if (!isPageNativeActionActive(this, action)) {
+                return
+              }
               wx.reLaunch({
                 url: "/pages/garage/garage",
                 fail: () => {
+                  if (!isPageNativeActionActive(this, action)) {
+                    return
+                  }
                   wx.showToast({
                     title: "返回车库失败",
                     icon: "none"
@@ -549,9 +613,15 @@ Page({
     wx.redirectTo({
       url: "/pages/garage/garage",
       fail: () => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         wx.reLaunch({
           url: "/pages/garage/garage",
           fail: () => {
+            if (!isPageNativeActionActive(this, action)) {
+              return
+            }
             wx.showToast({
               title: "返回车库失败",
               icon: "none"
@@ -563,6 +633,9 @@ Page({
   },
 
   handleRetryLoad() {
+    if (this.data.loading || this.data.favoriteLoading) {
+      return
+    }
     this.loadCarDetail(this.data.carId)
   },
 

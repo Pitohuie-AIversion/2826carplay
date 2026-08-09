@@ -371,6 +371,7 @@ describe("我的预约旅程状态", () => {
     }
     const page = createPage(loadPageDefinition("../pages/booking-detail/booking-detail"))
     page.data.id = "cancel-detail-timeout"
+    page.data.canCancel = true
     page.loadDetail = jest.fn()
 
     page.cancelBooking()
@@ -395,10 +396,119 @@ describe("我的预约旅程状态", () => {
     }
     const page = createPage(loadPageDefinition("../pages/booking-detail/booking-detail"))
     page.data.id = "cancel-detail-error"
+    page.data.canCancel = true
 
     expect(() => page.cancelBooking()).not.toThrow()
     expect(page.data.loading).toBe(false)
     expect(wx.showToast).toHaveBeenCalledWith({ title: "取消失败", icon: "none" })
+  })
+
+  test("详情编辑草稿期间拒绝刷新、订阅和取消入口覆盖当前输入", () => {
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn()
+      },
+      requestSubscribeMessage: jest.fn(),
+      showModal: jest.fn(),
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition("../pages/booking-detail/booking-detail"))
+    page.data.id = "booking-editing"
+    page.data.canEdit = true
+    page.data.canCancel = true
+    page.data.editing = true
+    page.data.bookingStatusTemplateId = "template_1234567890"
+    page.data.editForm = {
+      userName: "草稿联系人",
+      phone: "13800138000",
+      city: "杭州",
+      note: "尚未保存的草稿"
+    }
+
+    page.loadDetail()
+    page.handleRequestStatusSubscription()
+    page.handleCancel()
+    page.cancelBooking()
+
+    expect(wx.cloud.callFunction).not.toHaveBeenCalled()
+    expect(wx.requestSubscribeMessage).not.toHaveBeenCalled()
+    expect(wx.showModal).not.toHaveBeenCalled()
+    expect(page.data.editForm.note).toBe("尚未保存的草稿")
+    expect(page.data.editing).toBe(true)
+  })
+
+  test("取消确认期间锁定编辑与订阅并在放弃取消后恢复", () => {
+    let modalOptions = null
+    global.wx = {
+      showModal: jest.fn((options) => {
+        modalOptions = options
+      }),
+      requestSubscribeMessage: jest.fn(),
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition("../pages/booking-detail/booking-detail"))
+    page.data.id = "booking-confirm"
+    page.data.canEdit = true
+    page.data.canCancel = true
+    page.data.bookingStatusTemplateId = "template_1234567890"
+    page.data.booking = {
+      userName: "张先生",
+      phone: "13800138000",
+      city: "杭州",
+      note: ""
+    }
+
+    page.handleCancel()
+    page.handleCancel()
+    page.handleStartEdit()
+    page.handleRequestStatusSubscription()
+
+    expect(page.data.cancelling).toBe(true)
+    expect(wx.showModal).toHaveBeenCalledTimes(1)
+    expect(page.data.editing).toBe(false)
+    expect(wx.requestSubscribeMessage).not.toHaveBeenCalled()
+
+    modalOptions.success({ confirm: false })
+    expect(page.data.cancelling).toBe(false)
+
+    page.handleStartEdit()
+    expect(page.data.editing).toBe(true)
+  })
+
+  test("确认取消后保持独占状态并在成功时刷新详情", () => {
+    let modalOptions = null
+    let cancelOptions = null
+    global.wx = {
+      showModal: jest.fn((options) => {
+        modalOptions = options
+      }),
+      cloud: {
+        callFunction: jest.fn((options) => {
+          cancelOptions = options
+        })
+      },
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition("../pages/booking-detail/booking-detail"))
+    page.data.id = "booking-confirmed"
+    page.data.canCancel = true
+    page.loadDetail = jest.fn()
+
+    page.handleCancel()
+    modalOptions.success({ confirm: true })
+
+    expect(wx.cloud.callFunction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "bookingCancel",
+        data: { id: "booking-confirmed" }
+      })
+    )
+    expect(page.data.loading).toBe(true)
+    expect(page.data.cancelling).toBe(true)
+
+    cancelOptions.success({ result: { ok: true } })
+    expect(page.data.cancelling).toBe(false)
+    expect(page.loadDetail).toHaveBeenCalledTimes(1)
   })
 
   test("详情页状态变化时同步更新进度与下一步说明", () => {
@@ -503,7 +613,8 @@ describe("我的预约旅程状态", () => {
     expect(wxml).toContain("progress-node-cancel")
     expect(wxml).toContain("{{saving ? '正在保存' : '保存修改'}}")
     expect(wxml).toContain("{{subscriptionRequesting ? '正在订阅' : '立即订阅'}}")
-    expect(wxml).toContain("{{loading ? '正在取消' : '取消本次预约'}}")
+    expect(wxml).toContain("{{cancelling ? '正在取消' : '取消本次预约'}}")
+    expect(wxml).toContain('loading="{{cancelling}}" disabled="{{loading || editing || saving || subscriptionRequesting || cancelling}}"')
     expect(wxml).toContain("copy-native-icon")
     expect(wxml).toContain('aria-label="复制预约编号 {{bookingReference}}"')
     expect(wxml).toContain('class="brand-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true"')

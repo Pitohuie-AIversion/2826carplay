@@ -99,9 +99,9 @@
     <view wx:if="{{exportFilePath}}" class="export-actions">
       <view class="export-tip"><view class="export-file-native-icon" aria-hidden="true"><view class="export-file-line"></view></view><view><view class="export-tip-title">导出文件已就绪</view><view class="export-tip-name">{{exportFileName}}</view></view></view>
       <view class="actions">
-        <button wx:if="{{canShareExport}}" class="action-btn ui-btn ui-btn-primary" bindtap="handleShareExportedFile"><view class="export-action-content"><view class="share-native-icon" aria-hidden="true"></view><text>分享</text></view></button>
-        <button class="action-btn ui-btn {{canShareExport ? 'ui-btn-ghost' : 'ui-btn-primary'}}" bindtap="handleOpenExportedFile"><view class="export-action-content"><view class="open-native-icon" aria-hidden="true"><view class="open-native-line"></view></view><text>打开</text></view></button>
-        <button class="action-btn ui-btn ui-btn-ghost action-btn-last export-delete-btn" bindtap="handleDeleteExportedFile"><view class="export-action-content"><view class="export-delete-native-icon" aria-hidden="true"></view><text>删除</text></view></button>
+        <button wx:if="{{canShareExport}}" class="action-btn ui-btn ui-btn-primary" disabled="{{loading}}" bindtap="handleShareExportedFile"><view class="export-action-content"><view class="share-native-icon" aria-hidden="true"></view><text>分享</text></view></button>
+        <button class="action-btn ui-btn {{canShareExport ? 'ui-btn-ghost' : 'ui-btn-primary'}}" disabled="{{loading}}" bindtap="handleOpenExportedFile"><view class="export-action-content"><view class="open-native-icon" aria-hidden="true"><view class="open-native-line"></view></view><text>打开</text></view></button>
+        <button class="action-btn ui-btn ui-btn-ghost action-btn-last export-delete-btn" disabled="{{loading}}" bindtap="handleDeleteExportedFile"><view class="export-action-content"><view class="export-delete-native-icon" aria-hidden="true"></view><text>删除</text></view></button>
       </view>
     </view>
   </view>
@@ -228,8 +228,8 @@
       </view>
 
       <view class="quick-action-row">
-        <button class="quick-action-btn ui-btn ui-btn-primary" data-phone="{{item.phone}}" bindtap="handleCallPhone"><view class="booking-action-content"><view class="call-native-icon" aria-hidden="true"></view><text>拨打电话</text></view></button>
-        <button class="quick-action-btn quick-action-btn-last ui-btn ui-btn-ghost" data-id="{{item.id}}" bindtap="handleViewDetail"><view class="booking-action-content"><view class="detail-native-icon" aria-hidden="true"></view><text>查看详情</text></view></button>
+        <button class="quick-action-btn ui-btn ui-btn-primary" data-phone="{{item.phone}}" disabled="{{loading}}" bindtap="handleCallPhone"><view class="booking-action-content"><view class="call-native-icon" aria-hidden="true"></view><text>拨打电话</text></view></button>
+        <button class="quick-action-btn quick-action-btn-last ui-btn ui-btn-ghost" data-id="{{item.id}}" disabled="{{loading}}" bindtap="handleViewDetail"><view class="booking-action-content"><view class="detail-native-icon" aria-hidden="true"></view><text>查看详情</text></view></button>
       </view>
       <view wx:if="{{item.note}}" class="booking-note"><view class="booking-note-icon" aria-hidden="true"></view><view><view class="booking-note-label">用户备注</view><view class="booking-note-text">{{item.note}}</view></view></view>
 

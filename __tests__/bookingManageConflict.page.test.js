@@ -20,7 +20,19 @@ function createPage(definition, overrides) {
     }
   }
   page.setData = jest.fn((patch) => {
-    Object.assign(page.data, patch)
+    Object.entries(patch).forEach(([key, value]) => {
+      const segments = key.split(".")
+      if (segments.length === 1) {
+        page.data[key] = value
+        return
+      }
+      let target = page.data
+      segments.slice(0, -1).forEach((segment) => {
+        target[segment] = target[segment] || {}
+        target = target[segment]
+      })
+      target[segments[segments.length - 1]] = value
+    })
   })
   return page
 }
@@ -304,6 +316,79 @@ describe("pages/booking-manage-detail conflict handling", () => {
     })
   })
 
+  test("详情读取期间拒绝迟到备注输入", () => {
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn()
+      },
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition(), {
+      id: "booking_loading_remark",
+      loading: true,
+      booking: {
+        adminRemark: "线上备注",
+        adminRemarkDraft: "线上备注"
+      }
+    })
+
+    page.handleRemarkInput({ detail: { value: "迟到输入" } })
+
+    expect(page.data.booking.adminRemarkDraft).toBe("线上备注")
+    expect(page.data.remarkDirty).toBe(false)
+  })
+
+  test("未保存备注阻止详情刷新和其他写入但仍可保存草稿", () => {
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn()
+      },
+      showModal: jest.fn(),
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition(), {
+      id: "booking_dirty_remark",
+      pageAuthorized: true,
+      loading: false,
+      coordinationEditable: true,
+      booking: {
+        adminRemark: "原备注",
+        adminRemarkDraft: "原备注",
+        schedulePriority: "normal",
+        coordinationStatus: "pending"
+      }
+    })
+
+    page.handleRemarkInput({ detail: { value: "新的跟进备注" } })
+    page.onShow()
+    page.loadDetail()
+    page.handleUpdateCoordination({
+      currentTarget: {
+        dataset: { field: "schedulePriority", value: "priority" }
+      }
+    })
+    page.handleUpdateStatus({
+      currentTarget: { dataset: { status: "contacted" } }
+    })
+
+    expect(page.data.remarkDirty).toBe(true)
+    expect(global.wx.cloud.callFunction).not.toHaveBeenCalled()
+    expect(global.wx.showModal).not.toHaveBeenCalled()
+
+    page.handleSaveRemark()
+
+    expect(global.wx.cloud.callFunction).toHaveBeenCalledWith({
+      name: "bookingUpdateAdminRemark",
+      data: {
+        id: "booking_dirty_remark",
+        adminRemark: "新的跟进备注"
+      },
+      success: expect.any(Function),
+      fail: expect.any(Function)
+    })
+    page.onUnload()
+  })
+
   test("管理详情使用日期路线、冲突反馈和原生操作图标", () => {
     const pageDir = path.resolve(__dirname, "../pages/booking-manage-detail")
     const wxml = fs.readFileSync(path.join(pageDir, "booking-manage-detail.wxml"), "utf8")
@@ -331,9 +416,10 @@ describe("pages/booking-manage-detail conflict handling", () => {
     expect(wxml).toContain("manage-detail-button-pressed")
     expect(wxml).toContain('aria-pressed="{{booking.schedulePriority ===')
     expect(wxml).toContain(
-      'disabled="{{loading || coordinationLoading || !coordinationEditable}}"'
+      'disabled="{{loading || coordinationLoading || remarkDirty || !coordinationEditable}}"'
     )
     expect(wxml).toContain('disabled="{{loading || coordinationLoading}}"')
+    expect(wxml).toContain('disabled="{{loading || coordinationLoading || remarkDirty}}"')
     expect(wxss).toContain(".coordination-option-pressed")
     expect(wxss).toContain(".manage-detail-button-pressed")
   })

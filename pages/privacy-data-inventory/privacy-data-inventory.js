@@ -1,5 +1,17 @@
-const { requirePagePermission } = require("../../shared/pageAuth")
+const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
 const { formatToastTitle } = require("../../shared/uiFeedback")
+const {
+  activatePageCsvFileActions,
+  beginPageCsvFileAction,
+  cancelPageCsvFileActions,
+  isPageCsvFileActionActive
+} = require("../../shared/pageCsvFileActions")
+const {
+  activatePageNativeActions,
+  beginPageNativeAction,
+  cancelPageNativeActions,
+  isPageNativeActionActive
+} = require("../../shared/pageNativeAction")
 const {
   canShareCsvFile,
   isUserCancelError,
@@ -218,6 +230,8 @@ Page({
   },
 
   onLoad(options) {
+    activatePageCsvFileActions(this)
+    activatePageNativeActions(this)
     const requestId = String((options && options.id) || "").trim()
     this.setData({
       requestId,
@@ -240,6 +254,9 @@ Page({
   },
 
   onUnload() {
+    cancelPagePermissionCheck(this)
+    cancelPageCsvFileActions(this)
+    cancelPageNativeActions(this)
     this._inventoryRequestId = Number(this._inventoryRequestId || 0) + 1
     this._exportRequestSerial = Number(this._exportRequestSerial || 0) + 1
     this.finishInventoryRequestEffects()
@@ -264,6 +281,9 @@ Page({
   },
 
   handleCopyOpenid() {
+    if (this.data.loading || this.data.refreshing || this.data.exporting) {
+      return
+    }
     const openid = String(this.data.request.openid || "")
     if (!openid) {
       wx.showToast({
@@ -272,15 +292,22 @@ Page({
       })
       return
     }
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.setClipboardData({
       data: openid,
       success: () => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         wx.showToast({
           title: "申请账号已复制",
           icon: "none"
         })
       },
       fail: () => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         wx.showToast({
           title: "申请账号复制失败",
           icon: "none"
@@ -291,12 +318,16 @@ Page({
 
   handleBookingTap(event) {
     const id = String(event.currentTarget.dataset.id || "")
-    if (!id) {
+    if (this.data.loading || this.data.refreshing || this.data.exporting || !id) {
       return
     }
+    const action = beginPageNativeAction(this)
     wx.navigateTo({
       url: `/pages/booking-manage-detail/booking-manage-detail?id=${encodeURIComponent(id)}`,
       fail: () => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         wx.showToast({
           title: "预约详情打开失败",
           icon: "none"
@@ -331,13 +362,23 @@ Page({
       return
     }
 
+    const action = beginPageNativeAction(this, {
+      exclusiveKey: "privacy-inventory-export-confirmation"
+    })
     wx.showModal({
       title: "导出个人数据",
       content: "文件包含用户 OpenID、姓名、手机号和申请内容，请仅用于本次隐私申请并妥善保管。",
       confirmText: "确认导出",
       confirmColor: "#528fff",
       success: (modalResult) => {
-        if (!modalResult.confirm) {
+        if (
+          !isPageNativeActionActive(this, action) ||
+          !modalResult ||
+          !modalResult.confirm
+        ) {
+          return
+        }
+        if (this.data.loading || this.data.refreshing || this.data.exporting) {
           return
         }
         const inventoryRequestId = String(this.data.requestId || "").trim()
@@ -431,10 +472,15 @@ Page({
   },
 
   handleShareExportedFile() {
-    if (!this.data.exportFilePath || !this.data.exportFileName) {
+    if (this.data.exporting || !this.data.exportFilePath || !this.data.exportFileName) {
       return
     }
-    shareCsvFile(this.data.exportFilePath, this.data.exportFileName).catch((error) => {
+    const filePath = this.data.exportFilePath
+    const action = beginPageCsvFileAction(this, filePath)
+    shareCsvFile(filePath, this.data.exportFileName).catch((error) => {
+      if (!isPageCsvFileActionActive(this, action)) {
+        return
+      }
       if (isUserCancelError(error)) {
         return
       }
@@ -443,10 +489,15 @@ Page({
   },
 
   handleOpenExportedFile() {
-    if (!this.data.exportFilePath) {
+    if (this.data.exporting || !this.data.exportFilePath) {
       return
     }
-    openCsvFile(this.data.exportFilePath).catch(() => {
+    const filePath = this.data.exportFilePath
+    const action = beginPageCsvFileAction(this, filePath)
+    openCsvFile(filePath).catch(() => {
+      if (!isPageCsvFileActionActive(this, action)) {
+        return
+      }
       wx.showToast({
         title: "文件已生成",
         icon: "none"
@@ -456,20 +507,28 @@ Page({
 
   handleDeleteExportedFile() {
     const filePath = String(this.data.exportFilePath || "")
-    if (!filePath) {
+    if (this.data.exporting || !filePath) {
       return
     }
+    const action = beginPageCsvFileAction(this, filePath)
     wx.showModal({
       title: "删除本地个人数据",
       content: "将从当前设备删除这份 CSV，删除后无法恢复。云端用户数据和隐私申请不会受到影响。",
       confirmText: "确认删除",
       confirmColor: "#d46868",
       success: (res) => {
-        if (!res.confirm) {
+        if (
+          this.data.exporting ||
+          !isPageCsvFileActionActive(this, action) ||
+          !res.confirm
+        ) {
           return
         }
         removeCsvFile(filePath)
           .then(() => {
+            if (!isPageCsvFileActionActive(this, action)) {
+              return
+            }
             this.setData({
               exportFilePath: "",
               exportFileName: ""
@@ -480,6 +539,9 @@ Page({
             })
           })
           .catch((error) => {
+            if (!isPageCsvFileActionActive(this, action)) {
+              return
+            }
             wx.showToast({
               title: "删除失败",
               icon: "none"

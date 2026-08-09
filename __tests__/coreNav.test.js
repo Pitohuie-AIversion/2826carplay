@@ -109,6 +109,31 @@ describe("components/core-nav 核心导航", () => {
     expect(wx.redirectTo).not.toHaveBeenCalled()
   })
 
+  test("does not run fallback navigation after the component detaches", () => {
+    let navigateOptions
+    global.getCurrentPages = jest.fn(() => [{ route: "pages/garage/garage" }])
+    global.wx = {
+      navigateBack: jest.fn(),
+      navigateTo: jest.fn((options) => {
+        navigateOptions = options
+      }),
+      redirectTo: jest.fn(),
+      reLaunch: jest.fn(),
+      showToast: jest.fn()
+    }
+    const definition = loadComponentDefinition()
+    const component = createComponent(definition, "garage")
+    definition.lifetimes.attached.call(component)
+
+    component.handleNavigate({ currentTarget: { dataset: { key: "favorites" } } })
+    definition.lifetimes.detached.call(component)
+    navigateOptions.fail(new Error("navigate failed"))
+
+    expect(global.wx.redirectTo).not.toHaveBeenCalled()
+    expect(global.wx.reLaunch).not.toHaveBeenCalled()
+    expect(global.wx.showToast).not.toHaveBeenCalled()
+  })
+
   test("使用统一的原生图标并提供无障碍名称", () => {
     const wxml = fs.readFileSync(
       path.resolve(__dirname, "../components/core-nav/core-nav.wxml"),

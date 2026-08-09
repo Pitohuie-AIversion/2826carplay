@@ -52,9 +52,9 @@
       </view>
     </view>
     <view class="quick-contact">
-      <button class="quick-contact-btn quick-contact-primary ui-btn ui-btn-primary action-with-icon" bindtap="handleCallPhone"><view class="call-native-icon" aria-hidden="true"></view><text>拨打电话</text></button>
-      <button class="quick-contact-btn ui-btn ui-btn-ghost action-with-icon" data-field="phone" bindtap="handleCopyContact"><view class="copy-native-icon" aria-hidden="true"></view><text>复制手机号</text></button>
-      <button class="quick-contact-btn quick-contact-btn-last ui-btn ui-btn-ghost action-with-icon" data-field="openid" bindtap="handleCopyContact"><view class="identity-native-icon" aria-hidden="true"><view class="identity-native-dot"></view></view><text>复制 OpenID</text></button>
+      <button class="quick-contact-btn quick-contact-primary ui-btn ui-btn-primary action-with-icon" disabled="{{loading || coordinationLoading}}" bindtap="handleCallPhone"><view class="call-native-icon" aria-hidden="true"></view><text>拨打电话</text></button>
+      <button class="quick-contact-btn ui-btn ui-btn-ghost action-with-icon" disabled="{{loading || coordinationLoading}}" data-field="phone" bindtap="handleCopyContact"><view class="copy-native-icon" aria-hidden="true"></view><text>复制手机号</text></button>
+      <button class="quick-contact-btn quick-contact-btn-last ui-btn ui-btn-ghost action-with-icon" disabled="{{loading || coordinationLoading}}" data-field="openid" bindtap="handleCopyContact"><view class="identity-native-icon" aria-hidden="true"><view class="identity-native-dot"></view></view><text>复制 OpenID</text></button>
     </view>
   </view>
 
@@ -74,27 +74,27 @@
           class="coordination-option {{booking.schedulePriority === 'priority' ? 'coordination-option-priority coordination-option-active' : ''}}"
           data-field="schedulePriority"
           data-value="priority"
-          disabled="{{loading || coordinationLoading || !coordinationEditable}}"
+          disabled="{{loading || coordinationLoading || remarkDirty || !coordinationEditable}}"
           bindtap="handleUpdateCoordination"
-          hover-class="{{loading || coordinationLoading || !coordinationEditable ? 'none' : 'coordination-option-pressed'}}"
+          hover-class="{{loading || coordinationLoading || remarkDirty || !coordinationEditable ? 'none' : 'coordination-option-pressed'}}"
           aria-pressed="{{booking.schedulePriority === 'priority'}}"
         >优先</button>
         <button
           class="coordination-option {{booking.schedulePriority === 'normal' ? 'coordination-option-normal coordination-option-active' : ''}}"
           data-field="schedulePriority"
           data-value="normal"
-          disabled="{{loading || coordinationLoading || !coordinationEditable}}"
+          disabled="{{loading || coordinationLoading || remarkDirty || !coordinationEditable}}"
           bindtap="handleUpdateCoordination"
-          hover-class="{{loading || coordinationLoading || !coordinationEditable ? 'none' : 'coordination-option-pressed'}}"
+          hover-class="{{loading || coordinationLoading || remarkDirty || !coordinationEditable ? 'none' : 'coordination-option-pressed'}}"
           aria-pressed="{{booking.schedulePriority === 'normal'}}"
         >常规</button>
         <button
           class="coordination-option {{booking.schedulePriority === 'standby' ? 'coordination-option-standby coordination-option-active' : ''}}"
           data-field="schedulePriority"
           data-value="standby"
-          disabled="{{loading || coordinationLoading || !coordinationEditable}}"
+          disabled="{{loading || coordinationLoading || remarkDirty || !coordinationEditable}}"
           bindtap="handleUpdateCoordination"
-          hover-class="{{loading || coordinationLoading || !coordinationEditable ? 'none' : 'coordination-option-pressed'}}"
+          hover-class="{{loading || coordinationLoading || remarkDirty || !coordinationEditable ? 'none' : 'coordination-option-pressed'}}"
           aria-pressed="{{booking.schedulePriority === 'standby'}}"
         >候补</button>
       </view>
@@ -107,27 +107,27 @@
           class="coordination-option {{booking.coordinationStatus === 'pending' ? 'coordination-option-pending coordination-option-active' : ''}}"
           data-field="coordinationStatus"
           data-value="pending"
-          disabled="{{loading || coordinationLoading || !coordinationEditable}}"
+          disabled="{{loading || coordinationLoading || remarkDirty || !coordinationEditable}}"
           bindtap="handleUpdateCoordination"
-          hover-class="{{loading || coordinationLoading || !coordinationEditable ? 'none' : 'coordination-option-pressed'}}"
+          hover-class="{{loading || coordinationLoading || remarkDirty || !coordinationEditable ? 'none' : 'coordination-option-pressed'}}"
           aria-pressed="{{booking.coordinationStatus === 'pending'}}"
         >待协调</button>
         <button
           class="coordination-option {{booking.coordinationStatus === 'coordinating' ? 'coordination-option-coordinating coordination-option-active' : ''}}"
           data-field="coordinationStatus"
           data-value="coordinating"
-          disabled="{{loading || coordinationLoading || !coordinationEditable}}"
+          disabled="{{loading || coordinationLoading || remarkDirty || !coordinationEditable}}"
           bindtap="handleUpdateCoordination"
-          hover-class="{{loading || coordinationLoading || !coordinationEditable ? 'none' : 'coordination-option-pressed'}}"
+          hover-class="{{loading || coordinationLoading || remarkDirty || !coordinationEditable ? 'none' : 'coordination-option-pressed'}}"
           aria-pressed="{{booking.coordinationStatus === 'coordinating'}}"
         >协调中</button>
         <button
           class="coordination-option {{booking.coordinationStatus === 'resolved' ? 'coordination-option-resolved coordination-option-active' : ''}}"
           data-field="coordinationStatus"
           data-value="resolved"
-          disabled="{{loading || coordinationLoading || !coordinationEditable}}"
+          disabled="{{loading || coordinationLoading || remarkDirty || !coordinationEditable}}"
           bindtap="handleUpdateCoordination"
-          hover-class="{{loading || coordinationLoading || !coordinationEditable ? 'none' : 'coordination-option-pressed'}}"
+          hover-class="{{loading || coordinationLoading || remarkDirty || !coordinationEditable ? 'none' : 'coordination-option-pressed'}}"
           aria-pressed="{{booking.coordinationStatus === 'resolved'}}"
         >已协调</button>
       </view>
@@ -176,12 +176,14 @@
             <button
               class="conflict-action conflict-action-primary"
               data-phone="{{item.phone}}"
+              disabled="{{loading || coordinationLoading}}"
               catchtap="handleConflictCall"
               hover-class="manage-detail-button-pressed"
             ><view class="call-native-icon" aria-hidden="true"></view><text>拨打电话</text></button>
             <button
               class="conflict-action"
               data-id="{{item.id}}"
+              disabled="{{loading || coordinationLoading}}"
               catchtap="handleConflictTap"
               hover-class="manage-detail-button-pressed"
             ><view class="detail-native-icon" aria-hidden="true"><view class="detail-native-dot"></view></view><text>查看预约</text></button>
@@ -225,6 +227,7 @@
       placeholder="记录联系结果、到店时间、后续计划"
       aria-label="预约内部备注"
       value="{{booking.adminRemarkDraft}}"
+      disabled="{{loading || coordinationLoading}}"
       bindinput="handleRemarkInput"
     />
     <button class="save-btn ui-btn ui-btn-primary action-with-icon" loading="{{loading}}" disabled="{{loading || coordinationLoading}}" bindtap="handleSaveRemark"><view wx:if="{{!loading}}" class="save-native-icon" aria-hidden="true"><view class="save-native-line"></view></view><text>{{loading ? '正在保存' : '保存备注'}}</text></button>
@@ -234,9 +237,9 @@
     <view class="action-title note-title-with-icon"><view class="status-operation-native-icon" aria-hidden="true"><view class="status-operation-dot"></view></view><text>状态操作</text></view>
     <view class="action-tip"><view class="help-native-icon" aria-hidden="true"><view class="help-info-mark"></view></view><view>拨号不会自动改变状态，请在实际沟通完成后再标记“已联系”。</view></view>
     <view class="status-actions">
-      <button wx:if="{{booking.status === 'pending'}}" class="status-btn status-btn-alt action-with-icon" disabled="{{loading || coordinationLoading}}" data-status="contacted" bindtap="handleUpdateStatus" hover-class="{{loading || coordinationLoading ? 'none' : 'manage-detail-button-pressed'}}"><view class="status-contact-native-icon" aria-hidden="true"></view><text>标记已联系</text></button>
-      <button wx:if="{{booking.status === 'contacted'}}" class="status-btn action-with-icon" disabled="{{loading || coordinationLoading}}" data-status="completed" bindtap="handleUpdateStatus" hover-class="{{loading || coordinationLoading ? 'none' : 'manage-detail-button-pressed'}}"><view class="status-complete-native-icon" aria-hidden="true"></view><text>标记已完成</text></button>
-      <button class="status-btn status-btn-alt status-btn-danger status-btn-last action-with-icon" disabled="{{loading || coordinationLoading}}" data-status="cancelled" bindtap="handleUpdateStatus" hover-class="{{loading || coordinationLoading ? 'none' : 'manage-detail-button-pressed'}}"><view class="status-cancel-native-icon" aria-hidden="true"></view><text>取消预约</text></button>
+      <button wx:if="{{booking.status === 'pending'}}" class="status-btn status-btn-alt action-with-icon" disabled="{{loading || coordinationLoading || remarkDirty}}" data-status="contacted" bindtap="handleUpdateStatus" hover-class="{{loading || coordinationLoading || remarkDirty ? 'none' : 'manage-detail-button-pressed'}}"><view class="status-contact-native-icon" aria-hidden="true"></view><text>标记已联系</text></button>
+      <button wx:if="{{booking.status === 'contacted'}}" class="status-btn action-with-icon" disabled="{{loading || coordinationLoading || remarkDirty}}" data-status="completed" bindtap="handleUpdateStatus" hover-class="{{loading || coordinationLoading || remarkDirty ? 'none' : 'manage-detail-button-pressed'}}"><view class="status-complete-native-icon" aria-hidden="true"></view><text>标记已完成</text></button>
+      <button class="status-btn status-btn-alt status-btn-danger status-btn-last action-with-icon" disabled="{{loading || coordinationLoading || remarkDirty}}" data-status="cancelled" bindtap="handleUpdateStatus" hover-class="{{loading || coordinationLoading || remarkDirty ? 'none' : 'manage-detail-button-pressed'}}"><view class="status-cancel-native-icon" aria-hidden="true"></view><text>取消预约</text></button>
     </view>
   </view>
   </block>

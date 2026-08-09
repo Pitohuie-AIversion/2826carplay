@@ -1,4 +1,11 @@
 const { formatToastTitle } = require("../../shared/uiFeedback")
+const { requestOperationConfig } = require("../../shared/operationConfigRequest")
+const {
+  activatePageNativeActions,
+  beginPageNativeAction,
+  cancelPageNativeActions,
+  isPageNativeActionActive
+} = require("../../shared/pageNativeAction")
 
 const MENU_ITEMS = [
   { key: "bookings", title: "我的预约", desc: "查看已提交的预约咨询", section: "会员服务", sectionKicker: "MEMBER", icon: "calendar" },
@@ -52,6 +59,27 @@ const MEMBER_QUICK_ACTIONS = [
   }
 ]
 const MEMBER_QUICK_ACTION_KEYS = new Set(MEMBER_QUICK_ACTIONS.map((item) => item.key))
+const MENU_ROUTE_MAP = Object.freeze({
+  analyticsManage: "/pages/analytics-manage/analytics-manage",
+  auditLogManage: "/pages/audit-log-manage/audit-log-manage",
+  bookingCalendar: "/pages/booking-calendar/booking-calendar",
+  bookingManage: "/pages/booking-manage/booking-manage",
+  bookings: "/pages/bookings/bookings",
+  bookingWorkbench: "/pages/booking-workbench/booking-workbench",
+  configManage: "/pages/config-manage/config-manage",
+  errorLogManage: "/pages/error-log-manage/error-log-manage",
+  faq: "/pages/content-page/content-page?type=faq",
+  favorites: "/pages/favorites/favorites",
+  operationsOverview: "/pages/operations-overview/operations-overview",
+  privacy: "/pages/content-page/content-page?type=privacy",
+  privacyRequest: "/pages/privacy-request/privacy-request",
+  privacyRequestManage: "/pages/privacy-request-manage/privacy-request-manage",
+  roleManage: "/pages/role-manage/role-manage",
+  rules: "/pages/content-page/content-page?type=rules",
+  systemHealth: "/pages/system-health/system-health",
+  vehicleCreate: "/pages/vehicle-create/vehicle-create",
+  vehicleManage: "/pages/vehicle-manage/vehicle-manage"
+})
 
 function buildVisibleMenuItems(options) {
   const input = options && typeof options === "object" ? options : {}
@@ -268,6 +296,8 @@ function buildPermissionFailureRole() {
 }
 
 const PERMISSION_LOAD_TIMEOUT_MS = 12 * 1000
+const SUMMARY_LOAD_TIMEOUT_MS = 15 * 1000
+const MINE_TOOL_TIMEOUT_MS = 20 * 1000
 
 Page({
   data: {
@@ -305,6 +335,7 @@ Page({
   },
 
   onLoad() {
+    activatePageNativeActions(this)
     let envVersion = "release"
     try {
       const info = wx.getAccountInfoSync ? wx.getAccountInfoSync() : null
@@ -332,35 +363,50 @@ Page({
   },
 
   onShow() {
-    if (this.data.permissionsReady && !this.data.summaryLoading) {
+    if (
+      this.data.permissionsReady &&
+      !this.data.summaryLoading &&
+      !this._mineToolActive
+    ) {
       this.loadOperationSummary()
     }
   },
 
+  onUnload() {
+    cancelPageNativeActions(this)
+    this.cancelOperationConfigRequest()
+    this._permissionRequestId = Number(this._permissionRequestId || 0) + 1
+    this._summaryRequestId = Number(this._summaryRequestId || 0) + 1
+    this._mineToolRequestId = Number(this._mineToolRequestId || 0) + 1
+    this.clearPermissionTimer()
+    this.clearSummaryTimer()
+    this.finishMineToolEffects()
+  },
+
   loadOperationConfig() {
-    if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
-      return
-    }
-
-    wx.cloud.callFunction({
-      name: "operationConfigGet",
-      success: (res) => {
-        const result = res && res.result ? res.result : null
-        if (!result || !result.ok || !result.config) {
-          return
-        }
-
+    this.cancelOperationConfigRequest()
+    this._cancelOperationConfigRequest = requestOperationConfig({
+      onSuccess: (config) => {
         this.setData({
-          brandName: result.config.brandName || this.data.brandName,
-          servicePhone: result.config.servicePhone || this.data.servicePhone,
-          userDesc: result.config.mineUserDesc || this.data.userDesc
+          brandName: config.brandName || this.data.brandName,
+          servicePhone: config.servicePhone || this.data.servicePhone,
+          userDesc: config.mineUserDesc || this.data.userDesc
         })
-      },
-      fail: () => {}
+      }
     })
   },
 
+  cancelOperationConfigRequest() {
+    if (typeof this._cancelOperationConfigRequest === "function") {
+      this._cancelOperationConfigRequest()
+      this._cancelOperationConfigRequest = null
+    }
+  },
+
   loadMyPermissions() {
+    const requestId = Number(this._permissionRequestId || 0) + 1
+    this._permissionRequestId = requestId
+    this.clearPermissionTimer()
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       this.setData({
         permissionsLoading: false,
@@ -377,31 +423,32 @@ Page({
     })
 
     let settled = false
-    let timeoutId = null
-    const finish = (callback) => {
-      if (settled) {
-        return
+    const isCurrent = () => this._permissionRequestId === requestId
+    const finish = () => {
+      if (settled || !isCurrent()) {
+        return false
       }
       settled = true
-      if (timeoutId) {
-        clearTimeout(timeoutId)
-        timeoutId = null
-      }
-      callback()
+      this.clearPermissionTimer()
+      return true
     }
     const handleFailure = () => {
-      finish(() => {
-        this.setData({
-          permissionsLoading: false,
-          permissionsReady: false,
-          permissionsError: "权限同步失败，点击重试",
-          myPermissions: {},
-          ...buildPermissionFailureRole()
-        })
+      if (!finish()) {
+        return
+      }
+      this.setData({
+        permissionsLoading: false,
+        permissionsReady: false,
+        permissionsError: "权限同步失败，点击重试",
+        myPermissions: {},
+        ...buildPermissionFailureRole()
       })
     }
 
-    timeoutId = setTimeout(handleFailure, PERMISSION_LOAD_TIMEOUT_MS)
+    this._permissionRequestTimer = setTimeout(
+      handleFailure,
+      PERMISSION_LOAD_TIMEOUT_MS
+    )
 
     try {
       wx.cloud.callFunction({
@@ -413,28 +460,31 @@ Page({
             return
           }
 
-          finish(() => {
-            this.setData({
-              permissionsLoading: false,
-              permissionsReady: true,
-              permissionsError: "",
-              myPermissions: {
-                canManageBookings: Boolean(result.canManageBookings),
-                canManageRoles: Boolean(result.canManageRoles)
-              },
-              ...buildMemberRole(result),
-              menuItems: buildVisibleMenuItems({
-                envVersion: this.data.envVersion,
-                canManageRoles: Boolean(result.canManageRoles),
-                canManageConfig: Boolean(result.canManageConfig),
-                canViewAuditLogs: Boolean(result.canViewAuditLogs),
-                canViewErrorLogs: Boolean(result.canViewErrorLogs),
-                canManageVehicles: Boolean(result.canManageVehicles),
-                canManageBookings: Boolean(result.canManageBookings)
-              })
-            }, () => {
-              this.loadOperationSummary(result)
+          if (!finish()) {
+            return
+          }
+          this.setData({
+            permissionsLoading: false,
+            permissionsReady: true,
+            permissionsError: "",
+            myPermissions: {
+              canManageBookings: Boolean(result.canManageBookings),
+              canManageRoles: Boolean(result.canManageRoles)
+            },
+            ...buildMemberRole(result),
+            menuItems: buildVisibleMenuItems({
+              envVersion: this.data.envVersion,
+              canManageRoles: Boolean(result.canManageRoles),
+              canManageConfig: Boolean(result.canManageConfig),
+              canViewAuditLogs: Boolean(result.canViewAuditLogs),
+              canViewErrorLogs: Boolean(result.canViewErrorLogs),
+              canManageVehicles: Boolean(result.canManageVehicles),
+              canManageBookings: Boolean(result.canManageBookings)
             })
+          }, () => {
+            if (isCurrent()) {
+              this.loadOperationSummary(result)
+            }
           })
         },
         fail: handleFailure
@@ -465,30 +515,173 @@ Page({
       return
     }
 
+    const requestId = Number(this._summaryRequestId || 0) + 1
+    this._summaryRequestId = requestId
+    this.clearSummaryTimer()
     this.setData({ summaryLoading: true })
-    wx.cloud.callFunction({
+    let settled = false
+    const finishRequest = () => {
+      if (settled || this._summaryRequestId !== requestId) {
+        return false
+      }
+      settled = true
+      this.clearSummaryTimer()
+      return true
+    }
+    const handleFailure = () => {
+      if (!finishRequest()) {
+        return
+      }
+      this.setData({ summaryLoading: false })
+    }
+
+    this._summaryRequestTimer = setTimeout(
+      handleFailure,
+      SUMMARY_LOAD_TIMEOUT_MS
+    )
+
+    const requestOptions = {
       name: "operationSummaryGet",
       success: (res) => {
         const result = res && res.result ? res.result : null
         if (!result || !result.ok || !result.counts) {
+          handleFailure()
+          return
+        }
+        if (!finishRequest()) {
           return
         }
         this.setData({
           menuItems: applyOperationSummary(this.data.menuItems, result.counts),
-          operationPulse: buildOperationPulse(result)
+          operationPulse: buildOperationPulse(result),
+          summaryLoading: false
         })
       },
-      fail: () => {},
-      complete: () => {
-        this.setData({ summaryLoading: false })
-      }
-    })
+      fail: handleFailure,
+      complete: () => {}
+    }
+
+    try {
+      wx.cloud.callFunction(requestOptions)
+    } catch (error) {
+      handleFailure()
+    }
   },
 
-  handleOperationPulseTap() {
+  clearPermissionTimer() {
+    if (this._permissionRequestTimer) {
+      clearTimeout(this._permissionRequestTimer)
+      this._permissionRequestTimer = null
+    }
+  },
+
+  clearSummaryTimer() {
+    if (this._summaryRequestTimer) {
+      clearTimeout(this._summaryRequestTimer)
+      this._summaryRequestTimer = null
+    }
+  },
+
+  runMineTool(options) {
+    const input = options && typeof options === "object" ? options : {}
+    if (this._mineToolActive) {
+      return
+    }
+    if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
+      wx.showToast({
+        title: "云能力未初始化",
+        icon: "none"
+      })
+      return
+    }
+
+    const requestId = Number(this._mineToolRequestId || 0) + 1
+    this._mineToolRequestId = requestId
+    this._mineToolActive = true
+    this.clearMineToolTimer()
+    if (typeof wx.showLoading === "function") {
+      wx.showLoading({
+        title: input.loadingTitle || "处理中…",
+        mask: true
+      })
+    }
+
+    let settled = false
+    const finishRequest = () => {
+      if (settled || this._mineToolRequestId !== requestId) {
+        return false
+      }
+      settled = true
+      this.finishMineToolEffects()
+      return true
+    }
+    const handleFailure = (message) => {
+      if (!finishRequest()) {
+        return
+      }
+      wx.showToast({
+        title: formatToastTitle(message, input.failureFallback || "操作失败"),
+        icon: "none"
+      })
+    }
+
+    this._mineToolTimer = setTimeout(() => {
+      handleFailure(input.timeoutTitle || "操作超时，请重试")
+    }, MINE_TOOL_TIMEOUT_MS)
+
+    const requestOptions = {
+      name: input.name,
+      success: (res) => {
+        if (!finishRequest()) {
+          return
+        }
+        const result = res && res.result ? res.result : null
+        if (typeof input.onResult === "function") {
+          input.onResult(result)
+        }
+      },
+      fail: (error) => {
+        handleFailure(error && (error.errMsg || error.message))
+      }
+    }
+    if (Object.prototype.hasOwnProperty.call(input, "data")) {
+      requestOptions.data = input.data
+    }
+
+    try {
+      wx.cloud.callFunction(requestOptions)
+    } catch (error) {
+      handleFailure(error && (error.errMsg || error.message))
+    }
+  },
+
+  clearMineToolTimer() {
+    if (this._mineToolTimer) {
+      clearTimeout(this._mineToolTimer)
+      this._mineToolTimer = null
+    }
+  },
+
+  finishMineToolEffects() {
+    this.clearMineToolTimer()
+    if (this._mineToolActive && typeof wx.hideLoading === "function") {
+      wx.hideLoading()
+    }
+    this._mineToolActive = false
+  },
+
+  navigateToPage(url) {
+    const target = String(url || "").trim()
+    if (!target) {
+      return
+    }
+    const action = beginPageNativeAction(this)
     wx.navigateTo({
-      url: "/pages/operations-overview/operations-overview",
+      url: target,
       fail: () => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         wx.showToast({
           title: "页面跳转失败",
           icon: "none"
@@ -497,149 +690,22 @@ Page({
     })
   },
 
+  handleOperationPulseTap() {
+    this.navigateToPage(MENU_ROUTE_MAP.operationsOverview)
+  },
+
   handleMenuTap(event) {
     const { key, title } = event.currentTarget.dataset
-
-    if (key === "favorites") {
-      wx.navigateTo({
-        url: "/pages/favorites/favorites",
-        fail: () => {
-          wx.showToast({
-            title: "页面跳转失败",
-            icon: "none"
-          })
-        }
-      })
+    if (
+      this._mineToolActive &&
+      ["storageCleanup", "bootstrapAdmin", "getOpenid"].includes(key)
+    ) {
       return
     }
 
-    if (key === "operationsOverview") {
-      wx.navigateTo({
-        url: "/pages/operations-overview/operations-overview",
-        fail: () => {
-          wx.showToast({
-            title: "页面跳转失败",
-            icon: "none"
-          })
-        }
-      })
-      return
-    }
-
-    if (key === "analyticsManage") {
-      wx.navigateTo({
-        url: "/pages/analytics-manage/analytics-manage",
-        fail: () => {
-          wx.showToast({
-            title: "页面跳转失败",
-            icon: "none"
-          })
-        }
-      })
-      return
-    }
-
-    if (key === "bookingCalendar") {
-      wx.navigateTo({
-        url: "/pages/booking-calendar/booking-calendar",
-        fail: () => {
-          wx.showToast({
-            title: "页面跳转失败",
-            icon: "none"
-          })
-        }
-      })
-      return
-    }
-
-    if (key === "bookingWorkbench") {
-      wx.navigateTo({
-        url: "/pages/booking-workbench/booking-workbench",
-        fail: () => {
-          wx.showToast({
-            title: "页面跳转失败",
-            icon: "none"
-          })
-        }
-      })
-      return
-    }
-
-    if (key === "vehicleManage") {
-      wx.navigateTo({
-        url: "/pages/vehicle-manage/vehicle-manage",
-        fail: () => {
-          wx.showToast({
-            title: "页面跳转失败",
-            icon: "none"
-          })
-        }
-      })
-      return
-    }
-
-    if (key === "roleManage") {
-      wx.navigateTo({
-        url: "/pages/role-manage/role-manage",
-        fail: () => {
-          wx.showToast({
-            title: "页面跳转失败",
-            icon: "none"
-          })
-        }
-      })
-      return
-    }
-
-    if (key === "configManage") {
-      wx.navigateTo({
-        url: "/pages/config-manage/config-manage",
-        fail: () => {
-          wx.showToast({
-            title: "页面跳转失败",
-            icon: "none"
-          })
-        }
-      })
-      return
-    }
-
-    if (key === "auditLogManage") {
-      wx.navigateTo({
-        url: "/pages/audit-log-manage/audit-log-manage",
-        fail: () => {
-          wx.showToast({
-            title: "页面跳转失败",
-            icon: "none"
-          })
-        }
-      })
-      return
-    }
-
-    if (key === "errorLogManage") {
-      wx.navigateTo({
-        url: "/pages/error-log-manage/error-log-manage",
-        fail: () => {
-          wx.showToast({
-            title: "页面跳转失败",
-            icon: "none"
-          })
-        }
-      })
-      return
-    }
-
-    if (key === "systemHealth") {
-      wx.navigateTo({
-        url: "/pages/system-health/system-health",
-        fail: () => {
-          wx.showToast({
-            title: "页面跳转失败",
-            icon: "none"
-          })
-        }
-      })
+    const route = MENU_ROUTE_MAP[key]
+    if (route) {
+      this.navigateToPage(route)
       return
     }
 
@@ -652,23 +718,26 @@ Page({
         return
       }
 
+      const action = beginPageNativeAction(this, {
+        exclusiveKey: "mine-tool-confirmation"
+      })
       wx.showModal({
         title: "清理存储队列",
         content: "将重试删除此前清理失败的车辆图片，每次最多处理 5 条。确认继续？",
         confirmText: "确认清理",
         confirmColor: "#d46868",
         success: (modalRes) => {
-          if (!modalRes.confirm) {
+          if (!isPageNativeActionActive(this, action) || !modalRes || !modalRes.confirm) {
             return
           }
 
-          wx.showLoading({ title: "清理中…", mask: true })
-          wx.cloud.callFunction({
+          this.runMineTool({
             name: "pendingFileDeletionProcess",
             data: { limit: 5 },
-            success: (res) => {
-              wx.hideLoading()
-              const result = res && res.result ? res.result : null
+            loadingTitle: "清理中…",
+            timeoutTitle: "清理超时，请重试",
+            failureFallback: "清理失败",
+            onResult: (result) => {
               if (!result || !result.ok) {
                 wx.showToast({
                   title: formatToastTitle(result && result.message, "清理失败"),
@@ -698,13 +767,6 @@ Page({
                 confirmColor: "#528fff",
                 showCancel: false
               })
-            },
-            fail: (error) => {
-              wx.hideLoading()
-              wx.showToast({
-                title: "清理失败",
-                icon: "none"
-              })
             }
           })
         }
@@ -721,6 +783,9 @@ Page({
         return
       }
 
+      const action = beginPageNativeAction(this, {
+        exclusiveKey: "mine-tool-confirmation"
+      })
       wx.showModal({
         title: "输入初始化口令",
         content: "仅当 roles 集合没有任何记录时可用，口令只随本次请求发送。",
@@ -729,7 +794,7 @@ Page({
         editable: true,
         placeholderText: "BOOTSTRAP_TOKEN",
         success: (modalRes) => {
-          if (!modalRes.confirm) {
+          if (!isPageNativeActionActive(this, action) || !modalRes || !modalRes.confirm) {
             return
           }
 
@@ -742,20 +807,15 @@ Page({
             return
           }
 
-          wx.showLoading({
-            title: "初始化中…",
-            mask: true
-          })
-
-          wx.cloud.callFunction({
+          this.runMineTool({
             name: "bootstrapAdmin",
             data: {
               token
             },
-            success: (res) => {
-              wx.hideLoading()
-
-              const result = res && res.result ? res.result : null
+            loadingTitle: "初始化中…",
+            timeoutTitle: "初始化超时，请重试",
+            failureFallback: "初始化失败",
+            onResult: (result) => {
               const title = result && result.message ? result.message : "初始化完成"
 
               if (result && result.ok) {
@@ -800,13 +860,6 @@ Page({
                 confirmColor: "#528fff",
                 showCancel: false
               })
-            },
-            fail: (error) => {
-              wx.hideLoading()
-              wx.showToast({
-                title: "初始化失败",
-                icon: "none"
-              })
             }
           })
         }
@@ -823,17 +876,12 @@ Page({
         return
       }
 
-      wx.showLoading({
-        title: "查询中…",
-        mask: true
-      })
-
-      wx.cloud.callFunction({
+      this.runMineTool({
         name: "getOpenid",
-        success: (res) => {
-          wx.hideLoading()
-
-          const result = res && res.result ? res.result : null
+        loadingTitle: "查询中…",
+        timeoutTitle: "查询超时，请重试",
+        failureFallback: "查询失败",
+        onResult: (result) => {
           const openid = result && result.ok ? result.openid : ""
 
           if (!openid) {
@@ -844,15 +892,22 @@ Page({
             return
           }
 
+          const action = beginPageNativeAction(this, { requireCurrent: true })
           wx.setClipboardData({
             data: openid,
             success: () => {
+              if (!isPageNativeActionActive(this, action)) {
+                return
+              }
               wx.showToast({
                 title: "账号已复制",
                 icon: "none"
               })
             },
             fail: () => {
+              if (!isPageNativeActionActive(this, action)) {
+                return
+              }
               wx.showModal({
                 title: "当前账号",
                 content: `OpenID：${openid}`,
@@ -861,117 +916,6 @@ Page({
                 showCancel: false
               })
             }
-          })
-        },
-        fail: (error) => {
-          wx.hideLoading()
-          wx.showToast({
-            title: "查询失败",
-            icon: "none"
-          })
-        }
-      })
-      return
-    }
-
-    if (key === "vehicleCreate") {
-      wx.navigateTo({
-        url: "/pages/vehicle-create/vehicle-create",
-        fail: () => {
-          wx.showToast({
-            title: "页面跳转失败",
-            icon: "none"
-          })
-        }
-      })
-      return
-    }
-
-    if (key === "bookingManage") {
-      wx.navigateTo({
-        url: "/pages/booking-manage/booking-manage",
-        fail: () => {
-          wx.showToast({
-            title: "页面跳转失败",
-            icon: "none"
-          })
-        }
-      })
-      return
-    }
-
-    if (key === "bookings") {
-      wx.navigateTo({
-        url: "/pages/bookings/bookings",
-        fail: () => {
-          wx.showToast({
-            title: "页面跳转失败",
-            icon: "none"
-          })
-        }
-      })
-      return
-    }
-
-    if (key === "faq") {
-      wx.navigateTo({
-        url: "/pages/content-page/content-page?type=faq",
-        fail: () => {
-          wx.showToast({
-            title: "页面跳转失败",
-            icon: "none"
-          })
-        }
-      })
-      return
-    }
-
-    if (key === "rules") {
-      wx.navigateTo({
-        url: "/pages/content-page/content-page?type=rules",
-        fail: () => {
-          wx.showToast({
-            title: "页面跳转失败",
-            icon: "none"
-          })
-        }
-      })
-      return
-    }
-
-    if (key === "privacy") {
-      wx.navigateTo({
-        url: "/pages/content-page/content-page?type=privacy",
-        fail: () => {
-          wx.showToast({
-            title: "页面跳转失败",
-            icon: "none"
-          })
-        }
-      })
-      return
-    }
-
-    if (key === "privacyRequest") {
-      wx.navigateTo({
-        url: "/pages/privacy-request/privacy-request",
-        fail: () => {
-          wx.showToast({
-            title: "页面跳转失败",
-            icon: "none"
-          })
-        }
-      })
-      return
-    }
-
-    if (key === "privacyRequestManage") {
-      wx.navigateTo({
-        url: "/pages/privacy-request-manage/privacy-request-manage",
-        fail: () => {
-          wx.showToast({
-            title: "页面跳转失败",
-            icon: "none"
           })
         }
       })
@@ -994,9 +938,13 @@ Page({
       return
     }
 
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.makePhoneCall({
       phoneNumber: phone,
       fail: (error) => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         const message = error && (error.errMsg || error.message)
         if (message && String(message).includes("cancel")) {
           return

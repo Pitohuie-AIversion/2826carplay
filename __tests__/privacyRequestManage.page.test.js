@@ -2,6 +2,7 @@ const fs = require("fs")
 const path = require("path")
 
 jest.mock("../shared/pageAuth", () => ({
+  cancelPagePermissionCheck: jest.fn(),
   requirePagePermission: jest.fn()
 }))
 

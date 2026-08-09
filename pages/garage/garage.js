@@ -1,4 +1,11 @@
 const { trackEvent } = require("../../shared/analytics")
+const { requestOperationConfig } = require("../../shared/operationConfigRequest")
+const {
+  activatePageNativeActions,
+  beginPageNativeAction,
+  cancelPageNativeActions,
+  isPageNativeActionActive
+} = require("../../shared/pageNativeAction")
 const mockCategories = require("../../data/categories")
 
 const DEFAULT_GARAGE_SUBTITLE = "甄选座驾，为每一次出发预留专属席位"
@@ -203,6 +210,7 @@ Page({
   },
 
   onLoad() {
+    activatePageNativeActions(this)
     trackEvent("garage_view")
     const app = getApp()
     const env =
@@ -229,25 +237,15 @@ Page({
   },
 
   loadOperationConfig() {
-    if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
-      return
-    }
-
-    wx.cloud.callFunction({
-      name: "operationConfigGet",
-      success: (res) => {
-        const result = res && res.result ? res.result : null
-        if (!result || !result.ok || !result.config) {
-          return
-        }
-
+    this.cancelOperationConfigRequest()
+    this._cancelOperationConfigRequest = requestOperationConfig({
+      onSuccess: (config) => {
         this.setData({
-          pageTitle: result.config.garagePageTitle || this.data.pageTitle,
-          pageSubtitle: normalizeGarageSubtitle(result.config.garagePageSubtitle, this.data.pageSubtitle),
-          servicePhone: result.config.servicePhone || this.data.servicePhone
+          pageTitle: config.garagePageTitle || this.data.pageTitle,
+          pageSubtitle: normalizeGarageSubtitle(config.garagePageSubtitle, this.data.pageSubtitle),
+          servicePhone: config.servicePhone || this.data.servicePhone
         })
-      },
-      fail: () => {}
+      }
     })
   },
 
@@ -362,12 +360,21 @@ Page({
   },
 
   onUnload() {
+    cancelPageNativeActions(this)
     this._carsRequestId = Number(this._carsRequestId || 0) + 1
+    this.cancelOperationConfigRequest()
     if (this._carsLoadTimer) {
       clearTimeout(this._carsLoadTimer)
       this._carsLoadTimer = null
     }
     this.clearSearchDebounce()
+  },
+
+  cancelOperationConfigRequest() {
+    if (typeof this._cancelOperationConfigRequest === "function") {
+      this._cancelOperationConfigRequest()
+      this._cancelOperationConfigRequest = null
+    }
   },
 
   clearSearchDebounce() {
@@ -544,9 +551,13 @@ Page({
       return
     }
 
+    const action = beginPageNativeAction(this)
     wx.navigateTo({
       url: `/pages/car-detail/car-detail?carId=${carId}`,
       fail: () => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         wx.showToast({
           title: "车辆详情打开失败",
           icon: "none"
@@ -565,9 +576,13 @@ Page({
       return
     }
 
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.makePhoneCall({
       phoneNumber: phone,
       fail: (error) => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         const message = error && (error.errMsg || error.message)
         if (message && String(message).includes("cancel")) {
           return
@@ -584,6 +599,9 @@ Page({
   },
 
   handleRetryLoad() {
+    if (this.data.loadingCars || this.data.searchDebouncing) {
+      return
+    }
     this.loadCars()
   },
 

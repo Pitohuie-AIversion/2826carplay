@@ -1,5 +1,11 @@
-const { requirePagePermission } = require("../../shared/pageAuth")
+const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
 const { formatToastTitle } = require("../../shared/uiFeedback")
+const {
+  activatePageNativeActions,
+  beginPageNativeAction,
+  cancelPageNativeActions,
+  isPageNativeActionActive
+} = require("../../shared/pageNativeAction")
 
 const BOOKING_DETAIL_LOAD_TIMEOUT_MS = 15 * 1000
 const BOOKING_DETAIL_WRITE_TIMEOUT_MS = 20 * 1000
@@ -31,16 +37,33 @@ const COORDINATION_TEXT_MAP = {
 }
 
 function showStatusUpdateFeedback(result, done) {
+  const next = typeof done === "function" ? done : () => {}
+  let settled = false
+  const finish = () => {
+    if (settled) {
+      return
+    }
+    settled = true
+    next()
+  }
   const notificationStatus = String((result && result.notificationStatus) || "")
   if (notificationStatus === "failed") {
-    wx.showModal({
-      title: "状态已更新",
-      content: "预约状态已更新，但提醒发送失败。可在错误日志中查看原因。",
-      confirmText: "知道了",
-      confirmColor: "#528fff",
-      showCancel: false,
-      complete: done
-    })
+    if (typeof wx.showModal !== "function") {
+      finish()
+      return
+    }
+    try {
+      wx.showModal({
+        title: "状态已更新",
+        content: "预约状态已更新，但提醒发送失败。可在错误日志中查看原因。",
+        confirmText: "知道了",
+        confirmColor: "#528fff",
+        showCancel: false,
+        complete: finish
+      })
+    } catch (error) {
+      finish()
+    }
     return
   }
 
@@ -50,11 +73,14 @@ function showStatusUpdateFeedback(result, done) {
       : notificationStatus === "not_subscribed"
         ? "用户未订阅提醒"
         : "状态已更新"
-  wx.showToast({
-    title,
-    icon: "none"
-  })
-  done()
+  try {
+    wx.showToast({
+      title,
+      icon: "none"
+    })
+  } finally {
+    finish()
+  }
 }
 
 function formatDisplayTime(value) {
@@ -162,6 +188,7 @@ Page({
     loadErrorText: "预约详情加载失败，请稍后重试",
     pageAuthorized: false,
     booking: {},
+    remarkDirty: false,
     statusText: "待联系",
     statusClass: "status-pending",
     createdAtText: "",
@@ -178,6 +205,7 @@ Page({
   },
 
   onLoad(options) {
+    activatePageNativeActions(this)
     const id = String((options && options.id) || "").trim()
     this.setData({ id })
 
@@ -195,12 +223,24 @@ Page({
 
     const eventChannel = this.getOpenerEventChannel && this.getOpenerEventChannel()
     if (eventChannel && typeof eventChannel.on === "function") {
-      eventChannel.on("acceptManageBookingDetail", (payload) => {
+      const eventAction = beginPageNativeAction(this)
+      const handleManageBookingDetail = (payload) => {
+        if (!isPageNativeActionActive(this, eventAction)) {
+          return
+        }
         const booking = normalizeBooking(payload && payload.booking)
-        if (booking.id && this.data.pageAuthorized) {
+        if (
+          booking.id &&
+          this.data.pageAuthorized &&
+          !this.data.remarkDirty &&
+          !this.isBookingDetailInteractionBusy()
+        ) {
           this.applyBooking(booking)
         }
-      })
+      }
+      this._manageBookingDetailEventChannel = eventChannel
+      this._manageBookingDetailEventHandler = handleManageBookingDetail
+      eventChannel.on("acceptManageBookingDetail", handleManageBookingDetail)
     }
 
     requirePagePermission(this, {
@@ -220,19 +260,45 @@ Page({
     if (
       this.data.pageAuthorized &&
       this.data.id &&
-      !this._bookingDetailMutationActive
+      !this.data.remarkDirty &&
+      !this._bookingDetailMutationActive &&
+      !this._bookingDetailStatusFeedbackPending
     ) {
       this.loadDetail()
     }
   },
 
+  isBookingDetailInteractionBusy() {
+    return Boolean(
+      this.data.loading ||
+      this.data.coordinationLoading ||
+      this._bookingDetailMutationActive ||
+      this._bookingDetailStatusFeedbackPending
+    )
+  },
+
   onUnload() {
+    cancelPagePermissionCheck(this)
+    cancelPageNativeActions(this)
+    if (
+      this._manageBookingDetailEventChannel &&
+      typeof this._manageBookingDetailEventChannel.off === "function" &&
+      this._manageBookingDetailEventHandler
+    ) {
+      this._manageBookingDetailEventChannel.off(
+        "acceptManageBookingDetail",
+        this._manageBookingDetailEventHandler
+      )
+    }
+    this._manageBookingDetailEventChannel = null
+    this._manageBookingDetailEventHandler = null
     this._bookingDetailRequestId = Number(this._bookingDetailRequestId || 0) + 1
     this._bookingDetailMutationRequestId =
       Number(this._bookingDetailMutationRequestId || 0) + 1
     this.clearBookingDetailTimer()
     this.clearBookingDetailMutationTimer()
     this._bookingDetailMutationActive = false
+    this._bookingDetailStatusFeedbackPending = false
   },
 
   applyBooking(booking, conflictResult) {
@@ -241,6 +307,7 @@ Page({
       : {}
     this.setData({
       booking,
+      remarkDirty: false,
       initialLoading: false,
       loadFailed: false,
       statusText: STATUS_TEXT_MAP[booking.status] || "待联系",
@@ -271,7 +338,12 @@ Page({
       return
     }
 
-    if (this._bookingDetailMutationActive) {
+    if (
+      this.data.coordinationLoading ||
+      this.data.remarkDirty ||
+      this._bookingDetailMutationActive ||
+      this._bookingDetailStatusFeedbackPending
+    ) {
       return
     }
 
@@ -370,9 +442,16 @@ Page({
   },
 
   handleRemarkInput(event) {
+    if (this.isBookingDetailInteractionBusy()) {
+      return
+    }
     const value = normalizeRemark(event.detail && event.detail.value)
+    const savedValue = normalizeRemark(
+      this.data.booking && this.data.booking.adminRemark
+    )
     this.setData({
-      "booking.adminRemarkDraft": value
+      "booking.adminRemarkDraft": value,
+      remarkDirty: value !== savedValue
     })
   },
 
@@ -414,6 +493,7 @@ Page({
           icon: "none"
         })
         if (isCurrent()) {
+          this.setData({ remarkDirty: false })
           this.loadDetail()
         }
       }
@@ -425,6 +505,7 @@ Page({
       this.data.loading ||
       this.data.coordinationLoading ||
       this._bookingDetailMutationActive ||
+      this.data.remarkDirty ||
       !this.data.coordinationEditable ||
       !this.data.id
     ) {
@@ -488,6 +569,9 @@ Page({
   },
 
   callPhone(value) {
+    if (this.isBookingDetailInteractionBusy()) {
+      return
+    }
     const phone = normalizePhone(value)
     if (!phone) {
       wx.showToast({
@@ -497,9 +581,13 @@ Page({
       return
     }
 
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.makePhoneCall({
       phoneNumber: phone,
       fail: (error) => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         const message = error && (error.errMsg || error.message)
         if (message && String(message).includes("cancel")) {
           return
@@ -522,12 +610,16 @@ Page({
 
   handleConflictTap(event) {
     const id = String(event.currentTarget.dataset.id || "").trim()
-    if (!id || id === this.data.id) {
+    if (this.isBookingDetailInteractionBusy() || !id || id === this.data.id) {
       return
     }
+    const action = beginPageNativeAction(this)
     wx.navigateTo({
       url: `/pages/booking-manage-detail/booking-manage-detail?id=${id}`,
       fail: () => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         wx.showToast({
           title: "冲突预约打开失败",
           icon: "none"
@@ -537,6 +629,9 @@ Page({
   },
 
   handleCopyContact(event) {
+    if (this.isBookingDetailInteractionBusy()) {
+      return
+    }
     const field = String(event.currentTarget.dataset.field || "")
     const labels = {
       phone: "手机号",
@@ -555,15 +650,22 @@ Page({
       return
     }
 
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.setClipboardData({
       data: value,
       success: () => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         wx.showToast({
           title: `${labels[field]}已复制`,
           icon: "none"
         })
       },
       fail: () => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         wx.showToast({
           title: `${labels[field]}复制失败`,
           icon: "none"
@@ -577,6 +679,7 @@ Page({
       this.data.loading ||
       this.data.coordinationLoading ||
       this._bookingDetailMutationActive ||
+      this.data.remarkDirty ||
       !this.data.id
     ) {
       return
@@ -589,13 +692,16 @@ Page({
 
     const statusText = STATUS_TEXT_MAP[status] || status
 
+    const action = beginPageNativeAction(this, {
+      exclusiveKey: "booking-status-confirmation"
+    })
     wx.showModal({
       title: "更新状态",
       content: `确认将该预约更新为「${statusText}」？`,
       confirmText: "确认更新",
       confirmColor: status === "cancelled" ? "#d46868" : "#528fff",
       success: (res) => {
-        if (!res.confirm) {
+        if (!isPageNativeActionActive(this, action) || !res || !res.confirm) {
           return
         }
 
@@ -608,7 +714,9 @@ Page({
     if (
       this.data.loading ||
       this.data.coordinationLoading ||
-      this._bookingDetailMutationActive
+      this._bookingDetailMutationActive ||
+      this._bookingDetailStatusFeedbackPending ||
+      this.data.remarkDirty
     ) {
       return
     }
@@ -637,7 +745,9 @@ Page({
           return
         }
 
+        this._bookingDetailStatusFeedbackPending = true
         showStatusUpdateFeedback(result, () => {
+          this._bookingDetailStatusFeedbackPending = false
           if (isCurrent()) {
             this.loadDetail()
           }
@@ -648,7 +758,12 @@ Page({
 
   runBookingDetailMutation(options) {
     const input = options && typeof options === "object" ? options : {}
-    if (this._bookingDetailMutationActive) {
+    if (
+      this.data.loading ||
+      this.data.coordinationLoading ||
+      this._bookingDetailMutationActive ||
+      this._bookingDetailStatusFeedbackPending
+    ) {
       return
     }
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
@@ -738,21 +853,34 @@ Page({
   },
 
   handleRetryLoad() {
+    if (this.isBookingDetailInteractionBusy() || this.data.remarkDirty) {
+      return
+    }
     this.loadDetail()
   },
 
   handleBackManage() {
+    const action = beginPageNativeAction(this)
     const pages = getCurrentPages()
     if (pages.length > 1) {
       wx.navigateBack({
         delta: 1,
         fail: () => {
+          if (!isPageNativeActionActive(this, action)) {
+            return
+          }
           wx.redirectTo({
             url: "/pages/booking-manage/booking-manage",
             fail: () => {
+              if (!isPageNativeActionActive(this, action)) {
+                return
+              }
               wx.reLaunch({
                 url: "/pages/booking-manage/booking-manage",
                 fail: () => {
+                  if (!isPageNativeActionActive(this, action)) {
+                    return
+                  }
                   wx.showToast({
                     title: "返回预约管理失败",
                     icon: "none"
@@ -769,9 +897,15 @@ Page({
     wx.redirectTo({
       url: "/pages/booking-manage/booking-manage",
       fail: () => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         wx.reLaunch({
           url: "/pages/booking-manage/booking-manage",
           fail: () => {
+            if (!isPageNativeActionActive(this, action)) {
+              return
+            }
             wx.showToast({
               title: "返回预约管理失败",
               icon: "none"

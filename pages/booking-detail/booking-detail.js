@@ -1,7 +1,10 @@
 const { formatToastTitle } = require("../../shared/uiFeedback")
 const { buildVehicleDisplayIdentity } = require("../../shared/vehicle")
+const { requestOperationConfig } = require("../../shared/operationConfigRequest")
+const { isPageCurrent } = require("../../shared/pageNativeAction")
 const BOOKING_DETAIL_LOAD_TIMEOUT_MS = 15 * 1000
 const BOOKING_DETAIL_MUTATION_TIMEOUT_MS = 12 * 1000
+const SUBSCRIPTION_REQUEST_TIMEOUT_MS = 15 * 1000
 
 function mapStatusText(status) {
   const value = String(status || "").trim()
@@ -168,6 +171,7 @@ Page({
     canEdit: false,
     editing: false,
     saving: false,
+    cancelling: false,
     bookingStatusTemplateId: "",
     subscriptionEnabled: false,
     subscriptionRequesting: false,
@@ -180,6 +184,7 @@ Page({
   },
 
   onLoad(options) {
+    this._bookingDetailUnloaded = false
     const id = String((options && options.id) || "").trim()
     this.setData({
       id,
@@ -200,30 +205,66 @@ Page({
 
     const eventChannel = this.getOpenerEventChannel && this.getOpenerEventChannel()
     if (eventChannel && typeof eventChannel.on === "function") {
-      eventChannel.on("acceptBookingDetail", (payload) => {
+      const handleBookingDetail = (payload) => {
+        if (
+          this._bookingDetailUnloaded ||
+          this.data.editing ||
+          this.data.saving ||
+          this.data.subscriptionRequesting ||
+          this.data.cancelling
+        ) {
+          return
+        }
         const booking = normalizeBooking(payload && payload.booking)
         if (booking.id) {
           this.applyBooking(booking)
         }
-      })
+      }
+      this._bookingDetailEventChannel = eventChannel
+      this._bookingDetailEventHandler = handleBookingDetail
+      eventChannel.on("acceptBookingDetail", handleBookingDetail)
     }
 
     this.loadNotificationConfig()
   },
 
   onShow() {
-    if (this.data.id) {
+    if (
+      this.data.id &&
+      !this.data.loading &&
+      !this.data.editing &&
+      !this.data.saving &&
+      !this.data.subscriptionRequesting &&
+      !this.data.cancelling
+    ) {
       this.loadDetail()
     }
   },
 
   onUnload() {
+    this._bookingDetailUnloaded = true
+    this._cancelConfirmationSerial = Number(this._cancelConfirmationSerial || 0) + 1
+    if (
+      this._bookingDetailEventChannel &&
+      typeof this._bookingDetailEventChannel.off === "function" &&
+      this._bookingDetailEventHandler
+    ) {
+      this._bookingDetailEventChannel.off(
+        "acceptBookingDetail",
+        this._bookingDetailEventHandler
+      )
+    }
+    this._bookingDetailEventChannel = null
+    this._bookingDetailEventHandler = null
     this._detailRequestId = Number(this._detailRequestId || 0) + 1
     this._saveRequestSerial = Number(this._saveRequestSerial || 0) + 1
     this._cancelRequestSerial = Number(this._cancelRequestSerial || 0) + 1
+    this._subscriptionRequestId = Number(this._subscriptionRequestId || 0) + 1
+    this.cancelOperationConfigRequest()
     this.clearDetailLoadTimer()
     this.clearSaveRequestTimer()
     this.clearCancelRequestTimer()
+    this.clearSubscriptionRequestTimer()
   },
 
   applyBooking(booking) {
@@ -243,6 +284,7 @@ Page({
       canEdit: canEditBooking(booking.status),
       editing: false,
       saving: false,
+      cancelling: false,
       editForm: {
         userName: booking.userName,
         phone: booking.phone,
@@ -253,33 +295,39 @@ Page({
   },
 
   loadNotificationConfig() {
-    if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
-      return
-    }
-
-    wx.cloud.callFunction({
-      name: "operationConfigGet",
-      success: (res) => {
-        const result = res && res.result ? res.result : null
-        const templateId =
-          result && result.ok && result.config
-            ? String(result.config.bookingStatusTemplateId || "").trim()
-            : ""
+    this.cancelOperationConfigRequest()
+    this._cancelOperationConfigRequest = requestOperationConfig({
+      onSuccess: (config) => {
+        const templateId = String(config.bookingStatusTemplateId || "").trim()
         this.setData({
           bookingStatusTemplateId: templateId,
           subscriptionEnabled: Boolean(templateId)
         })
-      },
-      fail: () => {}
+      }
     })
+  },
+
+  cancelOperationConfigRequest() {
+    if (typeof this._cancelOperationConfigRequest === "function") {
+      this._cancelOperationConfigRequest()
+      this._cancelOperationConfigRequest = null
+    }
   },
 
   handleRequestStatusSubscription() {
     const templateId = String(this.data.bookingStatusTemplateId || "").trim()
     if (
+      this.data.loading ||
+      this.data.editing ||
+      this.data.saving ||
+      this.data.subscriptionRequesting ||
+      this.data.cancelling
+    ) {
+      return
+    }
+    if (
       !this.data.canEdit ||
       !templateId ||
-      this.data.subscriptionRequesting ||
       typeof wx.requestSubscribeMessage !== "function"
     ) {
       wx.showToast({
@@ -289,48 +337,79 @@ Page({
       return
     }
 
+    const requestId = Number(this._subscriptionRequestId || 0) + 1
+    this._subscriptionRequestId = requestId
+    this.clearSubscriptionRequestTimer()
     this.setData({ subscriptionRequesting: true })
+    let settled = false
+    const finishRequest = (callback) => {
+      if (settled || this._subscriptionRequestId !== requestId) {
+        return false
+      }
+      settled = true
+      this.clearSubscriptionRequestTimer()
+      this.setData({ subscriptionRequesting: false })
+      if (typeof callback === "function") {
+        callback()
+      }
+      return true
+    }
+    this._subscriptionRequestTimer = setTimeout(() => {
+      finishRequest(() => {
+        wx.showToast({
+          title: "订阅请求超时，请重试",
+          icon: "none"
+        })
+      })
+    }, SUBSCRIPTION_REQUEST_TIMEOUT_MS)
+
     try {
       wx.requestSubscribeMessage({
         tmplIds: [templateId],
         success: (result) => {
-          const choice = result && result[templateId]
-          if (choice === "accept") {
+          finishRequest(() => {
+            const choice = result && result[templateId]
             wx.showToast({
-              title: "已订阅下一次状态提醒",
+              title: choice === "accept" ? "已订阅下一次状态提醒" : "未开启状态提醒",
               icon: "none"
             })
-            return
-          }
-          wx.showToast({
-            title: "未开启状态提醒",
-            icon: "none"
           })
         },
         fail: (error) => {
-          const message = error && (error.errMsg || error.message)
-          if (message && String(message).includes("cancel")) {
-            return
-          }
-          wx.showToast({
-            title: "订阅失败，请稍后重试",
-            icon: "none"
+          finishRequest(() => {
+            const message = error && (error.errMsg || error.message)
+            if (message && String(message).includes("cancel")) {
+              return
+            }
+            wx.showToast({
+              title: "订阅失败，请稍后重试",
+              icon: "none"
+            })
           })
         },
         complete: () => {
-          this.setData({ subscriptionRequesting: false })
+          finishRequest()
         }
       })
     } catch (error) {
-      this.setData({ subscriptionRequesting: false })
-      wx.showToast({
-        title: "订阅失败，请稍后重试",
-        icon: "none"
+      finishRequest(() => {
+        wx.showToast({
+          title: "订阅失败，请稍后重试",
+          icon: "none"
+        })
       })
     }
   },
 
   loadDetail() {
+    if (
+      this.data.editing ||
+      this.data.saving ||
+      this.data.subscriptionRequesting ||
+      this.data.cancelling
+    ) {
+      return
+    }
     const requestId = Number(this._detailRequestId || 0) + 1
     this._detailRequestId = requestId
     this.clearDetailLoadTimer()
@@ -338,7 +417,8 @@ Page({
     if (!this.data.id) {
       this.setData({
         initialLoading: false,
-        loading: false
+        loading: false,
+        cancelling: false
       })
       return
     }
@@ -347,6 +427,7 @@ Page({
       this.setData({
         initialLoading: false,
         loading: false,
+        cancelling: false,
         loadFailed: true,
         loadErrorText: "云能力未初始化，请稍后重试"
       })
@@ -378,6 +459,7 @@ Page({
       this.setData({
         initialLoading: false,
         loading: false,
+        cancelling: false,
         loadFailed: true,
         loadErrorText: String(message || "预约详情加载失败，请稍后重试")
       })
@@ -406,6 +488,7 @@ Page({
           this.setData({
             initialLoading: false,
             loading: false,
+            cancelling: false,
             loadFailed: result && result.code !== "NOT_FOUND",
             loadErrorText: (result && result.message) || "预约详情加载失败，请稍后重试"
           })
@@ -436,27 +519,83 @@ Page({
   },
 
   handleCancel() {
-    if (!this.data.canCancel || this.data.loading || !this.data.id) {
+    if (
+      !this.data.canCancel ||
+      this.data.loading ||
+      this.data.editing ||
+      this.data.saving ||
+      this.data.subscriptionRequesting ||
+      this.data.cancelling ||
+      !this.data.id
+    ) {
       return
     }
 
-    wx.showModal({
-      title: "取消预约",
-      content: "已完成的预约不可取消。确认取消当前预约吗？",
-      confirmText: "确认取消",
-      confirmColor: "#d46868",
-      success: (res) => {
-        if (!res.confirm) {
-          return
-        }
-
-        this.cancelBooking()
+    const bookingId = String(this.data.id || "").trim()
+    const confirmationSerial = Number(this._cancelConfirmationSerial || 0) + 1
+    this._cancelConfirmationSerial = confirmationSerial
+    this.setData({ cancelling: true })
+    let confirmationSettled = false
+    const finishConfirmation = () => {
+      if (
+        confirmationSettled ||
+        confirmationSerial !== this._cancelConfirmationSerial ||
+        !this.isBookingDetailActive()
+      ) {
+        return false
       }
-    })
+      confirmationSettled = true
+      this.setData({ cancelling: false })
+      return true
+    }
+    try {
+      wx.showModal({
+        title: "取消预约",
+        content: "已完成的预约不可取消。确认取消当前预约吗？",
+        confirmText: "确认取消",
+        confirmColor: "#d46868",
+        success: (res) => {
+          if (
+            !this.isBookingDetailActive() ||
+            confirmationSerial !== this._cancelConfirmationSerial ||
+            !finishConfirmation()
+          ) {
+            return
+          }
+
+          if (
+            !res ||
+            !res.confirm ||
+            this.data.loading ||
+            this.data.editing ||
+            this.data.saving ||
+            this.data.subscriptionRequesting ||
+            !this.data.canCancel ||
+            String(this.data.id || "").trim() !== bookingId
+          ) {
+            return
+          }
+
+          this._cancelConfirmationSerial = confirmationSerial + 1
+          this.cancelBooking(bookingId)
+        },
+        fail: () => {
+          finishConfirmation()
+        }
+      })
+    } catch (error) {
+      finishConfirmation()
+    }
   },
 
   handleStartEdit() {
-    if (!this.data.canEdit || this.data.loading || this.data.saving) {
+    if (
+      !this.data.canEdit ||
+      this.data.loading ||
+      this.data.saving ||
+      this.data.subscriptionRequesting ||
+      this.data.cancelling
+    ) {
       return
     }
     const booking = this.data.booking || {}
@@ -472,6 +611,15 @@ Page({
   },
 
   handleEditInput(event) {
+    if (
+      !this.data.editing ||
+      this.data.loading ||
+      this.data.saving ||
+      this.data.subscriptionRequesting ||
+      this.data.cancelling
+    ) {
+      return
+    }
     const field = String(event.currentTarget.dataset.field || "")
     if (!["userName", "phone", "city", "note"].includes(field)) {
       return
@@ -486,7 +634,12 @@ Page({
   },
 
   handleCancelEdit() {
-    if (this.data.saving) {
+    if (
+      this.data.loading ||
+      this.data.saving ||
+      this.data.subscriptionRequesting ||
+      this.data.cancelling
+    ) {
       return
     }
     this.setData({
@@ -523,7 +676,14 @@ Page({
   },
 
   handleSaveEdit() {
-    if (!this.data.editing || this.data.saving || !this.data.id) {
+    if (
+      !this.data.editing ||
+      this.data.loading ||
+      this.data.saving ||
+      this.data.subscriptionRequesting ||
+      this.data.cancelling ||
+      !this.data.id
+    ) {
       return
     }
     const validationMessage = this.validateEditForm()
@@ -596,6 +756,7 @@ Page({
             icon: "none"
           })
           if (result && ["STATUS_CONFLICT", "STATUS_NOT_ALLOWED"].includes(result.code)) {
+            this.setData({ editing: false })
             this.loadDetail()
           }
           return
@@ -628,7 +789,19 @@ Page({
     this._saveRequestTimer = null
   },
 
-  cancelBooking() {
+  cancelBooking(id) {
+    const bookingId = String(id || this.data.id || "").trim()
+    if (
+      !bookingId ||
+      this.data.loading ||
+      this.data.editing ||
+      this.data.saving ||
+      this.data.subscriptionRequesting ||
+      this.data.cancelling ||
+      !this.data.canCancel
+    ) {
+      return
+    }
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       wx.showToast({
         title: "云能力未初始化",
@@ -637,11 +810,10 @@ Page({
       return
     }
 
-    const bookingId = String(this.data.id || "").trim()
     const cancelSerial = Number(this._cancelRequestSerial || 0) + 1
     this._cancelRequestSerial = cancelSerial
     this.clearCancelRequestTimer()
-    this.setData({ loading: true })
+    this.setData({ loading: true, cancelling: true })
 
     let settled = false
     const finishRequest = () => {
@@ -660,7 +832,7 @@ Page({
         title: formatToastTitle(message, "取消失败"),
         icon: "none"
       })
-      this.setData({ loading: false })
+      this.setData({ loading: false, cancelling: false })
     }
 
     this._cancelRequestTimer = setTimeout(() => {
@@ -680,7 +852,7 @@ Page({
           title: formatToastTitle(result && result.message, "取消失败"),
             icon: "none"
           })
-          this.setData({ loading: false })
+          this.setData({ loading: false, cancelling: false })
           return
         }
 
@@ -688,6 +860,7 @@ Page({
           title: "预约已取消",
           icon: "none"
         })
+        this.setData({ cancelling: false })
         this.loadDetail()
       },
       fail: (error) => {
@@ -710,7 +883,24 @@ Page({
     this._cancelRequestTimer = null
   },
 
+  clearSubscriptionRequestTimer() {
+    if (!this._subscriptionRequestTimer) {
+      return
+    }
+    clearTimeout(this._subscriptionRequestTimer)
+    this._subscriptionRequestTimer = null
+  },
+
   handleRetryLoad() {
+    if (
+      this.data.loading ||
+      this.data.editing ||
+      this.data.saving ||
+      this.data.subscriptionRequesting ||
+      this.data.cancelling
+    ) {
+      return
+    }
     this.loadDetail()
   },
 
@@ -726,12 +916,18 @@ Page({
     wx.setClipboardData({
       data: id,
       success: () => {
+        if (!this.isBookingDetailActive() || !isPageCurrent(this)) {
+          return
+        }
         wx.showToast({
           title: "预约编号已复制",
           icon: "none"
         })
       },
       fail: () => {
+        if (!this.isBookingDetailActive() || !isPageCurrent(this)) {
+          return
+        }
         wx.showToast({
           title: "预约编号复制失败",
           icon: "none"
@@ -752,6 +948,9 @@ Page({
     wx.navigateTo({
       url: `/pages/car-detail/car-detail?carId=${vehicleId}`,
       fail: () => {
+        if (!this.isBookingDetailActive()) {
+          return
+        }
         wx.showToast({
           title: "车辆详情打开失败",
           icon: "none"
@@ -761,17 +960,29 @@ Page({
   },
 
   handleBackBookings() {
+    if (!this.isBookingDetailActive()) {
+      return
+    }
     const pages = getCurrentPages()
     if (pages.length > 1) {
       wx.navigateBack({
         delta: 1,
         fail: () => {
+          if (!this.isBookingDetailActive()) {
+            return
+          }
           wx.redirectTo({
             url: "/pages/bookings/bookings",
             fail: () => {
+              if (!this.isBookingDetailActive()) {
+                return
+              }
               wx.reLaunch({
                 url: "/pages/bookings/bookings",
                 fail: () => {
+                  if (!this.isBookingDetailActive()) {
+                    return
+                  }
                   wx.showToast({
                     title: "返回预约列表失败",
                     icon: "none"
@@ -788,9 +999,15 @@ Page({
     wx.redirectTo({
       url: "/pages/bookings/bookings",
       fail: () => {
+        if (!this.isBookingDetailActive()) {
+          return
+        }
         wx.reLaunch({
           url: "/pages/bookings/bookings",
           fail: () => {
+            if (!this.isBookingDetailActive()) {
+              return
+            }
             wx.showToast({
               title: "返回预约列表失败",
               icon: "none"
@@ -799,5 +1016,9 @@ Page({
         })
       }
     })
+  },
+
+  isBookingDetailActive() {
+    return this._bookingDetailUnloaded !== true
   }
 })

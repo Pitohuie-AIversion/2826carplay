@@ -157,7 +157,7 @@
       <view class="identity-row">
         <view class="identity-native-icon" aria-hidden="true"></view>
         <view class="identity-copy"><view class="identity-label">申请账号</view><view class="identity-text">{{item.openid || '—'}}</view></view>
-        <button class="copy-btn ui-btn ui-btn-ghost" data-openid="{{item.openid}}" bindtap="handleCopyOpenid"><view class="copy-native-icon" aria-hidden="true"></view>复制</button>
+        <button class="copy-btn ui-btn ui-btn-ghost" data-openid="{{item.openid}}" disabled="{{loading || updatingId}}" bindtap="handleCopyOpenid"><view class="copy-native-icon" aria-hidden="true"></view>复制</button>
       </view>
       <view class="content-panel request-description-panel"><view class="content-panel-heading"><view class="description-native-icon" aria-hidden="true"></view><view class="field-label">申请说明</view></view><view class="field-content">{{item.description || '—'}}</view></view>
       <view wx:if="{{item.resolutionNote}}" class="resolution-box">
@@ -172,6 +172,7 @@
         <button
           class="inventory-btn ui-btn ui-btn-ghost"
           data-id="{{item.id}}"
+          disabled="{{loading || updatingId}}"
           bindtap="handleInventoryTap"
         >
           <view class="inventory-native-icon" aria-hidden="true"></view>核验相关数据

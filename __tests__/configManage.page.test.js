@@ -2,6 +2,7 @@ const fs = require("fs")
 const path = require("path")
 
 jest.mock("../shared/pageAuth", () => ({
+  cancelPagePermissionCheck: jest.fn(),
   requirePagePermission: jest.fn()
 }))
 
@@ -140,6 +141,7 @@ describe("pages/config-manage 运营配置体验", () => {
       request = options
     })
     const page = createPage(loadPageDefinition(), {
+      loading: false,
       hasLoadedConfig: true,
       loadFailed: false,
       isDirty: true
@@ -176,6 +178,7 @@ describe("pages/config-manage 运营配置体验", () => {
       throw new Error("cloud down")
     })
     const page = createPage(loadPageDefinition(), {
+      loading: false,
       hasLoadedConfig: true,
       loadFailed: false,
       isDirty: true
@@ -205,7 +208,10 @@ describe("pages/config-manage 运营配置体验", () => {
     expect(wxmlSource).toContain("save-native-icon")
     expect(wxmlSource).toContain("config-retry-native-icon")
     expect(wxmlSource).toContain("config-reset-native-icon")
-    expect(wxmlSource).toContain('disabled="{{saving || loadFailed || !hasLoadedConfig}}"')
+    expect(wxmlSource).toContain('disabled="{{loading || saving}}"')
+    expect(wxmlSource).toContain(
+      'disabled="{{loading || saving || loadFailed || !hasLoadedConfig}}"'
+    )
     expect(wxmlSource).not.toContain('bindtap="handleRetryLoad">重新加载配置</button>')
     expect(wxmlSource).not.toContain('bindtap="handleReset">恢复默认</button>')
     expect(wxssSource).toMatch(/\.action-dock\s*\{[\s\S]*?position:\s*sticky/)
@@ -214,8 +220,10 @@ describe("pages/config-manage 运营配置体验", () => {
   })
 
   test("编辑字段与恢复默认都会标记存在未保存修改", () => {
-    const page = createPage(loadPageDefinition())
-    page.data.hasLoadedConfig = true
+    const page = createPage(loadPageDefinition(), {
+      loading: false,
+      hasLoadedConfig: true
+    })
 
     page.handleInput({
       currentTarget: {
@@ -235,6 +243,61 @@ describe("pages/config-manage 运营配置体验", () => {
     page.handleReset()
     expect(page.data.form.brandName).toBe("极境车库")
     expect(page.data.isDirty).toBe(true)
+  })
+
+  test("配置刷新期间冻结表单、恢复默认和保存入口", () => {
+    let request = null
+    wx.cloud.callFunction.mockImplementation((options) => {
+      request = options
+    })
+    const page = createPage(loadPageDefinition(), {
+      loading: false,
+      hasLoadedConfig: true,
+      loadFailed: false,
+      isDirty: false
+    })
+    const originalBrandName = page.data.form.brandName
+
+    page.fetchConfig()
+    page.handleInput({
+      currentTarget: { dataset: { field: "brandName" } },
+      detail: { value: "刷新期间草稿" }
+    })
+    page.handleReset()
+    page.handleSubmit()
+
+    expect(page.data.loading).toBe(true)
+    expect(page.data.form.brandName).toBe(originalBrandName)
+    expect(page.data.isDirty).toBe(false)
+    expect(wx.cloud.callFunction).toHaveBeenCalledTimes(1)
+    expect(wx.showLoading).not.toHaveBeenCalled()
+
+    request.success({
+      result: {
+        ok: true,
+        config: { brandName: "刷新后的配置" }
+      }
+    })
+    expect(page.data.form.brandName).toBe("刷新后的配置")
+  })
+
+  test("未保存修改或保存期间底层配置读取入口直接收尾", () => {
+    const dirtyDone = jest.fn()
+    const savingDone = jest.fn()
+    const page = createPage(loadPageDefinition(), {
+      loading: false,
+      hasLoadedConfig: true,
+      isDirty: true
+    })
+
+    page.fetchConfig(dirtyDone)
+    page.data.isDirty = false
+    page.data.saving = true
+    page.fetchConfig(savingDone)
+
+    expect(wx.cloud.callFunction).not.toHaveBeenCalled()
+    expect(dirtyDone).toHaveBeenCalledTimes(1)
+    expect(savingDone).toHaveBeenCalledTimes(1)
   })
 
   test("成功加载与保存后恢复线上已同步状态", () => {

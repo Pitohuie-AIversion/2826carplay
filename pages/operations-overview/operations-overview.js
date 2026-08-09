@@ -1,4 +1,10 @@
-const { requirePagePermission } = require("../../shared/pageAuth")
+const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
+const {
+  activatePageNativeActions,
+  beginPageNativeAction,
+  cancelPageNativeActions,
+  isPageNativeActionActive
+} = require("../../shared/pageNativeAction")
 
 const BOOKING_STATUS_LABELS = {
   pending: "待联系",
@@ -162,6 +168,7 @@ Page({
   },
 
   onLoad() {
+    activatePageNativeActions(this)
     requirePagePermission(this, {
       required: (result) =>
         Boolean(result.canManageVehicles || result.canManageBookings || result.canManageRoles),
@@ -188,6 +195,13 @@ Page({
     })
   },
 
+  onUnload() {
+    cancelPagePermissionCheck(this)
+    cancelPageNativeActions(this)
+    this._overviewRequestId = Number(this._overviewRequestId || 0) + 1
+    this.finishOverviewRequestEffects()
+  },
+
   handleRefresh() {
     if (!this.data.loading && !this.data.refreshing) {
       this.loadOverview({ refreshing: true })
@@ -199,9 +213,13 @@ Page({
     if (!url) {
       return
     }
+    const action = beginPageNativeAction(this)
     wx.navigateTo({
       url,
       fail: () => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         wx.showToast({
           title: "页面跳转失败",
           icon: "none"
@@ -212,37 +230,58 @@ Page({
 
   loadOverview(options) {
     const input = options && typeof options === "object" ? options : {}
+    this.finishOverviewRequestEffects()
+    const requestId = Number(this._overviewRequestId || 0) + 1
+    this._overviewRequestId = requestId
+    this._overviewRequestDone =
+      typeof input.done === "function" ? input.done : null
+
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       this.setData({
         loading: false,
         refreshing: false,
         loadError: "云能力未初始化"
       })
-      if (typeof input.done === "function") {
-        input.done()
-      }
+      this.finishOverviewRequestEffects()
       return
     }
 
+    const permissions = {
+      canManageVehicles: Boolean(this.data.canManageVehicles),
+      canManageBookings: Boolean(this.data.canManageBookings),
+      canManageRoles: Boolean(this.data.canManageRoles)
+    }
+    const requestedSourceCount =
+      Number(permissions.canManageVehicles) +
+      Number(permissions.canManageBookings) +
+      Number(permissions.canManageBookings || permissions.canManageRoles)
     this.setData({
       loading: !input.refreshing,
       refreshing: Boolean(input.refreshing),
       loadError: "",
-      requestedSourceCount:
-        Number(this.data.canManageVehicles) +
-        Number(this.data.canManageBookings) +
-        Number(this.data.canManageBookings || this.data.canManageRoles)
+      requestedSourceCount
     })
 
-    const vehicleTask = this.data.canManageVehicles
+    const vehicleTask = permissions.canManageVehicles
       ? callCloud("vehicleList", { page: 0, pageSize: 1 })
       : Promise.resolve(null)
-    const bookingTask = this.data.canManageBookings
+    const bookingTask = permissions.canManageBookings
       ? callCloud("bookingList", { page: 0, pageSize: 1 })
       : Promise.resolve(null)
-    const summaryTask = this.data.canManageBookings || this.data.canManageRoles
+    const summaryTask = permissions.canManageBookings || permissions.canManageRoles
       ? callCloud("operationSummaryGet")
       : Promise.resolve(null)
+
+    let settled = false
+    const isCurrent = () => this._overviewRequestId === requestId
+    const finishRequest = () => {
+      if (settled || !isCurrent()) {
+        return false
+      }
+      settled = true
+      this.finishOverviewRequestEffects()
+      return true
+    }
 
     Promise.all([vehicleTask, bookingTask, summaryTask])
       .then(([vehicleResult, bookingResult, summaryResult]) => {
@@ -294,7 +333,7 @@ Page({
         const alerts = []
 
         if (
-          this.data.canManageBookings &&
+          permissions.canManageBookings &&
           (coordinationCountAvailable || (!hasCoordinationCount && bookingLoaded))
         ) {
           alerts.push({
@@ -307,7 +346,7 @@ Page({
             tone: pendingCoordination ? "warning" : "success",
             url: "/pages/booking-workbench/booking-workbench"
           })
-        } else if (this.data.canManageBookings) {
+        } else if (permissions.canManageBookings) {
           alerts.push({
             key: "booking",
             title: "预约待办暂不可用",
@@ -317,7 +356,7 @@ Page({
             url: "/pages/booking-workbench/booking-workbench"
           })
         }
-        if (this.data.canManageVehicles && vehicleLoaded) {
+        if (permissions.canManageVehicles && vehicleLoaded) {
           alerts.push({
             key: "vehicle",
             title: `${maintenanceVehicles} 辆车正在维护`,
@@ -326,7 +365,7 @@ Page({
             tone: maintenanceVehicles ? "primary" : "success",
             url: "/pages/vehicle-manage/vehicle-manage"
           })
-        } else if (this.data.canManageVehicles) {
+        } else if (permissions.canManageVehicles) {
           alerts.push({
             key: "vehicle",
             title: "车辆待办暂不可用",
@@ -336,7 +375,7 @@ Page({
             url: "/pages/vehicle-manage/vehicle-manage"
           })
         }
-        if (this.data.canManageRoles && privacyCountAvailable) {
+        if (permissions.canManageRoles && privacyCountAvailable) {
           alerts.push({
             key: "privacy",
             title: `${pendingPrivacyCount} 条待处理，${processingPrivacyCount} 条处理中`,
@@ -348,7 +387,7 @@ Page({
             tone: pendingPrivacyCount || processingPrivacyCount ? "warning" : "success",
             url: "/pages/privacy-request-manage/privacy-request-manage"
           })
-        } else if (this.data.canManageRoles) {
+        } else if (permissions.canManageRoles) {
           alerts.push({
             key: "privacy",
             title: "隐私待办暂不可用",
@@ -358,7 +397,7 @@ Page({
             url: "/pages/privacy-request-manage/privacy-request-manage"
           })
         }
-        if (this.data.canManageRoles && storageCountAvailable) {
+        if (permissions.canManageRoles && storageCountAvailable) {
           alerts.push({
             key: "storage",
             title: `${storageCleanupPendingCount} 条存储清理待重试`,
@@ -369,10 +408,6 @@ Page({
           })
         }
 
-        const requestedSourceCount =
-          Number(this.data.canManageVehicles) +
-          Number(this.data.canManageBookings) +
-          Number(this.data.canManageBookings || this.data.canManageRoles)
         const loadedSourceCount =
           Number(vehicleLoaded) + Number(bookingLoaded) + Number(summaryLoaded)
         const actionableAlerts = alerts.filter(
@@ -391,6 +426,9 @@ Page({
           actionLabel: Number(item.value) > 0 ? "立即处理" : "查看详情"
         }))
 
+        if (!finishRequest()) {
+          return
+        }
         this.setData({
           loading: false,
           refreshing: false,
@@ -422,16 +460,22 @@ Page({
         })
       })
       .catch(() => {
+        if (!finishRequest()) {
+          return
+        }
         this.setData({
           loading: false,
           refreshing: false,
           loadError: "运营数据加载失败，请稍后重试"
         })
       })
-      .then(() => {
-        if (typeof input.done === "function") {
-          input.done()
-        }
-      })
+  },
+
+  finishOverviewRequestEffects() {
+    if (typeof this._overviewRequestDone === "function") {
+      const done = this._overviewRequestDone
+      this._overviewRequestDone = null
+      done()
+    }
   }
 })

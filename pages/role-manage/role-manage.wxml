@@ -26,7 +26,7 @@
       value="{{formOpenid}}"
       maxlength="128"
       confirm-type="done"
-      disabled="{{!!editingOpenid}}"
+      disabled="{{initialLoading || loading || saving || !!editingOpenid}}"
       bindinput="handleOpenidInput"
     />
 
@@ -34,12 +34,13 @@
       <view
         wx:for="{{permissionOptions}}"
         wx:key="value"
-        class="permission-option {{item.active ? 'permission-option-active' : ''}}"
+        class="permission-option {{item.active ? 'permission-option-active' : ''}} {{initialLoading || loading || saving ? 'permission-option-disabled' : ''}}"
         data-value="{{item.value}}"
         bindtap="handleTogglePermission"
         hover-class="permission-option-pressed"
         aria-role="checkbox"
         aria-checked="{{item.active}}"
+        aria-disabled="{{initialLoading || loading || saving}}"
         aria-label="{{item.label}}，{{item.desc}}"
       >
         <view class="permission-option-icon" aria-hidden="true">
@@ -58,8 +59,8 @@
     <view class="form-tip"><view class="role-tip-native-icon" aria-hidden="true"></view><text>{{editingOpenid ? "编辑时不可更换 OpenID；如需新增成员，请先清空表单。" : "不选任何权限时，将保存为普通成员记录。"}}</text></view>
 
     <view class="action-row">
-      <button class="save-btn ui-btn ui-btn-primary" loading="{{saving}}" disabled="{{saving}}" bindtap="handleSubmit" aria-label="保存当前成员权限"><view class="role-action-content"><view wx:if="{{!saving}}" class="role-action-native-icon role-save-native-icon" aria-hidden="true"></view><text>{{saving ? '正在保存' : '保存权限'}}</text></view></button>
-      <button class="reset-btn ui-btn ui-btn-ghost" disabled="{{saving}}" bindtap="handleResetForm" aria-label="清空权限表单"><view class="role-action-content"><view class="role-action-native-icon role-reset-native-icon" aria-hidden="true"></view><text>清空表单</text></view></button>
+      <button class="save-btn ui-btn ui-btn-primary" loading="{{saving}}" disabled="{{initialLoading || loading || saving}}" bindtap="handleSubmit" aria-label="保存当前成员权限"><view class="role-action-content"><view wx:if="{{!saving}}" class="role-action-native-icon role-save-native-icon" aria-hidden="true"></view><text>{{saving ? '正在保存' : '保存权限'}}</text></view></button>
+      <button class="reset-btn ui-btn ui-btn-ghost" disabled="{{initialLoading || loading || saving}}" bindtap="handleResetForm" aria-label="清空权限表单"><view class="role-action-content"><view class="role-action-native-icon role-reset-native-icon" aria-hidden="true"></view><text>清空表单</text></view></button>
     </view>
   </view>
 
@@ -109,6 +110,7 @@
           class="edit-btn ui-btn ui-btn-ghost"
           data-openid="{{item.openid}}"
           data-permissions="{{item.permissions}}"
+          disabled="{{initialLoading || loading || saving}}"
           bindtap="handleEditRole"
           aria-label="编辑 {{item.openid}} 的权限"
         >
@@ -120,7 +122,7 @@
         wx:if="{{hasMore}}"
         class="load-more-btn ui-btn ui-btn-ghost"
         loading="{{loading}}"
-        disabled="{{loading}}"
+        disabled="{{loading || saving}}"
         bindtap="handleLoadMore"
       >
         <view class="role-action-content"><view wx:if="{{!loading}}" class="role-action-native-icon role-more-native-icon" aria-hidden="true"></view><text>{{loading ? '正在加载' : '加载更多'}}</text></view>

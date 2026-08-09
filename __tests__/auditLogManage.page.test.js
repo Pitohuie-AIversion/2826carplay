@@ -1,4 +1,5 @@
 jest.mock("../shared/pageAuth", () => ({
+  cancelPagePermissionCheck: jest.fn(),
   requirePagePermission: jest.fn()
 }))
 

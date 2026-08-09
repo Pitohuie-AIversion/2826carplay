@@ -1,5 +1,12 @@
 const { trackEvent } = require("../../shared/analytics")
 const { formatToastTitle } = require("../../shared/uiFeedback")
+const { requestOperationConfig } = require("../../shared/operationConfigRequest")
+const {
+  activatePageNativeActions,
+  beginPageNativeAction,
+  cancelPageNativeActions,
+  isPageNativeActionActive
+} = require("../../shared/pageNativeAction")
 const LAST_BOOKING_CONTACT_KEY = "lastBookingContact"
 const BOOKING_CAR_LOAD_TIMEOUT_MS = 15 * 1000
 const AVAILABILITY_CHECK_TIMEOUT_MS = 12 * 1000
@@ -165,6 +172,7 @@ Page({
   },
 
   onLoad(options) {
+    activatePageNativeActions(this)
     const app = getApp()
     const env =
       app &&
@@ -211,6 +219,9 @@ Page({
   },
 
   handleUseSavedContact() {
+    if (this.data.isSubmitting) {
+      return
+    }
     const saved = this._savedContact
     if (!saved) {
       return
@@ -231,33 +242,18 @@ Page({
   },
 
   loadOperationConfig() {
-    if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
-      return
-    }
-
-    this.setData({
-      loadingCar: true,
-      loadError: false
-    })
-
-    wx.cloud.callFunction({
-      name: "operationConfigGet",
-      success: (res) => {
-        const result = res && res.result ? res.result : null
-        if (!result || !result.ok || !result.config) {
-          return
-        }
-
+    this.cancelOperationConfigRequest()
+    this._cancelOperationConfigRequest = requestOperationConfig({
+      onSuccess: (config) => {
         this.setData({
-          privacyTip: result.config.bookingPrivacyTip || this.data.privacyTip,
-          cityOptions: Array.isArray(result.config.cityOptions) ? result.config.cityOptions : [],
-          bookingStatusTemplateId: String(result.config.bookingStatusTemplateId || "").trim(),
-          subscriptionEnabled: Boolean(String(result.config.bookingStatusTemplateId || "").trim())
+          privacyTip: config.bookingPrivacyTip || this.data.privacyTip,
+          cityOptions: Array.isArray(config.cityOptions) ? config.cityOptions : [],
+          bookingStatusTemplateId: String(config.bookingStatusTemplateId || "").trim(),
+          subscriptionEnabled: Boolean(String(config.bookingStatusTemplateId || "").trim())
         })
 
         this.syncCitySelection()
-      },
-      fail: () => {}
+      }
     })
   },
 
@@ -343,15 +339,24 @@ Page({
   },
 
   onUnload() {
+    cancelPageNativeActions(this)
     this._bookingCarRequestId = Number(this._bookingCarRequestId || 0) + 1
     this.availabilityRequestSerial = Number(this.availabilityRequestSerial || 0) + 1
     this._bookingSubmitSerial = Number(this._bookingSubmitSerial || 0) + 1
+    this.cancelOperationConfigRequest()
     if (this._bookingCarLoadTimer) {
       clearTimeout(this._bookingCarLoadTimer)
       this._bookingCarLoadTimer = null
     }
     this.clearAvailabilityCheckTimer()
     this.clearBookingSubmitTimer()
+  },
+
+  cancelOperationConfigRequest() {
+    if (typeof this._cancelOperationConfigRequest === "function") {
+      this._cancelOperationConfigRequest()
+      this._cancelOperationConfigRequest = null
+    }
   },
 
   setLoadError(message) {
@@ -400,6 +405,9 @@ Page({
   },
 
   handleInput(event) {
+    if (this.data.isSubmitting) {
+      return
+    }
     const { field } = event.currentTarget.dataset
     let value = event.detail.value
 
@@ -424,6 +432,9 @@ Page({
   },
 
   handleDateChange(event) {
+    if (this.data.isSubmitting) {
+      return
+    }
     const { field } = event.currentTarget.dataset
     const value = event.detail.value
 
@@ -468,6 +479,9 @@ Page({
   },
 
   handleDateShortcut(event) {
+    if (this.data.isSubmitting) {
+      return
+    }
     const action = String(event.currentTarget.dataset.action || "")
     const today = this.data.today
     const nextForm = { ...this.data.form }
@@ -520,6 +534,9 @@ Page({
   },
 
   checkVehicleAvailability() {
+    if (this.data.isSubmitting) {
+      return
+    }
     const form = this.data.form || {}
     const vehicleId = String(this.data.carId || "").trim()
     const startDate = String(form.startDate || "").trim()
@@ -620,6 +637,9 @@ Page({
   },
 
   handleCityChange(event) {
+    if (this.data.isSubmitting) {
+      return
+    }
     const index = Number(event.detail && event.detail.value)
     const cityOptions = Array.isArray(this.data.cityOptions) ? this.data.cityOptions : []
     if (!Number.isInteger(index) || index < 0 || index >= cityOptions.length) {
@@ -678,6 +698,9 @@ Page({
   },
 
   handlePrivacyAgreementChange(event) {
+    if (this.data.isSubmitting) {
+      return
+    }
     const values = event && event.detail && Array.isArray(event.detail.value) ? event.detail.value : []
     const privacyAgreed = values.includes("agreed")
     this.setData({
@@ -687,9 +710,13 @@ Page({
   },
 
   handleOpenPrivacyPolicy() {
+    const action = beginPageNativeAction(this)
     wx.navigateTo({
       url: "/pages/content-page/content-page?type=privacy",
       fail: () => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         wx.showToast({
           title: "隐私政策打开失败",
           icon: "none"
@@ -866,11 +893,15 @@ Page({
 
   handleViewSubmittedBooking() {
     const id = String(this.data.submittedBookingId || "").trim()
+    const action = beginPageNativeAction(this)
     wx.navigateTo({
       url: id
         ? `/pages/booking-detail/booking-detail?id=${id}`
         : "/pages/bookings/bookings",
       fail: () => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         wx.showToast({
           title: "预约记录打开失败",
           icon: "none"
@@ -880,12 +911,19 @@ Page({
   },
 
   handleContinueBrowse() {
+    const action = beginPageNativeAction(this)
     wx.redirectTo({
       url: "/pages/garage/garage",
       fail: () => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         wx.reLaunch({
           url: "/pages/garage/garage",
           fail: () => {
+            if (!isPageNativeActionActive(this, action)) {
+              return
+            }
             wx.showToast({
               title: "返回车库失败",
               icon: "none"
@@ -897,18 +935,28 @@ Page({
   },
 
   handleBackGarage() {
+    const action = beginPageNativeAction(this)
     const pages = getCurrentPages()
 
     if (pages.length > 1) {
       wx.navigateBack({
         delta: 1,
         fail: () => {
+          if (!isPageNativeActionActive(this, action)) {
+            return
+          }
           wx.redirectTo({
             url: "/pages/garage/garage",
             fail: () => {
+              if (!isPageNativeActionActive(this, action)) {
+                return
+              }
               wx.reLaunch({
                 url: "/pages/garage/garage",
                 fail: () => {
+                  if (!isPageNativeActionActive(this, action)) {
+                    return
+                  }
                   wx.showToast({
                     title: "返回车库失败",
                     icon: "none"
@@ -925,9 +973,15 @@ Page({
     wx.redirectTo({
       url: "/pages/garage/garage",
       fail: () => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         wx.reLaunch({
           url: "/pages/garage/garage",
           fail: () => {
+            if (!isPageNativeActionActive(this, action)) {
+              return
+            }
             wx.showToast({
               title: "返回车库失败",
               icon: "none"
@@ -938,6 +992,9 @@ Page({
     })
   },
   handleRetryLoad() {
+    if (this.data.loadingCar || this.data.isSubmitting) {
+      return
+    }
     this.loadBookingCar(this.data.carId)
   }
 })

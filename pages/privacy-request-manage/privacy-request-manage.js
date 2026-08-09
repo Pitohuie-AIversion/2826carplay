@@ -1,5 +1,11 @@
-const { requirePagePermission } = require("../../shared/pageAuth")
+const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
 const { formatToastTitle } = require("../../shared/uiFeedback")
+const {
+  activatePageNativeActions,
+  beginPageNativeAction,
+  cancelPageNativeActions,
+  isPageNativeActionActive
+} = require("../../shared/pageNativeAction")
 
 const PRIVACY_MANAGE_LIST_TIMEOUT_MS = 15 * 1000
 const PRIVACY_MANAGE_WRITE_TIMEOUT_MS = 20 * 1000
@@ -134,6 +140,7 @@ Page({
   },
 
   onLoad() {
+    activatePageNativeActions(this)
     requirePagePermission(this, {
       required: "canManageRoles",
       noPermissionMessage: "无权处理隐私申请",
@@ -153,6 +160,8 @@ Page({
   },
 
   onUnload() {
+    cancelPagePermissionCheck(this)
+    cancelPageNativeActions(this)
     this._privacyManageListRequestId =
       Number(this._privacyManageListRequestId || 0) + 1
     this._privacyManageWriteRequestId =
@@ -214,7 +223,13 @@ Page({
     if (!this.data.keyword || this.data.updatingId) {
       return
     }
-    this.setData({ keyword: "" }, () => this.fetchList())
+    const listRequestId = Number(this._privacyManageListRequestId || 0)
+    this.setData({ keyword: "" }, () => {
+      if (listRequestId !== Number(this._privacyManageListRequestId || 0)) {
+        return
+      }
+      this.fetchList()
+    })
   },
 
   handleSearch() {
@@ -233,13 +248,19 @@ Page({
     ) {
       return
     }
+    const listRequestId = Number(this._privacyManageListRequestId || 0)
     this.setData({
       keyword: "",
       currentType: "all",
       currentStatus: "pending",
       currentTypeLabel: "全部类型",
       currentStatusLabel: "待处理"
-    }, () => this.fetchList())
+    }, () => {
+      if (listRequestId !== Number(this._privacyManageListRequestId || 0)) {
+        return
+      }
+      this.fetchList()
+    })
   },
 
   handleLoadMore() {
@@ -249,6 +270,9 @@ Page({
   },
 
   handleCopyOpenid(event) {
+    if (this.data.loading || this.data.updatingId) {
+      return
+    }
     const openid = String(event.currentTarget.dataset.openid || "")
     if (!openid) {
       wx.showToast({
@@ -257,15 +281,22 @@ Page({
       })
       return
     }
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.setClipboardData({
       data: openid,
       success: () => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         wx.showToast({
           title: "申请账号已复制",
           icon: "none"
         })
       },
       fail: () => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         wx.showToast({
           title: "申请账号复制失败",
           icon: "none"
@@ -276,12 +307,16 @@ Page({
 
   handleInventoryTap(event) {
     const id = String(event.currentTarget.dataset.id || "")
-    if (!id) {
+    if (this.data.loading || this.data.updatingId || !id) {
       return
     }
+    const action = beginPageNativeAction(this)
     wx.navigateTo({
       url: `/pages/privacy-data-inventory/privacy-data-inventory?id=${encodeURIComponent(id)}`,
       fail: () => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         wx.showToast({
           title: "数据清单打开失败",
           icon: "none"
@@ -307,11 +342,17 @@ Page({
     }
     actions.push({ label: "驳回申请", status: "rejected" })
 
+    const nativeAction = beginPageNativeAction(this, {
+      exclusiveKey: "privacy-status-confirmation"
+    })
     wx.showActionSheet({
       alertText: "选择申请处理结果",
       itemList: actions.map((action) => action.label),
       itemColor: "#528fff",
       success: (res) => {
+        if (!isPageNativeActionActive(this, nativeAction) || !res) {
+          return
+        }
         const action = actions[res.tapIndex]
         if (!action) {
           return
@@ -326,6 +367,9 @@ Page({
   },
 
   promptResolution(item, action) {
+    const nativeAction = beginPageNativeAction(this, {
+      exclusiveKey: "privacy-status-confirmation"
+    })
     wx.showModal({
       title: action.status === "completed" ? "填写处理结果" : "填写未通过原因",
       content: "该说明会展示给申请用户，请清晰说明处理结果或后续方式。",
@@ -334,7 +378,7 @@ Page({
       editable: true,
       placeholderText: action.status === "completed" ? "例如：已完成核验并通过客服反馈" : "例如：依法需保留相关交易记录",
       success: (res) => {
-        if (!res.confirm) {
+        if (!isPageNativeActionActive(this, nativeAction) || !res || !res.confirm) {
           return
         }
         const note = String(res.content || "").trim()

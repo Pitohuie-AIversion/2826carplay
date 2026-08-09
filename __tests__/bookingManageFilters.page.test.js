@@ -32,6 +32,27 @@ describe("pages/booking-manage workflow filters", () => {
     delete global.wx
   })
 
+  test("ignores share callbacks after the booking management page unloads", () => {
+    let shareOptions
+    global.wx = {
+      shareFileMessage: jest.fn((options) => {
+        shareOptions = options
+      }),
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition(), {
+      exportFilePath: "/user-data/bookings.csv",
+      exportFileName: "bookings.csv"
+    })
+
+    page.handleShareExportedFile()
+    page.onUnload()
+    shareOptions.success()
+    shareOptions.fail(new Error("share failed"))
+
+    expect(global.wx.showToast).not.toHaveBeenCalled()
+  })
+
   test("预约管理列表无回调时超时收尾并忽略迟到结果", () => {
     jest.useFakeTimers()
     let lateSuccess
@@ -241,6 +262,9 @@ describe("pages/booking-manage workflow filters", () => {
       },
       success: expect.any(Function),
       fail: expect.any(Function)
+    })
+    global.wx.cloud.callFunction.mock.calls[0][0].fail({
+      errMsg: "bookingExportCsv:fail test"
     })
 
     page.fetchList = jest.fn()

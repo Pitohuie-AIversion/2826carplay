@@ -1,4 +1,12 @@
 App({
+  onShow() {
+    this.globalData.nativeActionAppVisible = true
+  },
+
+  onHide() {
+    this.globalData.nativeActionAppVisible = false
+  },
+
   onLaunch() {
     if (!wx.cloud || typeof wx.cloud.init !== "function") {
       return
@@ -16,5 +24,6 @@ App({
 
   globalData: {
     cloudEnvId: "cloud1-d8gtmns36320e045e",
+    nativeActionAppVisible: true
   }
 })

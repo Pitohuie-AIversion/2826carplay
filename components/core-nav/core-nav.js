@@ -4,12 +4,27 @@ const ROUTES = {
   bookings: "/pages/bookings/bookings",
   mine: "/pages/mine/mine"
 }
+const {
+  activatePageNativeActions,
+  beginPageNativeAction,
+  cancelPageNativeActions,
+  isPageNativeActionActive
+} = require("../../shared/pageNativeAction")
 
 function getRoutePath(page) {
   return String((page && (page.route || page.__route__)) || "").replace(/^\//, "")
 }
 
 Component({
+  lifetimes: {
+    attached() {
+      activatePageNativeActions(this)
+    },
+    detached() {
+      cancelPageNativeActions(this)
+    }
+  },
+
   properties: {
     activeKey: {
       type: String,
@@ -24,6 +39,7 @@ Component({
       if (!url || key === this.data.activeKey) {
         return
       }
+      const action = beginPageNativeAction(this)
 
       const targetRoute = url.replace(/^\//, "")
       const pages = typeof getCurrentPages === "function" ? getCurrentPages() : []
@@ -36,12 +52,21 @@ Component({
       }
 
       const fallback = () => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         wx.redirectTo({
           url,
           fail: () => {
+            if (!isPageNativeActionActive(this, action)) {
+              return
+            }
             wx.reLaunch({
               url,
               fail: () => {
+                if (!isPageNativeActionActive(this, action)) {
+                  return
+                }
                 wx.showToast({
                   title: "页面切换失败",
                   icon: "none"

@@ -1,5 +1,11 @@
-const { requirePagePermission } = require("../../shared/pageAuth")
+const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
 const { formatToastTitle } = require("../../shared/uiFeedback")
+const {
+  activatePageCsvFileActions,
+  beginPageCsvFileAction,
+  cancelPageCsvFileActions,
+  isPageCsvFileActionActive
+} = require("../../shared/pageCsvFileActions")
 const {
   canShareCsvFile,
   isUserCancelError,
@@ -171,6 +177,7 @@ Page({
   },
 
   onLoad() {
+    activatePageCsvFileActions(this)
     this.setData({
       canShareExport: canShareCsvFile()
     })
@@ -194,6 +201,8 @@ Page({
   },
 
   onUnload() {
+    cancelPagePermissionCheck(this)
+    cancelPageCsvFileActions(this)
     this._errorListRequestId = Number(this._errorListRequestId || 0) + 1
     this._exportRequestSerial = Number(this._exportRequestSerial || 0) + 1
     this.finishErrorListRequestEffects()
@@ -209,7 +218,13 @@ Page({
     if (!this.data.keyword) {
       return
     }
-    this.setData({ keyword: "" }, () => this.fetchList())
+    const listRequestId = Number(this._errorListRequestId || 0)
+    this.setData({ keyword: "" }, () => {
+      if (listRequestId !== Number(this._errorListRequestId || 0)) {
+        return
+      }
+      this.fetchList()
+    })
   },
 
   handleSearch() {
@@ -233,11 +248,17 @@ Page({
     if (!this.data.keyword && this.data.currentFunc === "all") {
       return
     }
+    const listRequestId = Number(this._errorListRequestId || 0)
     this.setData({
       keyword: "",
       currentFunc: "all",
       currentFuncLabel: "全部函数"
-    }, () => this.fetchList())
+    }, () => {
+      if (listRequestId !== Number(this._errorListRequestId || 0)) {
+        return
+      }
+      this.fetchList()
+    })
   },
 
   handleLoadMore() {
@@ -375,10 +396,15 @@ Page({
   },
 
   handleShareExportedFile() {
-    if (!this.data.exportFilePath || !this.data.exportFileName) {
+    if (this.data.exporting || !this.data.exportFilePath || !this.data.exportFileName) {
       return
     }
-    shareCsvFile(this.data.exportFilePath, this.data.exportFileName).catch((error) => {
+    const filePath = this.data.exportFilePath
+    const action = beginPageCsvFileAction(this, filePath)
+    shareCsvFile(filePath, this.data.exportFileName).catch((error) => {
+      if (!isPageCsvFileActionActive(this, action)) {
+        return
+      }
       if (isUserCancelError(error)) {
         return
       }
@@ -387,10 +413,15 @@ Page({
   },
 
   handleOpenExportedFile() {
-    if (!this.data.exportFilePath) {
+    if (this.data.exporting || !this.data.exportFilePath) {
       return
     }
-    openCsvFile(this.data.exportFilePath).catch(() => {
+    const filePath = this.data.exportFilePath
+    const action = beginPageCsvFileAction(this, filePath)
+    openCsvFile(filePath).catch(() => {
+      if (!isPageCsvFileActionActive(this, action)) {
+        return
+      }
       wx.showToast({
         title: "文件已生成",
         icon: "none"
@@ -400,20 +431,28 @@ Page({
 
   handleDeleteExportedFile() {
     const filePath = String(this.data.exportFilePath || "")
-    if (!filePath) {
+    if (this.data.exporting || !filePath) {
       return
     }
+    const action = beginPageCsvFileAction(this, filePath)
     wx.showModal({
       title: "删除本地 CSV",
       content: "将从当前设备删除这份导出文件，删除后无法恢复。云端错误日志不会受到影响。",
       confirmText: "确认删除",
       confirmColor: "#d46868",
       success: (res) => {
-        if (!res.confirm) {
+        if (
+          this.data.exporting ||
+          !isPageCsvFileActionActive(this, action) ||
+          !res.confirm
+        ) {
           return
         }
         removeCsvFile(filePath)
           .then(() => {
+            if (!isPageCsvFileActionActive(this, action)) {
+              return
+            }
             this.setData({
               exportFilePath: "",
               exportFileName: ""
@@ -424,6 +463,9 @@ Page({
             })
           })
           .catch((error) => {
+            if (!isPageCsvFileActionActive(this, action)) {
+              return
+            }
             wx.showToast({
               title: "删除失败",
               icon: "none"

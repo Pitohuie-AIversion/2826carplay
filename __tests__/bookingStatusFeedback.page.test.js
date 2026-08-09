@@ -121,8 +121,13 @@ describe("预约管理状态提醒反馈", () => {
       complete: expect.any(Function)
     })
     expect(global.wx.showToast).not.toHaveBeenCalled()
+    expect(page.data.loading).toBe(true)
+    page.saveRemark("booking_2", "不应覆盖状态更新")
+    expect(global.wx.cloud.callFunction).toHaveBeenCalledTimes(1)
+    global.wx.showModal.mock.calls[0][0].complete()
     global.wx.showModal.mock.calls[0][0].complete()
     expect(page.fetchList).toHaveBeenCalledTimes(1)
+    expect(page.data.loading).toBe(false)
   })
 
   test("详情更新成功且提醒已发送时给出成功反馈", () => {
@@ -243,9 +248,44 @@ describe("预约管理状态提醒反馈", () => {
     page.loadDetail = jest.fn()
 
     page.updateStatus("contacted")
+    expect(page.data.loading).toBe(true)
     page.onUnload()
+    global.wx.showModal.mock.calls[0][0].complete()
     global.wx.showModal.mock.calls[0][0].complete()
 
     expect(page.loadDetail).not.toHaveBeenCalled()
+  })
+
+  test("详情提醒失败弹窗重复完成时仅刷新一次", () => {
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(({ success }) => {
+          success({
+            result: {
+              ok: true,
+              notificationStatus: "failed"
+            }
+          })
+        })
+      },
+      showModal: jest.fn(),
+      showToast: jest.fn()
+    }
+    const page = createPage(
+      loadPageDefinition("../pages/booking-manage-detail/booking-manage-detail"),
+      { id: "booking_feedback", pageAuthorized: true }
+    )
+    page.loadDetail = jest.fn()
+
+    page.updateStatus("contacted")
+    expect(page._bookingDetailStatusFeedbackPending).toBe(true)
+    page.onShow()
+    expect(page.loadDetail).not.toHaveBeenCalled()
+    const complete = global.wx.showModal.mock.calls[0][0].complete
+    complete()
+    complete()
+
+    expect(page._bookingDetailStatusFeedbackPending).toBe(false)
+    expect(page.loadDetail).toHaveBeenCalledTimes(1)
   })
 })

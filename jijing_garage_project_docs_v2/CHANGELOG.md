@@ -937,6 +937,7 @@ Agent 每完成一个 Phase，必须追加记录。
 - `__tests__/bookingAvailability.page.test.js`
 - `__tests__/bookingExperience.page.test.js`
 - `__tests__/carDetail.page.test.js`
+- `__tests__/bookingSubscription.page.test.js`
 - `__tests__/bookingJourney.page.test.js`
 - `__tests__/favorites.page.test.js`
 - `__tests__/privacyRequest.page.test.js`
@@ -1002,3 +1003,613 @@ Agent 每完成一个 Phase，必须追加记录。
 下一步建议：
 - 真机重点验证弱网提交、搜索后快速切换分类以及上传中取消。
 - 验收无新增问题后进入云函数部署与发布检查。
+
+---
+
+## 2026-08-07 Phase 10 后异步体验验收修正（续）
+
+完成阶段：Phase 10 后验收反馈修正
+
+修改文件：
+- `app.js`
+- `components/core-nav/core-nav.js`
+- `pages/garage/garage.js`
+- `pages/car-detail/car-detail.js`
+- `pages/booking/booking.js`
+- `pages/booking-detail/booking-detail.js`
+- `pages/bookings/bookings.js`
+- `pages/favorites/favorites.js`
+- `pages/privacy-request/privacy-request.js`
+- `pages/content-page/content-page.js`
+- `pages/booking-manage/booking-manage.js`
+- `pages/booking-manage-detail/booking-manage-detail.js`
+- `pages/booking-workbench/booking-workbench.js`
+- `pages/booking-calendar/booking-calendar.js`
+- `pages/audit-log-manage/audit-log-manage.js`
+- `pages/error-log-manage/error-log-manage.js`
+- `pages/privacy-data-inventory/privacy-data-inventory.js`
+- `pages/privacy-request-manage/privacy-request-manage.js`
+- `pages/analytics-manage/analytics-manage.js`
+- `pages/config-manage/config-manage.js`
+- `pages/vehicle-manage/vehicle-manage.js`
+- `pages/system-health/system-health.js`
+- `pages/role-manage/role-manage.js`
+- `pages/operations-overview/operations-overview.js`
+- `pages/mine/mine.js`
+- `pages/vehicle-create/vehicle-create.js`
+- `pages/vehicle-edit/vehicle-edit.js`
+- `pages/vehicle-detail-manage/vehicle-detail-manage.js`
+- `shared/pageAuth.js`
+- `__tests__/managementPageAccess.test.js`
+- `__tests__/auditLogManage.page.test.js`
+- `__tests__/configManage.page.test.js`
+- `__tests__/errorLogManage.page.test.js`
+- `__tests__/logExport.page.test.js`
+- `__tests__/privacyDataInventory.page.test.js`
+- `__tests__/privacyRequestManage.page.test.js`
+- `__tests__/roleManage.page.test.js`
+- `__tests__/systemHealth.page.test.js`
+- `__tests__/vehicleManage.page.test.js`
+- `__tests__/operationsOverview.page.test.js`
+- `__tests__/mineOperationSummary.page.test.js`
+- `__tests__/mineMemberShortcuts.page.test.js`
+- `__tests__/consumerIconStyle.test.js`
+- `__tests__/vehicleFormExperience.test.js`
+- `__tests__/vehicleDetailManage.page.test.js`
+- `__tests__/contentPage.page.test.js`
+- `__tests__/carDetail.page.test.js`
+- `__tests__/bookingManageFilters.page.test.js`
+- `__tests__/bookingWorkbench.page.test.js`
+- `__tests__/coreNav.test.js`
+- `jijing_garage_project_docs_v2/CHANGELOG.md`
+
+新增文件：
+- `shared/operationConfigRequest.js`
+- `shared/pageCsvFileActions.js`
+- `shared/pageNativeAction.js`
+- `__tests__/operationConfigRequest.test.js`
+- `__tests__/pageAsyncLifecycle.test.js`
+- `__tests__/pageCsvFileActions.test.js`
+- `__tests__/pageNativeAction.test.js`
+- `__tests__/navigationLifecycle.page.test.js`
+- `__tests__/nativeModalLifecycle.page.test.js`
+
+删除文件：无
+
+主要改动：
+- 为运营总览三数据源聚合补充请求序号、权限快照和离页保护；新刷新会淘汰旧聚合结果并正确结束旧下拉刷新，避免迟到概览覆盖最新数据。
+- 为“我的”页权限、运营配置和运营摘要读取补充请求竞态、同步异常、摘要超时与离页保护；权限重试会淘汰旧身份结果，摘要无回调时可恢复刷新入口。
+- 将“我的”页存储清理、管理员初始化和 OpenID 查询接入统一工具执行器，补充 20 秒超时、同步异常、重复操作及离页保护，确保全局加载遮罩可靠关闭且迟到结果不再弹窗或复制。
+- 将系统加载遮罩静态验收同步改为验证统一工具执行器及三类操作文案，避免以重复调用次数代替实际覆盖能力。
+- 为车辆新增提交补充 20 秒超时、同步异常、重复提交与离页保护；迟到结果不再弹出上传引导或触发页面跳转。
+- 为车辆编辑详情读取补充 15 秒超时、同步异常、连续读取竞态与离页保护；旧车辆结果不会覆盖最新档案。
+- 为车辆编辑保存固定车辆 ID 与校验后的表单快照，并补充 20 秒超时、同步异常、重复提交和延迟导航清理，避免保存按钮永久锁定或用户离页后被二次跳转。
+- 为车辆详情管理读取补充 15 秒超时、同步异常、刷新竞态与离页收口；连续刷新会结束旧下拉状态，迟到档案不再覆盖最新车辆。
+- 将车辆状态更新、停用和恢复接入统一 20 秒操作执行器，补充同步异常、重复操作及迟到回调隔离，并在成功后安全刷新详情。
+- 为封面设置、图片移除与图片入库增加操作互斥、请求快照和离页失效保护；离页时终止当前上传，对已上传但尚未确认入库的文件发起服务端安全清理。
+- 新增统一运营配置请求器，为公共配置读取提供 10 秒静默超时、同步异常收口、结果校验和主动取消能力。
+- 将车库、客户车辆详情、预约提交、预约详情、“我的”页及服务指南接入统一配置请求器；重复加载会淘汰旧请求，离页后迟到配置不再改写当前页面。
+- 内容页固定本次内容类型快照，避免快速切换常见问题与平台规则时旧配置覆盖最新文档；云端配置不可用时继续保留本地默认内容和客服电话。
+- 为客户车辆详情的初始收藏状态查询补充 10 秒静默超时、同步异常与定时器清理；收藏写操作或页面离开会立即淘汰旧状态查询，迟到结果不再覆盖最新收藏状态。
+- 新增全站页面异步生命周期静态验收，所有发起云函数、上传、删除或运营配置请求的页面必须声明离页清理入口。
+- 扩展共享页面权限守卫，由页面实例托管当前校验取消句柄；新校验会自动淘汰旧请求，离页可同时取消权限超时与拒绝后的延迟返回。
+- 17 个受保护后台页面统一在 `onUnload` 清理权限校验；导航返回失败后的重定向与重启降级也会先确认原页面仍有效，避免离页后二次跳转。
+- 为预约详情的再次订阅请求补充 15 秒超时、同步异常、重复请求与离页回调隔离；订阅成功、拒绝、失败或完成回调只会收口一次。
+- 预约详情的编号复制、车辆跳转和返回预约列表降级统一检查页面有效性，用户提前离页后不再显示迟到提示或继续重定向。
+- 为预约管理、审计日志、错误日志和个人数据核验的 CSV 分享、打开与本地删除接入统一生命周期令牌；页面离开或导出文件被替换后，迟到的系统回调不会再弹提示、回退打开文件或误清空新文件状态。
+- 同一路径上的分享、打开与删除可以安全并行收尾；删除完成后仅清空实际删除的当前文件，避免物理文件已删除但页面仍保留失效入口。
+- 新增统一原生操作生命周期守卫，并接入除已单独保护的预约详情外全部 10 个相关页面；复制、拨号和图片预览的系统回调在页面离开后统一失效。
+- 静态验收覆盖全站 6 个剪贴板、7 个拨号和 2 个图片预览入口，要求失败或成功反馈必须先验证页面仍处于当前生命周期。
+- 为返回车库、预约管理和车辆管理的多级导航降级链接入生命周期守卫；页面在 `navigateBack`、`redirectTo` 或 `reLaunch` 任一阶段离开后，后续降级与终态提示都会立即停止。
+- 底部核心导航组件增加挂载与卸载生命周期，组件销毁后迟到的导航失败不会再切换路由；回归测试覆盖 6 类页面返回链以及组件卸载场景。
+- 将“我的”页 19 个普通菜单路由收敛为显式路由表和单一导航方法，删除重复的跳转与失败提示分支；全部菜单键逐项验证目标路径，工具类入口继续保留独立处理流程。
+- 补齐预约、预约管理、工作台、内容、车库、隐私申请和车辆详情等 11 个普通跳转入口的生命周期保护；详情页事件通道在来源页失效后也不会再发送迟到数据。
+- 扩展全站路由静态验收：凡已接入统一原生生命周期守卫的页面，其跳转失败回调必须声明页面、请求或组件级有效性检查。
+- 将收藏、个人信息申请、运营分析、运营总览、预约日历和车辆列表接入统一原生操作生命周期守卫，补齐剩余普通跳转入口；页面离开后迟到的导航失败不再弹出提示。
+- 为收藏移除、隐私申请撤回、匿名数据清理、车辆状态变更与删除，以及预约、工具和隐私管理页的确认弹窗增加生命周期令牌；弹窗回调迟到时不会再启动写操作、修改页面状态或触发后续弹窗。
+- 扩展确认弹窗静态验收，并新增 5 类离页回归场景，覆盖收藏移除、分析清理、车辆状态更新、存储清理和敏感数据导出。
+- 为预约工作台优先级选择和隐私申请处理菜单补充原生操作令牌；页面离开后迟到的操作菜单结果不会再启动协调更新、状态处理或结果说明弹窗。
+- 为服务指南章节滚动定位补充生命周期检查，并将操作菜单与滚动回调纳入全站静态验收；新增 3 个离页回归场景覆盖两类菜单和滚动失败反馈。
+- 为车辆、预约、审计日志、错误日志和隐私申请管理的清空搜索渲染回调固定列表请求序号；离页或新请求已启动时，迟到回调不会再发起额外列表读取。
+- 新增 5 个清空搜索离页回归场景，并固化页面计时器静态验收；当前 56 个实例超时句柄均要求页面声明离页入口和对应 `clearTimeout`。
+- 为客户预约详情和管理预约详情的来源事件通道增加接收端生命周期校验；目标页离开后即使通道仍递送数据，也不会再应用迟到的预约快照。
+- 两个详情页在离页时显式通过 `EventChannel.off` 解绑监听器，并新增目标页迟到事件回归和静态验收；Promise 与非空 `complete` 回调经复核均已有文件、请求或操作级收口。
+- 为统一原生操作令牌增加可选的当前顶层页约束，并接入 15 个复制、拨号、图片预览和滚动定位入口；来源页被新页面覆盖后，迟到系统回调不再把提示显示到目标页上。
+- 预约详情的编号复制沿用专用离页生命周期并补充顶层页判断；新增共享令牌、页面接线静态验收及 2 个真实页面跨页提示回归，导航和事件通道令牌保持原有行为。
+- App 生命周期集中记录小程序前后台可见性；启用顶层页约束的轻量反馈在后台期间统一静默，返回前台后新回调仍可正常反馈。
+- 确认弹窗、操作菜单与订阅请求继续使用普通生命周期令牌，避免后台切换导致按钮锁定无法收口；新增 App 生命周期、共享可见性和真实页面后台复制回归。
+- 为车辆列表、我的预约、待协调工作台、预约详情和“我的”页的 `onShow` 自动刷新补充写操作互斥；后台恢复或子页返回不会在更新、删除、取消、编辑保存或工具任务期间启动并发读取。
+- 预约详情在编辑态和订阅请求期间保留当前表单，车辆列表与工作台的下拉刷新同步遵守写锁；新增 7 个行为回归和恢复刷新静态验收。
+- 车辆管理与预约管理的搜索、筛选、重置、分页和下拉刷新统一检查读取及写入忙碌态；角色管理分页在权限保存期间不再追加旧列表。
+- 为分析、收藏、隐私申请、工作台、预约详情、配置、车辆编辑等 12 个重试入口补充忙碌态保护；审计日志、错误日志和隐私申请管理的筛选重置回调增加请求序号校验，离页后不会启动读取。
+- 新增 16 个行为回归并扩展异步静态验收；预约管理筛选测试显式结束导出请求后再验证重置，避免遗留超时句柄。
+
+测试方式：
+- `npm.cmd run check:release`
+
+已知问题：
+- 微信开发者工具编译和真机网络中断场景仍需人工验收。
+- 云函数生产部署与安全规则发布需按 `DEPLOY_CHECKLIST.md` 执行。
+
+下一步建议：
+- 继续验收写操作期间的详情跳转、复制、拨号和分享等非读取入口互斥边界。
+
+---
+
+## 2026-08-08 Phase 10 后异步体验验收修正（续）
+
+完成阶段：
+- 完成第四十一轮全局异步体验验收，收紧写操作期间详情跳转、复制、拨号、图片预览和导出文件操作的互斥边界。
+
+修改文件：
+- `pages/booking-manage/booking-manage.js`
+- `pages/booking-manage/booking-manage.wxml`
+- `pages/booking-workbench/booking-workbench.js`
+- `pages/booking-workbench/booking-workbench.wxml`
+- `pages/booking-manage-detail/booking-manage-detail.js`
+- `pages/booking-manage-detail/booking-manage-detail.wxml`
+- `pages/vehicle-manage/vehicle-manage.js`
+- `pages/vehicle-manage/vehicle-manage.wxml`
+- `pages/vehicle-detail-manage/vehicle-detail-manage.js`
+- `pages/vehicle-detail-manage/vehicle-detail-manage.wxml`
+- `pages/privacy-request-manage/privacy-request-manage.js`
+- `pages/privacy-request-manage/privacy-request-manage.wxml`
+- `pages/privacy-data-inventory/privacy-data-inventory.js`
+- `pages/privacy-data-inventory/privacy-data-inventory.wxml`
+- `pages/audit-log-manage/audit-log-manage.js`
+- `pages/audit-log-manage/audit-log-manage.wxml`
+- `pages/error-log-manage/error-log-manage.js`
+- `pages/error-log-manage/error-log-manage.wxml`
+- `__tests__/bookingWorkbench.page.test.js`
+- `__tests__/vehicleDetailManage.page.test.js`
+- `__tests__/nativeModalLifecycle.page.test.js`
+- `jijing_garage_project_docs_v2/CHANGELOG.md`
+
+新增文件：无
+
+删除文件：无
+
+主要改动：
+- 预约管理、待协调工作台和管理预约详情在列表读取、备注保存、协调更新或状态处理期间，不再启动详情跳转、拨号和复制；对应按钮同步展示禁用态。
+- 车辆列表在读取、更新或删除期间阻止新建、编辑和详情跳转；车辆详情将状态操作、图片上传、封面调整、移除、预览、编辑和下拉刷新纳入统一忙碌判断。
+- 车辆详情保留“返回列表”和“取消上传”入口，使管理员仍可主动放弃当前上传，并由既有离页清理流程终止任务和回收未入库文件。
+- 隐私申请处理或数据核验、导出期间阻止账号复制及关联详情跳转，避免写入结果尚未稳定时开启另一条系统交互链。
+- 预约、审计、错误与个人数据四类 CSV 页面在新文件生成期间禁用分享、打开和删除旧文件，避免替换清理与系统文件操作竞态。
+- 新增 11 个忙碌态行为回归，并将既有工作台和车辆图片用例显式置于空闲状态，区分正常交互与互斥场景。
+
+测试方式：
+- `npm.cmd test -- --maxWorkers=4`
+- `npm.cmd run check:structure`
+- `npm.cmd run check:secrets`
+- `npm.cmd run check:package`
+- `git diff --check`
+
+已知问题：
+- 微信开发者工具编译和真机网络中断场景仍需人工验收。
+- 云函数生产部署与安全规则发布需按 `DEPLOY_CHECKLIST.md` 执行。
+
+下一步建议：
+- 继续验收确认弹窗打开后页面状态变化时的二次提交与跨操作互斥边界。
+
+---
+
+## 2026-08-08 Phase 10 后异步体验验收修正（再续）
+
+完成阶段：
+- 完成第四十二轮全局异步体验验收，阻止重复或迟到确认弹窗发起二次写请求。
+
+修改文件：
+- `shared/pageNativeAction.js`
+- `pages/analytics-manage/analytics-manage.js`
+- `pages/booking-detail/booking-detail.js`
+- `pages/booking-manage/booking-manage.js`
+- `pages/booking-manage-detail/booking-manage-detail.js`
+- `pages/bookings/bookings.js`
+- `pages/favorites/favorites.js`
+- `pages/mine/mine.js`
+- `pages/privacy-data-inventory/privacy-data-inventory.js`
+- `pages/privacy-request/privacy-request.js`
+- `pages/privacy-request-manage/privacy-request-manage.js`
+- `pages/vehicle-manage/vehicle-manage.js`
+- `pages/vehicle-detail-manage/vehicle-detail-manage.js`
+- `pages/audit-log-manage/audit-log-manage.js`
+- `pages/error-log-manage/error-log-manage.js`
+- `__tests__/bookingJourney.page.test.js`
+- `__tests__/nativeModalLifecycle.page.test.js`
+- `__tests__/pageNativeAction.test.js`
+- `jijing_garage_project_docs_v2/CHANGELOG.md`
+
+新增文件：无
+
+删除文件：无
+
+主要改动：
+- 为统一页面原生操作令牌增加可选同类互斥键；同一页面再次打开同类确认时只淘汰旧确认，不影响普通导航、复制、拨号和其他独立操作。
+- 车辆状态、停用、恢复、删除及图片移除共用车辆写确认键，后选操作会使先前尚未响应的确认失效。
+- 预约状态、预约取消、收藏移除、隐私申请撤回、匿名数据清理、个人数据导出和后台工具确认均接入对应互斥键，避免快速重复点击产生二次提交。
+- 客户预约详情继续沿用专用页面生命周期，并增加取消确认序号、预约 ID 快照和可取消状态复核；详情已切换或状态变化后旧确认不再生效。
+- 将忙碌判断下沉到收藏移除、隐私撤回和预约取消的实际请求方法，防止绕过按钮处理器替换正在执行的请求。
+- 四类 CSV 删除确认在回调阶段重新检查导出状态；弹窗打开后若新文件已开始生成，不会继续删除可能被替换的旧文件。
+- 新增 13 个共享令牌和真实页面行为回归，覆盖同类确认淘汰、跨车辆操作、活动请求保护、重复数据导出及迟到文件删除。
+
+测试方式：
+- `npm.cmd test -- --maxWorkers=4`
+- `npm.cmd run check:structure`
+- `npm.cmd run check:secrets`
+- `npm.cmd run check:package`
+- `git diff --check`
+
+已知问题：
+- 微信开发者工具编译和真机网络中断场景仍需人工验收。
+- 云函数生产部署与安全规则发布需按 `DEPLOY_CHECKLIST.md` 执行。
+
+下一步建议：
+- 继续验收编辑表单保存、取消和离页之间的状态快照与迟到确认边界。
+
+---
+
+## 2026-08-08 Phase 10 后异步体验验收修正（续三）
+
+完成阶段：
+- 完成第四十三轮全局异步体验验收，冻结编辑表单保存快照期间的草稿与选择状态。
+
+修改文件：
+- `pages/vehicle-create/vehicle-create.js`
+- `pages/vehicle-create/vehicle-create.wxml`
+- `pages/vehicle-edit/vehicle-edit.js`
+- `pages/vehicle-edit/vehicle-edit.wxml`
+- `pages/booking/booking.js`
+- `pages/booking/booking.wxml`
+- `pages/booking-detail/booking-detail.js`
+- `pages/booking-detail/booking-detail.wxml`
+- `pages/privacy-request/privacy-request.js`
+- `pages/privacy-request/privacy-request.wxml`
+- `pages/config-manage/config-manage.js`
+- `pages/config-manage/config-manage.wxml`
+- `pages/role-manage/role-manage.js`
+- `pages/role-manage/role-manage.wxml`
+- `__tests__/nativeModalLifecycle.page.test.js`
+- `jijing_garage_project_docs_v2/CHANGELOG.md`
+
+新增文件：无
+
+删除文件：无
+
+主要改动：
+- 车辆新建和编辑在提交期间冻结车牌、文本、类型、状态、日期、变速箱及燃油类型入口，避免已排队输入改写正在保存的快照。
+- 客户预约在提交期间冻结已保存联系人回填、联系方式、日期快捷项、城市、备注、隐私勾选和档期重试；预约详情保存期间不再接受编辑字段变化。
+- 隐私申请提交、运营配置保存及成员权限保存期间，类型选择、文本输入、配置重置和权限表单切换均在脚本入口直接返回。
+- 所有相关原生输入框、文本域、日期或选项选择器同步绑定保存忙碌态，界面反馈与脚本层互斥保持一致。
+- 新增 7 组真实页面行为回归，覆盖上述表单保存期间所有可写事件且断言草稿状态不再变化。
+
+测试方式：
+- `npm.cmd test -- --maxWorkers=4`
+- `npm.cmd run check:structure`
+- `npm.cmd run check:secrets`
+- `npm.cmd run check:package`
+- `git diff --check`
+
+已知问题：
+- 微信开发者工具编译和真机网络中断场景仍需人工验收。
+- 云函数生产部署与安全规则发布需按 `DEPLOY_CHECKLIST.md` 执行。
+
+下一步建议：
+- 继续验收保存成功后的延迟导航、返回与重新进入编辑态之间的竞态边界。
+
+---
+
+## 2026-08-08 Phase 10 后异步体验验收修正（续四）
+
+完成阶段：
+- 完成第四十四轮全局异步体验验收，收紧车辆表单写成功后的结果弹窗与延迟导航生命周期。
+
+修改文件：
+- `pages/vehicle-create/vehicle-create.js`
+- `pages/vehicle-edit/vehicle-edit.js`
+- `__tests__/vehicleFormExperience.test.js`
+- `jijing_garage_project_docs_v2/CHANGELOG.md`
+
+新增文件：无
+
+删除文件：无
+
+主要改动：
+- 车辆创建成功后继续保持提交锁，直到管理员选择立即上传图片或稍后返回，避免结果弹窗尚未响应时再次提交并创建重复车辆。
+- 车辆创建的返回、重定向和重新启动三级降级链全部失败时主动解除提交锁并提示，避免页面永久停留在不可操作状态。
+- 车辆编辑保存成功后的延迟返回新增前台与当前页面校验；应用进入后台或页面暂不位于栈顶时挂起导航，重新回到页面后再继续。
+- 延迟导航的重定向降级回调同样复核请求代次和页面前台状态，离页后的旧回调不再接管当前导航。
+- 新增 3 个车辆表单行为回归，覆盖成功弹窗重复提交、导航失败恢复和后台延迟返回。
+
+测试方式：
+- `npm.cmd test -- --maxWorkers=4`
+- `npm.cmd run check:structure`
+- `npm.cmd run check:secrets`
+- `npm.cmd run check:package`
+- `git diff --check`
+
+已知问题：
+- 微信开发者工具编译和真机网络中断场景仍需人工验收。
+- 云函数生产部署与安全规则发布需按 `DEPLOY_CHECKLIST.md` 执行。
+
+下一步建议：
+- 继续验收成功结果弹窗、信息提示弹窗与后续列表刷新之间的写操作互斥和迟到回调边界。
+
+---
+
+## 2026-08-08 Phase 10 后异步体验验收修正（续五）
+
+完成阶段：
+- 完成第四十五轮全局异步体验验收，修正匿名数据清理结果弹窗与指标刷新之间的读写竞态。
+
+修改文件：
+- `pages/analytics-manage/analytics-manage.js`
+- `pages/analytics-manage/analytics-manage.wxml`
+- `pages/analytics-manage/analytics-manage.wxss`
+- `__tests__/analyticsManage.page.test.js`
+- `__tests__/nativeModalLifecycle.page.test.js`
+- `jijing_garage_project_docs_v2/CHANGELOG.md`
+
+新增文件：无
+
+删除文件：无
+
+主要改动：
+- 匿名数据清理不再与概览读取并行；初始加载、周期读取或清理结果弹窗未关闭时，清理、周期切换和下拉刷新入口均保持互斥。
+- 清理完成后继续维持写锁并展示处理结果，用户关闭弹窗后才解除锁定并重新读取当前周期指标，避免页面继续展示已删除的旧统计。
+- 结果弹窗收尾增加请求代次与幂等校验，重复完成回调只刷新一次；弹窗打开后离页时，迟到回调不会访问已销毁页面。
+- 周期选项和清理按钮同步展示忙碌禁用语义，使界面反馈与脚本入口保持一致。
+- 新增 2 个清理结果生命周期回归，并更新既有清理用例的已加载状态夹具。
+
+测试方式：
+- `npm.cmd test -- --maxWorkers=4`
+- `npm.cmd run check:structure`
+- `npm.cmd run check:secrets`
+- `npm.cmd run check:package`
+- `git diff --check`
+
+已知问题：
+- 微信开发者工具编译和真机网络中断场景仍需人工验收。
+- 云函数生产部署与安全规则发布需按 `DEPLOY_CHECKLIST.md` 执行。
+
+下一步建议：
+- 继续验收预约状态通知失败弹窗、写操作收尾与列表刷新之间的互斥和迟到回调边界。
+
+---
+
+## 2026-08-08 Phase 10 后异步体验验收修正（续六）
+
+完成阶段：
+- 完成第四十六轮全局异步体验验收，收紧预约状态通知失败弹窗与列表、详情刷新之间的写锁生命周期。
+
+修改文件：
+- `pages/booking-manage/booking-manage.js`
+- `pages/booking-manage-detail/booking-manage-detail.js`
+- `pages/booking-workbench/booking-workbench.js`
+- `__tests__/bookingStatusFeedback.page.test.js`
+- `__tests__/bookingWorkbench.page.test.js`
+- `jijing_garage_project_docs_v2/CHANGELOG.md`
+
+新增文件：无
+
+删除文件：无
+
+主要改动：
+- 预约管理列表在“状态已更新但提醒失败”弹窗关闭前继续保持加载写锁，避免管理员在旧结果提示尚未收尾时启动备注或下一次状态更新。
+- 管理预约详情的状态反馈收尾增加幂等与弹窗异常降级，重复完成回调只会触发一次详情刷新。
+- 待协调工作台在通知失败弹窗期间保留目标预约状态锁，并新增底层状态更新入口互斥，直接调用也不能绕过活动写入或结果提示。
+- 三个页面均在结果弹窗关闭后才解除对应写锁并刷新数据；页面卸载后迟到完成回调不再读取列表或详情。
+- 扩展预约状态和工作台回归，覆盖弹窗期间二次写入、重复完成以及离页后的迟到完成，并新增 1 个详情幂等刷新用例。
+
+测试方式：
+- `npm.cmd test -- --maxWorkers=4`
+- `npm.cmd run check:structure`
+- `npm.cmd run check:secrets`
+- `npm.cmd run check:package`
+- `git diff --check`
+
+已知问题：
+- 微信开发者工具编译和真机网络中断场景仍需人工验收。
+- 云函数生产部署与安全规则发布需按 `DEPLOY_CHECKLIST.md` 执行。
+
+下一步建议：
+- 继续验收写成功后立即刷新时，旧列表请求、筛选切换和分页追加结果覆盖新状态的边界。
+
+---
+
+## 2026-08-08 Phase 10 后异步体验验收修正（续七）
+
+完成阶段：
+- 完成第四十七轮全局异步体验验收，收紧待协调工作台列表读取期间的全部写入口与迟到原生选择回调。
+
+修改文件：
+- `pages/booking-workbench/booking-workbench.js`
+- `__tests__/bookingWorkbench.page.test.js`
+- `__tests__/nativeModalLifecycle.page.test.js`
+- `jijing_garage_project_docs_v2/CHANGELOG.md`
+
+新增文件：无
+
+删除文件：无
+
+主要改动：
+- 复核预约工作台请求代次后确认旧列表读取已能被新刷新淘汰；进一步将加载、下拉刷新、活动写入和结果反馈统一纳入交互忙碌态，避免旧记录在列表更新期间被操作。
+- 优先级、协调状态、内部备注和已联系状态的页面入口统一复用忙碌判断，详情跳转、拨号、复制等关联交互也继续遵守同一互斥边界。
+- 在协调与已联系状态的底层写方法和统一写执行器再次校验读取、写入与反馈状态，程序化调用不能绕过页面入口直接发起并发写入；被拒绝的调用会同步清理预置忙碌状态。
+- 原生优先级选择器打开后若列表刷新已经开始，其迟到选择结果不会更新旧预约，也不会遗留写入锁。
+- 新增 2 个工作台回归，并将正常交互用例明确置于加载完成状态，区分初始加载和可操作页面夹具。
+
+测试方式：
+- `npm.cmd test -- --maxWorkers=4`
+- `npm.cmd run check:structure`
+- `npm.cmd run check:secrets`
+- `npm.cmd run check:package`
+- `git diff --check`
+
+已知问题：
+- 微信开发者工具编译和真机网络中断场景仍需人工验收。
+- 云函数生产部署与安全规则发布需按 `DEPLOY_CHECKLIST.md` 执行。
+
+下一步建议：
+- 继续验收角色、权限与运营配置页面在列表读取、保存和下拉刷新交叠时的互斥、请求代次与表单快照边界。
+
+---
+
+## 2026-08-08 Phase 10 后异步体验验收修正（续八）
+
+完成阶段：
+- 完成第四十八轮全局异步体验验收，收紧角色权限与运营配置页面的读取、保存、下拉刷新和表单编辑互斥。
+
+修改文件：
+- `pages/config-manage/config-manage.js`
+- `pages/config-manage/config-manage.wxml`
+- `pages/role-manage/role-manage.js`
+- `pages/role-manage/role-manage.wxml`
+- `pages/role-manage/role-manage.wxss`
+- `__tests__/configManage.page.test.js`
+- `__tests__/roleManage.page.test.js`
+- `jijing_garage_project_docs_v2/CHANGELOG.md`
+
+新增文件：无
+
+删除文件：无
+
+主要改动：
+- 运营配置在初始读取或已有配置刷新期间冻结全部输入、恢复默认和保存入口，避免迟到线上配置覆盖刷新期间生成的新草稿。
+- 配置底层读取方法在存在未保存修改或保存任务活动时直接拒绝并执行调用方收尾；重复下拉刷新不再替换当前读取请求。
+- 角色权限页面统一初始读取、分页读取和保存忙碌态，OpenID、权限选项、成员编辑、表单清空和保存入口在列表读取期间保持互斥。
+- 角色列表底层读取方法在权限保存期间拒绝新请求并执行完成回调，下拉刷新同步结束，避免保存快照与旧列表读取并行。
+- 两个页面的原生输入、按钮、成员编辑和自定义权限选项同步展示禁用语义，界面反馈与脚本入口保持一致。
+- 新增 4 个读写交叠回归，覆盖配置刷新冻结、底层配置读取拒绝、角色读取冻结和保存期间列表读取收尾。
+
+测试方式：
+- `npm.cmd test -- --maxWorkers=4`
+- `npm.cmd run check:structure`
+- `npm.cmd run check:secrets`
+- `npm.cmd run check:package`
+- `git diff --check`
+
+已知问题：
+- 微信开发者工具编译和真机网络中断场景仍需人工验收。
+- 云函数生产部署与安全规则发布需按 `DEPLOY_CHECKLIST.md` 执行。
+
+下一步建议：
+- 继续验收后台详情页在读取刷新、状态写入和图片操作交叠时，旧详情请求、上传结果与写成功刷新之间的互斥边界。
+
+---
+
+## 2026-08-08 Phase 10 后异步体验验收修正（续九）
+
+完成阶段：
+- 完成第四十九轮全局异步体验验收，收紧车辆后台详情的读取刷新、状态变更与图片上传、入库操作互斥。
+
+修改文件：
+- `pages/vehicle-detail-manage/vehicle-detail-manage.js`
+- `pages/vehicle-detail-manage/vehicle-detail-manage.wxml`
+- `__tests__/vehicleDetailManage.page.test.js`
+- `jijing_garage_project_docs_v2/CHANGELOG.md`
+
+新增文件：无
+
+删除文件：无
+
+主要改动：
+- 详情底层读取方法在状态写入、图片上传或图片资料变更期间直接拒绝并执行刷新收尾，避免旧详情读取与写成功后的最新状态交叠。
+- 图片上传底层入口统一检查详情加载及全部写入忙碌态；图片选择器打开后若详情刷新已经开始，迟到选择结果不会启动上传。
+- 图片资料入库在详情读取、状态写入、已有图片任务或不匹配上传状态下拒绝新操作，并对已上传但未入库的文件发起服务端安全清理。
+- 被并发图片任务拒绝的新增图片入库会同步解除上传态，避免临时文件已回收但页面仍停留在处理中。
+- 状态、停用、恢复、失败图片重试、封面设置和图片移除按钮同步展示跨读取与上传禁用语义，脚本互斥与界面反馈保持一致。
+- 新增 3 个车辆详情回归，并将正常上传、入库和图片操作用例显式置于详情读取完成状态。
+
+测试方式：
+- `npm.cmd test -- --maxWorkers=4`
+- `npm.cmd run check:structure`
+- `npm.cmd run check:secrets`
+- `npm.cmd run check:package`
+- `git diff --check`
+
+已知问题：
+- 微信开发者工具编译和真机网络中断场景仍需人工验收。
+- 云函数生产部署与安全规则发布需按 `DEPLOY_CHECKLIST.md` 执行。
+
+下一步建议：
+- 继续验收后台预约详情的基础读取、冲突检查、备注保存、协调状态和预约状态写入交叠时，请求代次与局部表单状态是否保持一致。
+
+---
+
+## 2026-08-08 Phase 10 后异步体验验收修正（续十）
+
+完成阶段：
+- 完成第五十轮全局异步体验验收，收紧后台预约详情读取、管理员备注草稿、协调写入与状态反馈弹窗的交叠边界。
+
+修改文件：
+- `pages/booking-manage-detail/booking-manage-detail.js`
+- `pages/booking-manage-detail/booking-manage-detail.wxml`
+- `__tests__/bookingManageConflict.page.test.js`
+- `__tests__/bookingStatusFeedback.page.test.js`
+- `jijing_garage_project_docs_v2/CHANGELOG.md`
+
+新增文件：无
+
+删除文件：无
+
+主要改动：
+- 管理员备注增加独立草稿脏状态；详情读取、页面重新显示和来源事件通道不会覆盖尚未保存的跟进备注。
+- 备注输入在详情读取、协调更新、任一写任务或状态反馈期间直接拒绝，原生文本域同步绑定读取和写入禁用态。
+- 未保存备注期间阻止协调安排和预约状态变更，避免保存备注后的详情刷新覆盖并行写入结果；当前备注保存入口仍保持可用。
+- 状态更新结果反馈新增独立生命周期锁，提醒失败弹窗关闭前，`onShow`、详情读取和底层写执行器均不会提前启动下一次请求。
+- 统一写执行器再次检查详情读取、协调写入和结果反馈忙碌态，程序化调用不能绕过页面处理器发起并发写入。
+- 新增 2 个备注草稿与读取交叠回归，扩展状态反馈回归以覆盖弹窗期间的 `onShow` 刷新，并修正测试夹具的深层 `setData` 行为与计时器清理。
+
+测试方式：
+- `npm.cmd test -- --maxWorkers=4`
+- `npm.cmd run check:structure`
+- `npm.cmd run check:secrets`
+- `npm.cmd run check:package`
+- `git diff --check`
+
+已知问题：
+- 微信开发者工具编译和真机网络中断场景仍需人工验收。
+- 云函数生产部署与安全规则发布需按 `DEPLOY_CHECKLIST.md` 执行。
+
+下一步建议：
+- 继续验收客户预约详情和预约编辑表单在重新进入前台、订阅请求、取消预约与保存联系信息交叠时的草稿保留和读取刷新边界。
+
+---
+
+## 2026-08-08 Phase 10 后异步体验验收修正（续十一）
+
+完成阶段：
+- 完成第五十一轮全局异步体验验收，收紧客户预约详情读取、联系信息草稿、状态订阅与取消预约确认/请求的交叉边界。
+
+修改文件：
+- `pages/booking-detail/booking-detail.js`
+- `pages/booking-detail/booking-detail.wxml`
+- `__tests__/bookingJourney.page.test.js`
+- `__tests__/nativeModalLifecycle.page.test.js`
+- `jijing_garage_project_docs_v2/CHANGELOG.md`
+
+新增文件：无
+
+删除文件：无
+
+主要改动：
+- 客户正在编辑联系信息时，详情读取、来源事件通道、状态订阅和取消预约入口统一拒绝启动，避免迟到详情覆盖尚未保存的姓名、手机号、城市与备注草稿。
+- 新增独立 `cancelling` 生命周期，覆盖取消确认弹窗与取消云请求；确认期间重复点击只打开一个弹窗，编辑、订阅、保存和详情读取均保持互斥。
+- 取消确认放弃、弹窗失败、取消请求失败/超时及成功刷新前均显式收尾忙碌态；确认成功后先释放确认锁，再启动受底层守卫保护的取消请求，取消成功后释放请求锁并刷新详情。
+- 联系信息保存、详情读取、订阅和取消的底层方法均再次校验交叉忙碌态，程序化调用不能绕过页面入口；状态冲突刷新前退出编辑态，确保服务端最新状态仍可回填。
+- 表单输入、编辑按钮、订阅按钮和取消预约按钮同步展示跨操作禁用语义，界面反馈与脚本互斥保持一致。
+- 新增 3 个客户详情回归，并调整原生弹窗生命周期用例，覆盖草稿保护、单实例取消确认、放弃确认后恢复及确认取消成功刷新。
+
+测试方式：
+- `npm.cmd test -- --maxWorkers=4`
+- `npm.cmd run check:structure`
+- `npm.cmd run check:secrets`
+- `npm.cmd run check:package`
+- `git diff --check`
+
+已知问题：
+- 微信开发者工具编译和真机网络中断场景仍需人工验收。
+- 云函数生产部署与安全规则发布需按 `DEPLOY_CHECKLIST.md` 执行。
+
+下一步建议：
+- 继续验收客户预约提交页在订阅授权、表单提交、页面重新显示与重复点击交叉时，表单快照、成功跳转和迟到原生回调是否保持一致。

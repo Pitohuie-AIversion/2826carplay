@@ -1,4 +1,5 @@
 jest.mock("../shared/pageAuth", () => ({
+  cancelPagePermissionCheck: jest.fn(),
   requirePagePermission: jest.fn()
 }))
 
@@ -166,5 +167,91 @@ describe("log management CSV export", () => {
       title: "本地文件已删除",
       icon: "none"
     })
+  })
+
+  test("does not fall back to opening a shared file after page unload", async () => {
+    let rejectShare
+    global.wx = {
+      showToast: jest.fn()
+    }
+    const page = createPage(
+      loadPageDefinition("../pages/audit-log-manage/audit-log-manage"),
+      {
+        exportFilePath: "/user-data/audit-logs.csv",
+        exportFileName: "audit-logs.csv"
+      }
+    )
+    const csvFile = require("../shared/csvFile")
+    csvFile.shareCsvFile.mockImplementationOnce(
+      () => new Promise((resolve, reject) => {
+        rejectShare = reject
+      })
+    )
+
+    page.handleShareExportedFile()
+    page.onUnload()
+    rejectShare(new Error("share failed"))
+    await flushPromises()
+
+    expect(csvFile.openCsvFile).not.toHaveBeenCalled()
+    expect(global.wx.showToast).not.toHaveBeenCalled()
+  })
+
+  test("does not show an open failure after the exported file is replaced", async () => {
+    let rejectOpen
+    global.wx = {
+      showToast: jest.fn()
+    }
+    const page = createPage(
+      loadPageDefinition("../pages/error-log-manage/error-log-manage"),
+      {
+        exportFilePath: "/user-data/error-logs.csv",
+        exportFileName: "error-logs.csv"
+      }
+    )
+    const csvFile = require("../shared/csvFile")
+    csvFile.openCsvFile.mockImplementationOnce(
+      () => new Promise((resolve, reject) => {
+        rejectOpen = reject
+      })
+    )
+
+    page.handleOpenExportedFile()
+    page.data.exportFilePath = "/user-data/new-error-logs.csv"
+    rejectOpen(new Error("open failed"))
+    await flushPromises()
+
+    expect(global.wx.showToast).not.toHaveBeenCalled()
+  })
+
+  test("does not clear a replacement file when deletion resolves late", async () => {
+    let resolveRemoval
+    global.wx = {
+      showModal: jest.fn(({ success }) => success({ confirm: true })),
+      showToast: jest.fn()
+    }
+    const page = createPage(
+      loadPageDefinition("../pages/privacy-data-inventory/privacy-data-inventory"),
+      {
+        exportFilePath: "/user-data/privacy-old.csv",
+        exportFileName: "privacy-old.csv"
+      }
+    )
+    const csvFile = require("../shared/csvFile")
+    csvFile.removeCsvFile.mockImplementationOnce(
+      () => new Promise((resolve) => {
+        resolveRemoval = resolve
+      })
+    )
+
+    page.handleDeleteExportedFile()
+    page.data.exportFilePath = "/user-data/privacy-new.csv"
+    page.data.exportFileName = "privacy-new.csv"
+    resolveRemoval()
+    await flushPromises()
+
+    expect(page.data.exportFilePath).toBe("/user-data/privacy-new.csv")
+    expect(page.data.exportFileName).toBe("privacy-new.csv")
+    expect(global.wx.showToast).not.toHaveBeenCalled()
   })
 })

@@ -69,9 +69,9 @@
     <view wx:if="{{exportFilePath}}" class="export-actions">
       <view class="export-tip"><view class="file-native-icon" aria-hidden="true"></view><view class="export-tip-copy"><view class="export-tip-label">导出文件已就绪</view><view class="export-tip-name">{{exportFileName}}</view></view></view>
       <view class="export-buttons">
-        <button wx:if="{{canShareExport}}" class="export-button ui-btn ui-btn-primary" bindtap="handleShareExportedFile"><view class="export-action-icon share-native-icon" aria-hidden="true"></view>分享</button>
-        <button class="export-button ui-btn ui-btn-ghost" bindtap="handleOpenExportedFile"><view class="export-action-icon open-native-icon" aria-hidden="true"></view>打开</button>
-        <button class="export-button export-button-danger ui-btn ui-btn-ghost" bindtap="handleDeleteExportedFile"><view class="export-action-icon delete-native-icon" aria-hidden="true"></view>删除</button>
+        <button wx:if="{{canShareExport}}" class="export-button ui-btn ui-btn-primary" disabled="{{exporting}}" bindtap="handleShareExportedFile"><view class="export-action-icon share-native-icon" aria-hidden="true"></view>分享</button>
+        <button class="export-button ui-btn ui-btn-ghost" disabled="{{exporting}}" bindtap="handleOpenExportedFile"><view class="export-action-icon open-native-icon" aria-hidden="true"></view>打开</button>
+        <button class="export-button export-button-danger ui-btn ui-btn-ghost" disabled="{{exporting}}" bindtap="handleDeleteExportedFile"><view class="export-action-icon delete-native-icon" aria-hidden="true"></view>删除</button>
       </view>
     </view>
 

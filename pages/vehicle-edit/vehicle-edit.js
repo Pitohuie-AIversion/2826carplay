@@ -1,8 +1,18 @@
 const vehicleUtils = require("../../shared/vehicle")
 const { buildVehicleFormProgress } = require("../../shared/vehicleFormProgress")
-const { requirePagePermission } = require("../../shared/pageAuth")
+const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
 const { formatToastTitle } = require("../../shared/uiFeedback")
 const { clearUnsaved, markUnsaved } = require("../../shared/unsavedChanges")
+const {
+  activatePageNativeActions,
+  beginPageNativeAction,
+  cancelPageNativeActions,
+  isPageCurrent,
+  isPageNativeActionActive
+} = require("../../shared/pageNativeAction")
+
+const VEHICLE_EDIT_LOAD_TIMEOUT_MS = 15 * 1000
+const VEHICLE_EDIT_SUBMIT_TIMEOUT_MS = 20 * 1000
 
 const VEHICLE_TYPE_LABEL_MAP = {
   sedan: "轿车",
@@ -103,6 +113,7 @@ Page({
   },
 
   onLoad(options) {
+    activatePageNativeActions(this)
     const app = getApp()
     const env =
       app &&
@@ -144,7 +155,35 @@ Page({
     })
   },
 
+  onShow() {
+    const requestId = Number(this._vehicleEditPendingNavigationRequestId || 0)
+    if (
+      requestId &&
+      !this._vehicleEditNavigationTimer &&
+      requestId === this._vehicleEditSubmitRequestId
+    ) {
+      this.continueVehicleEditNavigation(requestId)
+    }
+  },
+
+  onUnload() {
+    cancelPagePermissionCheck(this)
+    cancelPageNativeActions(this)
+    this._vehicleEditLoadRequestId =
+      Number(this._vehicleEditLoadRequestId || 0) + 1
+    this._vehicleEditSubmitRequestId =
+      Number(this._vehicleEditSubmitRequestId || 0) + 1
+    this._vehicleEditPendingNavigationRequestId = 0
+    this.clearVehicleEditLoadTimer()
+    this.clearVehicleEditSubmitTimer()
+    this.clearVehicleEditNavigationTimer()
+  },
+
   fetchDetail(id) {
+    const vehicleId = String(id || "").trim()
+    const requestId = Number(this._vehicleEditLoadRequestId || 0) + 1
+    this._vehicleEditLoadRequestId = requestId
+    this.clearVehicleEditLoadTimer()
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       wx.showToast({
         title: "云能力未初始化",
@@ -158,16 +197,51 @@ Page({
       return
     }
 
-    wx.cloud.callFunction({
+    this.setData({
+      loading: true,
+      loadFailed: false
+    })
+    let settled = false
+    const finishRequest = () => {
+      if (settled || this._vehicleEditLoadRequestId !== requestId) {
+        return false
+      }
+      settled = true
+      this.clearVehicleEditLoadTimer()
+      return true
+    }
+    const handleFailure = (message) => {
+      if (!finishRequest()) {
+        return
+      }
+      wx.showToast({
+        title: formatToastTitle(message, "加载失败"),
+        icon: "none"
+      })
+      this.setData({
+        loading: false,
+        loadFailed: true,
+        loadErrorText: message || "车辆档案加载失败，请稍后重试"
+      })
+    }
+
+    this._vehicleEditLoadTimer = setTimeout(() => {
+      handleFailure("档案加载超时，请重试")
+    }, VEHICLE_EDIT_LOAD_TIMEOUT_MS)
+
+    const requestOptions = {
       name: "vehicleDetail",
       data: {
-        id
+        id: vehicleId
       },
       success: (res) => {
+        if (!finishRequest()) {
+          return
+        }
         const result = res && res.result ? res.result : null
         if (!result || !result.ok || !result.detail) {
           wx.showToast({
-          title: formatToastTitle(result && result.message, "加载失败"),
+            title: formatToastTitle(result && result.message, "加载失败"),
             icon: "none"
           })
           this.setData({
@@ -229,20 +303,21 @@ Page({
         clearUnsaved(this)
       },
       fail: (error) => {
-        wx.showToast({
-          title: "加载失败",
-          icon: "none"
-        })
-        this.setData({
-          loading: false,
-          loadFailed: true,
-          loadErrorText: (error && (error.errMsg || error.message)) || "车辆档案加载失败，请稍后重试"
-        })
+        handleFailure(error && (error.errMsg || error.message))
       }
-    })
+    }
+
+    try {
+      wx.cloud.callFunction(requestOptions)
+    } catch (error) {
+      handleFailure(error && (error.errMsg || error.message))
+    }
   },
 
   handlePlateInput(event) {
+    if (this.data.isSubmitting) {
+      return
+    }
     let value = vehicleUtils.normalizePlateNumber(event.detail.value)
     value = value.replace(/\s/g, "")
     value = value.replace(/[^0-9A-Z\u4e00-\u9fa5]/g, "").slice(0, 8)
@@ -255,6 +330,9 @@ Page({
   },
 
   handleTextInput(event) {
+    if (this.data.isSubmitting) {
+      return
+    }
     const { field } = event.currentTarget.dataset
     if (!field) {
       return
@@ -302,6 +380,9 @@ Page({
   },
 
   handleVehicleTypeChange(event) {
+    if (this.data.isSubmitting) {
+      return
+    }
     const index = Number(event.detail.value) || 0
     const value = vehicleUtils.VEHICLE_TYPES[index] || ""
     const label = VEHICLE_TYPE_LABEL_MAP[value] || ""
@@ -316,6 +397,9 @@ Page({
   },
 
   handleStatusChange(event) {
+    if (this.data.isSubmitting) {
+      return
+    }
     const index = Number(event.detail.value) || 0
     const value = vehicleUtils.VEHICLE_STATUSES[index] || ""
     const label = STATUS_LABEL_MAP[value] || ""
@@ -330,6 +414,9 @@ Page({
   },
 
   handleDateChange(event) {
+    if (this.data.isSubmitting) {
+      return
+    }
     this.setData({
       "form.registerDate": event.detail.value,
       formProgress: buildVehicleFormProgress({ ...this.data.form, registerDate: event.detail.value })
@@ -338,6 +425,9 @@ Page({
   },
 
   handleTransmissionChange(event) {
+    if (this.data.isSubmitting) {
+      return
+    }
     const index = Number(event.detail.value) || 0
     const value = vehicleUtils.TRANSMISSION_TYPES[index] || ""
     const label = TRANSMISSION_LABEL_MAP[value] || ""
@@ -351,6 +441,9 @@ Page({
   },
 
   handleFuelTypeChange(event) {
+    if (this.data.isSubmitting) {
+      return
+    }
     const index = Number(event.detail.value) || 0
     const value = vehicleUtils.FUEL_TYPES[index] || ""
     const label = FUEL_TYPE_LABEL_MAP[value] || ""
@@ -368,9 +461,13 @@ Page({
       return
     }
 
+    const action = beginPageNativeAction(this)
     wx.navigateTo({
       url: `/pages/vehicle-detail-manage/vehicle-detail-manage?id=${this.data.id}`,
       fail: () => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         wx.showToast({
           title: "车辆详情打开失败",
           icon: "none"
@@ -380,7 +477,7 @@ Page({
   },
 
   handleRetryLoad() {
-    if (!this.data.id) {
+    if (!this.data.id || this.data.loading || this.data.isSubmitting) {
       return
     }
 
@@ -392,17 +489,27 @@ Page({
   },
 
   handleBackList() {
+    const action = beginPageNativeAction(this)
     const pages = getCurrentPages()
     if (pages.length > 1) {
       wx.navigateBack({
         delta: 1,
         fail: () => {
+          if (!isPageNativeActionActive(this, action)) {
+            return
+          }
           wx.redirectTo({
             url: "/pages/vehicle-manage/vehicle-manage",
             fail: () => {
+              if (!isPageNativeActionActive(this, action)) {
+                return
+              }
               wx.reLaunch({
                 url: "/pages/vehicle-manage/vehicle-manage",
                 fail: () => {
+                  if (!isPageNativeActionActive(this, action)) {
+                    return
+                  }
                   wx.showToast({
                     title: "返回车辆管理失败",
                     icon: "none"
@@ -419,9 +526,15 @@ Page({
     wx.redirectTo({
       url: "/pages/vehicle-manage/vehicle-manage",
       fail: () => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         wx.reLaunch({
           url: "/pages/vehicle-manage/vehicle-manage",
           fail: () => {
+            if (!isPageNativeActionActive(this, action)) {
+              return
+            }
             wx.showToast({
               title: "返回车辆管理失败",
               icon: "none"
@@ -468,17 +581,51 @@ Page({
       return
     }
 
+    const payload = {
+      id: String(this.data.id || "").trim(),
+      ...check.value
+    }
+    const requestId = Number(this._vehicleEditSubmitRequestId || 0) + 1
+    this._vehicleEditSubmitRequestId = requestId
+    this.clearVehicleEditSubmitTimer()
+    this.clearVehicleEditNavigationTimer()
     this.setData({
       isSubmitting: true
     })
+    let settled = false
+    const isCurrent = () => this._vehicleEditSubmitRequestId === requestId
+    const finishRequest = () => {
+      if (settled || !isCurrent()) {
+        return false
+      }
+      settled = true
+      this.clearVehicleEditSubmitTimer()
+      return true
+    }
+    const handleFailure = (message) => {
+      if (!finishRequest()) {
+        return
+      }
+      wx.showToast({
+        title: formatToastTitle(message, "保存失败"),
+        icon: "none"
+      })
+      this.setData({
+        isSubmitting: false
+      })
+    }
 
-    wx.cloud.callFunction({
+    this._vehicleEditSubmitTimer = setTimeout(() => {
+      handleFailure("保存超时，请重试")
+    }, VEHICLE_EDIT_SUBMIT_TIMEOUT_MS)
+
+    const requestOptions = {
       name: "vehicleUpdate",
-      data: {
-        id: this.data.id,
-        ...check.value
-      },
+      data: payload,
       success: (res) => {
+        if (!finishRequest()) {
+          return
+        }
         const result = res && res.result ? res.result : null
 
         if (result && result.ok) {
@@ -489,27 +636,7 @@ Page({
             duration: 1200
           })
 
-          setTimeout(() => {
-            wx.navigateBack({
-              delta: 1,
-              fail: () => {
-                wx.redirectTo({
-                  url: "/pages/vehicle-manage/vehicle-manage",
-                  fail: () => {
-                    wx.reLaunch({
-                      url: "/pages/vehicle-manage/vehicle-manage",
-                      fail: () => {
-                        wx.showToast({
-                          title: "返回车辆管理失败",
-                          icon: "none"
-                        })
-                      }
-                    })
-                  }
-                })
-              }
-            })
-          }, 900)
+          this.scheduleVehicleEditNavigation(requestId)
           return
         }
 
@@ -531,15 +658,98 @@ Page({
         })
       },
       fail: (error) => {
-        wx.showToast({
-          title: "保存失败",
-          icon: "none"
-        })
+        handleFailure(error && (error.errMsg || error.message))
+      }
+    }
 
-        this.setData({
-          isSubmitting: false
+    try {
+      wx.cloud.callFunction(requestOptions)
+    } catch (error) {
+      handleFailure(error && (error.errMsg || error.message))
+    }
+  },
+
+  clearVehicleEditLoadTimer() {
+    if (this._vehicleEditLoadTimer) {
+      clearTimeout(this._vehicleEditLoadTimer)
+      this._vehicleEditLoadTimer = null
+    }
+  },
+
+  clearVehicleEditSubmitTimer() {
+    if (this._vehicleEditSubmitTimer) {
+      clearTimeout(this._vehicleEditSubmitTimer)
+      this._vehicleEditSubmitTimer = null
+    }
+  },
+
+  scheduleVehicleEditNavigation(requestId) {
+    this.clearVehicleEditNavigationTimer()
+    this._vehicleEditPendingNavigationRequestId = requestId
+    this._vehicleEditNavigationTimer = setTimeout(() => {
+      this._vehicleEditNavigationTimer = null
+      this.continueVehicleEditNavigation(requestId)
+    }, 900)
+  },
+
+  continueVehicleEditNavigation(requestId) {
+    const isCurrent = () => this._vehicleEditSubmitRequestId === requestId
+    const canNavigate = () => isCurrent() && isPageCurrent(this)
+    const deferNavigation = () => {
+      if (isCurrent()) {
+        this._vehicleEditPendingNavigationRequestId = requestId
+      }
+    }
+
+    if (!canNavigate()) {
+      deferNavigation()
+      return
+    }
+
+    this._vehicleEditPendingNavigationRequestId = 0
+    wx.navigateBack({
+      delta: 1,
+      fail: () => {
+        if (!canNavigate()) {
+          deferNavigation()
+          return
+        }
+        wx.redirectTo({
+          url: "/pages/vehicle-manage/vehicle-manage",
+          fail: () => {
+            if (!canNavigate()) {
+              deferNavigation()
+              return
+            }
+            wx.reLaunch({
+              url: "/pages/vehicle-manage/vehicle-manage",
+              fail: () => {
+                if (!isCurrent()) {
+                  return
+                }
+                if (!isPageCurrent(this)) {
+                  deferNavigation()
+                  return
+                }
+                this.setData({
+                  isSubmitting: false
+                })
+                wx.showToast({
+                  title: "返回车辆管理失败",
+                  icon: "none"
+                })
+              }
+            })
+          }
         })
       }
     })
+  },
+
+  clearVehicleEditNavigationTimer() {
+    if (this._vehicleEditNavigationTimer) {
+      clearTimeout(this._vehicleEditNavigationTimer)
+      this._vehicleEditNavigationTimer = null
+    }
   }
 })

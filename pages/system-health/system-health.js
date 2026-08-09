@@ -1,4 +1,4 @@
-const { requirePagePermission } = require("../../shared/pageAuth")
+const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
 
 const STATUS_META = {
   pass: { label: "正常", className: "check-pass" },
@@ -168,6 +168,7 @@ Page({
   },
 
   onUnload() {
+    cancelPagePermissionCheck(this)
     this._healthRequestId = Number(this._healthRequestId || 0) + 1
     this.finishHealthRequestEffects()
   },

@@ -1,16 +1,26 @@
-function redirectToMine() {
+function redirectToMine(shouldContinue) {
+  const canContinue =
+    typeof shouldContinue === "function" ? shouldContinue : () => true
+  if (!canContinue()) {
+    return
+  }
   const pages = typeof getCurrentPages === "function" ? getCurrentPages() : []
 
   if (pages.length > 1) {
     wx.navigateBack({
       delta: 1,
       fail: () => {
+        if (!canContinue()) {
+          return
+        }
         wx.redirectTo({
           url: "/pages/mine/mine",
           fail: () => {
-            wx.reLaunch({
-              url: "/pages/mine/mine"
-            })
+            if (canContinue()) {
+              wx.reLaunch({
+                url: "/pages/mine/mine"
+              })
+            }
           }
         })
       }
@@ -21,9 +31,11 @@ function redirectToMine() {
   wx.redirectTo({
     url: "/pages/mine/mine",
     fail: () => {
-      wx.reLaunch({
-        url: "/pages/mine/mine"
-      })
+      if (canContinue()) {
+        wx.reLaunch({
+          url: "/pages/mine/mine"
+        })
+      }
     }
   })
 }
@@ -46,6 +58,14 @@ function resolveAllowed(result, required) {
 
 const PERMISSION_CHECK_TIMEOUT_MS = 12 * 1000
 
+function cancelPagePermissionCheck(page) {
+  if (!page || typeof page._cancelPagePermissionCheck !== "function") {
+    return
+  }
+  page._cancelPagePermissionCheck()
+  page._cancelPagePermissionCheck = null
+}
+
 function requirePagePermission(page, options) {
   const config = options && typeof options === "object" ? options : {}
   const required = config.required
@@ -56,25 +76,49 @@ function requirePagePermission(page, options) {
     return
   }
 
+  cancelPagePermissionCheck(page)
+  let settled = false
+  let cancelled = false
+  let timeoutId = null
+  let redirectTimerId = null
+  const cancel = () => {
+    cancelled = true
+    settled = true
+    if (timeoutId) {
+      clearTimeout(timeoutId)
+      timeoutId = null
+    }
+    if (redirectTimerId) {
+      clearTimeout(redirectTimerId)
+      redirectTimerId = null
+    }
+  }
+  page._cancelPagePermissionCheck = cancel
+  const scheduleRedirect = (delay) => {
+    redirectTimerId = setTimeout(() => {
+      redirectTimerId = null
+      if (!cancelled) {
+        redirectToMine(() => !cancelled)
+      }
+    }, delay)
+  }
+
   if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
     wx.showToast({
       title: "云能力未初始化",
       icon: "none"
     })
-    setTimeout(redirectToMine, 500)
-    return
+    scheduleRedirect(500)
+    return cancel
   }
 
   page.setData({
     pageAuthorized: false
   })
 
-  let settled = false
-  let timeoutId = null
-
   const finish = (callback) => {
-    if (settled) {
-      return
+    if (settled || cancelled) {
+      return false
     }
     settled = true
     if (timeoutId) {
@@ -82,6 +126,7 @@ function requirePagePermission(page, options) {
       timeoutId = null
     }
     callback()
+    return true
   }
 
   const handleCheckFailure = () => {
@@ -90,7 +135,7 @@ function requirePagePermission(page, options) {
         title: failMessage,
         icon: "none"
       })
-      setTimeout(redirectToMine, 700)
+      scheduleRedirect(700)
     })
   }
 
@@ -115,7 +160,7 @@ function requirePagePermission(page, options) {
               title: noPermissionMessage,
               icon: "none"
             })
-            setTimeout(redirectToMine, 700)
+            scheduleRedirect(700)
           })
           return
         }
@@ -136,17 +181,10 @@ function requirePagePermission(page, options) {
     handleCheckFailure()
   }
 
-  return () => {
-    if (!settled) {
-      settled = true
-      if (timeoutId) {
-        clearTimeout(timeoutId)
-        timeoutId = null
-      }
-    }
-  }
+  return cancel
 }
 
 module.exports = {
+  cancelPagePermissionCheck,
   requirePagePermission
 }

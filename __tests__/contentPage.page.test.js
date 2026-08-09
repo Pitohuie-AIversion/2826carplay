@@ -30,6 +30,7 @@ function createPage(definition) {
 
 describe("pages/content-page 服务指南", () => {
   afterEach(() => {
+    jest.useRealTimers()
     delete global.Page
     delete global.wx
   })
@@ -124,5 +125,62 @@ describe("pages/content-page 服务指南", () => {
     expect(wxss).toContain("calc(24rpx + env(safe-area-inset-right))")
     expect(wxss).toContain("calc(24rpx + env(safe-area-inset-left))")
     expect(wxss).toContain("calc(70rpx + env(safe-area-inset-bottom))")
+  })
+
+  test("连续读取内容配置时只采用最新类型结果", () => {
+    const requests = []
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn((options) => requests.push(options))
+      }
+    }
+    const page = createPage(loadPageDefinition())
+
+    page.loadContent("faq")
+    page.loadContent("rules")
+    requests[1].success({
+      result: {
+        ok: true,
+        config: {
+          servicePhone: "18800000000",
+          rulesContent: "1. 最新规则\n规则正文"
+        }
+      }
+    })
+    requests[0].success({
+      result: {
+        ok: true,
+        config: {
+          faqContent: "1. 旧问题\n旧正文"
+        }
+      }
+    })
+
+    expect(page.data.servicePhone).toBe("18800000000")
+    expect(page.data.sections[0].title).toBe("最新规则")
+  })
+
+  test("内容页离开后忽略迟到配置", () => {
+    let requestOptions = null
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn((options) => {
+          requestOptions = options
+        })
+      }
+    }
+    const page = createPage(loadPageDefinition())
+    page.applyContent("1. 默认问题\n默认正文")
+
+    page.loadContent("faq")
+    page.onUnload()
+    requestOptions.success({
+      result: {
+        ok: true,
+        config: { faqContent: "1. 迟到问题\n迟到正文" }
+      }
+    })
+
+    expect(page.data.sections[0].title).toBe("默认问题")
   })
 })

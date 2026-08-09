@@ -1,3 +1,11 @@
+const { requestOperationConfig } = require("../../shared/operationConfigRequest")
+const {
+  activatePageNativeActions,
+  beginPageNativeAction,
+  cancelPageNativeActions,
+  isPageNativeActionActive
+} = require("../../shared/pageNativeAction")
+
 const CONTENT_MAP = {
   faq: {
     title: "常见问题",
@@ -86,6 +94,7 @@ Page({
   },
 
   onLoad(options) {
+    activatePageNativeActions(this)
     const requestedType = String((options && options.type) || "faq").trim()
     const type = Object.prototype.hasOwnProperty.call(CONTENT_MAP, requestedType)
       ? requestedType
@@ -106,6 +115,11 @@ Page({
     this.loadContent(type)
   },
 
+  onUnload() {
+    cancelPageNativeActions(this)
+    this.cancelContentConfigRequest()
+  },
+
   applyContent(content) {
     const document = buildDocumentSections(content)
     this.setData({
@@ -122,9 +136,13 @@ Page({
       return
     }
 
+    const action = beginPageNativeAction(this)
     wx.redirectTo({
       url: `/pages/content-page/content-page?type=${type}`,
       fail: () => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         wx.showToast({
           title: "内容页切换失败",
           icon: "none"
@@ -142,10 +160,14 @@ Page({
     this.setData({
       activeSectionKey: key
     })
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.pageScrollTo({
       selector: `#${key}`,
       duration: 280,
       fail: () => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         wx.showToast({
           title: "章节定位失败",
           icon: "none"
@@ -155,40 +177,38 @@ Page({
   },
 
   loadContent(type) {
-    if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
-      return
-    }
-
-    wx.cloud.callFunction({
-      name: "operationConfigGet",
-      success: (res) => {
-        const result = res && res.result ? res.result : null
-        if (!result || !result.ok || !result.config) {
-          return
-        }
-
+    const contentType = String(type || "").trim()
+    this.cancelContentConfigRequest()
+    this._cancelContentConfigRequest = requestOperationConfig({
+      onSuccess: (config) => {
         this.setData({
-          servicePhone: result.config.servicePhone || this.data.servicePhone
+          servicePhone: config.servicePhone || this.data.servicePhone
         })
 
         const field =
-          type === "rules"
+          contentType === "rules"
             ? "rulesContent"
-            : type === "faq"
+            : contentType === "faq"
               ? "faqContent"
               : ""
         if (!field) {
           return
         }
-        const nextContent = result.config[field]
+        const nextContent = config[field]
         if (!nextContent) {
           return
         }
 
         this.applyContent(nextContent)
-      },
-      fail: () => {}
+      }
     })
+  },
+
+  cancelContentConfigRequest() {
+    if (typeof this._cancelContentConfigRequest === "function") {
+      this._cancelContentConfigRequest()
+      this._cancelContentConfigRequest = null
+    }
   },
 
   handlePhoneCall() {
@@ -201,9 +221,13 @@ Page({
       return
     }
 
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.makePhoneCall({
       phoneNumber: phone,
       fail: (error) => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         const message = error && (error.errMsg || error.message)
         if (message && String(message).includes("cancel")) {
           return
@@ -220,9 +244,13 @@ Page({
   },
 
   handlePrivacyRequest() {
+    const action = beginPageNativeAction(this)
     wx.navigateTo({
       url: "/pages/privacy-request/privacy-request",
       fail: () => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         wx.showToast({
           title: "个人信息申请打开失败",
           icon: "none"

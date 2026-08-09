@@ -312,7 +312,7 @@
             hover-class="{{updatingId !== '' || savingRemark || statusUpdatingId !== '' ? 'none' : 'workbench-button-pressed'}}"
           ><view wx:if="{{updatingId !== item.id}}" class="coordination-native-icon {{item.coordinationStatus === 'coordinating' ? 'coordination-native-icon-complete' : ''}}" aria-hidden="true"><view class="coordination-native-mark"></view></view><text>{{updatingId === item.id ? '处理中…' : (item.coordinationStatus === 'coordinating' ? '标记已协调' : '开始协调')}}</text></button>
           <view class="queue-actions">
-            <button class="queue-action queue-action-primary action-with-icon" data-phone="{{item.phone}}" bindtap="handleCallPhone" hover-class="workbench-button-pressed"><view class="queue-call-native-icon" aria-hidden="true"></view><text>拨打电话</text></button>
+            <button class="queue-action queue-action-primary action-with-icon" data-phone="{{item.phone}}" disabled="{{loading || refreshing || updatingId !== '' || savingRemark || statusUpdatingId !== ''}}" bindtap="handleCallPhone" hover-class="workbench-button-pressed"><view class="queue-call-native-icon" aria-hidden="true"></view><text>拨打电话</text></button>
             <button
               class="queue-action queue-action-priority action-with-icon"
               data-id="{{item.id}}"
@@ -322,7 +322,7 @@
               bindtap="handlePriorityTap"
               hover-class="{{updatingId !== '' || savingRemark || statusUpdatingId !== '' ? 'none' : 'workbench-button-pressed'}}"
             ><view wx:if="{{updatingId !== item.id}}" class="queue-priority-native-icon" aria-hidden="true"><view class="queue-priority-mark"></view></view><text>{{updatingId === item.id ? '更新中…' : '级别 · ' + item.priorityLabel}}</text></button>
-            <button class="queue-action action-with-icon" data-id="{{item.id}}" bindtap="handleViewDetail" hover-class="workbench-button-pressed"><view class="queue-detail-native-icon" aria-hidden="true"><view class="queue-detail-dot"></view></view><text>进入处理</text></button>
+            <button class="queue-action action-with-icon" data-id="{{item.id}}" disabled="{{loading || refreshing || updatingId !== '' || savingRemark || statusUpdatingId !== ''}}" bindtap="handleViewDetail" hover-class="workbench-button-pressed"><view class="queue-detail-native-icon" aria-hidden="true"><view class="queue-detail-dot"></view></view><text>进入处理</text></button>
           </view>
         </view>
       </view>
@@ -337,7 +337,7 @@
       </view>
     </view>
 
-    <button class="manage-button ui-btn ui-btn-ghost action-with-icon" bindtap="handleOpenBookingManage"><view class="manage-native-icon" aria-hidden="true"><view class="manage-native-line manage-native-line-top"></view><view class="manage-native-line"></view></view><text>前往预约管理</text></button>
+    <button class="manage-button ui-btn ui-btn-ghost action-with-icon" disabled="{{loading || refreshing || updatingId !== '' || savingRemark || statusUpdatingId !== ''}}" bindtap="handleOpenBookingManage"><view class="manage-native-icon" aria-hidden="true"><view class="manage-native-line manage-native-line-top"></view><view class="manage-native-line"></view></view><text>前往预约管理</text></button>
     <view wx:if="{{truncated}}" class="scope-tip scope-tip-with-icon"><view class="scope-native-icon" aria-hidden="true"><view class="scope-alert-mark"></view></view><view>预约超过 2000 条，工作台只汇总当前已读取范围，请缩小筛选或分批处理。</view></view>
   </block>
 </view>

@@ -1,6 +1,18 @@
-const { requirePagePermission } = require("../../shared/pageAuth")
+const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
 const { isUserCancelError, removeCsvFile } = require("../../shared/csvFile")
 const { formatToastTitle } = require("../../shared/uiFeedback")
+const {
+  activatePageCsvFileActions,
+  beginPageCsvFileAction,
+  cancelPageCsvFileActions,
+  isPageCsvFileActionActive
+} = require("../../shared/pageCsvFileActions")
+const {
+  activatePageNativeActions,
+  beginPageNativeAction,
+  cancelPageNativeActions,
+  isPageNativeActionActive
+} = require("../../shared/pageNativeAction")
 
 const STATUS_OPTIONS = [
   { value: "all", label: "全部" },
@@ -56,16 +68,33 @@ const BOOKING_MANAGE_MUTATION_TIMEOUT_MS = 20 * 1000
 const BOOKING_MANAGE_EXPORT_TIMEOUT_MS = 20 * 1000
 
 function showStatusUpdateFeedback(result, done) {
+  const next = typeof done === "function" ? done : () => {}
+  let settled = false
+  const finish = () => {
+    if (settled) {
+      return
+    }
+    settled = true
+    next()
+  }
   const notificationStatus = String((result && result.notificationStatus) || "")
   if (notificationStatus === "failed") {
-    wx.showModal({
-      title: "状态已更新",
-      content: "预约状态已更新，但提醒发送失败。可在错误日志中查看原因。",
-      confirmText: "知道了",
-      confirmColor: "#528fff",
-      showCancel: false,
-      complete: done
-    })
+    if (typeof wx.showModal !== "function") {
+      finish()
+      return
+    }
+    try {
+      wx.showModal({
+        title: "状态已更新",
+        content: "预约状态已更新，但提醒发送失败。可在错误日志中查看原因。",
+        confirmText: "知道了",
+        confirmColor: "#528fff",
+        showCancel: false,
+        complete: finish
+      })
+    } catch (error) {
+      finish()
+    }
     return
   }
 
@@ -75,11 +104,14 @@ function showStatusUpdateFeedback(result, done) {
       : notificationStatus === "not_subscribed"
         ? "用户未订阅提醒"
         : "状态已更新"
-  wx.showToast({
-    title,
-    icon: "none"
-  })
-  done()
+  try {
+    wx.showToast({
+      title,
+      icon: "none"
+    })
+  } finally {
+    finish()
+  }
 }
 
 function buildStatusSummary(stats) {
@@ -301,6 +333,8 @@ Page({
   },
 
   onLoad() {
+    activatePageCsvFileActions(this)
+    activatePageNativeActions(this)
     const app = getApp()
     const env =
       app &&
@@ -332,7 +366,7 @@ Page({
   },
 
   onPullDownRefresh() {
-    if (!this.data.pageAuthorized) {
+    if (!this.data.pageAuthorized || this.data.loading) {
       wx.stopPullDownRefresh()
       return
     }
@@ -342,6 +376,9 @@ Page({
   },
 
   onUnload() {
+    cancelPagePermissionCheck(this)
+    cancelPageCsvFileActions(this)
+    cancelPageNativeActions(this)
     this._bookingListRequestId = Number(this._bookingListRequestId || 0) + 1
     this._bookingMutationRequestId = Number(this._bookingMutationRequestId || 0) + 1
     this._bookingExportRequestId = Number(this._bookingExportRequestId || 0) + 1
@@ -356,23 +393,35 @@ Page({
   },
 
   handleClearKeyword() {
-    if (!this.data.keyword) {
+    if (!this.data.keyword || this.data.loading) {
       return
     }
-    this.setData({ keyword: "" }, () => this.fetchList())
+    const listRequestId = Number(this._bookingListRequestId || 0)
+    this.setData({ keyword: "" }, () => {
+      if (listRequestId !== Number(this._bookingListRequestId || 0)) {
+        return
+      }
+      this.fetchList()
+    })
   },
 
   handleKeywordConfirm() {
+    if (this.data.loading) {
+      return
+    }
     this.fetchList()
   },
 
   handleSearch() {
+    if (this.data.loading) {
+      return
+    }
     this.fetchList()
   },
 
   handleStatusTap(event) {
     const status = event.currentTarget.dataset.status
-    if (!status || status === this.data.currentStatus) {
+    if (!status || status === this.data.currentStatus || this.data.loading) {
       return
     }
 
@@ -385,7 +434,7 @@ Page({
 
   handlePriorityTap(event) {
     const value = String(event.currentTarget.dataset.value || "")
-    if (!value || value === this.data.currentPriority) {
+    if (!value || value === this.data.currentPriority || this.data.loading) {
       return
     }
     this.setData({ currentPriority: value })
@@ -394,7 +443,7 @@ Page({
 
   handleCoordinationTap(event) {
     const value = String(event.currentTarget.dataset.value || "")
-    if (!value || value === this.data.currentCoordination) {
+    if (!value || value === this.data.currentCoordination || this.data.loading) {
       return
     }
     this.setData({ currentCoordination: value })
@@ -402,6 +451,9 @@ Page({
   },
 
   handleReset() {
+    if (this.data.loading) {
+      return
+    }
     this.setData({
       keyword: "",
       currentStatus: "all",
@@ -579,6 +631,9 @@ Page({
   },
 
   handleShareExportedFile() {
+    if (this.data.loading) {
+      return
+    }
     if (!this.data.exportFilePath || !this.data.exportFileName) {
       wx.showToast({
         title: "请先导出CSV",
@@ -591,6 +646,9 @@ Page({
   },
 
   handleOpenExportedFile() {
+    if (this.data.loading) {
+      return
+    }
     if (!this.data.exportFilePath) {
       wx.showToast({
         title: "请先导出CSV",
@@ -604,20 +662,28 @@ Page({
 
   handleDeleteExportedFile() {
     const filePath = String(this.data.exportFilePath || "")
-    if (!filePath) {
+    if (this.data.loading || !filePath) {
       return
     }
+    const action = beginPageCsvFileAction(this, filePath)
     wx.showModal({
       title: "删除本地 CSV",
       content: "将从当前设备删除这份导出文件，删除后无法恢复。云端预约数据不会受到影响。",
       confirmText: "确认删除",
       confirmColor: "#d46868",
       success: (res) => {
-        if (!res.confirm) {
+        if (
+          this.data.loading ||
+          !isPageCsvFileActionActive(this, action) ||
+          !res.confirm
+        ) {
           return
         }
         removeCsvFile(filePath)
           .then(() => {
+            if (!isPageCsvFileActionActive(this, action)) {
+              return
+            }
             this.setData({
               exportFilePath: "",
               exportFileName: ""
@@ -628,6 +694,9 @@ Page({
             })
           })
           .catch((error) => {
+            if (!isPageCsvFileActionActive(this, action)) {
+              return
+            }
             wx.showToast({
               title: "删除失败",
               icon: "none"
@@ -638,6 +707,7 @@ Page({
   },
 
   shareCsvFile(filePath, fileName) {
+    const action = beginPageCsvFileAction(this, filePath)
     const share = wx.shareFileMessage
     if (isDevtoolsEnv()) {
       wx.showToast({
@@ -653,12 +723,18 @@ Page({
         filePath,
         fileName,
         success: () => {
+          if (!isPageCsvFileActionActive(this, action)) {
+            return
+          }
           wx.showToast({
             title: "文件已生成",
             icon: "none"
           })
         },
         fail: (error) => {
+          if (!isPageCsvFileActionActive(this, action)) {
+            return
+          }
           if (isUserCancelError(error)) {
             return
           }
@@ -694,6 +770,7 @@ Page({
   },
 
   openCsvFile(filePath) {
+    const action = beginPageCsvFileAction(this, filePath)
     const open = wx.openDocument
     if (typeof open === "function") {
       open({
@@ -702,6 +779,9 @@ Page({
         showMenu: true,
         success: () => {},
         fail: () => {
+          if (!isPageCsvFileActionActive(this, action)) {
+            return
+          }
           wx.showToast({
             title: "文件打开失败",
             icon: "none"
@@ -711,6 +791,9 @@ Page({
       return
     }
 
+    if (!isPageCsvFileActionActive(this, action)) {
+      return
+    }
     wx.showToast({
       title: "暂不支持打开",
       icon: "none"
@@ -731,15 +814,19 @@ Page({
 
   handleViewDetail(event) {
     const id = String(event.currentTarget.dataset.id || "").trim()
-    if (!id) {
+    if (this.data.loading || !id) {
       return
     }
 
     const current = this.data.list.find((item) => item.id === id)
 
+    const action = beginPageNativeAction(this)
     wx.navigateTo({
       url: `/pages/booking-manage-detail/booking-manage-detail?id=${id}`,
       success: (res) => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         if (current && res && res.eventChannel) {
           res.eventChannel.emit("acceptManageBookingDetail", {
             booking: current
@@ -747,6 +834,9 @@ Page({
         }
       },
       fail: () => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         wx.showToast({
           title: "页面跳转失败",
           icon: "none"
@@ -756,6 +846,9 @@ Page({
   },
 
   handleCallPhone(event) {
+    if (this.data.loading) {
+      return
+    }
     const phone = normalizePhone(event.currentTarget.dataset.phone)
     if (!phone) {
       wx.showToast({
@@ -765,9 +858,13 @@ Page({
       return
     }
 
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.makePhoneCall({
       phoneNumber: phone,
       fail: (error) => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         const message = error && (error.errMsg || error.message)
         if (message && String(message).includes("cancel")) {
           return
@@ -793,13 +890,16 @@ Page({
 
     const statusText = STATUS_TEXT_MAP[status] || status
 
+    const action = beginPageNativeAction(this, {
+      exclusiveKey: "booking-status-confirmation"
+    })
     wx.showModal({
       title: "更新状态",
       content: `确认将该预约更新为「${statusText}」？`,
       confirmText: "确认更新",
       confirmColor: status === "cancelled" ? "#d46868" : "#528fff",
       success: (modalRes) => {
-        if (!modalRes.confirm) {
+        if (!isPageNativeActionActive(this, action) || !modalRes || !modalRes.confirm) {
           return
         }
 
@@ -841,11 +941,11 @@ Page({
           return
         }
 
-        this.setData({ loading: false })
         showStatusUpdateFeedback(result, () => {
           if (!isCurrent()) {
             return
           }
+          this.setData({ loading: false })
           this.fetchList()
         })
       }

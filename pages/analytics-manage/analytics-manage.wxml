@@ -14,12 +14,13 @@
       <view
         wx:for="{{periodOptions}}"
         wx:key="value"
-        class="period-chip {{days === item.value ? 'period-chip-active' : ''}}"
+        class="period-chip {{days === item.value ? 'period-chip-active' : ''}} {{cleanupLoading ? 'period-chip-disabled' : ''}}"
         data-days="{{item.value}}"
         bindtap="handlePeriodTap"
         hover-class="period-chip-pressed"
         aria-role="button"
         aria-pressed="{{days === item.value}}"
+        aria-disabled="{{cleanupLoading}}"
       >
         {{item.label}}
       </view>
@@ -174,7 +175,7 @@
       <button
         class="cleanup-button ui-btn ui-btn-ghost"
         loading="{{cleanupLoading}}"
-        disabled="{{cleanupLoading}}"
+        disabled="{{loading || cleanupLoading}}"
         bindtap="handleCleanup"
         aria-label="清理九十天前的匿名行为数据"
       >

@@ -50,6 +50,7 @@
       maxlength="500"
       value="{{description}}"
       placeholder="请说明希望查询、更正或删除的具体内容，避免填写与申请无关的敏感信息"
+      disabled="{{submitting}}"
       bindinput="handleDescriptionInput"
       aria-label="填写个人信息申请说明"
       aria-required="{{true}}"

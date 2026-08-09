@@ -99,6 +99,30 @@ describe("pages/car-detail 客户侧车辆状态", () => {
     )
   })
 
+  test("ignores a preview failure after the vehicle detail page unloads", () => {
+    let previewOptions
+    global.wx = {
+      setNavigationBarTitle: jest.fn(),
+      previewImage: jest.fn((options) => {
+        previewOptions = options
+      }),
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition())
+    page.applyCar({
+      id: "vehicle-preview-unload",
+      name: "Porsche 911",
+      status: "available",
+      images: ["cloud://cover-1"]
+    })
+
+    page.handleHeroImageTap({ currentTarget: { dataset: { index: 0 } } })
+    page.onUnload()
+    previewOptions.fail(new Error("preview failed"))
+
+    expect(global.wx.showToast).not.toHaveBeenCalled()
+  })
+
   test("轮播图片索引只接受图库范围内的值", () => {
     global.wx = {
       setNavigationBarTitle: jest.fn()
@@ -267,6 +291,59 @@ describe("pages/car-detail 客户侧车辆状态", () => {
     expect(wx.showToast).toHaveBeenCalledWith({ title: "收藏请求超时，请重试", icon: "none" })
 
     lateSuccess({ result: { ok: true, favorited: true } })
+    expect(page.data.favorited).toBe(false)
+  })
+
+  test("初始收藏状态无响应时超时并忽略迟到结果", () => {
+    jest.useFakeTimers()
+    let lateSuccess = null
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn((options) => {
+          lateSuccess = options.success
+        })
+      }
+    }
+    const page = createPage(loadPageDefinition())
+
+    page.loadFavoriteStatus("vehicle-status-timeout")
+    jest.advanceTimersByTime(10 * 1000)
+    lateSuccess({ result: { ok: true, favorited: true } })
+
+    expect(page.data.favorited).toBe(false)
+    expect(page._favoriteStatusTimer).toBeNull()
+  })
+
+  test("初始收藏状态同步异常时保持默认值并清理计时器", () => {
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(() => {
+          throw new Error("favorite status unavailable")
+        })
+      }
+    }
+    const page = createPage(loadPageDefinition())
+
+    expect(() => page.loadFavoriteStatus("vehicle-status-error")).not.toThrow()
+    expect(page.data.favorited).toBe(false)
+    expect(page._favoriteStatusTimer).toBeNull()
+  })
+
+  test("详情页离开后初始收藏状态不再回写", () => {
+    let lateSuccess = null
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn((options) => {
+          lateSuccess = options.success
+        })
+      }
+    }
+    const page = createPage(loadPageDefinition())
+
+    page.loadFavoriteStatus("vehicle-status-unload")
+    page.onUnload()
+    lateSuccess({ result: { ok: true, favorited: true } })
+
     expect(page.data.favorited).toBe(false)
   })
 

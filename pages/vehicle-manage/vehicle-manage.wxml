@@ -9,7 +9,7 @@
       </view>
       <image class="hero-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
     </view>
-    <button class="hero-button ui-btn ui-btn-primary" bindtap="handleGoCreate"><view class="hero-button-content"><view class="create-native-icon" aria-hidden="true"></view><text>新增车辆</text></view></button>
+    <button class="hero-button ui-btn ui-btn-primary" disabled="{{loading || updatingId !== '' || deletingId !== ''}}" bindtap="handleGoCreate"><view class="hero-button-content"><view class="create-native-icon" aria-hidden="true"></view><text>新增车辆</text></view></button>
   </view>
 
   <view class="section-card ui-card">
@@ -230,8 +230,8 @@
       </view>
 
       <view class="card-primary-actions">
-        <button class="detail-button ui-btn ui-btn-ghost" data-id="{{item.id}}" bindtap="handleViewDetail"><view class="vehicle-action-content"><view class="detail-native-icon" aria-hidden="true"></view><text>查看详情</text></view></button>
-        <button class="edit-button ui-btn ui-btn-primary" data-id="{{item.id}}" bindtap="handleEdit"><view class="vehicle-action-content"><view class="edit-native-icon" aria-hidden="true"></view><text>编辑车辆</text></view></button>
+        <button class="detail-button ui-btn ui-btn-ghost" data-id="{{item.id}}" disabled="{{loading || updatingId !== '' || deletingId !== ''}}" bindtap="handleViewDetail"><view class="vehicle-action-content"><view class="detail-native-icon" aria-hidden="true"></view><text>查看详情</text></view></button>
+        <button class="edit-button ui-btn ui-btn-primary" data-id="{{item.id}}" disabled="{{loading || updatingId !== '' || deletingId !== ''}}" bindtap="handleEdit"><view class="vehicle-action-content"><view class="edit-native-icon" aria-hidden="true"></view><text>编辑车辆</text></view></button>
       </view>
       <view class="card-maintenance-actions">
         <view class="maintenance-label">维护操作</view>
@@ -255,6 +255,6 @@
     <view class="empty-title">{{emptyTitle}}</view>
     <view class="empty-desc">{{emptyDesc}}</view>
     <button wx:if="{{keyword || currentStatus !== 'all'}}" class="empty-action ui-btn ui-btn-ghost" bindtap="handleReset"><view class="vehicle-action-content"><view class="reset-native-icon" aria-hidden="true"></view><text>清除筛选</text></view></button>
-    <button wx:else class="empty-action ui-btn ui-btn-primary" bindtap="handleGoCreate"><view class="vehicle-action-content"><view class="create-native-icon" aria-hidden="true"></view><text>新增第一辆车</text></view></button>
+    <button wx:else class="empty-action ui-btn ui-btn-primary" disabled="{{loading || updatingId !== '' || deletingId !== ''}}" bindtap="handleGoCreate"><view class="vehicle-action-content"><view class="create-native-icon" aria-hidden="true"></view><text>新增第一辆车</text></view></button>
   </view>
 </view>

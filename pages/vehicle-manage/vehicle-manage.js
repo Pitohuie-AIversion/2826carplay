@@ -1,6 +1,12 @@
 const vehicleUtils = require("../../shared/vehicle")
-const { requirePagePermission } = require("../../shared/pageAuth")
+const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
 const { formatToastTitle } = require("../../shared/uiFeedback")
+const {
+  activatePageNativeActions,
+  beginPageNativeAction,
+  cancelPageNativeActions,
+  isPageNativeActionActive
+} = require("../../shared/pageNativeAction")
 
 const STATUS_OPTIONS = [
   { value: "all", label: "全部" },
@@ -211,6 +217,7 @@ Page({
   },
 
   onLoad() {
+    activatePageNativeActions(this)
     requirePagePermission(this, {
       required: "canManageVehicles",
       noPermissionMessage: "无权访问车辆管理",
@@ -221,7 +228,11 @@ Page({
   },
 
   onShow() {
-    if (!this.data.pageAuthorized || this.data.loading) {
+    if (
+      !this.data.pageAuthorized ||
+      this.data.loading ||
+      this.isVehicleMutationBusy()
+    ) {
       return
     }
 
@@ -229,7 +240,10 @@ Page({
   },
 
   onPullDownRefresh() {
-    if (!this.data.pageAuthorized) {
+    if (
+      !this.data.pageAuthorized ||
+      this.isVehicleMutationBusy()
+    ) {
       wx.stopPullDownRefresh()
       return
     }
@@ -239,10 +253,20 @@ Page({
   },
 
   onUnload() {
+    cancelPagePermissionCheck(this)
+    cancelPageNativeActions(this)
     this._vehicleListRequestId = Number(this._vehicleListRequestId || 0) + 1
     this._vehicleMutationRequestId = Number(this._vehicleMutationRequestId || 0) + 1
     this.finishVehicleListRequestEffects()
     this.finishVehicleMutationEffects()
+  },
+
+  isVehicleMutationBusy() {
+    return Boolean(
+      this.data.updatingId ||
+      this.data.deletingId ||
+      this._vehicleMutationLoadingVisible
+    )
   },
 
   handleKeywordInput(event) {
@@ -254,20 +278,34 @@ Page({
   },
 
   handleClearKeyword() {
-    if (!this.data.keyword) {
+    if (!this.data.keyword || this.data.loading || this.isVehicleMutationBusy()) {
       return
     }
-    this.setData({ keyword: "" }, () => this.fetchList())
+    const listRequestId = Number(this._vehicleListRequestId || 0)
+    this.setData({ keyword: "" }, () => {
+      if (listRequestId !== Number(this._vehicleListRequestId || 0)) {
+        return
+      }
+      this.fetchList()
+    })
   },
 
   handleKeywordConfirm() {
+    if (this.data.loading || this.isVehicleMutationBusy()) {
+      return
+    }
     this.fetchList()
   },
 
   handleStatusTap(event) {
     const status = event.currentTarget.dataset.status
 
-    if (!status || status === this.data.currentStatus) {
+    if (
+      !status ||
+      status === this.data.currentStatus ||
+      this.data.loading ||
+      this.isVehicleMutationBusy()
+    ) {
       return
     }
 
@@ -279,6 +317,9 @@ Page({
   },
 
   handleReset() {
+    if (this.data.loading || this.isVehicleMutationBusy()) {
+      return
+    }
     this.setData({
       keyword: "",
       currentStatus: "all"
@@ -288,7 +329,7 @@ Page({
   },
 
   handleLoadMore() {
-    if (this.data.loading || !this.data.hasMore) {
+    if (this.data.loading || this.isVehicleMutationBusy() || !this.data.hasMore) {
       return
     }
 
@@ -296,9 +337,16 @@ Page({
   },
 
   handleGoCreate() {
+    if (this.data.loading || this.isVehicleMutationBusy()) {
+      return
+    }
+    const action = beginPageNativeAction(this)
     wx.navigateTo({
       url: "/pages/vehicle-create/vehicle-create",
       fail: () => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         wx.showToast({
           title: "新建页面打开失败",
           icon: "none"
@@ -310,6 +358,9 @@ Page({
   handleEdit(event) {
     const id = String(event.currentTarget.dataset.id || "").trim()
 
+    if (this.data.loading || this.isVehicleMutationBusy()) {
+      return
+    }
     if (!id) {
       wx.showToast({
         title: "车辆编号缺失",
@@ -318,9 +369,13 @@ Page({
       return
     }
 
+    const action = beginPageNativeAction(this)
     wx.navigateTo({
       url: `/pages/vehicle-edit/vehicle-edit?id=${id}`,
       fail: () => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         wx.showToast({
           title: "编辑页面打开失败",
           icon: "none"
@@ -332,6 +387,9 @@ Page({
   handleViewDetail(event) {
     const id = String(event.currentTarget.dataset.id || "").trim()
 
+    if (this.data.loading || this.isVehicleMutationBusy()) {
+      return
+    }
     if (!id) {
       wx.showToast({
         title: "车辆编号缺失",
@@ -340,9 +398,13 @@ Page({
       return
     }
 
+    const action = beginPageNativeAction(this)
     wx.navigateTo({
       url: `/pages/vehicle-detail-manage/vehicle-detail-manage?id=${id}`,
       fail: () => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
         wx.showToast({
           title: "车辆详情打开失败",
           icon: "none"
@@ -393,13 +455,16 @@ Page({
 
     const statusText = STATUS_LABEL_MAP[status] || status
 
+    const action = beginPageNativeAction(this, {
+      exclusiveKey: "vehicle-write-confirmation"
+    })
     wx.showModal({
       title: "更新状态",
       content: `确认将车辆 ${plateNumber || id} 状态更新为「${statusText}」？`,
       confirmText: "确认更新",
       confirmColor: "#528fff",
       success: (modalRes) => {
-        if (!modalRes.confirm) {
+        if (!isPageNativeActionActive(this, action) || !modalRes || !modalRes.confirm) {
           return
         }
 
@@ -424,13 +489,16 @@ Page({
       return
     }
 
+    const action = beginPageNativeAction(this, {
+      exclusiveKey: "vehicle-write-confirmation"
+    })
     wx.showModal({
       title: "停用车辆",
       content: `确认将车辆 ${plateNumber || id} 标记为停用？`,
       confirmText: "确认停用",
       confirmColor: "#d46868",
       success: (modalRes) => {
-        if (!modalRes.confirm) {
+        if (!isPageNativeActionActive(this, action) || !modalRes || !modalRes.confirm) {
           return
         }
 
@@ -455,13 +523,16 @@ Page({
       return
     }
 
+    const action = beginPageNativeAction(this, {
+      exclusiveKey: "vehicle-write-confirmation"
+    })
     wx.showModal({
       title: "恢复启用",
       content: `确认将车辆 ${plateNumber || id} 恢复为可管理状态？`,
       confirmText: "确认恢复",
       confirmColor: "#528fff",
       success: (modalRes) => {
-        if (!modalRes.confirm) {
+        if (!isPageNativeActionActive(this, action) || !modalRes || !modalRes.confirm) {
           return
         }
 
@@ -486,13 +557,16 @@ Page({
       return
     }
 
+    const action = beginPageNativeAction(this, {
+      exclusiveKey: "vehicle-write-confirmation"
+    })
     wx.showModal({
       title: "删除车辆",
       content: `确认删除车辆 ${plateNumber || id}？仅无预约历史的车辆可删除；有预约历史请改为停用。删除后不可恢复。`,
       confirmText: "确认删除",
       confirmColor: "#d46868",
       success: (modalRes) => {
-        if (!modalRes.confirm) {
+        if (!isPageNativeActionActive(this, action) || !modalRes || !modalRes.confirm) {
           return
         }
 
@@ -700,6 +774,7 @@ Page({
     const message = String((result && result.message) || "").trim()
 
     if (code === "VEHICLE_HAS_BOOKINGS") {
+      const action = beginPageNativeAction(this)
       wx.showModal({
         title: "无法彻底删除",
         content: message || "该车辆存在预约记录。为保留历史记录，可以将车辆改为停用，停用后用户端不再展示。",
@@ -707,7 +782,7 @@ Page({
         cancelText: "暂不处理",
         confirmColor: "#d46868",
         success: (modalRes) => {
-          if (modalRes.confirm) {
+          if (isPageNativeActionActive(this, action) && modalRes && modalRes.confirm) {
             this.retireVehicle(id)
           }
         }
@@ -716,13 +791,18 @@ Page({
     }
 
     if (code === "NOT_FOUND") {
+      const action = beginPageNativeAction(this)
       wx.showModal({
         title: "车辆已不存在",
         content: message || "该车辆可能已被其他管理员删除，列表将自动刷新。",
         showCancel: false,
         confirmText: "知道了",
         confirmColor: "#528fff",
-        success: () => this.fetchList()
+        success: () => {
+          if (isPageNativeActionActive(this, action)) {
+            this.fetchList()
+          }
+        }
       })
       return
     }
@@ -731,6 +811,7 @@ Page({
       ? "当前账号没有删除车辆的权限，请重新进入小程序刷新权限，或检查管理员配置。"
       : message || "云端删除请求未完成，请检查网络后重试。"
 
+    const action = beginPageNativeAction(this)
     wx.showModal({
       title: code === "FORBIDDEN" ? "无删除权限" : "删除未完成",
       content,
@@ -739,7 +820,12 @@ Page({
       showCancel: code !== "FORBIDDEN",
       confirmColor: code === "FORBIDDEN" ? "#528fff" : "#d46868",
       success: (modalRes) => {
-        if (code !== "FORBIDDEN" && modalRes.confirm) {
+        if (
+          isPageNativeActionActive(this, action) &&
+          code !== "FORBIDDEN" &&
+          modalRes &&
+          modalRes.confirm
+        ) {
           this.deleteVehicle(id)
         }
       }

@@ -149,6 +149,7 @@ describe("pages/booking-workbench", () => {
       showToast: jest.fn()
     }
     const page = createPage(loadPageDefinition(), {
+      loading: false,
       selectedMode: "todo",
       allBookings: [
         {
@@ -206,8 +207,34 @@ describe("pages/booking-workbench", () => {
     }))
   })
 
+  test("ignores phone and clipboard callbacks after the workbench unloads", () => {
+    let phoneOptions
+    let clipboardOptions
+    global.wx = {
+      makePhoneCall: jest.fn((options) => {
+        phoneOptions = options
+      }),
+      setClipboardData: jest.fn((options) => {
+        clipboardOptions = options
+      }),
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition(), { loading: false })
+    const event = { currentTarget: { dataset: { phone: "13800000000" } } }
+
+    page.handleCallPhone(event)
+    page.handleCopyPhone(event)
+    page.onUnload()
+    phoneOptions.fail(new Error("phone failed"))
+    clipboardOptions.success()
+    clipboardOptions.fail(new Error("copy failed"))
+
+    expect(global.wx.showToast).not.toHaveBeenCalled()
+  })
+
   test("支持按多个字段本地搜索并清空关键词", () => {
     const page = createPage(loadPageDefinition(), {
+      loading: false,
       allBookings: [
         {
           id: "booking_shanghai",
@@ -279,6 +306,7 @@ describe("pages/booking-workbench", () => {
       showToast: jest.fn()
     }
     const page = createPage(loadPageDefinition(), {
+      loading: false,
       allBookings: [
         {
           id: "booking_without_phone",
@@ -318,6 +346,7 @@ describe("pages/booking-workbench", () => {
   })
 
   test("支持按智能优先、等待时间和用车日期切换排序", () => {
+    jest.useFakeTimers().setSystemTime(new Date("2026-08-01T00:00:00.000Z"))
     const page = createPage(loadPageDefinition(), {
       allBookings: [
         {
@@ -427,7 +456,10 @@ describe("pages/booking-workbench", () => {
       },
       showToast: jest.fn()
     }
-    const page = createPage(loadPageDefinition())
+    const page = createPage(loadPageDefinition(), {
+      loading: false,
+      refreshing: false
+    })
     page.fetchBookings = jest.fn()
 
     page.handleQuickCoordination({
@@ -469,7 +501,10 @@ describe("pages/booking-workbench", () => {
       },
       showToast: jest.fn()
     }
-    const page = createPage(loadPageDefinition())
+    const page = createPage(loadPageDefinition(), {
+      loading: false,
+      refreshing: false
+    })
     page.fetchBookings = jest.fn()
     const event = {
       currentTarget: {
@@ -515,7 +550,10 @@ describe("pages/booking-workbench", () => {
       }),
       showToast: jest.fn()
     }
-    const page = createPage(loadPageDefinition())
+    const page = createPage(loadPageDefinition(), {
+      loading: false,
+      refreshing: false
+    })
     page.fetchBookings = jest.fn()
 
     page.handlePriorityTap({
@@ -566,6 +604,8 @@ describe("pages/booking-workbench", () => {
       showToast: jest.fn()
     }
     const page = createPage(loadPageDefinition(), {
+      loading: false,
+      refreshing: false,
       allBookings: [
         {
           id: "booking_remark",
@@ -618,6 +658,8 @@ describe("pages/booking-workbench", () => {
       showToast: jest.fn()
     }
     const page = createPage(loadPageDefinition(), {
+      loading: false,
+      refreshing: false,
       editingRemarkId: "booking_remark_error",
       remarkDraft: "新备注",
       allBookings: [
@@ -656,7 +698,10 @@ describe("pages/booking-workbench", () => {
       }),
       showToast: jest.fn()
     }
-    const page = createPage(loadPageDefinition())
+    const page = createPage(loadPageDefinition(), {
+      loading: false,
+      refreshing: false
+    })
     page.fetchBookings = jest.fn()
 
     page.handleMarkContacted({
@@ -709,7 +754,10 @@ describe("pages/booking-workbench", () => {
       showModal: jest.fn(),
       showToast: jest.fn()
     }
-    const page = createPage(loadPageDefinition())
+    const page = createPage(loadPageDefinition(), {
+      loading: false,
+      refreshing: false
+    })
     page.fetchBookings = jest.fn()
 
     page.updateContactedStatus("booking_notify_failed")
@@ -723,8 +771,13 @@ describe("pages/booking-workbench", () => {
       complete: expect.any(Function)
     })
     expect(global.wx.showToast).not.toHaveBeenCalled()
+    expect(page.data.statusUpdatingId).toBe("booking_notify_failed")
+    page.updateContactedStatus("booking_second")
+    expect(global.wx.cloud.callFunction).toHaveBeenCalledTimes(1)
     global.wx.showModal.mock.calls[0][0].complete()
-    expect(page.fetchBookings).toHaveBeenCalled()
+    global.wx.showModal.mock.calls[0][0].complete()
+    expect(page.fetchBookings).toHaveBeenCalledTimes(1)
+    expect(page.data.statusUpdatingId).toBe("")
   })
 
   test("离开工作台后不再执行提醒弹窗的迟到刷新", () => {
@@ -742,14 +795,111 @@ describe("pages/booking-workbench", () => {
       showModal: jest.fn(),
       showToast: jest.fn()
     }
-    const page = createPage(loadPageDefinition())
+    const page = createPage(loadPageDefinition(), {
+      loading: false,
+      refreshing: false
+    })
     page.fetchBookings = jest.fn()
 
     page.updateContactedStatus("booking_unloaded")
     page.onUnload()
     global.wx.showModal.mock.calls[0][0].complete()
+    global.wx.showModal.mock.calls[0][0].complete()
 
     expect(page.fetchBookings).not.toHaveBeenCalled()
+  })
+
+  test("列表刷新期间所有写入口都拒绝旧记录操作", () => {
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn()
+      },
+      showActionSheet: jest.fn(),
+      showModal: jest.fn(),
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition(), {
+      loading: false,
+      refreshing: true,
+      editingRemarkId: "booking_refresh",
+      remarkDraft: "刷新期间的旧备注",
+      allBookings: [
+        {
+          id: "booking_refresh",
+          adminRemark: "原备注"
+        }
+      ]
+    })
+
+    page.handlePriorityTap({
+      currentTarget: {
+        dataset: {
+          id: "booking_refresh",
+          schedulePriority: "normal",
+          coordinationStatus: "pending"
+        }
+      }
+    })
+    page.handleMarkContacted({
+      currentTarget: {
+        dataset: { id: "booking_refresh", status: "pending" }
+      }
+    })
+    page.handleQuickCoordination({
+      currentTarget: {
+        dataset: {
+          id: "booking_refresh",
+          schedulePriority: "normal",
+          coordinationStatus: "pending"
+        }
+      }
+    })
+    page.handleSaveRemark()
+    page.updateContactedStatus("booking_refresh")
+    page.updateCoordination({
+      id: "booking_refresh",
+      schedulePriority: "priority",
+      coordinationStatus: "coordinating"
+    })
+
+    expect(global.wx.showActionSheet).not.toHaveBeenCalled()
+    expect(global.wx.showModal).not.toHaveBeenCalled()
+    expect(global.wx.cloud.callFunction).not.toHaveBeenCalled()
+    expect(page.data.savingRemark).toBe(false)
+    expect(page.data.statusUpdatingId).toBe("")
+    expect(page.data.updatingId).toBe("")
+  })
+
+  test("优先级选择器在刷新开始后返回时不更新旧记录", () => {
+    let actionSheetOptions = null
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn()
+      },
+      showActionSheet: jest.fn((options) => {
+        actionSheetOptions = options
+      }),
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition(), {
+      loading: false,
+      refreshing: false
+    })
+
+    page.handlePriorityTap({
+      currentTarget: {
+        dataset: {
+          id: "booking_stale_priority",
+          schedulePriority: "normal",
+          coordinationStatus: "pending"
+        }
+      }
+    })
+    page.setData({ refreshing: true })
+    actionSheetOptions.success({ tapIndex: 0 })
+
+    expect(global.wx.cloud.callFunction).not.toHaveBeenCalled()
+    expect(page.data.updatingId).toBe("")
   })
 
   test("协调中的预约确认后可标记为已协调", () => {
@@ -770,7 +920,10 @@ describe("pages/booking-workbench", () => {
       }),
       showToast: jest.fn()
     }
-    const page = createPage(loadPageDefinition())
+    const page = createPage(loadPageDefinition(), {
+      loading: false,
+      refreshing: false
+    })
     page.fetchBookings = jest.fn()
 
     page.handleQuickCoordination({

@@ -64,7 +64,7 @@
       <view class="identity-row">
         <view class="identity-native-icon" aria-hidden="true"></view>
         <view class="identity-copy"><view class="identity-label">申请账号</view><view class="identity-text">{{request.openid || '—'}}</view></view>
-        <button class="copy-button ui-btn ui-btn-ghost" bindtap="handleCopyOpenid"><view class="copy-native-icon" aria-hidden="true"></view>复制</button>
+        <button class="copy-button ui-btn ui-btn-ghost" disabled="{{loading || refreshing || exporting}}" bindtap="handleCopyOpenid"><view class="copy-native-icon" aria-hidden="true"></view>复制</button>
       </view>
       <view class="request-meta"><view class="time-native-icon" aria-hidden="true"></view><view><view class="request-meta-label">申请时间</view><view>{{request.createdAtText}}</view></view></view>
       <view class="request-description"><view class="description-native-icon" aria-hidden="true"></view><view class="request-description-copy"><view class="request-meta-label">申请说明</view><view class="request-description-value">{{request.description || '未填写申请说明'}}</view></view></view>
@@ -95,14 +95,15 @@
           <button
             wx:if="{{canShareExport}}"
             class="export-action ui-btn ui-btn-primary"
+            disabled="{{exporting}}"
             bindtap="handleShareExportedFile"
           >
             <view class="export-action-icon share-native-icon" aria-hidden="true"></view>分享文件
           </button>
-          <button class="export-action ui-btn ui-btn-ghost" bindtap="handleOpenExportedFile">
+          <button class="export-action ui-btn ui-btn-ghost" disabled="{{exporting}}" bindtap="handleOpenExportedFile">
             <view class="export-action-icon open-native-icon" aria-hidden="true"></view>打开文件
           </button>
-          <button class="export-action delete-action ui-btn ui-btn-ghost" bindtap="handleDeleteExportedFile">
+          <button class="export-action delete-action ui-btn ui-btn-ghost" disabled="{{exporting}}" bindtap="handleDeleteExportedFile">
             <view class="export-action-icon delete-native-icon" aria-hidden="true"></view>删除本地文件
           </button>
         </view>

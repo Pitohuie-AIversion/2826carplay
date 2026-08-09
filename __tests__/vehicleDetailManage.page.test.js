@@ -1,6 +1,32 @@
 const fs = require("fs")
 const path = require("path")
 
+function loadVehicleDetailDefinition(wxMock) {
+  let definition = null
+  global.Page = jest.fn((input) => {
+    definition = input
+  })
+  global.wx = wxMock
+  jest.resetModules()
+  require("../pages/vehicle-detail-manage/vehicle-detail-manage")
+  return definition
+}
+
+function createVehicleDetailPage(definition, overrides = {}) {
+  const page = {
+    ...definition,
+    data: {
+      ...definition.data,
+      loading: false,
+      ...overrides
+    }
+  }
+  page.setData = jest.fn((patch) => {
+    page.data = { ...page.data, ...patch }
+  })
+  return page
+}
+
 describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
   const pageDir = path.resolve(__dirname, "../pages/vehicle-detail-manage")
   const wxmlSource = fs.readFileSync(path.join(pageDir, "vehicle-detail-manage.wxml"), "utf8")
@@ -40,6 +66,10 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
     expect(wxmlSource).toContain('aria-pressed="{{detail.status === op.value}}"')
     expect(wxmlSource).toContain("status-op-btn-pressed")
     expect(wxmlSource).toContain("vehicle-detail-button-pressed")
+    expect(wxmlSource).toContain('disabled="{{loading || updatingStatus || uploading}}"')
+    expect(wxmlSource).toContain(
+      "{{loading || updatingStatus || uploading ? 'none' : 'vehicle-detail-button-pressed'}}"
+    )
     expect(wxssSource).toContain(".status-op-btn-pressed")
     expect(wxssSource).toContain(".vehicle-detail-button-pressed")
     expect(wxmlSource).toContain('binderror="handleManagedImageError"')
@@ -55,7 +85,7 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
   test("部分图片被跳过时使用无勾的长提示", () => {
     const jsSource = fs.readFileSync(path.join(pageDir, "vehicle-detail-manage.js"), "utf8")
 
-    expect(jsSource).toContain('const partialUpload = payload.action === "add" && Number(skippedCount) > 0')
+    expect(jsSource).toContain('const partialUpload = actionPayload.action === "add" && Number(skippedCount) > 0')
     expect(jsSource).toContain("`已上传，跳过 ${skippedCount} 张`")
     expect(jsSource).toContain('icon: partialUpload ? "none" : "success"')
     expect(jsSource).toContain("duration: partialUpload ? 2200 : 1500")
@@ -113,6 +143,7 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
       data: {
         ...definition.data,
         detail: { imageCount: 0 },
+        loading: false,
         uploading: false
       },
       uploadSelectedFiles: jest.fn()
@@ -145,6 +176,7 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
       data: {
         ...definition.data,
         detail: { imageCount },
+        loading: false,
         uploading: false
       }
     }
@@ -174,6 +206,7 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
       data: {
         ...definition.data,
         detail: { imageCount: 9 },
+        loading: false,
         uploading: false
       }
     }
@@ -209,6 +242,7 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
       data: {
         ...definition.data,
         detail: { imageCount: 0 },
+        loading: false,
         uploading: false
       },
       uploadSelectedFiles: jest.fn()
@@ -242,6 +276,7 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
       data: {
         ...definition.data,
         detail: { imageCount: 0 },
+        loading: false,
         uploading: false
       }
     }
@@ -282,6 +317,7 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
       ...definition,
       data: {
         ...definition.data,
+        loading: false,
         id: "car_1",
         uploading: true
       }
@@ -334,6 +370,7 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
       ...definition,
       data: {
         ...definition.data,
+        loading: false,
         id: "car_1"
       }
     }
@@ -373,6 +410,7 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
       ...definition,
       data: {
         ...definition.data,
+        loading: false,
         id: "car_1"
       }
     }
@@ -410,6 +448,7 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
       ...definition,
       data: {
         ...definition.data,
+        loading: false,
         id: "car_1"
       }
     }
@@ -450,6 +489,7 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
       ...definition,
       data: {
         ...definition.data,
+        loading: false,
         id: "car_1"
       },
       persistImageChange: jest.fn()
@@ -492,6 +532,7 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
       ...definition,
       data: {
         ...definition.data,
+        loading: false,
         id: "car_1"
       },
       persistImageChange: jest.fn()
@@ -538,6 +579,7 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
       ...definition,
       data: {
         ...definition.data,
+        loading: false,
         id: "car_1"
       },
       persistImageChange: jest.fn()
@@ -585,6 +627,7 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
       ...definition,
       data: {
         ...definition.data,
+        loading: false,
         id: "car_1"
       }
     }
@@ -620,6 +663,7 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
       ...definition,
       data: {
         ...definition.data,
+        loading: false,
         id: "car_1"
       }
     }
@@ -662,6 +706,7 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
       ...definition,
       data: {
         ...definition.data,
+        loading: false,
         id: "car_1",
         uploading: true,
         detail: { imageList: [], coverImage: "" }
@@ -720,6 +765,7 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
       ...definition,
       data: {
         ...definition.data,
+        loading: false,
         id: "car_1",
         uploading: true
       }
@@ -754,6 +800,7 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
       ...definition,
       data: {
         ...definition.data,
+        loading: false,
         id: "car_1",
         uploading: false
       }
@@ -794,7 +841,7 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
     require("../pages/vehicle-detail-manage/vehicle-detail-manage")
     const page = {
       ...definition,
-      data: { ...definition.data, id: "car_1" },
+      data: { ...definition.data, loading: false, id: "car_1" },
       persistImageChange: jest.fn()
     }
     page.setData = jest.fn((patch) => {
@@ -842,7 +889,7 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
     require("../pages/vehicle-detail-manage/vehicle-detail-manage")
     const page = {
       ...definition,
-      data: { ...definition.data, id: "car_1" }
+      data: { ...definition.data, loading: false, id: "car_1" }
     }
     page.setData = jest.fn((patch) => {
       page.data = { ...page.data, ...patch }
@@ -876,7 +923,7 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
     require("../pages/vehicle-detail-manage/vehicle-detail-manage")
     const page = {
       ...definition,
-      data: { ...definition.data, id: "car_1" }
+      data: { ...definition.data, loading: false, id: "car_1" }
     }
     page.setData = jest.fn((patch) => {
       page.data = { ...page.data, ...patch }
@@ -894,5 +941,304 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
 
     jest.advanceTimersByTime(40 * 1000)
     expect(wx.showToast).toHaveBeenCalledTimes(1)
+  })
+
+  test("详情读取超时会结束刷新并忽略迟到结果", () => {
+    jest.useFakeTimers()
+    let requestOptions = null
+    const done = jest.fn()
+    const definition = loadVehicleDetailDefinition({
+      cloud: {
+        callFunction: jest.fn((options) => {
+          requestOptions = options
+        })
+      },
+      showToast: jest.fn()
+    })
+    const page = createVehicleDetailPage(definition)
+
+    page.fetchDetail("car-timeout", done)
+    jest.advanceTimersByTime(15 * 1000)
+
+    expect(done).toHaveBeenCalledTimes(1)
+    expect(page.data.loading).toBe(false)
+    expect(wx.showToast).toHaveBeenCalledWith({
+      title: "档案加载超时，请重试",
+      icon: "none"
+    })
+
+    requestOptions.success({
+      result: {
+        ok: true,
+        detail: { id: "car-timeout", brandModel: "迟到车辆" }
+      }
+    })
+    expect(page.data.detail).toBeNull()
+    expect(done).toHaveBeenCalledTimes(1)
+  })
+
+  test("连续读取详情时结束旧刷新且只采用最新结果", () => {
+    const requests = []
+    const firstDone = jest.fn()
+    const secondDone = jest.fn()
+    const definition = loadVehicleDetailDefinition({
+      cloud: {
+        callFunction: jest.fn((options) => requests.push(options))
+      },
+      showToast: jest.fn()
+    })
+    const page = createVehicleDetailPage(definition)
+
+    page.fetchDetail("car-old", firstDone)
+    page.fetchDetail("car-new", secondDone)
+    expect(firstDone).toHaveBeenCalledTimes(1)
+
+    requests[1].success({
+      result: {
+        ok: true,
+        detail: { id: "car-new", brandModel: "新车辆" }
+      }
+    })
+    requests[0].success({
+      result: {
+        ok: true,
+        detail: { id: "car-old", brandModel: "旧车辆" }
+      }
+    })
+
+    expect(page.data.detail.id).toBe("car-new")
+    expect(page.data.detail.brandModel).toBe("新车辆")
+    expect(secondDone).toHaveBeenCalledTimes(1)
+  })
+
+  test("状态或图片写入期间底层详情读取入口直接收尾", () => {
+    const definition = loadVehicleDetailDefinition({
+      cloud: {
+        callFunction: jest.fn()
+      },
+      showToast: jest.fn()
+    })
+    const page = createVehicleDetailPage(definition, {
+      id: "car-busy",
+      loading: false,
+      updatingStatus: true
+    })
+    const statusDone = jest.fn()
+    const uploadDone = jest.fn()
+    const imageDone = jest.fn()
+
+    page.fetchDetail("car-busy", statusDone)
+    page.data.updatingStatus = false
+    page.data.uploading = true
+    page.fetchDetail("car-busy", uploadDone)
+    page.data.uploading = false
+    page._imageChangePending = true
+    page.fetchDetail("car-busy", imageDone)
+
+    expect(wx.cloud.callFunction).not.toHaveBeenCalled()
+    expect(statusDone).toHaveBeenCalledTimes(1)
+    expect(uploadDone).toHaveBeenCalledTimes(1)
+    expect(imageDone).toHaveBeenCalledTimes(1)
+  })
+
+  test("图片选择器在详情刷新开始后返回时不启动上传", () => {
+    let chooseOptions = null
+    const definition = loadVehicleDetailDefinition({
+      chooseImage: jest.fn((options) => {
+        chooseOptions = options
+      }),
+      cloud: {
+        uploadFile: jest.fn()
+      },
+      showToast: jest.fn()
+    })
+    const page = createVehicleDetailPage(definition, {
+      id: "car-refresh",
+      loading: false,
+      detail: { imageCount: 0 }
+    })
+
+    page.handleUploadImages()
+    page.setData({ loading: true })
+    chooseOptions.success({
+      tempFiles: [{ path: "/tmp/stale.jpg", size: 1024 }]
+    })
+
+    expect(wx.cloud.uploadFile).not.toHaveBeenCalled()
+    expect(page.data.uploading).toBe(false)
+  })
+
+  test("状态更新超时会解除互斥并忽略迟到成功", () => {
+    jest.useFakeTimers()
+    let requestOptions = null
+    const definition = loadVehicleDetailDefinition({
+      cloud: {
+        callFunction: jest.fn((options) => {
+          requestOptions = options
+        })
+      },
+      showLoading: jest.fn(),
+      hideLoading: jest.fn(),
+      showToast: jest.fn()
+    })
+    const page = createVehicleDetailPage(definition, { loading: false })
+    page.fetchDetail = jest.fn()
+
+    page.updateVehicleStatus("car-1", "idle")
+    page.updateVehicleStatus("car-1", "maintenance")
+    expect(wx.cloud.callFunction).toHaveBeenCalledTimes(1)
+    jest.advanceTimersByTime(20 * 1000)
+
+    expect(page.data.updatingStatus).toBe(false)
+    expect(wx.hideLoading).toHaveBeenCalledTimes(1)
+    expect(wx.showToast).toHaveBeenCalledWith({
+      title: "状态更新超时，请重试",
+      icon: "none"
+    })
+
+    requestOptions.success({ result: { ok: true, message: "已更新" } })
+    expect(page.fetchDetail).not.toHaveBeenCalled()
+  })
+
+  test("状态云函数同步抛错时恢复页面操作", () => {
+    const definition = loadVehicleDetailDefinition({
+      cloud: {
+        callFunction: jest.fn(() => {
+          throw new Error("status unavailable")
+        })
+      },
+      showLoading: jest.fn(),
+      hideLoading: jest.fn(),
+      showToast: jest.fn()
+    })
+    const page = createVehicleDetailPage(definition, { loading: false })
+
+    expect(() => page.retireVehicle("car-1")).not.toThrow()
+    expect(page.data.updatingStatus).toBe(false)
+    expect(wx.hideLoading).toHaveBeenCalledTimes(1)
+    expect(wx.showToast).toHaveBeenCalledWith({
+      title: "停用失败",
+      icon: "none"
+    })
+  })
+
+  test("封面设置期间阻止重复图片操作并在超时后恢复", () => {
+    jest.useFakeTimers()
+    const requests = []
+    const definition = loadVehicleDetailDefinition({
+      cloud: {
+        callFunction: jest.fn((options) => requests.push(options))
+      },
+      showLoading: jest.fn(),
+      hideLoading: jest.fn(),
+      showToast: jest.fn()
+    })
+    const page = createVehicleDetailPage(definition, {
+      id: "car-1",
+      detail: { imageList: ["cloud://cover"], coverImage: "cloud://cover" }
+    })
+
+    page.persistImageChange({ action: "setCover", fileId: "cloud://cover" })
+    page.persistImageChange({ action: "remove", fileId: "cloud://cover" })
+    expect(wx.cloud.callFunction).toHaveBeenCalledTimes(1)
+
+    jest.advanceTimersByTime(15 * 1000)
+    expect(page._imageChangePending).toBe(false)
+    page.persistImageChange({ action: "setCover", fileId: "cloud://cover" })
+    expect(wx.cloud.callFunction).toHaveBeenCalledTimes(2)
+    requests[1].fail({ errMsg: "request failed" })
+  })
+
+  test("已有图片写入拒绝上传入库时清理新文件并解除上传态", () => {
+    const fileIds = ["cloud://env/new-upload.jpg"]
+    const definition = loadVehicleDetailDefinition({
+      cloud: {
+        callFunction: jest.fn()
+      },
+      hideLoading: jest.fn(),
+      showToast: jest.fn()
+    })
+    const page = createVehicleDetailPage(definition, {
+      id: "car-image-busy",
+      loading: false,
+      uploading: true
+    })
+    page._imageChangePending = true
+
+    page.persistImageChange(
+      { action: "add", fileIds },
+      fileIds,
+      0
+    )
+
+    expect(wx.cloud.callFunction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "vehicleImageUpdate",
+        data: {
+          id: "car-image-busy",
+          action: "cleanupUpload",
+          fileIds
+        }
+      })
+    )
+    expect(page.data.uploading).toBe(false)
+  })
+
+  test("图片入库期间离页会清理待确认文件并忽略迟到成功", () => {
+    const requests = []
+    const fileIds = ["cloud://env/orphan.jpg"]
+    const definition = loadVehicleDetailDefinition({
+      cloud: {
+        callFunction: jest.fn((options) => requests.push(options))
+      },
+      showLoading: jest.fn(),
+      hideLoading: jest.fn(),
+      showToast: jest.fn()
+    })
+    const page = createVehicleDetailPage(definition, {
+      id: "car-1",
+      uploading: true,
+      detail: { imageList: [], coverImage: "" }
+    })
+
+    page.persistImageChange(
+      { action: "add", fileIds },
+      fileIds,
+      0
+    )
+    page.onUnload()
+
+    expect(requests[1]).toEqual(expect.objectContaining({
+      name: "vehicleImageUpdate",
+      data: {
+        id: "car-1",
+        action: "cleanupUpload",
+        fileIds
+      }
+    }))
+    requests[0].success({
+      result: { ok: true, imageList: fileIds, coverImage: fileIds[0] }
+    })
+    expect(page.data.detail.imageList).toEqual([])
+    expect(wx.showToast).not.toHaveBeenCalled()
+  })
+
+  test("上传过程中离页会终止任务且不再显示反馈", () => {
+    const abort = jest.fn()
+    const definition = loadVehicleDetailDefinition({
+      cloud: {
+        uploadFile: jest.fn(() => ({ abort })),
+        callFunction: jest.fn()
+      },
+      hideLoading: jest.fn(),
+      showToast: jest.fn()
+    })
+    const page = createVehicleDetailPage(definition, { id: "car-1" })
+
+    page.uploadSelectedFiles(["/tmp/vehicle.jpg"], 0)
+    page.onUnload()
+
+    expect(abort).toHaveBeenCalledTimes(1)
+    expect(wx.showToast).not.toHaveBeenCalled()
   })
 })

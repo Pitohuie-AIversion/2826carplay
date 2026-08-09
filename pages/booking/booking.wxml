@@ -186,6 +186,7 @@
         value="{{form.userName}}"
         maxlength="20"
         data-field="userName"
+        disabled="{{isSubmitting}}"
         bindinput="handleInput"
         confirm-type="next"
         aria-label="填写联系人姓名"
@@ -206,6 +207,7 @@
         placeholder-class="input-placeholder"
         value="{{form.phone}}"
         data-field="phone"
+        disabled="{{isSubmitting}}"
         bindinput="handleInput"
         confirm-type="done"
         aria-label="填写十一位手机号"
@@ -223,7 +225,7 @@
     <view class="form-row">
       <view class="form-item form-item-half">
         <view class="form-label-row"><view class="form-label">取车日期</view><view class="required-mark">必填</view></view>
-        <picker mode="date" value="{{form.startDate}}" start="{{today}}" data-field="startDate" bindchange="handleDateChange" aria-label="选择取车日期" aria-required="{{true}}">
+        <picker mode="date" value="{{form.startDate}}" start="{{today}}" data-field="startDate" disabled="{{isSubmitting}}" bindchange="handleDateChange" aria-label="选择取车日期" aria-required="{{true}}">
           <view class="form-picker {{form.startDate ? 'form-picker-filled' : ''}} {{formProgress.startDateComplete ? 'form-control-complete' : ''}}" hover-class="booking-picker-pressed">
             <text>{{form.startDate || '选择日期'}}</text>
             <view class="picker-arrow" aria-hidden="true"><view class="picker-chevron"></view></view>
@@ -233,7 +235,7 @@
 
       <view class="form-item form-item-half">
         <view class="form-label-row"><view class="form-label">还车日期</view><view class="required-mark">必填</view></view>
-        <picker mode="date" value="{{form.endDate}}" start="{{endMinDate}}" data-field="endDate" bindchange="handleDateChange" aria-label="选择还车日期" aria-required="{{true}}">
+        <picker mode="date" value="{{form.endDate}}" start="{{endMinDate}}" data-field="endDate" disabled="{{isSubmitting}}" bindchange="handleDateChange" aria-label="选择还车日期" aria-required="{{true}}">
           <view class="form-picker {{form.endDate ? 'form-picker-filled' : ''}} {{formProgress.endDateComplete ? 'form-control-complete' : ''}}" hover-class="booking-picker-pressed">
             <text>{{form.endDate || '选择日期'}}</text>
             <view class="picker-arrow" aria-hidden="true"><view class="picker-chevron"></view></view>
@@ -243,9 +245,9 @@
     </view>
 
     <view class="date-shortcuts" aria-role="group" aria-label="常用日期快捷选择">
-      <button class="date-shortcut" data-action="today" bindtap="handleDateShortcut">今天取车</button>
-      <button class="date-shortcut" data-action="tomorrow" bindtap="handleDateShortcut">明天取车</button>
-      <button class="date-shortcut" data-action="three-days" bindtap="handleDateShortcut">安排 3 天</button>
+      <button class="date-shortcut" data-action="today" disabled="{{isSubmitting}}" bindtap="handleDateShortcut">今天取车</button>
+      <button class="date-shortcut" data-action="tomorrow" disabled="{{isSubmitting}}" bindtap="handleDateShortcut">明天取车</button>
+      <button class="date-shortcut" data-action="three-days" disabled="{{isSubmitting}}" bindtap="handleDateShortcut">安排 3 天</button>
     </view>
 
     <view class="availability-card availability-{{availabilityState}}">
@@ -274,7 +276,7 @@
 
     <view class="form-item">
       <view class="form-label-row"><view class="form-label">取车城市</view><view class="optional-mark">选填</view></view>
-      <picker wx:if="{{cityOptions.length}}" mode="selector" range="{{cityOptions}}" value="{{pickerCityIndex}}" bindchange="handleCityChange" aria-label="选择取车城市">
+      <picker wx:if="{{cityOptions.length}}" mode="selector" range="{{cityOptions}}" value="{{pickerCityIndex}}" disabled="{{isSubmitting}}" bindchange="handleCityChange" aria-label="选择取车城市">
         <view class="form-picker {{form.city ? 'form-picker-filled' : ''}}" hover-class="booking-picker-pressed">
           <text>{{form.city || '请选择取车城市'}}</text>
           <view class="picker-arrow" aria-hidden="true"><view class="picker-chevron"></view></view>
@@ -288,6 +290,7 @@
         value="{{form.city}}"
         maxlength="20"
         data-field="city"
+        disabled="{{isSubmitting}}"
         bindinput="handleInput"
         confirm-type="done"
         aria-label="填写取车城市，选填"
@@ -305,6 +308,7 @@
         placeholder-class="input-placeholder"
         value="{{form.note}}"
         data-field="note"
+        disabled="{{isSubmitting}}"
         bindinput="handleInput"
         maxlength="200"
         aria-label="填写预约备注，选填，最多二百字"
@@ -323,7 +327,7 @@
     <view class="privacy-copy">{{privacyTip}}</view>
     <checkbox-group class="privacy-agreement {{privacyAgreed ? 'privacy-agreement-complete' : ''}}" bindchange="handlePrivacyAgreementChange" aria-label="阅读并同意隐私政策" aria-required="{{true}}">
       <label class="privacy-agreement-label">
-        <checkbox value="agreed" checked="{{privacyAgreed}}" color="#548fff" aria-label="同意隐私政策" aria-checked="{{privacyAgreed}}" />
+        <checkbox value="agreed" checked="{{privacyAgreed}}" disabled="{{isSubmitting}}" color="#548fff" aria-label="同意隐私政策" aria-checked="{{privacyAgreed}}" />
         <text>我已阅读并同意</text>
         <text class="privacy-required-mark">必填</text>
       </label>

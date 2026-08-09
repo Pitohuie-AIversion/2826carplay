@@ -117,7 +117,7 @@ describe("pages/analytics-manage cleanup", () => {
         })
       }
     }
-    const page = createPage(loadPageDefinition(), { canCleanup: true })
+    const page = createPage(loadPageDefinition(), { canCleanup: true, loading: false })
 
     page.runCleanup()
     jest.advanceTimersByTime(20 * 1000)
@@ -151,7 +151,7 @@ describe("pages/analytics-manage cleanup", () => {
         })
       }
     }
-    const page = createPage(loadPageDefinition(), { canCleanup: true })
+    const page = createPage(loadPageDefinition(), { canCleanup: true, loading: false })
 
     expect(() => page.runCleanup()).not.toThrow()
     expect(page.data.cleanupLoading).toBe(false)
@@ -164,31 +164,46 @@ describe("pages/analytics-manage cleanup", () => {
 
   test("管理员确认后调用限量清理并展示结果", () => {
     global.wx = {
-      showModal: jest.fn(({ title, success }) => {
+      showModal: jest.fn(({ title, success, complete }) => {
         if (title === "清理过期匿名数据") {
           success({ confirm: true })
+          return
         }
+        complete()
       }),
       showLoading: jest.fn(),
       hideLoading: jest.fn(),
       showToast: jest.fn(),
       cloud: {
-        callFunction: jest.fn(({ success, complete }) => {
-          success({
-            result: {
-              ok: true,
-              processed: 100,
-              deleted: 99,
-              failed: 1,
-              hasMore: true
-            }
-          })
+        callFunction: jest.fn(({ name, success, complete }) => {
+          if (name === "analyticsCleanup") {
+            success({
+              result: {
+                ok: true,
+                processed: 100,
+                deleted: 99,
+                failed: 1,
+                hasMore: true
+              }
+            })
+          } else {
+            success({
+              result: {
+                ok: true,
+                metrics: {},
+                conversionRate: 0,
+                trend: [],
+                topVehicles: []
+              }
+            })
+          }
           complete()
         })
       }
     }
     const page = createPage(loadPageDefinition(), {
-      canCleanup: true
+      canCleanup: true,
+      loading: false
     })
 
     page.handleCleanup()
@@ -205,9 +220,104 @@ describe("pages/analytics-manage cleanup", () => {
       content: "处理 100 条，成功删除 99 条，失败 1 条。可能仍有过期数据，可再次执行清理。",
       confirmText: "知道了",
       confirmColor: "#528fff",
-      showCancel: false
+      showCancel: false,
+      complete: expect.any(Function)
     })
     expect(page.data.cleanupLoading).toBe(false)
+    expect(global.wx.cloud.callFunction).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "analyticsOverview" })
+    )
+  })
+
+  test("清理结果弹窗关闭前保持写锁并在关闭后刷新概览", () => {
+    const requests = []
+    let resultModal = null
+    global.wx = {
+      showModal: jest.fn((options) => {
+        resultModal = options
+      }),
+      showLoading: jest.fn(),
+      hideLoading: jest.fn(),
+      showToast: jest.fn(),
+      stopPullDownRefresh: jest.fn(),
+      cloud: {
+        callFunction: jest.fn((options) => requests.push(options))
+      }
+    }
+    const page = createPage(loadPageDefinition(), {
+      pageAuthorized: true,
+      canCleanup: true,
+      loading: false,
+      days: 7
+    })
+
+    page.runCleanup()
+    requests[0].success({
+      result: {
+        ok: true,
+        processed: 2,
+        deleted: 2,
+        failed: 0
+      }
+    })
+
+    expect(page.data.cleanupLoading).toBe(true)
+    page.handlePeriodTap({ currentTarget: { dataset: { days: 30 } } })
+    page.onPullDownRefresh()
+    page.handleCleanup()
+    expect(requests).toHaveLength(1)
+    expect(global.wx.stopPullDownRefresh).toHaveBeenCalledTimes(1)
+    expect(global.wx.showModal).toHaveBeenCalledTimes(1)
+
+    resultModal.complete()
+    resultModal.complete()
+
+    expect(page.data.cleanupLoading).toBe(false)
+    expect(requests).toHaveLength(2)
+    expect(requests[1].name).toBe("analyticsOverview")
+    requests[1].success({
+      result: {
+        ok: true,
+        metrics: {},
+        conversionRate: 0,
+        trend: [],
+        topVehicles: []
+      }
+    })
+  })
+
+  test("清理结果弹窗打开后离页会忽略迟到关闭回调", () => {
+    const requests = []
+    let resultModal = null
+    global.wx = {
+      showModal: jest.fn((options) => {
+        resultModal = options
+      }),
+      showLoading: jest.fn(),
+      hideLoading: jest.fn(),
+      showToast: jest.fn(),
+      cloud: {
+        callFunction: jest.fn((options) => requests.push(options))
+      }
+    }
+    const page = createPage(loadPageDefinition(), {
+      canCleanup: true,
+      loading: false
+    })
+
+    page.runCleanup()
+    requests[0].success({
+      result: {
+        ok: true,
+        processed: 1,
+        deleted: 1,
+        failed: 0
+      }
+    })
+    page.onUnload()
+    resultModal.complete()
+
+    expect(requests).toHaveLength(1)
   })
 
   test("非管理员不会发起清理", () => {

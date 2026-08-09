@@ -193,7 +193,7 @@ describe("pages/config-manage 运营配置体验", () => {
     })
   })
 
-  test("四个配置分组使用对应原生图标并提供吸底保存状态", () => {
+  test("五个配置分组使用对应原生图标并提供吸底保存状态", () => {
     const pageDir = path.resolve(__dirname, "../pages/config-manage")
     const wxmlSource = fs.readFileSync(path.join(pageDir, "config-manage.wxml"), "utf8")
     const wxssSource = fs.readFileSync(path.join(pageDir, "config-manage.wxss"), "utf8")
@@ -202,6 +202,8 @@ describe("pages/config-manage 运营配置体验", () => {
     expect(wxmlSource).toContain("section-glyph-home")
     expect(wxmlSource).toContain("section-glyph-content")
     expect(wxmlSource).toContain("section-glyph-reservation")
+    expect(wxmlSource).toContain("section-glyph-pricing")
+    expect(wxmlSource).toContain("rentalEstimateDisclaimer")
     expect(wxmlSource).toContain("field-counter")
     expect(wxmlSource).toContain("template-state")
     expect(wxmlSource).toContain("action-dock")
@@ -217,6 +219,38 @@ describe("pages/config-manage 运营配置体验", () => {
     expect(wxssSource).toMatch(/\.action-dock\s*\{[\s\S]*?position:\s*sticky/)
     expect(wxssSource).toContain(".save-state-mark-dirty")
     expect(wxssSource).toContain(".config-action-native-icon")
+  })
+
+  test("费用规则以结构化配置提交且不会混入预约说明", () => {
+    let request = null
+    wx.cloud.callFunction.mockImplementation((options) => {
+      request = options
+    })
+    const page = createPage(loadPageDefinition(), {
+      loading: false,
+      hasLoadedConfig: true,
+      loadFailed: false,
+      isDirty: true
+    })
+    page.data.form.rentalIncludedText = "仅含车辆使用费"
+    page.data.form.rentalDepositText = "押金会在确认前说明"
+
+    page.handleSubmit()
+
+    expect(request.data.config.rentalTerms).toEqual(
+      expect.objectContaining({
+        includedText: "仅含车辆使用费",
+        depositText: "押金会在确认前说明"
+      })
+    )
+    expect(request.data.config.bookingPrivacyTip).toBe(page.data.form.bookingPrivacyTip)
+    request.success({
+      result: {
+        ok: true,
+        message: "保存成功",
+        config: request.data.config
+      }
+    })
   })
 
   test("编辑字段与恢复默认都会标记存在未保存修改", () => {

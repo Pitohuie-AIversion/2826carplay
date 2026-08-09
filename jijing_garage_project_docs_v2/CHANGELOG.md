@@ -1613,3 +1613,72 @@ Agent 每完成一个 Phase，必须追加记录。
 
 下一步建议：
 - 继续验收客户预约提交页在订阅授权、表单提交、页面重新显示与重复点击交叉时，表单快照、成功跳转和迟到原生回调是否保持一致。
+
+---
+
+## 2026-08-09 Phase 11
+
+完成阶段：
+- 完成费用与租赁规则透明化，等待用户验收。
+
+修改文件：
+- `cloudfunctions/operationConfigGet/index.js`
+- `cloudfunctions/operationConfigUpdate/index.js`
+- `cloudfunctions/vehiclePublicDetail/index.js`
+- `cloudfunctions/analyticsTrack/index.js`
+- `cloudfunctions/analyticsOverview/index.js`
+- `shared/analytics.js`
+- `pages/config-manage/config-manage.js`
+- `pages/config-manage/config-manage.wxml`
+- `pages/config-manage/config-manage.wxss`
+- `pages/car-detail/car-detail.js`
+- `pages/car-detail/car-detail.wxml`
+- `pages/car-detail/car-detail.wxss`
+- `pages/garage/garage.js`
+- `pages/booking/booking.js`
+- `pages/analytics-manage/analytics-manage.js`
+- `pages/analytics-manage/analytics-manage.wxml`
+- `pages/analytics-manage/analytics-manage.wxss`
+- `__tests__/operationConfigGet.int.test.js`
+- `__tests__/operationConfigUpdate.int.test.js`
+- `__tests__/configManage.page.test.js`
+- `__tests__/vehiclePublicDetail.int.test.js`
+- `__tests__/carDetail.page.test.js`
+- `__tests__/analyticsClient.test.js`
+- `__tests__/analyticsTrack.int.test.js`
+- `__tests__/analyticsOverview.int.test.js`
+- `__tests__/analyticsManage.page.test.js`
+- `__tests__/bookingAvailability.page.test.js`
+- `__tests__/consumerIconStyle.test.js`
+- `README.md`
+- `DEVELOPMENT_ROADMAP.md`
+- `jijing_garage_project_docs_v2/CURRENT_PHASE.md`
+- `jijing_garage_project_docs_v2/DATA_SCHEMA.md`
+- `jijing_garage_project_docs_v2/CHANGELOG.md`
+
+新增文件：无
+
+删除文件：无
+
+主要改动：
+- 车辆公开详情由 `priceDay` 生成结构化基础日租摘要，并保持公开字段白名单不读取 VIN、发动机号或内部备注。
+- 运营配置新增基础日租包含内容、保障、服务费、取送车、押金、取消改期、超时、油电和预估边界九项通用规则，旧配置自动补充默认值。
+- 车辆详情新增费用摘要、可展开费用说明和完整租赁规则，明确页面价格不是正式报价，提交预约不会自动锁定车辆。
+- 匿名统计新增费用、规则、电话、分享和档期结果事件；分析页增加费用转化阶段和用户决策行为汇总。
+- 新增和扩展回归测试，覆盖配置归一化、公开价格摘要、最小匿名载荷、页面展开行为及分析聚合。
+
+数据与隐私影响：
+- `app_configs.value` 新增公开 `rentalTerms` 对象，不包含用户信息。
+- `analytics_events` 新增事件类型，但仍只保存事件类型、车辆 ID 和时间。
+- 未新增用户身份、预约表单、证件、支付、合同或库存锁定数据。
+
+测试方式：
+- `npm run check:release`
+- `git diff --check`
+
+已知问题：
+- 新增运营规则需要部署 `operationConfigGet`、`operationConfigUpdate`、`vehiclePublicDetail`、`analyticsTrack` 和 `analyticsOverview` 后才能在云环境生效。
+- 微信开发者工具编译、真机展开交互与长文案换行仍需人工验收。
+
+下一步建议：
+- 用户验收 Phase 11 后，再明确决定是否开始 Phase 12 报价与用户确认闭环。

@@ -69,6 +69,56 @@ describe("pages/car-detail 客户侧车辆状态", () => {
     })
   })
 
+  test("费用与租赁规则按需展开且每次访问只记录一次匿名查看", () => {
+    global.wx = {
+      setNavigationBarTitle: jest.fn()
+    }
+    const page = createPage(loadPageDefinition())
+    const { trackEvent } = require("../shared/analytics")
+    trackEvent.mockClear()
+    page.data.carId = "vehicle-pricing"
+    page.applyCar({
+      id: "vehicle-pricing",
+      name: "Porsche 911",
+      status: "available",
+      priceDay: 1888,
+      priceSummary: {
+        hasBasePrice: true,
+        baseDailyRate: 1888,
+        baseDailyRateText: "￥1888",
+        billingUnit: "24小时"
+      },
+      images: []
+    })
+
+    expect(page.data.pricingOverview.baseDailyRateText).toBe("￥1888")
+    expect(page.data.pricingOverview.disclaimer).toContain("不会自动锁定车辆")
+
+    page.handleTogglePricing()
+    page.handleTogglePricing()
+    page.handleTogglePricing()
+    page.handleToggleRentalRules()
+    page.handleToggleRentalRules()
+    page.handleToggleRentalRules()
+
+    expect(trackEvent).toHaveBeenCalledWith("pricing_view", "vehicle-pricing")
+    expect(trackEvent).toHaveBeenCalledWith("rental_rules_view", "vehicle-pricing")
+    expect(trackEvent.mock.calls.filter(([type]) => type === "pricing_view")).toHaveLength(1)
+    expect(trackEvent.mock.calls.filter(([type]) => type === "rental_rules_view")).toHaveLength(1)
+  })
+
+  test("详情页公开展示费用边界而不伪造正式报价或支付", () => {
+    const pageDir = path.resolve(__dirname, "../pages/car-detail")
+    const wxmlSource = fs.readFileSync(path.join(pageDir, "car-detail.wxml"), "utf8")
+
+    expect(wxmlSource).toContain("费用怎么计算")
+    expect(wxmlSource).toContain("基础日租参考")
+    expect(wxmlSource).toContain("查看完整租赁规则")
+    expect(wxmlSource).toContain("pricingOverview.disclaimer")
+    expect(wxmlSource).not.toContain("立即支付")
+    expect(wxmlSource).not.toContain("报价已生效")
+  })
+
   test("点击车辆图片可从当前位置打开全屏预览", () => {
     global.wx = {
       setNavigationBarTitle: jest.fn(),

@@ -90,6 +90,54 @@ reserved       已预约
 
 禁止新增状态，除非用户明确要求。
 
+## Phase 11：公开价格摘要与通用租赁规则
+
+公开车辆详情在现有 `priceDay` 基础上生成只读 `priceSummary`，不保存正式报价：
+
+```js
+{
+  hasBasePrice: true,
+  baseDailyRate: 599,
+  currency: "CNY",
+  currencySymbol: "￥",
+  billingUnit: "24小时",
+  baseDailyRateText: "￥599",
+  estimateLabel: "基础日租参考"
+}
+```
+
+运营配置 `app_configs.value.rentalTerms` 保存所有车辆共用的公开规则：
+
+```js
+{
+  includedText: "基础日租包含内容",
+  protectionText: "保障或保险说明",
+  serviceFeeText: "服务费说明",
+  deliveryFeeText: "取送车费用说明",
+  depositText: "押金与退还规则",
+  cancellationText: "取消与改期规则",
+  overtimeText: "超时费用说明",
+  energyText: "油量或电量规则",
+  estimateDisclaimer: "预估价格、正式报价与车辆锁定边界"
+}
+```
+
+规则字段公开读取前会去除首尾空白、限制为 200 字，并为旧配置的缺失字段补充默认文案。车辆只保存 `priceDay` 差异，不重复保存通用规则。
+
+Phase 11 匿名分析事件包括：
+
+```text
+pricing_view
+rental_rules_view
+phone_call
+share
+availability_available
+availability_conflict
+availability_unknown
+```
+
+匿名事件仍只保存 `eventType`、`vehicleId` 和 `createdAt`，不保存 OpenID、姓名、手机号、预约备注、日期或城市。
+
 ## 5. 分类数据 categories
 
 文件路径：

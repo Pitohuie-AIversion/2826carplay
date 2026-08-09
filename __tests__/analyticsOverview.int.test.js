@@ -91,6 +91,8 @@ describe("cloudfunctions/analyticsOverview integration", () => {
         { eventType: "garage_view", vehicleId: "", createdAt: new Date(now - 1000) },
         { eventType: "vehicle_detail", vehicleId: "vehicle_1", createdAt: new Date(now - 900) },
         { eventType: "vehicle_detail", vehicleId: "vehicle_1", createdAt: new Date(now - 800) },
+        { eventType: "pricing_view", vehicleId: "vehicle_1", createdAt: new Date(now - 750) },
+        { eventType: "rental_rules_view", vehicleId: "vehicle_1", createdAt: new Date(now - 725) },
         { eventType: "booking_start", vehicleId: "vehicle_1", createdAt: new Date(now - 700) },
         { eventType: "booking_submit", vehicleId: "vehicle_1", createdAt: new Date(now - 600) },
         { eventType: "favorite_add", vehicleId: "vehicle_1", createdAt: new Date(now - 500) }
@@ -117,7 +119,14 @@ describe("cloudfunctions/analyticsOverview integration", () => {
       vehicle_detail: 2,
       booking_start: 1,
       booking_submit: 1,
-      favorite_add: 1
+      favorite_add: 1,
+      pricing_view: 1,
+      rental_rules_view: 1,
+      phone_call: 0,
+      share: 0,
+      availability_available: 0,
+      availability_conflict: 0,
+      availability_unknown: 0
     })
     expect(res.conversionRate).toBe(50)
     expect(res.topVehicles[0]).toEqual(
@@ -127,7 +136,9 @@ describe("cloudfunctions/analyticsOverview integration", () => {
         detailViews: 2,
         bookingStarts: 1,
         bookingSubmits: 1,
-        favorites: 1
+        favorites: 1,
+        pricingViews: 1,
+        rentalRuleViews: 1
       })
     )
     expect(res.topVehicles[0]).not.toHaveProperty("vin")

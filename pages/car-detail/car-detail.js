@@ -10,6 +10,58 @@ const {
 const CAR_DETAIL_LOAD_TIMEOUT_MS = 15 * 1000
 const FAVORITE_STATUS_TIMEOUT_MS = 10 * 1000
 const FAVORITE_UPDATE_TIMEOUT_MS = 12 * 1000
+const DEFAULT_RENTAL_TERMS = {
+  includedText: "基础日租仅包含车辆使用费，其他项目会在正式报价前单独列明。",
+  protectionText: "基础保障内容根据车型与租期确认，不默认包含额外保障服务。",
+  serviceFeeText: "如有车辆整备或门店服务费，将在报价明细中单独列示。",
+  deliveryFeeText: "取送车服务及费用按城市、距离和时段确认，无该服务时不收费。",
+  depositText: "车辆押金与违章押金的金额、支付方式和退还时间会在确认前明确告知。",
+  cancellationText: "预约提交后可取消；顾问确认后的取消或改期规则以有效报价说明为准。",
+  overtimeText: "超时用车费用按最终确认的计费规则执行，产生前由顾问说明。",
+  energyText: "取还车油量或电量标准会在交付前确认，并以交接记录为准。",
+  estimateDisclaimer: "页面价格为基础日租参考，不是正式报价，提交预约也不会自动锁定车辆。"
+}
+
+function normalizeRentalTerms(raw) {
+  const input = raw && typeof raw === "object" ? raw : {}
+  return Object.keys(DEFAULT_RENTAL_TERMS).reduce((result, key) => {
+    result[key] = String(input[key] || "").trim() || DEFAULT_RENTAL_TERMS[key]
+    return result
+  }, {})
+}
+
+function buildPricingOverview(car, rentalTermsInput) {
+  const source = car && typeof car === "object" ? car : {}
+  const rentalTerms = normalizeRentalTerms(rentalTermsInput)
+  const priceSummary = source.priceSummary && typeof source.priceSummary === "object"
+    ? source.priceSummary
+    : {}
+  const priceDay = Number(source.priceDay)
+  const hasBasePrice = priceSummary.hasBasePrice === true || (Number.isInteger(priceDay) && priceDay > 0)
+  const baseDailyRate = Number(priceSummary.baseDailyRate) || (hasBasePrice ? priceDay : 0)
+
+  return {
+    hasBasePrice,
+    baseDailyRateText: hasBasePrice
+      ? String(priceSummary.baseDailyRateText || `￥${baseDailyRate}`)
+      : "待顾问确认",
+    billingUnit: String(priceSummary.billingUnit || "24小时"),
+    estimateLabel: String(priceSummary.estimateLabel || "基础日租参考"),
+    includedText: rentalTerms.includedText,
+    feeItems: [
+      { key: "protection", label: "保障说明", text: rentalTerms.protectionText },
+      { key: "service", label: "服务费用", text: rentalTerms.serviceFeeText },
+      { key: "delivery", label: "取送车费用", text: rentalTerms.deliveryFeeText }
+    ],
+    ruleItems: [
+      { key: "deposit", label: "押金与退还", text: rentalTerms.depositText },
+      { key: "cancellation", label: "取消与改期", text: rentalTerms.cancellationText },
+      { key: "overtime", label: "超时用车", text: rentalTerms.overtimeText },
+      { key: "energy", label: "油量或电量", text: rentalTerms.energyText }
+    ],
+    disclaimer: rentalTerms.estimateDisclaimer
+  }
+}
 
 function getStatusText(status, fallbackText) {
   const statusTextMap = {
@@ -101,6 +153,10 @@ function formatCarViewModel(car) {
 Page({
   data: {
     servicePhone: "15715710090",
+    rentalTerms: normalizeRentalTerms(),
+    pricingOverview: buildPricingOverview(null, DEFAULT_RENTAL_TERMS),
+    pricingExpanded: false,
+    rulesExpanded: false,
     carId: "",
     car: null,
     currentImageIndex: 0,
@@ -114,10 +170,6 @@ Page({
       { key: "request", index: "01", title: "提交意向", desc: "填写日期与联系方式" },
       { key: "confirm", index: "02", title: "顾问确认", desc: "核对档期、价格和规则" },
       { key: "delivery", index: "03", title: "安排交付", desc: "确认取还车时间与方式" }
-    ],
-    rentalTips: [
-      "车辆价格、可用时间、押金和取还车规则以客服最终确认为准。",
-      "提交预约后，客服将与您确认车辆档期和具体租赁细节。"
     ]
   },
 
@@ -157,12 +209,13 @@ Page({
       onSuccess: (config) => {
         const servicePhone =
           String(config.servicePhone || "").trim()
+        const rentalTerms = normalizeRentalTerms(config.rentalTerms)
 
-        if (servicePhone) {
-          this.setData({
-            servicePhone
-          })
-        }
+        this.setData({
+          servicePhone: servicePhone || this.data.servicePhone,
+          rentalTerms,
+          pricingOverview: buildPricingOverview(this.data.car, rentalTerms)
+        })
       }
     })
   },
@@ -354,6 +407,7 @@ Page({
 
     this.setData({
       car: formatCarViewModel(targetCar),
+      pricingOverview: buildPricingOverview(targetCar, this.data.rentalTerms),
       currentImageIndex: 0,
       loading: false,
       loadError: false
@@ -542,6 +596,24 @@ Page({
     })
   },
 
+  handleTogglePricing() {
+    const pricingExpanded = !this.data.pricingExpanded
+    this.setData({ pricingExpanded })
+    if (pricingExpanded && !this._pricingViewTracked) {
+      this._pricingViewTracked = true
+      trackEvent("pricing_view", this.data.carId)
+    }
+  },
+
+  handleToggleRentalRules() {
+    const rulesExpanded = !this.data.rulesExpanded
+    this.setData({ rulesExpanded })
+    if (rulesExpanded && !this._rentalRulesViewTracked) {
+      this._rentalRulesViewTracked = true
+      trackEvent("rental_rules_view", this.data.carId)
+    }
+  },
+
   handlePhoneCall() {
     const phone = String(this.data.servicePhone || "").trim()
     if (!phone) {
@@ -551,6 +623,8 @@ Page({
       })
       return
     }
+
+    trackEvent("phone_call", this.data.carId)
 
     const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.makePhoneCall({
@@ -641,6 +715,8 @@ Page({
 
   onShareAppMessage() {
     const car = this.data.car
+
+    trackEvent("share", car && car.id)
 
     if (!car) {
       return {

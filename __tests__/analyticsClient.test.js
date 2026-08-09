@@ -75,4 +75,27 @@ describe("shared/analytics", () => {
 
     expect(global.wx.cloud.callFunction).toHaveBeenCalledTimes(2)
   })
+
+  test("费用、规则、咨询、分享与档期结果使用最小匿名载荷", () => {
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn()
+      }
+    }
+    const { trackEvent } = loadAnalytics()
+
+    trackEvent("pricing_view", "vehicle_1")
+    trackEvent("rental_rules_view", "vehicle_1")
+    trackEvent("phone_call")
+    trackEvent("share", "vehicle_1")
+    trackEvent("availability_conflict", "vehicle_1")
+
+    expect(global.wx.cloud.callFunction.mock.calls.map(([options]) => options.data)).toEqual([
+      { eventType: "pricing_view", vehicleId: "vehicle_1" },
+      { eventType: "rental_rules_view", vehicleId: "vehicle_1" },
+      { eventType: "phone_call", vehicleId: "" },
+      { eventType: "share", vehicleId: "vehicle_1" },
+      { eventType: "availability_conflict", vehicleId: "vehicle_1" }
+    ])
+  })
 })

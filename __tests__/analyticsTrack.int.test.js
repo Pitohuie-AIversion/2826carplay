@@ -99,4 +99,22 @@ describe("cloudfunctions/analyticsTrack integration", () => {
     expect(res.code).toBe("VALIDATION_ERROR")
     expect(mocks.set).not.toHaveBeenCalled()
   })
+
+  test("费用与档期事件要求车辆 ID，电话与分享允许首页无车辆上下文", async () => {
+    const pricingMocks = loadModule("user_pricing")
+    const missingVehicle = await pricingMocks.mod.main({ eventType: "pricing_view" })
+    expect(missingVehicle.code).toBe("VALIDATION_ERROR")
+    expect(pricingMocks.set).not.toHaveBeenCalled()
+
+    const phoneMocks = loadModule("user_phone")
+    const phoneResult = await phoneMocks.mod.main({ eventType: "phone_call" })
+    expect(phoneResult).toEqual({ ok: true })
+    expect(phoneMocks.set).toHaveBeenCalledWith({
+      data: {
+        eventType: "phone_call",
+        vehicleId: "",
+        createdAt: phoneMocks.serverDateValue
+      }
+    })
+  })
 })

@@ -87,6 +87,23 @@
     <view class="section-card ui-card">
       <view class="section-heading">
         <view>
+          <view class="section-eyebrow">DECISION SIGNALS</view>
+          <view class="section-title">用户决策行为</view>
+        </view>
+        <view class="section-index">02</view>
+      </view>
+      <view class="decision-grid">
+        <view class="decision-item" wx:for="{{decisionItems}}" wx:key="key">
+          <view class="decision-label">{{item.label}}</view>
+          <view class="decision-value">{{item.value}}</view>
+          <view wx:if="{{item.meta}}" class="decision-meta">{{item.meta}}</view>
+        </view>
+      </view>
+    </view>
+
+    <view class="section-card ui-card">
+      <view class="section-heading">
+        <view>
           <view class="section-eyebrow">CONVERSION FUNNEL</view>
           <view class="section-title">预约转化漏斗</view>
         </view>
@@ -117,7 +134,7 @@
           <view class="section-eyebrow">ACTIVITY TREND</view>
           <view class="section-title">每日行为趋势</view>
         </view>
-        <view class="section-index">02</view>
+        <view class="section-index">03</view>
       </view>
       <view class="trend-scroll-shell ui-scroll-shell">
         <scroll-view class="trend-scroll" scroll-x enhanced show-scrollbar="{{false}}" aria-label="近 {{days}} 天每日行为趋势，可横向滑动查看">
@@ -141,14 +158,14 @@
           <view class="section-eyebrow">POPULAR VEHICLES</view>
           <view class="section-title">热门车型</view>
         </view>
-        <view class="section-index">03</view>
+        <view class="section-index">04</view>
       </view>
       <view wx:if="{{topVehicles.length}}" class="vehicle-rank-list">
         <view class="rank-item" wx:for="{{topVehicles}}" wx:key="vehicleId">
           <view class="rank-number">{{index + 1}}</view>
           <view class="rank-copy">
             <view class="rank-name">{{item.name}}</view>
-            <view class="rank-meta">详情 {{item.detailViews}} · 预约 {{item.bookingStarts}} · 收藏 {{item.favorites}}</view>
+            <view class="rank-meta">详情 {{item.detailViews}} · 费用 {{item.pricingViews}} · 预约 {{item.bookingStarts}} · 收藏 {{item.favorites}}</view>
           </view>
           <view class="rank-score">{{item.score}}</view>
         </view>
@@ -169,7 +186,7 @@
           <view class="section-eyebrow">DATA RETENTION</view>
           <view class="section-title">匿名数据保留</view>
         </view>
-        <view class="section-index">04</view>
+        <view class="section-index">05</view>
       </view>
       <view class="cleanup-desc">管理员可分批删除 90 天前的匿名行为事件。预约、车辆和用户资料不受影响。</view>
       <button

@@ -167,7 +167,16 @@ describe("用户主流程原生图标", () => {
         "form.cityOptionsText.length",
         "form.faqContent.length",
         "form.rulesContent.length",
-        "form.bookingPrivacyTip.length"
+        "form.bookingPrivacyTip.length",
+        "form.rentalIncludedText.length",
+        "form.rentalProtectionText.length",
+        "form.rentalServiceFeeText.length",
+        "form.rentalDeliveryFeeText.length",
+        "form.rentalDepositText.length",
+        "form.rentalCancellationText.length",
+        "form.rentalOvertimeText.length",
+        "form.rentalEnergyText.length",
+        "form.rentalEstimateDisclaimer.length"
       ],
       "pages/privacy-request/privacy-request.wxml": ["descriptionLength"],
       "pages/vehicle-create/vehicle-create.wxml": ["publicDescriptionLength", "noteLength"],
@@ -205,9 +214,9 @@ describe("用户主流程原生图标", () => {
       })
     })
 
-    expect(inputControlCount).toBe(48)
+    expect(inputControlCount).toBe(57)
     expect(singleLineInputCount).toBe(32)
-    expect(textareaCount).toBe(16)
+    expect(textareaCount).toBe(25)
     expect(Object.values(textareaCounterExpressions).flat()).toHaveLength(textareaCount)
     Object.entries(textareaCounterExpressions).forEach(([relativePath, expressions]) => {
       const source = read(relativePath)

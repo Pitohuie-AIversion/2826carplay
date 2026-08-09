@@ -347,8 +347,15 @@ describe("pages/analytics-manage cleanup", () => {
               metrics: {
                 garage_view: 100,
                 vehicle_detail: 60,
+                pricing_view: 40,
                 booking_start: 30,
-                booking_submit: 12
+                booking_submit: 12,
+                rental_rules_view: 20,
+                phone_call: 4,
+                share: 3,
+                availability_available: 8,
+                availability_conflict: 2,
+                availability_unknown: 1
               },
               conversionRate: 20,
               trend: [
@@ -372,7 +379,13 @@ describe("pages/analytics-manage cleanup", () => {
       "check",
       "chart"
     ])
-    expect(page.data.funnelItems.map((item) => item.rate)).toEqual([100, 60, 30, 12])
+    expect(page.data.funnelItems.map((item) => item.rate)).toEqual([100, 60, 40, 30, 12])
+    expect(page.data.decisionItems).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: "rules", value: 20 }),
+        expect.objectContaining({ key: "availability", value: 11 })
+      ])
+    )
     expect(page.data.trendItems.map((item) => item.isPeak)).toEqual([false, true])
   })
 

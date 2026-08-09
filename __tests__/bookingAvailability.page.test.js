@@ -1,6 +1,10 @@
 const fs = require("fs")
 const path = require("path")
 
+jest.mock("../shared/analytics", () => ({
+  trackEvent: jest.fn()
+}))
+
 function loadPageDefinition() {
   jest.resetModules()
   let definition = null

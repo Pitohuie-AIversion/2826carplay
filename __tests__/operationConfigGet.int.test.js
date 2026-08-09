@@ -69,6 +69,11 @@ describe("cloudfunctions/operationConfigGet integration", () => {
       faqContent: expect.any(String),
       rulesContent: expect.any(String),
       bookingStatusTemplateId: "",
+      rentalTerms: expect.objectContaining({
+        includedText: expect.any(String),
+        depositText: expect.any(String),
+        estimateDisclaimer: expect.stringContaining("不会自动锁定车辆")
+      }),
       bookingPrivacyTip: "仅用于本次预约沟通。"
     })
     expect(mocks.configField).toHaveBeenCalledWith({ value: true })
@@ -87,6 +92,30 @@ describe("cloudfunctions/operationConfigGet integration", () => {
     expect(res.config.servicePhone).toBe("15715710090")
     expect(res.config.garagePageSubtitle).toBe("甄选座驾，为每一次出发预留专属席位")
     expect(res.config.cityOptions).toEqual(["杭州", "上海"])
+    expect(res.config.rentalTerms.protectionText).toContain("不默认包含额外保障")
+  })
+
+  test("租赁规则按公开长度归一化并为缺失项补默认文案", async () => {
+    const mocks = createMockDb({
+      configData: [
+        {
+          key: "operation_settings",
+          value: {
+            rentalTerms: {
+              includedText: "仅含车辆使用费",
+              depositText: "押金规则".repeat(100)
+            }
+          }
+        }
+      ]
+    })
+
+    const mod = await loadOperationConfigGetWith({ mockDb: mocks.db })
+    const res = await mod.main()
+
+    expect(res.config.rentalTerms.includedText).toBe("仅含车辆使用费")
+    expect(res.config.rentalTerms.depositText).toHaveLength(200)
+    expect(res.config.rentalTerms.energyText).toContain("油量或电量")
   })
 
   test("读取遗留后台说明时自动升级为面向用户的品牌文案", async () => {

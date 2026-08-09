@@ -13,9 +13,19 @@ const ALLOWED_EVENTS = [
   "vehicle_detail",
   "booking_start",
   "booking_submit",
-  "favorite_add"
+  "favorite_add",
+  "pricing_view",
+  "rental_rules_view",
+  "phone_call",
+  "share",
+  "availability_available",
+  "availability_conflict",
+  "availability_unknown"
 ]
-const VEHICLE_EVENTS = ALLOWED_EVENTS.filter((item) => item !== "garage_view")
+const OPTIONAL_VEHICLE_EVENTS = ["phone_call", "share"]
+const VEHICLE_EVENTS = ALLOWED_EVENTS.filter(
+  (item) => item !== "garage_view" && !OPTIONAL_VEHICLE_EVENTS.includes(item)
+)
 
 function buildEventDocumentId(openid, eventType, now) {
   const windowId = Math.floor(now / DEDUP_WINDOW_MS)
@@ -99,6 +109,13 @@ exports.main = async (event) => {
       }
     }
     if (VEHICLE_EVENTS.includes(eventType) && (!vehicleId || vehicleId.length > 128)) {
+      return {
+        ok: false,
+        code: "VALIDATION_ERROR",
+        message: "车辆 ID 格式不正确"
+      }
+    }
+    if (OPTIONAL_VEHICLE_EVENTS.includes(eventType) && vehicleId.length > 128) {
       return {
         ok: false,
         code: "VALIDATION_ERROR",

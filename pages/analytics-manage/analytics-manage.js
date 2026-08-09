@@ -14,7 +14,7 @@ function buildMetrics(metrics, conversionRate) {
   const source = metrics && typeof metrics === "object" ? metrics : {}
   return [
     { key: "detail", label: "详情浏览", value: Number(source.vehicle_detail) || 0, tone: "primary", icon: "eye" },
-    { key: "start", label: "发起预约", value: Number(source.booking_start) || 0, tone: "warning", icon: "calendar" },
+    { key: "pricing", label: "查看费用", value: Number(source.pricing_view) || 0, tone: "warning", icon: "calendar" },
     { key: "submit", label: "提交成功", value: Number(source.booking_submit) || 0, tone: "success", icon: "check" },
     { key: "conversion", label: "详情转化率", value: `${Number(conversionRate) || 0}%`, tone: "accent", icon: "chart" }
   ]
@@ -25,6 +25,7 @@ function buildFunnel(metrics) {
   const list = [
     { key: "garage", label: "进入车库", value: Number(source.garage_view) || 0 },
     { key: "detail", label: "查看详情", value: Number(source.vehicle_detail) || 0 },
+    { key: "pricing", label: "查看费用", value: Number(source.pricing_view) || 0 },
     { key: "start", label: "发起预约", value: Number(source.booking_start) || 0 },
     { key: "submit", label: "提交成功", value: Number(source.booking_submit) || 0 }
   ]
@@ -35,6 +36,24 @@ function buildFunnel(metrics) {
     width: Math.max(Math.round((item.value / max) * 100), item.value ? 8 : 0),
     rate: firstStageValue ? Math.min(100, Math.round((item.value / firstStageValue) * 100)) : 0
   }))
+}
+
+function buildDecisionItems(metrics) {
+  const source = metrics && typeof metrics === "object" ? metrics : {}
+  return [
+    { key: "rules", label: "查看租赁规则", value: Number(source.rental_rules_view) || 0 },
+    { key: "phone", label: "电话咨询", value: Number(source.phone_call) || 0 },
+    { key: "share", label: "主动分享", value: Number(source.share) || 0 },
+    {
+      key: "availability",
+      label: "档期检查",
+      value:
+        (Number(source.availability_available) || 0) +
+        (Number(source.availability_conflict) || 0) +
+        (Number(source.availability_unknown) || 0),
+      meta: `可咨询 ${Number(source.availability_available) || 0} · 有冲突 ${Number(source.availability_conflict) || 0} · 未知 ${Number(source.availability_unknown) || 0}`
+    }
+  ]
 }
 
 function buildTrend(trend) {
@@ -62,6 +81,7 @@ Page({
     ],
     metricItems: [],
     funnelItems: [],
+    decisionItems: [],
     trendItems: [],
     topVehicles: [],
     truncated: false,
@@ -311,6 +331,7 @@ Page({
           loadError: "",
           metricItems: buildMetrics(result.metrics, result.conversionRate),
           funnelItems: buildFunnel(result.metrics),
+          decisionItems: buildDecisionItems(result.metrics),
           trendItems: buildTrend(result.trend),
           topVehicles: Array.isArray(result.topVehicles) ? result.topVehicles : [],
           truncated: Boolean(result.truncated)

@@ -118,15 +118,47 @@
 
     <view class="price-row">
       <view>
-        <view class="price-label">参考价格</view>
+        <view class="price-label">基础日租参考</view>
         <view class="car-price">{{car.priceText}}</view>
       </view>
-      <view class="price-note">以顾问最终确认为准</view>
+      <view class="price-note">不含未列明项目</view>
     </view>
 
     <view class="tag-list">
       <text wx:for="{{car.tags}}" wx:key="*this" class="tag-item">{{item}}</text>
     </view>
+  </view>
+
+  <view class="pricing-card ui-card">
+    <view class="section-heading pricing-heading">
+      <view class="section-heading-copy">
+        <view class="section-mark"></view>
+        <view>
+          <view class="section-title">费用怎么计算</view>
+          <view class="section-kicker">PRICE ESTIMATE</view>
+        </view>
+      </view>
+      <view class="pricing-badge">预估</view>
+    </view>
+    <view class="pricing-base-row">
+      <view>
+        <view class="pricing-base-label">{{pricingOverview.estimateLabel}}</view>
+        <view class="pricing-base-value">{{pricingOverview.baseDailyRateText}}<text wx:if="{{pricingOverview.hasBasePrice}}" class="pricing-base-unit"> / {{pricingOverview.billingUnit}}</text></view>
+      </view>
+      <view class="pricing-base-state">仅基础日租</view>
+    </view>
+    <view class="pricing-included">{{pricingOverview.includedText}}</view>
+    <button class="disclosure-button" bindtap="handleTogglePricing" hover-class="disclosure-button-pressed" aria-expanded="{{pricingExpanded}}">
+      <text>{{pricingExpanded ? '收起费用说明' : '查看保障与其他费用'}}</text>
+      <view class="disclosure-chevron {{pricingExpanded ? 'disclosure-chevron-open' : ''}}" aria-hidden="true"></view>
+    </button>
+    <view wx:if="{{pricingExpanded}}" class="disclosure-list">
+      <view class="disclosure-item" wx:for="{{pricingOverview.feeItems}}" wx:key="key">
+        <view class="disclosure-label">{{item.label}}</view>
+        <view class="disclosure-text">{{item.text}}</view>
+      </view>
+    </view>
+    <view class="estimate-disclaimer"><view class="estimate-disclaimer-mark" aria-hidden="true">i</view><text>{{pricingOverview.disclaimer}}</text></view>
   </view>
 
   <view class="notice-card ui-card" wx:if="{{car.statusNoticeText}}">
@@ -192,12 +224,22 @@
     </view>
   </view>
 
-  <view class="info-card ui-card">
+  <view class="info-card ui-card rental-rules-card">
     <view class="section-heading">
       <view class="section-mark"></view>
-      <view class="section-title">租赁说明</view>
+      <view class="section-title">租赁规则</view>
     </view>
-    <view wx:for="{{rentalTips}}" wx:key="*this" class="section-text rental-tip">{{item}}</view>
+    <view class="rental-rules-summary">押金、取消改期、超时和油电标准会在确认前明确说明。</view>
+    <button class="disclosure-button rental-disclosure-button" bindtap="handleToggleRentalRules" hover-class="disclosure-button-pressed" aria-expanded="{{rulesExpanded}}">
+      <text>{{rulesExpanded ? '收起租赁规则' : '查看完整租赁规则'}}</text>
+      <view class="disclosure-chevron {{rulesExpanded ? 'disclosure-chevron-open' : ''}}" aria-hidden="true"></view>
+    </button>
+    <view wx:if="{{rulesExpanded}}" class="disclosure-list rental-rule-list">
+      <view class="disclosure-item" wx:for="{{pricingOverview.ruleItems}}" wx:key="key">
+        <view class="disclosure-label">{{item.label}}</view>
+        <view class="disclosure-text">{{item.text}}</view>
+      </view>
+    </view>
   </view>
 
   <view class="detail-bottom-bar">

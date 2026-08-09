@@ -3,7 +3,14 @@ const ALLOWED_EVENTS = [
   "vehicle_detail",
   "booking_start",
   "booking_submit",
-  "favorite_add"
+  "favorite_add",
+  "pricing_view",
+  "rental_rules_view",
+  "phone_call",
+  "share",
+  "availability_available",
+  "availability_conflict",
+  "availability_unknown"
 ]
 const TRACK_COOLDOWN_MS = 5000
 const recentEvents = new Map()

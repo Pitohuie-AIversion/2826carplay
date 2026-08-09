@@ -74,6 +74,15 @@ describe("cloudfunctions/vehiclePublicDetail integration", () => {
     expect(res.car.cover).toBe("cloud://img2")
     expect(res.car.images).toEqual(["cloud://img2", "cloud://img1"])
     expect(res.car.description).toBe("公开车辆亮点")
+    expect(res.car.priceSummary).toEqual({
+      hasBasePrice: true,
+      baseDailyRate: 1299,
+      currency: "CNY",
+      currencySymbol: "￥",
+      billingUnit: "24小时",
+      baseDailyRateText: "￥1299",
+      estimateLabel: "基础日租参考"
+    })
     expect(JSON.stringify(res.car)).not.toContain("内部维修记录不得公开")
     expect(mocks.vehiclesDoc).toHaveBeenCalledWith("car_1")
     expect(mocks.vehiclesField).toHaveBeenCalledWith(
@@ -116,6 +125,8 @@ describe("cloudfunctions/vehiclePublicDetail integration", () => {
     expect(res.ok).toBe(true)
     expect(res.car.description).toBe("Legacy Car支持到店咨询与预约服务。")
     expect(res.car.seatsText).toBe("—")
+    expect(res.car.priceSummary.hasBasePrice).toBe(false)
+    expect(res.car.priceSummary.baseDailyRateText).toBe("待顾问确认")
     expect(JSON.stringify(res.car)).not.toContain("内部维修记录不得公开")
   })
 

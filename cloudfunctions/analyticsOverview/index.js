@@ -27,7 +27,14 @@ const EVENT_TYPES = [
   "vehicle_detail",
   "booking_start",
   "booking_submit",
-  "favorite_add"
+  "favorite_add",
+  "pricing_view",
+  "rental_rules_view",
+  "phone_call",
+  "share",
+  "availability_available",
+  "availability_conflict",
+  "availability_unknown"
 ]
 
 function normalizeStringArray(value) {
@@ -202,6 +209,8 @@ exports.main = async (event) => {
         bookingStarts: 0,
         bookingSubmits: 0,
         favorites: 0,
+        pricingViews: 0,
+        rentalRuleViews: 0,
         score: 0
       }
       if (item.eventType === "vehicle_detail") {
@@ -216,6 +225,12 @@ exports.main = async (event) => {
       } else if (item.eventType === "favorite_add") {
         current.favorites += 1
         current.score += 2
+      } else if (item.eventType === "pricing_view") {
+        current.pricingViews += 1
+        current.score += 1
+      } else if (item.eventType === "rental_rules_view") {
+        current.rentalRuleViews += 1
+        current.score += 1
       }
       vehicleScores[vehicleId] = current
     })

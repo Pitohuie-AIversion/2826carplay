@@ -12,7 +12,7 @@
     <view class="hero-status">
       <view class="hero-status-dot"></view>
       <text>保存后将同步首页、我的页面与预约服务</text>
-      <view class="hero-status-count">4 GROUPS</view>
+      <view class="hero-status-count">5 GROUPS</view>
     </view>
   </view>
 
@@ -183,6 +183,65 @@
         <view>{{form.bookingStatusTemplateId ? '已填写订阅模板 ID' : '当前未启用状态订阅通知'}}</view>
       </view>
       <view class="form-tip">模板需包含：车辆名称 thing1、预约状态 phrase2、服务说明 thing3、更新时间 time4。未配置时预约仍可提交，但用户收不到状态变更提醒。</view>
+    </view>
+  </view>
+
+  <view class="form-card ui-card">
+    <view class="section-heading">
+      <view class="section-heading-main">
+        <view class="section-glyph section-glyph-pricing" aria-hidden="true"><view class="section-glyph-icon"></view></view>
+        <view>
+          <view class="section-eyebrow">PRICING & TERMS</view>
+          <view class="section-heading-title">费用与租赁规则</view>
+        </view>
+      </view>
+      <view class="section-index">05</view>
+    </view>
+    <view class="form-tip pricing-config-tip">这些内容公开展示在车辆详情页。请只写已经确认的通用规则，车型差异和最终金额由后续有效报价说明。</view>
+    <view class="form-item">
+      <view class="form-label">基础日租包含内容</view>
+      <textarea class="form-textarea ui-input" value="{{form.rentalIncludedText}}" data-field="rentalIncludedText" disabled="{{loading || saving}}" bindinput="handleInput" maxlength="200" placeholder="说明基础日租包含哪些项目" aria-label="基础日租包含内容" />
+      <view class="field-meta"><view class="form-tip">避免使用“一口价”等尚未核实的承诺。</view><view class="field-counter">{{form.rentalIncludedText.length}} / 200</view></view>
+    </view>
+    <view class="form-item">
+      <view class="form-label">保障或保险说明</view>
+      <textarea class="form-textarea ui-input" value="{{form.rentalProtectionText}}" data-field="rentalProtectionText" disabled="{{loading || saving}}" bindinput="handleInput" maxlength="200" placeholder="说明基础保障和额外保障边界" aria-label="保障或保险说明" />
+      <view class="field-counter field-counter-standalone">{{form.rentalProtectionText.length}} / 200</view>
+    </view>
+    <view class="form-item">
+      <view class="form-label">服务费说明</view>
+      <textarea class="form-textarea ui-input" value="{{form.rentalServiceFeeText}}" data-field="rentalServiceFeeText" disabled="{{loading || saving}}" bindinput="handleInput" maxlength="200" placeholder="说明整备费或门店服务费" aria-label="服务费说明" />
+      <view class="field-counter field-counter-standalone">{{form.rentalServiceFeeText.length}} / 200</view>
+    </view>
+    <view class="form-item">
+      <view class="form-label">取送车费用说明</view>
+      <textarea class="form-textarea ui-input" value="{{form.rentalDeliveryFeeText}}" data-field="rentalDeliveryFeeText" disabled="{{loading || saving}}" bindinput="handleInput" maxlength="200" placeholder="说明取车、还车或送车费用" aria-label="取送车费用说明" />
+      <view class="field-counter field-counter-standalone">{{form.rentalDeliveryFeeText.length}} / 200</view>
+    </view>
+    <view class="form-item">
+      <view class="form-label">押金与退还规则</view>
+      <textarea class="form-textarea ui-input" value="{{form.rentalDepositText}}" data-field="rentalDepositText" disabled="{{loading || saving}}" bindinput="handleInput" maxlength="200" placeholder="说明车辆押金、违章押金与退还时间" aria-label="押金与退还规则" />
+      <view class="field-counter field-counter-standalone">{{form.rentalDepositText.length}} / 200</view>
+    </view>
+    <view class="form-item">
+      <view class="form-label">取消与改期规则</view>
+      <textarea class="form-textarea ui-input" value="{{form.rentalCancellationText}}" data-field="rentalCancellationText" disabled="{{loading || saving}}" bindinput="handleInput" maxlength="200" placeholder="说明预约取消与改期边界" aria-label="取消与改期规则" />
+      <view class="field-counter field-counter-standalone">{{form.rentalCancellationText.length}} / 200</view>
+    </view>
+    <view class="form-item">
+      <view class="form-label">超时费用说明</view>
+      <textarea class="form-textarea ui-input" value="{{form.rentalOvertimeText}}" data-field="rentalOvertimeText" disabled="{{loading || saving}}" bindinput="handleInput" maxlength="200" placeholder="说明延迟还车的计费边界" aria-label="超时费用说明" />
+      <view class="field-counter field-counter-standalone">{{form.rentalOvertimeText.length}} / 200</view>
+    </view>
+    <view class="form-item">
+      <view class="form-label">油量或电量规则</view>
+      <textarea class="form-textarea ui-input" value="{{form.rentalEnergyText}}" data-field="rentalEnergyText" disabled="{{loading || saving}}" bindinput="handleInput" maxlength="200" placeholder="说明取还车油量或电量标准" aria-label="油量或电量规则" />
+      <view class="field-counter field-counter-standalone">{{form.rentalEnergyText.length}} / 200</view>
+    </view>
+    <view class="form-item">
+      <view class="form-label">预估价格边界说明</view>
+      <textarea class="form-textarea ui-input" value="{{form.rentalEstimateDisclaimer}}" data-field="rentalEstimateDisclaimer" disabled="{{loading || saving}}" bindinput="handleInput" maxlength="200" placeholder="明确页面价格、正式报价和车辆锁定的边界" aria-label="预估价格边界说明" />
+      <view class="field-counter field-counter-standalone">{{form.rentalEstimateDisclaimer.length}} / 200</view>
     </view>
   </view>
 

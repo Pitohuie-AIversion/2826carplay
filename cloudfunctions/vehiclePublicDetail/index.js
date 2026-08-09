@@ -186,10 +186,23 @@ function buildNickname(plateNumber, vehicleTypeText) {
 
 function buildPriceText(priceDay) {
   if (Number.isInteger(priceDay) && priceDay > 0) {
-    return `今日 ￥${priceDay} / 24小时`
+    return `￥${priceDay} / 24小时`
   }
 
   return "价格到店详询"
+}
+
+function buildPriceSummary(priceDay) {
+  const hasBasePrice = Number.isInteger(priceDay) && priceDay > 0
+  return {
+    hasBasePrice,
+    baseDailyRate: hasBasePrice ? priceDay : 0,
+    currency: "CNY",
+    currencySymbol: "￥",
+    billingUnit: "24小时",
+    baseDailyRateText: hasBasePrice ? `￥${priceDay}` : "待顾问确认",
+    estimateLabel: "基础日租参考"
+  }
 }
 
 function buildTags(vehicle, vehicleTypeText) {
@@ -249,6 +262,7 @@ function mapVehicle(vehicle) {
     category: inferCategory(vehicleType, brandModel, fuelType),
     priceDay,
     priceText: buildPriceText(priceDay),
+    priceSummary: buildPriceSummary(priceDay),
     status: mappedStatus.status,
     statusText: mappedStatus.statusText,
     location: String((vehicle && vehicle.location) || "").trim() || "门店咨询",

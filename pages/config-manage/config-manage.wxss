@@ -451,6 +451,38 @@
   content: "";
 }
 
+.section-glyph-pricing .section-glyph-icon {
+  width: 29rpx;
+  height: 29rpx;
+  border: 3rpx solid currentColor;
+  border-radius: 50%;
+}
+
+.section-glyph-pricing .section-glyph-icon::before {
+  position: absolute;
+  top: 4rpx;
+  left: 8rpx;
+  color: currentColor;
+  font-size: 17rpx;
+  font-weight: 700;
+  line-height: 1;
+  content: "¥";
+}
+
+.pricing-config-tip {
+  margin-top: 0;
+  margin-bottom: 25rpx;
+  padding: 16rpx 18rpx;
+  border-left: 3rpx solid rgba(84, 143, 255, 0.45);
+  border-radius: 0 14rpx 14rpx 0;
+  background: rgba(84, 143, 255, 0.05);
+}
+
+.field-counter-standalone {
+  margin-top: 10rpx;
+  text-align: right;
+}
+
 .field-meta {
   display: flex;
   align-items: flex-start;

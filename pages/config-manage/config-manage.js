@@ -6,6 +6,17 @@ const CONFIG_LOAD_TIMEOUT_MS = 15 * 1000
 const CONFIG_SAVE_TIMEOUT_MS = 20 * 1000
 
 const LEGACY_GARAGE_SUBTITLE = "后台车辆资料已接入首页展示，上传封面后会同步展示到车库首页"
+const DEFAULT_RENTAL_TERMS = {
+  includedText: "基础日租仅包含车辆使用费，其他项目会在正式报价前单独列明。",
+  protectionText: "基础保障内容根据车型与租期确认，不默认包含额外保障服务。",
+  serviceFeeText: "如有车辆整备或门店服务费，将在报价明细中单独列示。",
+  deliveryFeeText: "取送车服务及费用按城市、距离和时段确认，无该服务时不收费。",
+  depositText: "车辆押金与违章押金的金额、支付方式和退还时间会在确认前明确告知。",
+  cancellationText: "预约提交后可取消；顾问确认后的取消或改期规则以有效报价说明为准。",
+  overtimeText: "超时用车费用按最终确认的计费规则执行，产生前由顾问说明。",
+  energyText: "取还车油量或电量标准会在交付前确认，并以交接记录为准。",
+  estimateDisclaimer: "页面价格为基础日租参考，不是正式报价，提交预约也不会自动锁定车辆。"
+}
 
 const DEFAULT_CONFIG = {
   brandName: "极境车库",
@@ -19,6 +30,7 @@ const DEFAULT_CONFIG = {
   rulesContent:
     "1. 车辆展示信息仅供参考，具体以客服最终确认为准。\n2. 预约不代表最终成交，需以档期、资质与规则审核结果为准。\n3. 平台保留对异常预约、恶意占用档期等行为的处理权利。",
   bookingStatusTemplateId: "",
+  rentalTerms: DEFAULT_RENTAL_TERMS,
   bookingPrivacyTip:
     "提交预约即表示您同意我们仅将所填信息用于本次车辆预约沟通与联系确认。您可在【我的预约】查看、修改联系信息与取消；如需查询、更正或删除其他个人信息，请前往【个人信息申请】。车辆档期、价格、押金及取还车规则以客服最终确认为准。"
 }
@@ -36,6 +48,9 @@ function normalizeGarageSubtitle(value) {
 
 function buildForm(config) {
   const source = config && typeof config === "object" ? config : DEFAULT_CONFIG
+  const rentalTerms = source.rentalTerms && typeof source.rentalTerms === "object"
+    ? source.rentalTerms
+    : DEFAULT_RENTAL_TERMS
   return {
     brandName: source.brandName || DEFAULT_CONFIG.brandName,
     servicePhone: source.servicePhone || DEFAULT_CONFIG.servicePhone,
@@ -46,7 +61,17 @@ function buildForm(config) {
     faqContent: source.faqContent || DEFAULT_CONFIG.faqContent,
     rulesContent: source.rulesContent || DEFAULT_CONFIG.rulesContent,
     bookingStatusTemplateId: source.bookingStatusTemplateId || "",
-    bookingPrivacyTip: source.bookingPrivacyTip || DEFAULT_CONFIG.bookingPrivacyTip
+    bookingPrivacyTip: source.bookingPrivacyTip || DEFAULT_CONFIG.bookingPrivacyTip,
+    rentalIncludedText: rentalTerms.includedText || DEFAULT_RENTAL_TERMS.includedText,
+    rentalProtectionText: rentalTerms.protectionText || DEFAULT_RENTAL_TERMS.protectionText,
+    rentalServiceFeeText: rentalTerms.serviceFeeText || DEFAULT_RENTAL_TERMS.serviceFeeText,
+    rentalDeliveryFeeText: rentalTerms.deliveryFeeText || DEFAULT_RENTAL_TERMS.deliveryFeeText,
+    rentalDepositText: rentalTerms.depositText || DEFAULT_RENTAL_TERMS.depositText,
+    rentalCancellationText: rentalTerms.cancellationText || DEFAULT_RENTAL_TERMS.cancellationText,
+    rentalOvertimeText: rentalTerms.overtimeText || DEFAULT_RENTAL_TERMS.overtimeText,
+    rentalEnergyText: rentalTerms.energyText || DEFAULT_RENTAL_TERMS.energyText,
+    rentalEstimateDisclaimer:
+      rentalTerms.estimateDisclaimer || DEFAULT_RENTAL_TERMS.estimateDisclaimer
   }
 }
 
@@ -68,7 +93,18 @@ function buildSubmitConfig(form) {
     faqContent: source.faqContent || "",
     rulesContent: source.rulesContent || "",
     bookingStatusTemplateId: String(source.bookingStatusTemplateId || "").trim(),
-    bookingPrivacyTip: source.bookingPrivacyTip || ""
+    bookingPrivacyTip: source.bookingPrivacyTip || "",
+    rentalTerms: {
+      includedText: source.rentalIncludedText || "",
+      protectionText: source.rentalProtectionText || "",
+      serviceFeeText: source.rentalServiceFeeText || "",
+      deliveryFeeText: source.rentalDeliveryFeeText || "",
+      depositText: source.rentalDepositText || "",
+      cancellationText: source.rentalCancellationText || "",
+      overtimeText: source.rentalOvertimeText || "",
+      energyText: source.rentalEnergyText || "",
+      estimateDisclaimer: source.rentalEstimateDisclaimer || ""
+    }
   }
 }
 

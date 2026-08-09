@@ -557,6 +557,7 @@ Page({
         availabilityText: "暂时无法查看档期，仍可提交并由顾问确认",
         availabilityConflictCount: 0
       })
+      trackEvent("availability_unknown", vehicleId)
       return
     }
 
@@ -584,6 +585,7 @@ Page({
         availabilityText: message || "档期查询暂时失败，仍可提交并由顾问确认",
         availabilityConflictCount: 0
       })
+      trackEvent("availability_unknown", vehicleId)
     }
 
     this._availabilityCheckTimer = setTimeout(() => {
@@ -609,20 +611,30 @@ Page({
             availabilityText: (result && result.message) || "暂时无法查看档期，仍可提交并由顾问确认",
             availabilityConflictCount: 0
           })
+          trackEvent("availability_unknown", vehicleId)
           return
         }
 
         const conflictCount = Math.max(0, Number(result.conflictCount || 0))
+        const availabilityState =
+          result.available === true
+            ? "clear"
+            : conflictCount > 0
+              ? "conflict"
+              : "unknown"
         this.setData({
-          availabilityState:
-            result.available === true
-              ? "clear"
-              : conflictCount > 0
-                ? "conflict"
-                : "unknown",
+          availabilityState,
           availabilityText: result.message || "档期请以顾问最终确认为准",
           availabilityConflictCount: conflictCount
         })
+        trackEvent(
+          availabilityState === "clear"
+            ? "availability_available"
+            : availabilityState === "conflict"
+              ? "availability_conflict"
+              : "availability_unknown",
+          vehicleId
+        )
       },
       fail: () => {
         handleFailure()

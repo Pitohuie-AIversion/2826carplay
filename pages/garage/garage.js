@@ -576,6 +576,8 @@ Page({
       return
     }
 
+    trackEvent("phone_call")
+
     const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.makePhoneCall({
       phoneNumber: phone,
@@ -602,10 +604,12 @@ Page({
     if (this.data.loadingCars || this.data.searchDebouncing) {
       return
     }
+
     this.loadCars()
   },
 
   onShareAppMessage() {
+    trackEvent("share")
     return {
       title: "极境车库",
       path: "/pages/garage/garage"

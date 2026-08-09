@@ -193,4 +193,39 @@ describe("cloudfunctions/operationConfigUpdate integration", () => {
     expect(res.message).toBe("订阅消息模板 ID 格式不正确")
     expect(mocks.configAdd).not.toHaveBeenCalled()
   })
+
+  test("租赁规则会归一化后写入运营配置", async () => {
+    const mocks = createMockDb({
+      rolesData: [{ openid: "admin_openid", role: "admin" }],
+      configData: []
+    })
+    const mod = await loadOperationConfigUpdateWith({
+      openid: "admin_openid",
+      mockDb: mocks.db
+    })
+
+    const res = await mod.main({
+      config: {
+        servicePhone: "18800000000",
+        rentalTerms: {
+          includedText: "  基础日租仅含车辆使用费  ",
+          depositText: "明确告知押金"
+        }
+      }
+    })
+
+    expect(res.ok).toBe(true)
+    expect(res.config.rentalTerms.includedText).toBe("基础日租仅含车辆使用费")
+    expect(res.config.rentalTerms.depositText).toBe("明确告知押金")
+    expect(res.config.rentalTerms.energyText).toEqual(expect.any(String))
+    expect(mocks.configAdd).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        value: expect.objectContaining({
+          rentalTerms: expect.objectContaining({
+            includedText: "基础日租仅含车辆使用费"
+          })
+        })
+      })
+    })
+  })
 })

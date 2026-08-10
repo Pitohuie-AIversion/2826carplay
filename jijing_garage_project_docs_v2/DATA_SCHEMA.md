@@ -289,3 +289,127 @@ cancelled              已取消
 - 报价、用户可见备注和调整说明已纳入现有个人数据清单与 CSV 导出。
 - 审计日志只保存预约 ID、报价 ID、版本、状态和金额摘要，不保存调整正文、手机号或其他表单内容。
 - 确认报价不创建支付单、合同、押金冻结或车辆库存锁定。
+
+## 10. Phase 13 车辆可信档案
+
+可信档案继续保存在 `vehicles` 集合，不新增集合。公开摘要与内部原始记录使用不同的顶层字段和查询白名单：
+
+```js
+{
+  publicMaterialsUpdatedDate: "2026-08-01",
+  publicInspectionDate: "2026-07-28",
+  publicInspectionSummary: "最近保养和检查的公开摘要，最多 200 字",
+  publicExteriorSummary: "当前已知外观情况公开摘要，最多 200 字",
+  publicInsuranceSummary: "商业保险能力摘要，最多 200 字",
+  publicAssistanceSummary: "道路救援或人工协助能力摘要，最多 200 字",
+  publicArchiveReviewStatus: "pending | reviewed",
+
+  internalMaintenanceRecord: "内部保养原始记录，最多 500 字",
+  internalInspectionRecord: "内部检查原始记录，最多 500 字",
+  internalInsuranceRecord: "内部保险记录，最多 500 字",
+  internalArchiveNote: "内部档案说明，最多 500 字"
+}
+```
+
+公开接口仅查询 `public*` 档案字段，不查询 `internal*`、`note`、VIN、发动机号或完整车牌。服务端根据完整度、最近资料日期和人工复核状态派生：
+
+```text
+current  资料已复核且最近资料日期不超过 180 天
+pending  字段完整但仍待运营人员复核
+stale    字段完整但最近资料日期超过 180 天
+missing  至少一个公开档案字段缺失
+```
+
+“已复核”只代表运营人员核对过公开摘要，不代表政府、平台或第三方认证。车辆年份从注册日期派生；客户侧继续只展示座位、能源、变速箱等既有决策字段。
+
+匿名事件新增 `trusted_profile_view`。与 `phone_call`、`booking_start` 的比率只做相同统计周期内的聚合，不保存 OpenID、手机号、档案正文或单个用户行为链路。
+
+## 11. Phase 14 预约交接版本 `booking_handovers`
+
+取车和还车分别保存不可静默覆盖的版本记录，文档 ID 为 `{bookingId}__{pickup|return}__v{version}`：
+
+```js
+{
+  _id: "booking_001__pickup__v1",
+  bookingId: "booking_001",
+  stage: "pickup", // pickup | return
+  version: 1,
+  status: "submitted", // submitted | confirmed | superseded | archived
+  mileageKm: 12000,
+  energyType: "fuel", // fuel | electric
+  energyLevelPercent: 80,
+  damageNote: "未发现已知损伤",
+  additionalNote: "钥匙一把",
+  photos: [
+    { angle: "front", fileId: "cloud://.../handover-images/booking_001/pickup/front.jpg" },
+    { angle: "rear", fileId: "cloud://..." },
+    { angle: "left", fileId: "cloud://..." },
+    { angle: "right", fileId: "cloud://..." }
+  ],
+  submitRequestId: "幂等请求标识",
+  capturedAt: "服务端时间",
+  submittedAt: "服务端时间",
+  confirmedAt: "用户核对服务端时间",
+  createdAt: "服务端时间",
+  updatedAt: "服务端时间"
+}
+```
+
+服务端强制校验四个必需角度、不同文件、预约/阶段专属存储路径、整数里程和 0—100 能源百分比。还车提交前必须先核对取车记录；每次新版本都会清空该阶段旧的核对时间。`bookings` 保存当前取车/还车记录 ID、版本、提交和核对时间，只有两个当前版本都已核对时才能转为 `completed`。
+
+交接照片存放在私有 `handover-images/` 前缀，客户端安全规则不允许公开读取；`bookingDetail` 和 `bookingMyDetail` 完成顾问权限或预约归属校验后才生成临时地址。归档会先清空记录中的照片引用，再进入 `pending_file_deletions` 清理队列；文字版本和状态审计继续保留。个人数据清单与 CSV 覆盖交接文字、里程和能源摘要，不导出可长期访问的照片地址。
+
+## 12. Phase 15 车辆档期与价格日历
+
+真实占用分为区间元数据和确定性按日锁。`vehicle_availability_blocks` 保存运营可读区间、版本和释放状态：
+
+```js
+{
+  _id: "booking_<bookingId哈希> | block_<随机标识>",
+  vehicleId: "vehicle_001",
+  vehicleName: "BMW M4",
+  kind: "booking | maintenance | hold | unavailable",
+  bookingId: "仅确认预约占用保存",
+  startDate: "2026-10-01",
+  endDate: "2026-10-03",
+  reason: "业务原因",
+  status: "active | released | completed",
+  version: 1,
+  createdAt: "服务端时间",
+  updatedAt: "服务端时间"
+}
+```
+
+`vehicle_calendar_days` 每辆车每个中国日期最多一条记录，文档 ID 为 `day_{vehicleId SHA-256 前24位}_{YYYYMMDD}`。确认报价和运营变更在事务内先读取所有目标日文档，再写入或删除；确定性 ID 让并发事务争用同一文档，防止同车确认占用重叠。普通 `pending`、`contacted`、`quoted` 或 `adjustment_requested` 咨询不会写入此集合。
+
+```js
+{
+  vehicleId: "vehicle_001",
+  date: "2026-10-01",
+  blockId: "booking_...",
+  kind: "booking",
+  bookingId: "booking_001",
+  createdAt: "服务端时间",
+  updatedAt: "服务端时间"
+}
+```
+
+`vehicle_price_rules` 保存某辆车互不重叠的特殊日期价格：
+
+```js
+{
+  vehicleId: "vehicle_001",
+  vehicleName: "BMW M4",
+  label: "国庆假期",
+  startDate: "2026-10-01",
+  endDate: "2026-10-07",
+  dailyPrice: 1200, // 元/日，与现有 vehicles.priceDay 一致
+  reason: "人工明确价格原因",
+  status: "active | released",
+  version: 1,
+  createdAt: "服务端时间",
+  updatedAt: "服务端时间"
+}
+```
+
+用户接口只返回是否可用、占用天数、同期咨询数量和价格摘要，不返回区间原因、预约 ID、其他用户身份或运营账号。价格摘要是每日参考合计，正式费用仍由 `booking_quotes` 服务端金额版本决定。

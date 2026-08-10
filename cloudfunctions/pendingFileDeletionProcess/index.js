@@ -22,6 +22,7 @@ const VEHICLE_IMAGE_REFERENCE_FIELDS = {
   imageList: true
 }
 const VERIFIED_IMAGE_CLEANUP_SOURCE = "vehicleImageUploadCleanup"
+const VERIFIED_HANDOVER_CLEANUP_SOURCE = "bookingHandoverUploadCleanup"
 const DEFAULT_LIMIT = 5
 const MAX_LIMIT = 5
 const QUEUE_SCAN_LIMIT = 100
@@ -123,11 +124,18 @@ function toTimestamp(value) {
 }
 
 function isDeferredImageCleanup(record, now) {
-  if (String(record && record.source) !== VERIFIED_IMAGE_CLEANUP_SOURCE) {
+  if (![VERIFIED_IMAGE_CLEANUP_SOURCE, VERIFIED_HANDOVER_CLEANUP_SOURCE].includes(String(record && record.source))) {
     return false
   }
   const notBeforeAt = toTimestamp(record && record.notBeforeAt)
   return Boolean(notBeforeAt && now < notBeforeAt)
+}
+
+async function readHandoverImageReferences(bookingId) {
+  const res = await db.collection("booking_handovers").where({ bookingId }).field({ photos: true }).limit(40).get()
+  return normalizeStringArray((res && res.data || []).flatMap((record) =>
+    Array.isArray(record.photos) ? record.photos.map((photo) => photo && photo.fileId) : []
+  ))
 }
 
 function selectQueueRecords(records, limit, now) {
@@ -273,6 +281,35 @@ exports.main = async (event) => {
               lastAttemptAt: db.serverDate()
             }
           })
+          return { deleted: 0, failed: 1, invalid: 0, deferred: 0, preserved: 0 }
+        }
+      }
+
+      if (String(record && record.source) === VERIFIED_HANDOVER_CLEANUP_SOURCE) {
+        const notBeforeAt = toTimestamp(record && record.notBeforeAt)
+        if (notBeforeAt && Date.now() < notBeforeAt) {
+          return { deleted: 0, failed: 0, invalid: 0, deferred: 1, preserved: 0 }
+        }
+        const bookingId = String(record && record.context && record.context.bookingId || "").trim()
+        if (!bookingId) {
+          await db.collection("pending_file_deletions").doc(recordId).remove()
+          return { deleted: 0, failed: 0, invalid: 1, deferred: 0, preserved: 0 }
+        }
+        try {
+          const referenced = new Set(await readHandoverImageReferences(bookingId))
+          const orphanFileIds = fileList.filter((fileId) => !referenced.has(fileId))
+          preserved = fileList.length - orphanFileIds.length
+          fileList = orphanFileIds
+          if (!fileList.length) {
+            await db.collection("pending_file_deletions").doc(recordId).remove()
+            return { deleted: 0, failed: 0, invalid: 0, deferred: 0, preserved }
+          }
+        } catch (error) {
+          await db.collection("pending_file_deletions").doc(recordId).update({ data: {
+            attemptCount: (Number(record.attemptCount) || 0) + 1,
+            lastError: "交接图片引用校验失败",
+            lastAttemptAt: db.serverDate()
+          } })
           return { deleted: 0, failed: 1, invalid: 0, deferred: 0, preserved: 0 }
         }
       }

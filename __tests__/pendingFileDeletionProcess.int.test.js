@@ -1,6 +1,6 @@
 jest.mock("wx-server-sdk")
 
-function createMockDb({ rolesData, queueData, vehicleData = null, vehicleError = null }) {
+function createMockDb({ rolesData, queueData, vehicleData = null, vehicleError = null, handoverData = [] }) {
   const rolesGet = jest.fn().mockResolvedValue({ data: rolesData })
   const queueGet = jest.fn().mockResolvedValue({ data: queueData })
   const queueRemove = jest.fn().mockResolvedValue({ stats: { removed: 1 } })
@@ -11,6 +11,10 @@ function createMockDb({ rolesData, queueData, vehicleData = null, vehicleError =
     : jest.fn().mockResolvedValue({ data: vehicleData })
   const vehicleField = jest.fn(() => ({ get: vehicleGet }))
   const vehicleDoc = jest.fn(() => ({ field: vehicleField }))
+  const handoverGet = jest.fn().mockResolvedValue({ data: handoverData })
+  const handoverLimit = jest.fn(() => ({ get: handoverGet }))
+  const handoverField = jest.fn(() => ({ limit: handoverLimit }))
+  const handoverWhere = jest.fn(() => ({ field: handoverField }))
 
   const rolesWhere = jest.fn(() => ({
     limit: jest.fn(() => ({ get: rolesGet }))
@@ -42,6 +46,9 @@ function createMockDb({ rolesData, queueData, vehicleData = null, vehicleError =
       if (name === "vehicles") {
         return { doc: vehicleDoc }
       }
+      if (name === "booking_handovers") {
+        return { where: handoverWhere }
+      }
       throw new Error(`Unexpected collection: ${name}`)
     }),
     serverDate
@@ -60,6 +67,8 @@ function createMockDb({ rolesData, queueData, vehicleData = null, vehicleError =
     vehicleDoc,
     vehicleField,
     vehicleGet,
+    handoverWhere,
+    handoverField,
     serverDateValue
   }
 }
@@ -312,6 +321,32 @@ describe("cloudfunctions/pendingFileDeletionProcess integration", () => {
     expect(mocks.queueRemove).toHaveBeenCalledWith()
     expect(res.deleted).toBe(1)
     expect(res.preserved).toBe(1)
+  })
+
+  test("交接上传清理会保留已挂载照片并删除孤儿文件", async () => {
+    const referenced = "cloud://env/handover-images/booking_1/pickup/front.jpg"
+    const orphan = "cloud://env/handover-images/booking_1/pickup/orphan.jpg"
+    const mocks = createMockDb({
+      rolesData: [{ role: "admin" }],
+      handoverData: [{ photos: [{ angle: "front", fileId: referenced }] }],
+      queueData: [{
+        _id: "queue_handover",
+        fileList: [referenced, orphan],
+        context: { bookingId: "booking_1", stage: "pickup" },
+        source: "bookingHandoverUploadCleanup",
+        notBeforeAt: new Date(Date.now() - 1000)
+      }]
+    })
+    const mod = await loadFunctionWith({ openid: "admin_openid", mockDb: mocks.db })
+    const cloud = require("wx-server-sdk")
+    cloud.deleteFile.mockResolvedValue({ fileList: [] })
+
+    const res = await mod.main()
+
+    expect(mocks.handoverWhere).toHaveBeenCalledWith({ bookingId: "booking_1" })
+    expect(mocks.handoverField).toHaveBeenCalledWith({ photos: true })
+    expect(cloud.deleteFile).toHaveBeenCalledWith({ fileList: [orphan] })
+    expect(res).toMatchObject({ deleted: 1, preserved: 1 })
   })
 
   test("非管理员不能处理存储清理队列", async () => {

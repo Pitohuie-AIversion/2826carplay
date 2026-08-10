@@ -16,10 +16,13 @@ const ALLOWED_EVENTS = [
   "favorite_add",
   "pricing_view",
   "rental_rules_view",
+  "trusted_profile_view",
   "phone_call",
   "share",
   "availability_available",
   "availability_conflict",
+  "availability_shortage",
+  "price_change_view",
   "availability_unknown"
 ]
 const OPTIONAL_VEHICLE_EVENTS = ["phone_call", "share"]

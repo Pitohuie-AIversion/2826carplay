@@ -52,6 +52,12 @@ describe("cloudfunctions/bookingMyDetail integration", () => {
         note: "尽快联系",
         latestQuoteId: "",
         latestQuoteVersion: 0,
+        latestPickupHandoverId: "",
+        latestPickupHandoverVersion: 0,
+        latestReturnHandoverId: "",
+        latestReturnHandoverVersion: 0,
+        pickupHandoverConfirmedAt: "",
+        returnHandoverConfirmedAt: "",
         quotedAt: "",
         confirmedAt: "",
         adjustmentRequestedAt: "",
@@ -59,7 +65,8 @@ describe("cloudfunctions/bookingMyDetail integration", () => {
         createdAt: "2026-07-18T10:00:00.000Z",
         updatedAt: "2026-07-18T11:00:00.000Z"
       },
-      latestQuote: null
+      latestQuote: null,
+      handovers: { pickup: null, return: null }
     })
 
     const mod = await loadBookingMyDetailWith({ openid: "user_openid", mockDb: mocks.db })
@@ -80,6 +87,12 @@ describe("cloudfunctions/bookingMyDetail integration", () => {
         note: "尽快联系",
         latestQuoteId: "",
         latestQuoteVersion: 0,
+        latestPickupHandoverId: "",
+        latestPickupHandoverVersion: 0,
+        latestReturnHandoverId: "",
+        latestReturnHandoverVersion: 0,
+        pickupHandoverConfirmedAt: "",
+        returnHandoverConfirmedAt: "",
         quotedAt: "",
         confirmedAt: "",
         adjustmentRequestedAt: "",
@@ -87,7 +100,8 @@ describe("cloudfunctions/bookingMyDetail integration", () => {
         createdAt: "2026-07-18T10:00:00.000Z",
         updatedAt: "2026-07-18T11:00:00.000Z"
       },
-      latestQuote: null
+      latestQuote: null,
+      handovers: { pickup: null, return: null }
     })
     expect(mocks.doc).toHaveBeenCalledWith("booking_1")
     const fields = mocks.field.mock.calls[0][0]

@@ -241,6 +241,27 @@
     <view wx:elif="{{latestQuote.status === 'expired'}}" class="quote-response-state">当前报价已失效，请联系顾问重新报价。</view>
   </view>
 
+  <view wx:if="{{handovers.pickup.id || handovers.return.id}}" class="customer-handover-card ui-card">
+    <view class="section-heading">
+      <view><view class="section-kicker">VEHICLE HANDOVER</view><view class="section-title">车辆交接记录</view></view>
+      <view class="section-index">核对现状</view>
+    </view>
+    <view class="handover-boundary">确认仅表示你核对了页面展示的车辆现状，不是电子签章、合同签署、自动定损、扣款或维修报价。</view>
+    <view class="customer-handover-record" wx:for="{{handoverList}}" wx:key="id">
+      <view class="handover-record-head"><text>{{item.stageText}}记录 v{{item.version}}</text><text class="handover-status handover-status-{{item.status}}">{{item.statusText}}</text></view>
+      <view class="handover-record-meta">{{item.mileageKm}} km · {{item.energyText}} · {{item.submittedAtText || '—'}}</view>
+      <view class="handover-record-note"><text>已知损伤</text><view>{{item.damageNote || '—'}}</view></view>
+      <view wx:if="{{item.additionalNote}}" class="handover-record-note"><text>补充说明</text><view>{{item.additionalNote}}</view></view>
+      <view wx:if="{{item.photos.length}}" class="customer-handover-photos">
+        <image wx:for="{{item.photos}}" wx:for-item="photo" wx:key="angle" src="{{photo.url}}" mode="aspectFill" lazy-load="{{true}}" fade-in="{{true}}" binderror="handleHandoverImageError" data-stage="{{item.stage}}" data-url="{{photo.url}}" bindtap="handlePreviewHandoverPhoto" hover-class="detail-action-pressed" aria-role="button" />
+      </view>
+      <button wx:if="{{item.status === 'submitted'}}" class="ui-btn ui-btn-primary handover-confirm-btn" loading="{{handoverResponding}}" disabled="{{loading || handoverResponding}}" data-stage="{{item.stage}}" bindtap="handleConfirmHandover">我已核对{{item.stageText}}记录</button>
+      <view wx:if="{{item.confirmedAtText}}" class="handover-confirmed-time">已于 {{item.confirmedAtText}} 完成内容核对</view>
+    </view>
+    <button class="ui-btn ui-btn-danger-ghost emergency-call-btn" bindtap="handleEmergencyCall">一键拨打救援 / 紧急联系电话</button>
+    <view class="emergency-boundary">电话将接通人工服务渠道；本页面不提供实时调度、定位跟踪或到达时间承诺。紧急人身危险请直接拨打 110 / 119 / 120。</view>
+  </view>
+
   <view wx:if="{{booking.note && !editing}}" class="note-card ui-card">
     <view class="section-heading">
       <view>

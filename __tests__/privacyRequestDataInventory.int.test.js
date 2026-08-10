@@ -21,6 +21,7 @@ function createMockDb({
   request,
   bookings = [],
   quotes = [],
+  handovers = [],
   favorites = [],
   privacyRequests = [],
   unavailable = []
@@ -47,6 +48,17 @@ function createMockDb({
           ? jest.fn().mockRejectedValue(new Error("collection not found"))
           : jest.fn().mockResolvedValue({
               data: quotes.filter((item) => item.bookingId === filter.bookingId).slice(0, limit)
+            })
+      }))
+    }))
+  }))
+  const handoversWhere = jest.fn((filter) => ({
+    field: jest.fn(() => ({
+      limit: jest.fn((limit) => ({
+        get: unavailable.includes("booking_handovers")
+          ? jest.fn().mockRejectedValue(new Error("collection not found"))
+          : jest.fn().mockResolvedValue({
+              data: handovers.filter((item) => item.bookingId === filter.bookingId).slice(0, limit)
             })
       }))
     }))
@@ -80,6 +92,9 @@ function createMockDb({
     }
     if (name === "booking_quotes") {
       return { where: quotesWhere }
+    }
+    if (name === "booking_handovers") {
+      return { where: handoversWhere }
     }
     if (name === "privacy_requests") {
       return {
@@ -161,6 +176,20 @@ describe("cloudfunctions/privacyRequestDataInventory integration", () => {
           createdAt: "2026-07-21T01:00:00.000Z"
         }
       ],
+      handovers: [{
+        _id: "booking_1__pickup__v1",
+        bookingId: "booking_1",
+        stage: "pickup",
+        version: 1,
+        status: "confirmed",
+        mileageKm: 12000,
+        energyType: "fuel",
+        energyLevelPercent: 80,
+        damageNote: "未发现已知损伤",
+        additionalNote: "钥匙一把",
+        photos: [{ fileId: "cloud://private-photo" }],
+        createdAt: "2026-07-21T02:00:00.000Z"
+      }],
       favorites: [
         {
           _id: "favorite_1",
@@ -188,6 +217,13 @@ describe("cloudfunctions/privacyRequestDataInventory integration", () => {
     expect(res.partial).toBe(false)
     expect(res.categories.bookings.count).toBe(1)
     expect(res.categories.quotes.count).toBe(1)
+    expect(res.categories.handovers.count).toBe(1)
+    expect(res.categories.handovers.list[0]).toMatchObject({
+      id: "booking_1__pickup__v1",
+      mileageKm: 12000,
+      damageNote: "未发现已知损伤"
+    })
+    expect(res.categories.handovers.list[0]).not.toHaveProperty("photos")
     expect(res.categories.quotes.list[0]).toMatchObject({
       id: "quote_1",
       totalCents: 128000,

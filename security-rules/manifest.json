@@ -5,6 +5,7 @@
       "analytics_events",
       "app_configs",
       "audit_logs",
+      "booking_handovers",
       "booking_quotes",
       "bookings",
       "error_logs",
@@ -12,12 +13,16 @@
       "pending_file_deletions",
       "privacy_requests",
       "roles",
+      "vehicle_availability_blocks",
+      "vehicle_calendar_days",
+      "vehicle_price_rules",
       "vehicles"
     ]
   },
   "storage": {
     "ruleFile": "storage.json",
     "publicReadPrefix": "vehicle-images/",
+    "privateUploadPrefix": "handover-images/",
     "maxUploadBytes": 10485760,
     "allowedImageExtensions": ["jpg", "jpeg", "png", "webp"]
   },

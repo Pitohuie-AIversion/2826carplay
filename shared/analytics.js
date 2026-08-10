@@ -10,6 +10,8 @@ const ALLOWED_EVENTS = [
   "share",
   "availability_available",
   "availability_conflict",
+  "availability_shortage",
+  "price_change_view",
   "availability_unknown"
 ]
 const TRACK_COOLDOWN_MS = 5000

@@ -89,6 +89,9 @@ function formatDetail(detail) {
   const imageList = Array.isArray(detail.imageList) ? detail.imageList.filter(Boolean) : []
   const coverImage =
     detail.coverImage && imageList.includes(detail.coverImage) ? detail.coverImage : imageList[0] || ""
+  const archiveHealth = detail.archiveHealth && typeof detail.archiveHealth === "object"
+    ? detail.archiveHealth
+    : { status: "missing", statusText: "资料缺失", missingCount: 6, freshnessDays: null }
 
   return {
     ...detail,
@@ -110,6 +113,24 @@ function formatDetail(detail) {
     engineNumberText: detail.engineNumber || "—",
     publicDescriptionText: detail.publicDescription || "—",
     noteText: detail.note || "—",
+    archiveHealth: {
+      ...archiveHealth,
+      statusClass: `archive-health-${archiveHealth.status || "missing"}`,
+      freshnessText: Number.isInteger(archiveHealth.freshnessDays)
+        ? `${archiveHealth.freshnessDays} 天前更新`
+        : "暂无有效更新日期"
+    },
+    publicMaterialsUpdatedDateText: detail.publicMaterialsUpdatedDate || "待补充",
+    publicInspectionDateText: detail.publicInspectionDate || "待补充",
+    publicInspectionSummaryText: detail.publicInspectionSummary || "待补充",
+    publicExteriorSummaryText: detail.publicExteriorSummary || "待补充",
+    publicInsuranceSummaryText: detail.publicInsuranceSummary || "待补充",
+    publicAssistanceSummaryText: detail.publicAssistanceSummary || "待补充",
+    publicArchiveReviewStatusText: detail.publicArchiveReviewStatus === "reviewed" ? "已复核" : "待复核",
+    internalMaintenanceRecordText: detail.internalMaintenanceRecord || "—",
+    internalInspectionRecordText: detail.internalInspectionRecord || "—",
+    internalInsuranceRecordText: detail.internalInsuranceRecord || "—",
+    internalArchiveNoteText: detail.internalArchiveNote || "—",
     createdByOpenidText: detail.createdByOpenid || "—"
   }
 }

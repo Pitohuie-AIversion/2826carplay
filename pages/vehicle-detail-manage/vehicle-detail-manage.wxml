@@ -189,8 +189,29 @@
     </view>
 
     <view class="section-card ui-card">
+      <view class="note-heading">
+        <view><view class="detail-section-kicker">TRUST PROFILE</view><view class="section-title">公开可信档案</view></view>
+        <view class="archive-health-chip {{detail.archiveHealth.statusClass}}">{{detail.archiveHealth.statusText}}</view>
+      </view>
+      <view class="detail-section-desc">{{detail.archiveHealth.freshnessText}} · 缺失 {{detail.archiveHealth.missingCount}} 项；“已复核”不代表第三方认证。</view>
+      <view class="info-grid">
+        <view class="info-item"><view class="info-item-inner"><view class="info-label">实拍/资料更新</view><view class="info-value">{{detail.publicMaterialsUpdatedDateText}}</view></view></view>
+        <view class="info-item"><view class="info-item-inner"><view class="info-label">最近保养/检查</view><view class="info-value">{{detail.publicInspectionDateText}}</view></view></view>
+        <view class="info-item"><view class="info-item-inner"><view class="info-label">人工复核状态</view><view class="info-value">{{detail.publicArchiveReviewStatusText}}</view></view></view>
+      </view>
+      <view class="note-box"><view class="info-label">保养/检查摘要</view>{{detail.publicInspectionSummaryText}}</view>
+      <view class="note-box"><view class="info-label">已知外观情况</view>{{detail.publicExteriorSummaryText}}</view>
+      <view class="note-box"><view class="info-label">商业保险摘要</view>{{detail.publicInsuranceSummaryText}}</view>
+      <view class="note-box"><view class="info-label">救援能力摘要</view>{{detail.publicAssistanceSummaryText}}</view>
+    </view>
+
+    <view class="section-card ui-card">
       <view class="note-heading"><view><view class="detail-section-kicker">PRIVATE NOTE</view><view class="section-title">内部备注</view></view><view class="visibility-chip visibility-chip-private"><view class="visibility-lock-icon" aria-hidden="true"><view class="visibility-lock-shackle"></view></view><text>仅后台可见</text></view></view>
       <view class="note-box">{{detail.noteText}}</view>
+      <view class="note-box"><view class="info-label">内部保养记录</view>{{detail.internalMaintenanceRecordText}}</view>
+      <view class="note-box"><view class="info-label">内部检查记录</view>{{detail.internalInspectionRecordText}}</view>
+      <view class="note-box"><view class="info-label">内部保险记录</view>{{detail.internalInsuranceRecordText}}</view>
+      <view class="note-box"><view class="info-label">内部档案说明</view>{{detail.internalArchiveNoteText}}</view>
     </view>
 
     <view class="section-card ui-card">

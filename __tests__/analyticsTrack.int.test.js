@@ -106,6 +106,15 @@ describe("cloudfunctions/analyticsTrack integration", () => {
     expect(missingVehicle.code).toBe("VALIDATION_ERROR")
     expect(pricingMocks.set).not.toHaveBeenCalled()
 
+    const trustMocks = loadModule("user_trust")
+    const trustMissingVehicle = await trustMocks.mod.main({ eventType: "trusted_profile_view" })
+    expect(trustMissingVehicle.code).toBe("VALIDATION_ERROR")
+    const trustResult = await trustMocks.mod.main({
+      eventType: "trusted_profile_view",
+      vehicleId: "vehicle_1"
+    })
+    expect(trustResult).toEqual({ ok: true })
+
     const phoneMocks = loadModule("user_phone")
     const phoneResult = await phoneMocks.mod.main({ eventType: "phone_call" })
     expect(phoneResult).toEqual({ ok: true })

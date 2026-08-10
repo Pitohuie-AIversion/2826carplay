@@ -110,6 +110,19 @@
       </view>
     </view>
 
+    <view class="archive-dashboard">
+      <view class="ratio-head">
+        <view class="dashboard-title">可信档案新鲜度</view>
+        <view class="dashboard-desc">超过 180 天标记过期；缺失或待复核均需处理</view>
+      </view>
+      <view class="archive-summary-grid">
+        <view wx:for="{{archiveSummaryItems}}" wx:key="key" class="archive-summary-item {{item.className}}">
+          <view class="archive-summary-value">{{item.value}}</view>
+          <view class="archive-summary-label">{{item.label}}</view>
+        </view>
+      </view>
+    </view>
+
     <view class="recent-block">
       <view class="recent-head">
         <view class="dashboard-title">近 7 天新增车辆</view>
@@ -189,6 +202,10 @@
           <view class="media-health {{item.mediaStatusClass}}">
             <view class="media-health-head"><view class="media-health-copy"><view class="media-health-icon" aria-hidden="true"></view><text>展示素材</text></view><view class="media-health-status">{{item.mediaStatusText}}</view></view>
             <view class="media-health-track"><view class="media-health-fill" style="width: {{item.mediaProgress}}%;"></view></view>
+          </view>
+          <view class="archive-health-row">
+            <view class="archive-health-copy"><view class="archive-health-title">可信档案</view><view class="archive-health-meta">{{item.archiveHealthMeta}}</view></view>
+            <view class="archive-health-chip {{item.archiveStatusClass}}">{{item.archiveStatusText}}</view>
           </view>
         </view>
       </view>

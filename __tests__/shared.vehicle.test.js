@@ -198,4 +198,48 @@ describe("shared/vehicle.js validateVehicle", () => {
       note: ""
     })
   })
+
+  test("可信档案字段区分公开摘要与内部记录并执行长度和日期校验", () => {
+    const valid = validateVehicle({
+      plateNumber: "京A12345",
+      vehicleType: "sedan",
+      brandModel: "Toyota",
+      registerDate: "2026-07-08",
+      status: "idle",
+      publicMaterialsUpdatedDate: "2026-07-01",
+      publicInspectionDate: "2026-06-30",
+      publicInspectionSummary: "已完成常规检查",
+      publicExteriorSummary: "右前轮毂有轻微使用痕迹",
+      publicInsuranceSummary: "商业保险范围以有效保单为准",
+      publicAssistanceSummary: "支持人工协调道路救援",
+      publicArchiveReviewStatus: "reviewed",
+      internalMaintenanceRecord: "内部工单编号 M-001",
+      internalArchiveNote: "内部复核说明"
+    })
+
+    expect(valid.ok).toBe(true)
+    expect(valid.value.publicInspectionSummary).toBe("已完成常规检查")
+    expect(valid.value.internalMaintenanceRecord).toBe("内部工单编号 M-001")
+
+    const invalid = validateVehicle({
+      plateNumber: "京A12345",
+      vehicleType: "sedan",
+      brandModel: "Toyota",
+      registerDate: "2026-07-08",
+      status: "idle",
+      publicMaterialsUpdatedDate: "2026-07-09",
+      publicArchiveReviewStatus: "certified",
+      publicExteriorSummary: "x".repeat(201),
+      internalArchiveNote: "x".repeat(501)
+    })
+    expect(invalid.ok).toBe(false)
+    expect(invalid.details.errors.map((item) => item.field)).toEqual(
+      expect.arrayContaining([
+        "publicMaterialsUpdatedDate",
+        "publicArchiveReviewStatus",
+        "publicExteriorSummary",
+        "internalArchiveNote"
+      ])
+    )
+  })
 })

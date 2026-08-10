@@ -1,10 +1,13 @@
 const cloud = require("wx-server-sdk")
+const crypto = require("crypto")
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
-const BOOKING_FIELDS = { _id: true, openid: true, status: true, latestQuoteId: true }
+const BOOKING_FIELDS = { _id: true, openid: true, status: true, latestQuoteId: true, vehicleId: true, vehicleName: true, startDate: true, endDate: true }
 const QUOTE_FIELDS = { _id: true, bookingId: true, status: true, validUntil: true, version: true, sentAt: true, confirmedAt: true, adjustmentRequestedAt: true }
+const VEHICLE_FIELDS = { status: true, brandModel: true, plateNumber: true }
+const MAX_OCCUPANCY_DAYS = 90
 
 function createError(code, message, details) {
   const result = { ok: false, code: String(code || "VALIDATION_ERROR"), message: String(message || "参数校验失败") }
@@ -24,6 +27,24 @@ function normalizeEvent(event) {
 
 function todayInChina() {
   return new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10)
+}
+
+function enumerateDates(startDate, endDate) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(startDate || "")) || !/^\d{4}-\d{2}-\d{2}$/.test(String(endDate || "")) || endDate < startDate) return []
+  const dates = []
+  const end = Date.parse(`${endDate}T00:00:00.000Z`)
+  for (let time = Date.parse(`${startDate}T00:00:00.000Z`); time <= end && dates.length <= MAX_OCCUPANCY_DAYS; time += 86400000) {
+    dates.push(new Date(time).toISOString().slice(0, 10))
+  }
+  return dates
+}
+
+function hashId(value) {
+  return crypto.createHash("sha256").update(String(value || "")).digest("hex").slice(0, 24)
+}
+
+function dayDocumentId(vehicleId, date) {
+  return `day_${hashId(vehicleId)}_${String(date || "").replace(/-/g, "")}`
 }
 
 function documentMissing(error) {
@@ -86,6 +107,34 @@ exports.main = async (event) => {
         return { expired: true, quote }
       }
 
+      let occupancy = null
+      if (input.action === "confirm") {
+        const vehicleId = String(booking.vehicleId || "").trim()
+        const dates = enumerateDates(String(booking.startDate || ""), String(booking.endDate || booking.startDate || ""))
+        if (!vehicleId || !dates.length || dates.length > MAX_OCCUPANCY_DAYS) {
+          return { error: createError("BOOKING_DATES_INVALID", "预约车辆或日期无效，请联系顾问调整后重试") }
+        }
+        const vehicle = await getDocOrNull(transaction.collection("vehicles"), vehicleId, VEHICLE_FIELDS)
+        if (!vehicle) return { error: createError("VEHICLE_NOT_FOUND", "预约车辆已删除，不能确认档期") }
+        if (["maintenance", "retired"].includes(String(vehicle.status || ""))) {
+          return { error: createError("VEHICLE_NOT_OCCUPIABLE", "车辆维修或已停用，不能确认档期") }
+        }
+        for (const date of dates) {
+          const occupied = await getDocOrNull(transaction.collection("vehicle_calendar_days"), dayDocumentId(vehicleId, date), { blockId: true, bookingId: true, kind: true })
+          if (occupied && String(occupied.bookingId || "") !== input.bookingId) {
+            return { error: createError("AVAILABILITY_CONFLICT", `${date} 已被占用，请联系顾问调整日期`, { date }) }
+          }
+        }
+        occupancy = {
+          id: `booking_${hashId(input.bookingId)}`,
+          vehicleId,
+          vehicleName: String(booking.vehicleName || vehicle.brandModel || vehicle.plateNumber || "车辆"),
+          startDate: String(booking.startDate || ""),
+          endDate: String(booking.endDate || booking.startDate || ""),
+          dates
+        }
+      }
+
       const quoteUpdate = input.action === "confirm"
         ? { status: "confirmed", responseStatus: "confirmed", confirmedAt: db.serverDate(), updatedAt: db.serverDate() }
         : { status: "adjustment_requested", responseStatus: "adjustment_requested", adjustmentNote: input.adjustmentNote, adjustmentRequestedAt: db.serverDate(), updatedAt: db.serverDate() }
@@ -94,6 +143,32 @@ exports.main = async (event) => {
         : { status: "adjustment_requested", adjustmentRequestedAt: db.serverDate(), updatedAt: db.serverDate() }
       await transaction.collection("booking_quotes").doc(input.quoteId).update({ data: quoteUpdate })
       await transaction.collection("bookings").doc(input.bookingId).update({ data: bookingUpdate })
+      if (occupancy) {
+        await transaction.collection("vehicle_availability_blocks").doc(occupancy.id).set({ data: {
+          vehicleId: occupancy.vehicleId,
+          vehicleName: occupancy.vehicleName,
+          kind: "booking",
+          bookingId: input.bookingId,
+          startDate: occupancy.startDate,
+          endDate: occupancy.endDate,
+          reason: "用户确认有效报价",
+          status: "active",
+          version: 1,
+          createdAt: db.serverDate(),
+          updatedAt: db.serverDate()
+        } })
+        for (const date of occupancy.dates) {
+          await transaction.collection("vehicle_calendar_days").doc(dayDocumentId(occupancy.vehicleId, date)).set({ data: {
+            vehicleId: occupancy.vehicleId,
+            date,
+            blockId: occupancy.id,
+            kind: "booking",
+            bookingId: input.bookingId,
+            createdAt: db.serverDate(),
+            updatedAt: db.serverDate()
+          } })
+        }
+      }
       return { duplicate: false, targetStatus, quote }
     })
 

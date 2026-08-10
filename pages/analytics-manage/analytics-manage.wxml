@@ -148,6 +148,24 @@
     <view class="section-card ui-card">
       <view class="section-heading">
         <view>
+          <view class="section-eyebrow">TRUST PROFILE</view>
+          <view class="section-title">可信档案转化</view>
+        </view>
+        <view class="section-index">04</view>
+      </view>
+      <view class="decision-grid">
+        <view class="decision-item" wx:for="{{trustProfileMetricItems}}" wx:key="key">
+          <view class="decision-label">{{item.label}}</view>
+          <view class="decision-value">{{item.value}}</view>
+          <view class="decision-meta">{{item.meta}}</view>
+        </view>
+      </view>
+      <view class="decision-note">比率为同周期匿名事件汇总，不用于识别或追踪单个用户。</view>
+    </view>
+
+    <view class="section-card ui-card">
+      <view class="section-heading">
+        <view>
           <view class="section-eyebrow">ACTIVITY TREND</view>
           <view class="section-title">每日行为趋势</view>
         </view>
@@ -182,7 +200,7 @@
           <view class="rank-number">{{index + 1}}</view>
           <view class="rank-copy">
             <view class="rank-name">{{item.name}}</view>
-            <view class="rank-meta">详情 {{item.detailViews}} · 费用 {{item.pricingViews}} · 预约 {{item.bookingStarts}} · 收藏 {{item.favorites}}</view>
+            <view class="rank-meta">详情 {{item.detailViews}} · 档案 {{item.trustProfileViews}} · 费用 {{item.pricingViews}} · 预约 {{item.bookingStarts}} · 收藏 {{item.favorites}}</view>
           </view>
           <view class="rank-score">{{item.score}}</view>
         </view>

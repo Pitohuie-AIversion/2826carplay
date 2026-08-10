@@ -18,6 +18,9 @@ const BOOKING_CALENDAR_FIELDS = {
   endDate: true,
   status: true
 }
+const BLOCK_FIELDS = { _id: true, vehicleId: true, vehicleName: true, kind: true, bookingId: true, startDate: true, endDate: true, reason: true, status: true, version: true }
+const PRICE_RULE_FIELDS = { _id: true, vehicleId: true, vehicleName: true, label: true, startDate: true, endDate: true, dailyPrice: true, reason: true, status: true, version: true }
+const VEHICLE_FIELDS = { _id: true, brandModel: true, plateNumber: true, status: true, priceDay: true }
 const BOOKING_BATCH_SIZE = 100
 const MAX_BOOKING_RECORDS = 2000
 
@@ -147,6 +150,27 @@ async function readBookings(monthStart, monthEnd) {
   }
 }
 
+async function readActiveRanges(collectionName, fields, monthStart, monthEnd) {
+  const res = await db.collection(collectionName).where({ status: "active" }).field(fields).limit(MAX_BOOKING_RECORDS).get()
+  const list = res && Array.isArray(res.data) ? res.data : []
+  return list.filter((item) => {
+    const startDate = String(item.startDate || "")
+    const endDate = String(item.endDate || item.startDate || "")
+    return startDate <= monthEnd && endDate >= monthStart
+  })
+}
+
+async function readVehicles() {
+  const res = await db.collection("vehicles").field(VEHICLE_FIELDS).limit(500).get()
+  const list = res && Array.isArray(res.data) ? res.data : []
+  return list.map((item) => ({
+    id: String(item._id || ""),
+    name: String(item.brandModel || item.plateNumber || "车辆"),
+    status: String(item.status || ""),
+    priceDay: Number.isInteger(item.priceDay) ? item.priceDay : 0
+  })).sort((a, b) => a.name.localeCompare(b.name))
+}
+
 async function writeErrorLogBestEffort(payload) {
   try {
     await db.collection("error_logs").add({
@@ -172,7 +196,12 @@ exports.main = async (event) => {
     }
 
     const range = getMonthRange(month)
-    const records = await readBookings(range.monthStart, range.monthEnd)
+    const [records, rawBlocks, rawPriceRules, vehicles] = await Promise.all([
+      readBookings(range.monthStart, range.monthEnd),
+      readActiveRanges("vehicle_availability_blocks", BLOCK_FIELDS, range.monthStart, range.monthEnd),
+      readActiveRanges("vehicle_price_rules", PRICE_RULE_FIELDS, range.monthStart, range.monthEnd),
+      readVehicles()
+    ])
     const list = records.list
       .filter((item) => isActiveInRange(item, range.monthStart, range.monthEnd))
       .map((item) => ({
@@ -188,6 +217,29 @@ exports.main = async (event) => {
         return dateOrder || prev.vehicleName.localeCompare(next.vehicleName)
       })
 
+    const blocks = rawBlocks.map((item) => ({
+      id: String(item._id || ""),
+      vehicleId: String(item.vehicleId || ""),
+      vehicleName: String(item.vehicleName || "车辆"),
+      kind: String(item.kind || "unavailable"),
+      bookingId: String(item.bookingId || ""),
+      startDate: String(item.startDate || ""),
+      endDate: String(item.endDate || item.startDate || ""),
+      reason: String(item.reason || ""),
+      version: Number(item.version || 1)
+    })).sort((a, b) => a.startDate.localeCompare(b.startDate))
+    const priceRules = rawPriceRules.map((item) => ({
+      id: String(item._id || ""),
+      vehicleId: String(item.vehicleId || ""),
+      vehicleName: String(item.vehicleName || "车辆"),
+      label: String(item.label || "特殊日期价"),
+      startDate: String(item.startDate || ""),
+      endDate: String(item.endDate || item.startDate || ""),
+      dailyPrice: Number(item.dailyPrice || 0),
+      reason: String(item.reason || ""),
+      version: Number(item.version || 1)
+    })).sort((a, b) => a.startDate.localeCompare(b.startDate))
+
     return {
       ok: true,
       month,
@@ -195,7 +247,10 @@ exports.main = async (event) => {
       monthEnd: range.monthEnd,
       total: list.length,
       truncated: records.truncated,
-      list
+      list,
+      blocks,
+      priceRules,
+      vehicles
     }
   } catch (error) {
     await writeErrorLogBestEffort({

@@ -214,13 +214,68 @@
     <view class="form-card">
       <view class="section-heading">
         <view class="section-heading-main">
+          <view class="vehicle-section-glyph vehicle-section-glyph-rental" aria-hidden="true"><view class="vehicle-section-glyph-icon"></view></view>
+          <view>
+            <view class="section-kicker">TRUST PROFILE</view>
+            <view class="section-title">公开可信档案</view>
+          </view>
+        </view>
+        <view class="section-index">03</view>
+      </view>
+      <view class="form-divider"></view>
+      <view class="section-helper">以下摘要会公开展示；有缺失、超过 180 天或未经复核时，前台会如实标记。</view>
+
+      <view class="form-row">
+        <view class="field-group field-group-half">
+          <view class="field-label">实拍/资料更新</view>
+          <picker mode="date" end="{{today}}" value="{{form.publicMaterialsUpdatedDate}}" data-field="publicMaterialsUpdatedDate" disabled="{{isSubmitting}}" bindchange="handleArchiveDateChange" aria-label="选择实拍或资料更新日期">
+            <view class="picker-field {{form.publicMaterialsUpdatedDate ? '' : 'picker-field-placeholder'}}" hover-class="vehicle-picker-pressed"><text>{{form.publicMaterialsUpdatedDate || "选择日期"}}</text><view class="picker-arrow" aria-hidden="true"><view class="picker-chevron"></view></view></view>
+          </picker>
+        </view>
+        <view class="field-group field-group-half">
+          <view class="field-label">最近保养/检查</view>
+          <picker mode="date" end="{{today}}" value="{{form.publicInspectionDate}}" data-field="publicInspectionDate" disabled="{{isSubmitting}}" bindchange="handleArchiveDateChange" aria-label="选择最近保养或检查日期">
+            <view class="picker-field {{form.publicInspectionDate ? '' : 'picker-field-placeholder'}}" hover-class="vehicle-picker-pressed"><text>{{form.publicInspectionDate || "选择日期"}}</text><view class="picker-arrow" aria-hidden="true"><view class="picker-chevron"></view></view></view>
+          </picker>
+        </view>
+      </view>
+
+      <view class="field-group">
+        <view class="field-label">公开档案状态</view>
+        <picker range="{{archiveReviewLabels}}" value="{{archiveReviewIndex}}" disabled="{{isSubmitting}}" bindchange="handleArchiveReviewChange" aria-label="选择公开档案复核状态">
+          <view class="picker-field" hover-class="vehicle-picker-pressed"><text>{{archiveReviewLabel}}</text><view class="picker-arrow" aria-hidden="true"><view class="picker-chevron"></view></view></view>
+        </picker>
+        <view class="section-helper">“已复核”只表示运营人员核对过公开摘要，不代表平台或第三方认证。</view>
+      </view>
+
+      <view class="field-group">
+        <view class="field-label field-label-row"><text>保养/检查摘要</text><text class="field-counter">{{form.publicInspectionSummary.length}} / 200</text></view>
+        <textarea class="field-textarea" placeholder="公开说明最近保养或检查项目" placeholder-class="input-placeholder" value="{{form.publicInspectionSummary}}" maxlength="200" data-field="publicInspectionSummary" disabled="{{isSubmitting}}" bindinput="handleTextInput" aria-label="保养或检查摘要" />
+      </view>
+      <view class="field-group">
+        <view class="field-label field-label-row"><text>已知外观情况</text><text class="field-counter">{{form.publicExteriorSummary.length}} / 200</text></view>
+        <textarea class="field-textarea" placeholder="如实说明当前已知划痕、修复或无明显异常" placeholder-class="input-placeholder" value="{{form.publicExteriorSummary}}" maxlength="200" data-field="publicExteriorSummary" disabled="{{isSubmitting}}" bindinput="handleTextInput" aria-label="已知外观情况" />
+      </view>
+      <view class="field-group">
+        <view class="field-label field-label-row"><text>商业保险摘要</text><text class="field-counter">{{form.publicInsuranceSummary.length}} / 200</text></view>
+        <textarea class="field-textarea" placeholder="仅填写保障范围摘要，不上传或公开完整保单" placeholder-class="input-placeholder" value="{{form.publicInsuranceSummary}}" maxlength="200" data-field="publicInsuranceSummary" disabled="{{isSubmitting}}" bindinput="handleTextInput" aria-label="商业保险摘要" />
+      </view>
+      <view class="field-group">
+        <view class="field-label field-label-row"><text>救援能力摘要</text><text class="field-counter">{{form.publicAssistanceSummary.length}} / 200</text></view>
+        <textarea class="field-textarea" placeholder="说明可提供的道路救援或人工协助边界" placeholder-class="input-placeholder" value="{{form.publicAssistanceSummary}}" maxlength="200" data-field="publicAssistanceSummary" disabled="{{isSubmitting}}" bindinput="handleTextInput" aria-label="救援能力摘要" />
+      </view>
+    </view>
+
+    <view class="form-card">
+      <view class="section-heading">
+        <view class="section-heading-main">
           <view class="vehicle-section-glyph vehicle-section-glyph-archive" aria-hidden="true"><view class="vehicle-section-glyph-icon"></view></view>
           <view>
             <view class="section-kicker">ARCHIVE</view>
             <view class="section-title">档案与备注</view>
           </view>
         </view>
-        <view class="section-index">03</view>
+        <view class="section-index">04</view>
       </view>
       <view class="form-divider"></view>
       <view class="section-helper">选填信息 · 仅用于内部档案，不会在前台展示</view>
@@ -228,6 +283,23 @@
       <view class="field-group">
         <view class="field-label">VIN</view>
         <input class="field-input" placeholder="选填，最多 32 位" placeholder-class="input-placeholder" value="{{form.vin}}" maxlength="32" data-field="vin" disabled="{{isSubmitting}}" bindinput="handleTextInput" confirm-type="done" aria-label="车辆识别码 VIN" />
+      </view>
+
+      <view class="field-group">
+        <view class="field-label field-label-row"><text>内部保养记录</text><text class="field-counter">{{form.internalMaintenanceRecord.length}} / 500</text></view>
+        <textarea class="field-textarea" placeholder="仅后台可见，最多 500 字" placeholder-class="input-placeholder" value="{{form.internalMaintenanceRecord}}" maxlength="500" data-field="internalMaintenanceRecord" disabled="{{isSubmitting}}" bindinput="handleTextInput" aria-label="内部保养记录" />
+      </view>
+      <view class="field-group">
+        <view class="field-label field-label-row"><text>内部检查记录</text><text class="field-counter">{{form.internalInspectionRecord.length}} / 500</text></view>
+        <textarea class="field-textarea" placeholder="仅后台可见，最多 500 字" placeholder-class="input-placeholder" value="{{form.internalInspectionRecord}}" maxlength="500" data-field="internalInspectionRecord" disabled="{{isSubmitting}}" bindinput="handleTextInput" aria-label="内部检查记录" />
+      </view>
+      <view class="field-group">
+        <view class="field-label field-label-row"><text>内部保险记录</text><text class="field-counter">{{form.internalInsuranceRecord.length}} / 500</text></view>
+        <textarea class="field-textarea" placeholder="仅后台可见，最多 500 字" placeholder-class="input-placeholder" value="{{form.internalInsuranceRecord}}" maxlength="500" data-field="internalInsuranceRecord" disabled="{{isSubmitting}}" bindinput="handleTextInput" aria-label="内部保险记录" />
+      </view>
+      <view class="field-group">
+        <view class="field-label field-label-row"><text>内部档案说明</text><text class="field-counter">{{form.internalArchiveNote.length}} / 500</text></view>
+        <textarea class="field-textarea" placeholder="仅后台可见，最多 500 字" placeholder-class="input-placeholder" value="{{form.internalArchiveNote}}" maxlength="500" data-field="internalArchiveNote" disabled="{{isSubmitting}}" bindinput="handleTextInput" aria-label="内部档案说明" />
       </view>
 
       <view class="field-group">

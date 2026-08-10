@@ -1394,3 +1394,23 @@
 @media (max-width: 360px) {
   .quote-form-grid { grid-template-columns: 1fr; }
 }
+
+.handover-card { margin-top: 24rpx; }
+.handover-boundary, .handover-warning { margin-top: 18rpx; border-radius: 14rpx; padding: 18rpx; color: #aeb7c5; background: rgba(82, 143, 255, 0.08); font-size: 22rpx; line-height: 1.6; }
+.handover-warning { color: #f3cf96; background: rgba(229, 168, 79, 0.1); }
+.handover-tabs { display: flex; gap: 14rpx; margin: 24rpx 0; }
+.handover-tab { flex: 1; margin: 0; border: 1rpx solid rgba(255,255,255,.12); border-radius: 14rpx; color: #aab2bf; background: rgba(255,255,255,.03); font-size: 24rpx; }
+.handover-tab-active { border-color: rgba(82,143,255,.65); color: #fff; background: rgba(82,143,255,.16); }
+.handover-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18rpx; }
+.handover-photo-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12rpx; margin-top: 20rpx; }
+.handover-photo { height: 132rpx; margin: 0; padding: 0; overflow: hidden; border: 1rpx dashed rgba(255,255,255,.2); border-radius: 14rpx; background: rgba(255,255,255,.025); }
+.handover-photo-image { width: 100%; height: 132rpx; border-radius: 14rpx; background: #151a22; }
+.handover-photo-placeholder { display: flex; height: 100%; align-items: center; justify-content: center; flex-direction: column; color: #71809a; font-size: 32rpx; }
+.handover-photo-placeholder text { margin-top: 4rpx; font-size: 20rpx; }
+.handover-submit { margin-top: 24rpx; }
+.handover-history { margin-top: 28rpx; }
+.handover-record { margin-top: 14rpx; border: 1rpx solid rgba(255,255,255,.09); border-radius: 18rpx; padding: 20rpx; background: rgba(255,255,255,.025); }
+.handover-record-head { display: flex; justify-content: space-between; color: #eef2f8; font-size: 25rpx; font-weight: 600; }
+.handover-record-meta, .handover-record-note { margin-top: 12rpx; color: #9aa4b3; font-size: 22rpx; line-height: 1.55; }
+.handover-confirmed { margin-top: 12rpx; color: #84d3ae; font-size: 22rpx; }
+.handover-photo-grid-readonly image { display: block; }

@@ -367,6 +367,52 @@ describe("车辆新增与编辑表单体验", () => {
     expect(page.data.loadFailed).toBe(false)
   })
 
+  test("编辑页加载并维护公开可信摘要与内部档案字段", () => {
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn((options) => options.success({
+          result: {
+            ok: true,
+            detail: {
+              ...VALID_FORM,
+              publicMaterialsUpdatedDate: "2026-07-08",
+              publicInspectionDate: "2026-07-01",
+              publicInspectionSummary: "公开检查摘要",
+              publicExteriorSummary: "公开外观摘要",
+              publicInsuranceSummary: "公开保险摘要",
+              publicAssistanceSummary: "公开救援摘要",
+              publicArchiveReviewStatus: "reviewed",
+              internalMaintenanceRecord: "内部保养工单",
+              internalInspectionRecord: "内部检查记录",
+              internalInsuranceRecord: "内部保险索引",
+              internalArchiveNote: "内部说明"
+            }
+          }
+        }))
+      },
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition("../pages/vehicle-edit/vehicle-edit"))
+
+    page.fetchDetail("vehicle-trust")
+
+    expect(page.data.form).toMatchObject({
+      publicInspectionSummary: "公开检查摘要",
+      publicArchiveReviewStatus: "reviewed",
+      internalMaintenanceRecord: "内部保养工单",
+      internalInsuranceRecord: "内部保险索引"
+    })
+    expect(page.data.archiveReviewLabel).toBe("已复核")
+
+    page.handleArchiveReviewChange({ detail: { value: 0 } })
+    page.handleArchiveDateChange({
+      detail: { value: "2026-07-09" },
+      currentTarget: { dataset: { field: "publicInspectionDate" } }
+    })
+    expect(page.data.form.publicArchiveReviewStatus).toBe("pending")
+    expect(page.data.form.publicInspectionDate).toBe("2026-07-09")
+  })
+
   test("编辑保存超时后解锁按钮并忽略迟到成功回调", () => {
     jest.useFakeTimers()
     let requestOptions = null

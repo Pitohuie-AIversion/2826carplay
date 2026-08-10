@@ -45,6 +45,21 @@ function createMockDb({ rolesData, bookingData, rangeError = null }) {
       if (name === "bookings") {
         return createBookingQuery(0, false)
       }
+      if (["vehicle_availability_blocks", "vehicle_price_rules"].includes(name)) {
+        const chain = {
+          where: jest.fn(() => chain),
+          field: jest.fn(() => chain),
+          limit: jest.fn(() => ({ get: jest.fn().mockResolvedValue({ data: [] }) }))
+        }
+        return chain
+      }
+      if (name === "vehicles") {
+        const chain = {
+          field: jest.fn(() => chain),
+          limit: jest.fn(() => ({ get: jest.fn().mockResolvedValue({ data: [] }) }))
+        }
+        return chain
+      }
       if (name === "error_logs") {
         return { add: errorAdd }
       }

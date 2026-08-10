@@ -1,7 +1,12 @@
 const { formatToastTitle } = require("../../shared/uiFeedback")
 const { buildVehicleDisplayIdentity } = require("../../shared/vehicle")
 const { requestOperationConfig } = require("../../shared/operationConfigRequest")
-const { isPageCurrent } = require("../../shared/pageNativeAction")
+const {
+  beginPageNativeAction,
+  cancelPageNativeActions,
+  isPageNativeActionActive,
+  isPageCurrent
+} = require("../../shared/pageNativeAction")
 const BOOKING_DETAIL_LOAD_TIMEOUT_MS = 15 * 1000
 const BOOKING_DETAIL_MUTATION_TIMEOUT_MS = 12 * 1000
 const SUBSCRIPTION_REQUEST_TIMEOUT_MS = 15 * 1000
@@ -149,6 +154,21 @@ function normalizeQuote(item) {
   }
 }
 
+function normalizeHandover(item) {
+  if (!item || typeof item !== "object") return {}
+  const status = String(item.status || "")
+  return {
+    ...item,
+    id: String(item.id || ""),
+    stageText: item.stage === "return" ? "还车" : "取车",
+    statusText: { submitted: "待我核对", confirmed: "已核对", archived: "已归档" }[status] || status,
+    energyText: `${item.energyType === "electric" ? "电量" : "油量"} ${Math.max(0, Number(item.energyLevelPercent || 0))}%`,
+    submittedAtText: formatDisplayTime(item.submittedAt),
+    confirmedAtText: formatDisplayTime(item.confirmedAt),
+    photos: Array.isArray(item.photos) ? item.photos.filter((photo) => photo && photo.url) : []
+  }
+}
+
 function formatDisplayTime(value) {
   if (!value) {
     return ""
@@ -199,6 +219,8 @@ function normalizeBooking(item) {
     note: booking.note || "",
     latestQuoteId: booking.latestQuoteId || "",
     latestQuoteVersion: Math.max(0, Number(booking.latestQuoteVersion || 0)),
+    latestPickupHandoverId: booking.latestPickupHandoverId || "",
+    latestReturnHandoverId: booking.latestReturnHandoverId || "",
     status,
     createdAt: booking.createdAt || "",
     updatedAt: booking.updatedAt || ""
@@ -230,6 +252,10 @@ Page({
     subscriptionEnabled: false,
     subscriptionRequesting: false,
     quoteResponding: false,
+    handoverResponding: false,
+    handovers: { pickup: {}, return: {} },
+    handoverList: [],
+    servicePhone: "",
     latestQuote: {},
     adjustmentNote: "",
     editForm: {
@@ -294,12 +320,14 @@ Page({
       !this.data.subscriptionRequesting &&
       !this.data.cancelling &&
       !this.data.quoteResponding
+      && !this.data.handoverResponding
     ) {
       this.loadDetail()
     }
   },
 
   onUnload() {
+    cancelPageNativeActions(this)
     this._bookingDetailUnloaded = true
     this._cancelConfirmationSerial = Number(this._cancelConfirmationSerial || 0) + 1
     if (
@@ -319,6 +347,7 @@ Page({
     this._cancelRequestSerial = Number(this._cancelRequestSerial || 0) + 1
     this._subscriptionRequestId = Number(this._subscriptionRequestId || 0) + 1
     this._quoteResponseRequestId = Number(this._quoteResponseRequestId || 0) + 1
+    this._handoverResponseRequestId = Number(this._handoverResponseRequestId || 0) + 1
     this.cancelOperationConfigRequest()
     this.clearDetailLoadTimer()
     this.clearSaveRequestTimer()
@@ -327,8 +356,10 @@ Page({
     this.clearQuoteResponseTimer()
   },
 
-  applyBooking(booking, latestQuote) {
+  applyBooking(booking, latestQuote, handovers) {
     const quote = normalizeQuote(latestQuote)
+    const pickupHandover = normalizeHandover(handovers && handovers.pickup)
+    const returnHandover = normalizeHandover(handovers && handovers.return)
     this.setData({
       booking,
       initialLoading: false,
@@ -348,6 +379,12 @@ Page({
       cancelling: false,
       quoteResponding: false,
       latestQuote: quote,
+      handoverResponding: false,
+      handovers: {
+        pickup: pickupHandover,
+        return: returnHandover
+      },
+      handoverList: [pickupHandover, returnHandover].filter((item) => item.id),
       adjustmentNote: quote.status === "adjustment_requested" ? quote.adjustmentNote : "",
       editForm: {
         userName: booking.userName,
@@ -365,7 +402,8 @@ Page({
         const templateId = String(config.bookingStatusTemplateId || "").trim()
         this.setData({
           bookingStatusTemplateId: templateId,
-          subscriptionEnabled: Boolean(templateId)
+          subscriptionEnabled: Boolean(templateId),
+          servicePhone: String(config.servicePhone || "").trim()
         })
       }
     })
@@ -559,7 +597,7 @@ Page({
           return
         }
 
-        this.applyBooking(normalizeBooking(current), result.latestQuote)
+        this.applyBooking(normalizeBooking(current), result.latestQuote, result.handovers)
         this.setData({ loading: false })
       },
       fail: (error) => {
@@ -1034,6 +1072,81 @@ Page({
     }
     clearTimeout(this._subscriptionRequestTimer)
     this._subscriptionRequestTimer = null
+  },
+
+  handleConfirmHandover(event) {
+    if (this.data.loading || this.data.handoverResponding) return
+    const stage = String(event.currentTarget.dataset.stage || "")
+    const record = this.data.handovers && this.data.handovers[stage]
+    if (!record || !record.id || record.status !== "submitted") return
+    const modalAction = beginPageNativeAction(this, { exclusiveKey: "handover-confirmation" })
+    wx.showModal({
+      title: `核对${record.stageText}记录`,
+      content: "请确认页面中的照片、里程、油量/电量和说明与交接时所见一致。本操作仅为内容核对，不是电子签章或合同签署。",
+      confirmText: "确认已核对",
+      confirmColor: "#528fff",
+      success: (choice) => {
+        if (!isPageNativeActionActive(this, modalAction) || !choice || !choice.confirm) return
+        const requestId = Number(this._handoverResponseRequestId || 0) + 1
+        this._handoverResponseRequestId = requestId
+        this.setData({ handoverResponding: true })
+        wx.cloud.callFunction({
+          name: "bookingHandover",
+          data: { action: "confirm", bookingId: this.data.id, handoverId: record.id, stage },
+          success: (res) => {
+            if (this._handoverResponseRequestId !== requestId) return
+            const result = res && res.result
+            if (!result || !result.ok) {
+              wx.showToast({ title: formatToastTitle(result && result.message, "核对失败"), icon: "none" })
+              return
+            }
+            wx.showToast({ title: result.duplicate ? "已完成核对" : "交接记录已核对", icon: "none" })
+            this._reloadAfterHandoverResponse = true
+          },
+          fail: () => wx.showToast({ title: "核对失败，请重试", icon: "none" }),
+          complete: () => {
+            if (this._handoverResponseRequestId !== requestId) return
+            this.setData({ handoverResponding: false })
+            if (this._reloadAfterHandoverResponse) {
+              this._reloadAfterHandoverResponse = false
+              this.loadDetail()
+            }
+          }
+        })
+      }
+    })
+  },
+
+  handlePreviewHandoverPhoto(event) {
+    const stage = String(event.currentTarget.dataset.stage || "")
+    const current = String(event.currentTarget.dataset.url || "")
+    const record = this.data.handovers && this.data.handovers[stage]
+    const urls = record && Array.isArray(record.photos) ? record.photos.map((photo) => photo.url).filter(Boolean) : []
+    const action = beginPageNativeAction(this)
+    if (current && wx.previewImage) wx.previewImage({
+      current,
+      urls: urls.length ? urls : [current],
+      fail: () => {
+        if (isPageNativeActionActive(this, action)) wx.showToast({ title: "图片预览失败", icon: "none" })
+      }
+    })
+  },
+
+  handleHandoverImageError() {},
+
+  handleEmergencyCall() {
+    const phoneNumber = String(this.data.servicePhone || "").trim()
+    if (!/^\+?[0-9-]{6,20}$/.test(phoneNumber)) {
+      wx.showToast({ title: "救援电话暂不可用", icon: "none" })
+      return
+    }
+    const action = beginPageNativeAction(this)
+    wx.makePhoneCall({
+      phoneNumber,
+      fail: (error) => {
+        if (isPageNativeActionActive(this, action) && !String(error && error.errMsg || "").includes("cancel")) wx.showToast({ title: "拨号失败，请重试", icon: "none" })
+      }
+    })
   },
 
   handleRetryLoad() {

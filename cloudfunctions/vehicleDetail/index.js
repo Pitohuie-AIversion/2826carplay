@@ -26,11 +26,52 @@ const VEHICLE_MANAGE_DETAIL_FIELDS = {
   engineNumber: true,
   publicDescription: true,
   note: true,
+  publicMaterialsUpdatedDate: true,
+  publicInspectionDate: true,
+  publicInspectionSummary: true,
+  publicExteriorSummary: true,
+  publicInsuranceSummary: true,
+  publicAssistanceSummary: true,
+  publicArchiveReviewStatus: true,
+  internalMaintenanceRecord: true,
+  internalInspectionRecord: true,
+  internalInsuranceRecord: true,
+  internalArchiveNote: true,
   imageList: true,
   coverImage: true,
   createdByOpenid: true,
   createdAt: true,
   updatedAt: true
+}
+
+function buildArchiveHealth(item) {
+  const source = item && typeof item === "object" ? item : {}
+  const requiredValues = [
+    source.publicMaterialsUpdatedDate,
+    source.publicInspectionDate,
+    source.publicInspectionSummary,
+    source.publicExteriorSummary,
+    source.publicInsuranceSummary,
+    source.publicAssistanceSummary
+  ].map((value) => String(value || "").trim())
+  const missingCount = requiredValues.filter((value) => !value).length
+  const timestamps = [source.publicMaterialsUpdatedDate, source.publicInspectionDate]
+    .map((value) => new Date(`${String(value || "").trim()}T00:00:00+08:00`).getTime())
+    .filter((value) => Number.isFinite(value))
+  const latestTimestamp = timestamps.length ? Math.max(...timestamps) : 0
+  const freshnessDays = latestTimestamp
+    ? Math.max(0, Math.floor((Date.now() - latestTimestamp) / (24 * 60 * 60 * 1000)))
+    : null
+  if (missingCount) {
+    return { status: "missing", statusText: "资料缺失", missingCount, freshnessDays }
+  }
+  if (freshnessDays !== null && freshnessDays > 180) {
+    return { status: "stale", statusText: "资料已过期", missingCount, freshnessDays }
+  }
+  if (String(source.publicArchiveReviewStatus || "") !== "reviewed") {
+    return { status: "pending", statusText: "资料待复核", missingCount, freshnessDays }
+  }
+  return { status: "current", statusText: "资料已复核", missingCount, freshnessDays }
 }
 
 function createError(code, message, details) {
@@ -175,6 +216,18 @@ exports.main = async (event) => {
         engineNumber: item.engineNumber || "",
         publicDescription: item.publicDescription || "",
         note: item.note || "",
+        publicMaterialsUpdatedDate: item.publicMaterialsUpdatedDate || "",
+        publicInspectionDate: item.publicInspectionDate || "",
+        publicInspectionSummary: item.publicInspectionSummary || "",
+        publicExteriorSummary: item.publicExteriorSummary || "",
+        publicInsuranceSummary: item.publicInsuranceSummary || "",
+        publicAssistanceSummary: item.publicAssistanceSummary || "",
+        publicArchiveReviewStatus: item.publicArchiveReviewStatus || "pending",
+        internalMaintenanceRecord: item.internalMaintenanceRecord || "",
+        internalInspectionRecord: item.internalInspectionRecord || "",
+        internalInsuranceRecord: item.internalInsuranceRecord || "",
+        internalArchiveNote: item.internalArchiveNote || "",
+        archiveHealth: buildArchiveHealth(item),
         imageList: Array.isArray(item.imageList) ? item.imageList.filter(Boolean) : [],
         coverImage: item.coverImage || "",
         createdByOpenid: item.createdByOpenid || "",

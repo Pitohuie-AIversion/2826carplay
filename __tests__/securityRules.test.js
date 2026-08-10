@@ -16,6 +16,7 @@ describe("production security rules", () => {
       "analytics_events",
       "app_configs",
       "audit_logs",
+      "booking_handovers",
       "booking_quotes",
       "bookings",
       "error_logs",
@@ -23,6 +24,9 @@ describe("production security rules", () => {
       "pending_file_deletions",
       "privacy_requests",
       "roles",
+      "vehicle_availability_blocks",
+      "vehicle_calendar_days",
+      "vehicle_price_rules",
       "vehicles"
     ]
 

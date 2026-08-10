@@ -6,6 +6,22 @@ const TRANSMISSION_TYPES = ["manual", "automatic"]
 
 const FUEL_TYPES = ["gasoline", "electric", "hybrid"]
 
+const ARCHIVE_REVIEW_STATUSES = ["pending", "reviewed"]
+
+const PUBLIC_ARCHIVE_TEXT_FIELDS = [
+  "publicInspectionSummary",
+  "publicExteriorSummary",
+  "publicInsuranceSummary",
+  "publicAssistanceSummary"
+]
+
+const INTERNAL_ARCHIVE_TEXT_FIELDS = [
+  "internalMaintenanceRecord",
+  "internalInspectionRecord",
+  "internalInsuranceRecord",
+  "internalArchiveNote"
+]
+
 const REQUIRED_FIELDS = ["plateNumber", "vehicleType", "brandModel", "registerDate", "status"]
 
 const PROVINCES = "京津沪渝冀豫云辽黑湘皖鲁新苏浙赣鄂桂甘晋蒙陕吉闽贵粤青藏川宁琼"
@@ -158,6 +174,9 @@ function normalizeVehicleInput(input) {
   const engineNumber = normalizeOptionalTextField(payload, "engineNumber")
   const publicDescription = normalizeOptionalTextField(payload, "publicDescription")
   const note = normalizeOptionalTextField(payload, "note")
+  const publicMaterialsUpdatedDate = normalizeOptionalTextField(payload, "publicMaterialsUpdatedDate")
+  const publicInspectionDate = normalizeOptionalTextField(payload, "publicInspectionDate")
+  const publicArchiveReviewStatus = normalizeOptionalTextField(payload, "publicArchiveReviewStatus")
   const seats = normalizeOptionalIntField(payload, "seats")
   const priceDay = normalizeOptionalIntField(payload, "priceDay")
 
@@ -181,6 +200,21 @@ function normalizeVehicleInput(input) {
   if (note !== undefined) {
     normalized.note = note
   }
+  if (publicMaterialsUpdatedDate !== undefined) {
+    normalized.publicMaterialsUpdatedDate = publicMaterialsUpdatedDate
+  }
+  if (publicInspectionDate !== undefined) {
+    normalized.publicInspectionDate = publicInspectionDate
+  }
+  if (publicArchiveReviewStatus !== undefined) {
+    normalized.publicArchiveReviewStatus = publicArchiveReviewStatus
+  }
+  PUBLIC_ARCHIVE_TEXT_FIELDS.concat(INTERNAL_ARCHIVE_TEXT_FIELDS).forEach((field) => {
+    const value = normalizeOptionalTextField(payload, field)
+    if (value !== undefined) {
+      normalized[field] = value
+    }
+  })
   if (location !== undefined) {
     normalized.location = location
   }
@@ -306,6 +340,45 @@ function validateVehicle(input) {
     })
   }
 
+  ;["publicMaterialsUpdatedDate", "publicInspectionDate"].forEach((field) => {
+    if (!value[field]) {
+      return
+    }
+    const dateCheck = isValidYmdDate(value[field])
+    if (!dateCheck.ok) {
+      errors.push({
+        field,
+        message: dateCheck.reason === "FUTURE" ? "日期不得晚于今天" : "日期格式不合法（YYYY-MM-DD）",
+        value: value[field],
+        reason: dateCheck.reason
+      })
+    }
+  })
+
+  if (
+    value.publicArchiveReviewStatus &&
+    !ARCHIVE_REVIEW_STATUSES.includes(value.publicArchiveReviewStatus)
+  ) {
+    errors.push({
+      field: "publicArchiveReviewStatus",
+      message: "公开档案复核状态不合法",
+      value: value.publicArchiveReviewStatus,
+      allowed: ARCHIVE_REVIEW_STATUSES
+    })
+  }
+
+  PUBLIC_ARCHIVE_TEXT_FIELDS.forEach((field) => {
+    if (value[field] !== undefined && value[field].length > 200) {
+      errors.push({ field, message: "公开摘要长度不能超过 200", value: value[field] })
+    }
+  })
+
+  INTERNAL_ARCHIVE_TEXT_FIELDS.forEach((field) => {
+    if (value[field] !== undefined && value[field].length > 500) {
+      errors.push({ field, message: "内部记录长度不能超过 500", value: value[field] })
+    }
+  })
+
   if (value.location !== undefined) {
     if (value.location.length > 20) {
       errors.push({ field: "location", message: "城市长度不能超过 20", value: value.location })
@@ -336,6 +409,9 @@ module.exports = {
   VEHICLE_STATUSES,
   TRANSMISSION_TYPES,
   FUEL_TYPES,
+  ARCHIVE_REVIEW_STATUSES,
+  PUBLIC_ARCHIVE_TEXT_FIELDS,
+  INTERNAL_ARCHIVE_TEXT_FIELDS,
   REQUIRED_FIELDS,
   normalizePlateNumber,
   normalizeOptionalText,

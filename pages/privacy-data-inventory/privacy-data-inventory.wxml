@@ -110,10 +110,10 @@
       </view>
     </view>
 
-    <view class="inventory-progress-card ui-card {{inventoryStatusClass}}" aria-role="group" aria-label="数据核验覆盖 {{inventoryProgress}}%，{{verifiedCategoryCount}} / 4 类完整，{{inventoryStatusLabel}}">
+    <view class="inventory-progress-card ui-card {{inventoryStatusClass}}" aria-role="group" aria-label="数据核验覆盖 {{inventoryProgress}}%，{{verifiedCategoryCount}} / 5 类完整，{{inventoryStatusLabel}}">
       <view class="inventory-progress-head"><view><view class="section-eyebrow">VERIFICATION COVERAGE</view><view class="inventory-progress-title">核验覆盖</view></view><view class="inventory-status-pill"><view class="inventory-status-dot"></view>{{inventoryStatusLabel}}</view></view>
       <view class="inventory-progress-track" aria-hidden="true"><view class="inventory-progress-value" style="width: {{inventoryProgress}}%;"></view></view>
-      <view class="inventory-progress-foot"><view>{{verifiedCategoryCount}} / 4 类完整</view><view>共关联 {{totalRecordCount}} 条记录</view></view>
+      <view class="inventory-progress-foot"><view>{{verifiedCategoryCount}} / 5 类完整</view><view>共关联 {{totalRecordCount}} 条记录</view></view>
     </view>
 
     <view class="metric-grid">
@@ -135,12 +135,37 @@
         <view class="metric-label">报价记录</view>
         <view class="metric-state"><view class="metric-state-dot"></view>{{quotes.stateLabel}}</view>
       </view>
+      <view class="metric-card ui-card {{handovers.stateClass}}">
+        <view class="metric-native-icon {{handovers.iconClass}}" aria-hidden="true"></view>
+        <view class="metric-value">{{handovers.count}}{{handovers.truncated ? '+' : ''}}</view>
+        <view class="metric-label">交接记录</view>
+        <view class="metric-state"><view class="metric-state-dot"></view>{{handovers.stateLabel}}</view>
+      </view>
       <view class="metric-card ui-card {{privacyRequests.stateClass}}">
         <view class="metric-native-icon {{privacyRequests.iconClass}}" aria-hidden="true"></view>
         <view class="metric-value">{{privacyRequests.count}}{{privacyRequests.truncated ? '+' : ''}}</view>
         <view class="metric-label">隐私申请</view>
         <view class="metric-state"><view class="metric-state-dot"></view>{{privacyRequests.stateLabel}}</view>
       </view>
+    </view>
+
+    <view class="section-card ui-card">
+      <view class="section-heading">
+        <view class="section-heading-icon-wrap">
+          <view class="section-native-icon booking-section-native-icon" aria-hidden="true"></view>
+          <view><view class="section-eyebrow">HANDOVERS</view><view class="section-title">交接数据</view></view>
+        </view>
+        <view class="section-index">{{handovers.count}}{{handovers.truncated ? '+' : ''}}</view>
+      </view>
+      <view wx:if="{{handovers.list.length}}" class="record-list">
+        <view class="record-item" wx:for="{{handovers.list}}" wx:key="id">
+          <view class="record-head"><view class="record-title">{{item.stageLabel}} v{{item.version}} · {{item.mileageKm}} km</view><view class="record-status">{{item.status}}</view></view>
+          <view class="record-meta">{{item.energyLabel}} {{item.energyLevelPercent}}% · {{item.createdAtText}}</view>
+          <view class="record-note">已知损伤：{{item.damageNote || '—'}}</view>
+          <view wx:if="{{item.additionalNote}}" class="record-note">补充说明：{{item.additionalNote}}</view>
+        </view>
+      </view>
+      <view wx:else class="empty-text"><view class="inventory-empty-native-icon" aria-hidden="true"></view><text>未发现交接记录</text></view>
     </view>
 
     <view class="section-card ui-card">

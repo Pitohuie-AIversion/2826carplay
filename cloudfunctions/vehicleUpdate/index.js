@@ -25,7 +25,18 @@ const VEHICLE_UPDATE_FIELD_NAMES = [
   "publicDescription",
   "vin",
   "engineNumber",
-  "note"
+  "note",
+  "publicMaterialsUpdatedDate",
+  "publicInspectionDate",
+  "publicInspectionSummary",
+  "publicExteriorSummary",
+  "publicInsuranceSummary",
+  "publicAssistanceSummary",
+  "publicArchiveReviewStatus",
+  "internalMaintenanceRecord",
+  "internalInspectionRecord",
+  "internalInsuranceRecord",
+  "internalArchiveNote"
 ]
 const VEHICLE_UPDATE_CURRENT_FIELDS = VEHICLE_UPDATE_FIELD_NAMES.reduce(
   (fields, key) => ({ ...fields, [key]: true }),
@@ -175,7 +186,18 @@ function normalizeUpdateInput(event) {
     "publicDescription",
     "vin",
     "engineNumber",
-    "note"
+    "note",
+    "publicMaterialsUpdatedDate",
+    "publicInspectionDate",
+    "publicInspectionSummary",
+    "publicExteriorSummary",
+    "publicInsuranceSummary",
+    "publicAssistanceSummary",
+    "publicArchiveReviewStatus",
+    "internalMaintenanceRecord",
+    "internalInspectionRecord",
+    "internalInsuranceRecord",
+    "internalArchiveNote"
   ]
   optionalFields.forEach((field) => {
     if (Object.prototype.hasOwnProperty.call(payload, field)) {

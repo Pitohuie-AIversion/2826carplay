@@ -176,6 +176,31 @@ function buildMediaHealth(item) {
   }
 }
 
+function buildArchiveSummary(stats) {
+  const source = stats && typeof stats === "object" ? stats : {}
+  return [
+    { key: "current", label: "已复核", value: Number(source.current) || 0, className: "archive-summary-current" },
+    { key: "pending", label: "待复核", value: Number(source.pending) || 0, className: "archive-summary-pending" },
+    { key: "stale", label: "已过期", value: Number(source.stale) || 0, className: "archive-summary-stale" },
+    { key: "missing", label: "资料缺失", value: Number(source.missing) || 0, className: "archive-summary-missing" }
+  ]
+}
+
+function buildArchiveHealthView(item) {
+  const health = item && item.archiveHealth && typeof item.archiveHealth === "object"
+    ? item.archiveHealth
+    : { status: "missing", statusText: "资料缺失", missingCount: 6, freshnessDays: null }
+  return {
+    archiveStatus: health.status || "missing",
+    archiveStatusText: health.statusText || "资料缺失",
+    archiveStatusClass: `archive-health-${health.status || "missing"}`,
+    archiveUpdatedText: health.lastUpdatedDate || "暂无更新日期",
+    archiveHealthMeta: Number.isInteger(health.freshnessDays)
+      ? `${health.freshnessDays} 天前更新 · 缺失 ${Number(health.missingCount) || 0} 项`
+      : `暂无有效更新日期 · 缺失 ${Number(health.missingCount) || 0} 项`
+  }
+}
+
 function buildRecentAddedViewModel(list) {
   if (!Array.isArray(list)) {
     return []
@@ -207,6 +232,7 @@ Page({
     truncated: false,
     summaryItems: buildStatusSummary({}),
     statusRatioSegments: buildStatusRatioSegments({}),
+    archiveSummaryItems: buildArchiveSummary({}),
     recentAddedList: [],
     list: [],
     page: 0,
@@ -929,7 +955,8 @@ Page({
                 TRANSMISSION_LABEL_MAP[item.transmission] || (item.transmission ? String(item.transmission) : "—"),
               fuelTypeText: FUEL_TYPE_LABEL_MAP[item.fuelType] || (item.fuelType ? String(item.fuelType) : "—"),
               seatsText: Number.isInteger(item.seats) && item.seats > 0 ? `${item.seats} 座` : "—",
-              ...buildMediaHealth(item)
+              ...buildMediaHealth(item),
+              ...buildArchiveHealthView(item)
             }))
           : []
 
@@ -941,6 +968,7 @@ Page({
           truncated: Boolean(result.truncated),
           summaryItems: buildStatusSummary(result.dashboard || {}),
           statusRatioSegments: buildStatusRatioSegments(result.dashboard || {}),
+          archiveSummaryItems: buildArchiveSummary(result.archiveDashboard || {}),
           recentAddedList: buildRecentAddedViewModel(result.recentAddedList),
           page: Number.isInteger(result.page) ? result.page : nextPage,
           hasMore: Boolean(result.hasMore),

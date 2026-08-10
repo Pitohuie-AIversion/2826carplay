@@ -31,6 +31,12 @@ const BOOKING_MANAGE_DETAIL_FIELDS = {
   quotedAt: true,
   confirmedAt: true,
   adjustmentRequestedAt: true,
+  latestPickupHandoverId: true,
+  latestPickupHandoverVersion: true,
+  latestReturnHandoverId: true,
+  latestReturnHandoverVersion: true,
+  pickupHandoverConfirmedAt: true,
+  returnHandoverConfirmedAt: true,
   status: true,
   createdAt: true,
   updatedAt: true
@@ -74,6 +80,25 @@ const BOOKING_CONFLICT_FIELDS = {
   status: true,
   schedulePriority: true,
   coordinationStatus: true
+}
+const BOOKING_HANDOVER_DETAIL_FIELDS = {
+  _id: true,
+  bookingId: true,
+  stage: true,
+  version: true,
+  status: true,
+  mileageKm: true,
+  energyType: true,
+  energyLevelPercent: true,
+  damageNote: true,
+  additionalNote: true,
+  photos: true,
+  capturedAt: true,
+  submittedAt: true,
+  confirmedAt: true,
+  supersededAt: true,
+  archivedAt: true,
+  archivedPhotoCount: true
 }
 const CONFLICT_BATCH_SIZE = 100
 const MAX_CONFLICT_SCAN_RECORDS = 1000
@@ -231,6 +256,53 @@ async function readBookingQuotes(bookingId) {
     if (message.includes("Unexpected collection:") || message.includes("not exist")) {
       return { draft: null, history: [], unavailable: false }
     }
+    throw error
+  }
+}
+
+async function addHandoverPhotoUrls(records) {
+  const list = Array.isArray(records) ? records : []
+  const fileIds = [...new Set(list.flatMap((item) => Array.isArray(item.photos) ? item.photos.map((photo) => String(photo && photo.fileId || "").trim()) : []).filter(Boolean))]
+  const urlMap = new Map()
+  if (fileIds.length && typeof cloud.getTempFileURL === "function") {
+    try {
+      const result = await cloud.getTempFileURL({ fileList: fileIds })
+      ;(result && result.fileList || []).forEach((item) => {
+        const fileId = String(item && (item.fileID || item.fileId) || "").trim()
+        const url = String(item && item.tempFileURL || "").trim()
+        if (fileId && url && Number(item.status || 0) === 0) urlMap.set(fileId, url)
+      })
+    } catch (error) {}
+  }
+  return list.map((item) => ({
+    id: String(item._id || item.id || ""),
+    bookingId: String(item.bookingId || ""),
+    stage: String(item.stage || ""),
+    version: Math.max(0, Number(item.version || 0)),
+    status: String(item.status || ""),
+    mileageKm: Math.max(0, Number(item.mileageKm || 0)),
+    energyType: String(item.energyType || ""),
+    energyLevelPercent: Math.max(0, Number(item.energyLevelPercent || 0)),
+    damageNote: String(item.damageNote || ""),
+    additionalNote: String(item.additionalNote || ""),
+    photos: (Array.isArray(item.photos) ? item.photos : []).map((photo) => ({ angle: String(photo.angle || ""), url: urlMap.get(String(photo.fileId || "")) || "" })),
+    capturedAt: formatTime(item.capturedAt),
+    submittedAt: formatTime(item.submittedAt),
+    confirmedAt: formatTime(item.confirmedAt),
+    supersededAt: formatTime(item.supersededAt),
+    archivedAt: formatTime(item.archivedAt),
+    archivedPhotoCount: Math.max(0, Number(item.archivedPhotoCount || 0))
+  }))
+}
+
+async function readBookingHandovers(bookingId) {
+  try {
+    const res = await db.collection("booking_handovers").where({ bookingId }).field(BOOKING_HANDOVER_DETAIL_FIELDS).limit(40).get()
+    const list = await addHandoverPhotoUrls(res && Array.isArray(res.data) ? res.data : [])
+    return list.sort((left, right) => right.version - left.version || left.stage.localeCompare(right.stage))
+  } catch (error) {
+    const message = String(error && (error.message || error.errMsg) || error)
+    if (message.includes("Unexpected collection:") || message.includes("not exist")) return []
     throw error
   }
 }
@@ -423,6 +495,7 @@ exports.main = async (event) => {
 
     const conflictResult = await findBookingConflicts(item, id)
     const quoteResult = await readBookingQuotes(id)
+    const handoverHistory = await readBookingHandovers(id)
 
     return {
       ok: true,
@@ -454,6 +527,12 @@ exports.main = async (event) => {
         quotedAt: formatTime(item.quotedAt),
         confirmedAt: formatTime(item.confirmedAt),
         adjustmentRequestedAt: formatTime(item.adjustmentRequestedAt),
+        latestPickupHandoverId: item.latestPickupHandoverId || "",
+        latestPickupHandoverVersion: Math.max(0, Number(item.latestPickupHandoverVersion || 0)),
+        latestReturnHandoverId: item.latestReturnHandoverId || "",
+        latestReturnHandoverVersion: Math.max(0, Number(item.latestReturnHandoverVersion || 0)),
+        pickupHandoverConfirmedAt: formatTime(item.pickupHandoverConfirmedAt),
+        returnHandoverConfirmedAt: formatTime(item.returnHandoverConfirmedAt),
         status: item.status || "pending",
         createdAt: formatTime(item.createdAt),
         updatedAt: formatTime(item.updatedAt)
@@ -466,6 +545,7 @@ exports.main = async (event) => {
       ,quoteDraft: quoteResult.draft
       ,quoteHistory: quoteResult.history
       ,quotesUnavailable: quoteResult.unavailable
+      ,handoverHistory
     }
   } catch (error) {
     const errorMessage = String(

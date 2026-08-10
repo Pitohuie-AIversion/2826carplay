@@ -55,6 +55,23 @@ const INVENTORY_FIELDS = {
     createdAt: true,
     updatedAt: true
   },
+  booking_handovers: {
+    _id: true,
+    bookingId: true,
+    stage: true,
+    version: true,
+    status: true,
+    mileageKm: true,
+    energyType: true,
+    energyLevelPercent: true,
+    damageNote: true,
+    additionalNote: true,
+    capturedAt: true,
+    submittedAt: true,
+    confirmedAt: true,
+    createdAt: true,
+    updatedAt: true
+  },
   favorites: {
     _id: true,
     vehicleId: true,
@@ -200,6 +217,15 @@ function buildCsvText(subjectOpenid, categories) {
       `预估总额：${Number(item.totalCents || 0) / 100} 元；有效至：${trimText(item.validUntil, 30)}`,
       trimText(item.createdAt, 50),
       trimText(item.updatedAt, 50)
+    ])
+  })
+  categories.handovers.list.forEach((item) => {
+    rows.push([
+      "车辆交接记录", safeOpenid, trimText(item.id, 128), "", "", "", "", "",
+      limitText(`已知损伤：${item.damageNote}${item.additionalNote ? `；补充：${item.additionalNote}` : ""}`, 500),
+      "", "", trimText(`${item.stage} / ${item.status} / v${item.version}`, 50), "",
+      `里程：${item.mileageKm} km`, `${item.energyType === "electric" ? "电量" : "油量"}：${item.energyLevelPercent}%`,
+      trimText(item.createdAt, 50), trimText(item.updatedAt, 50)
     ])
   })
   categories.favorites.list.forEach((item) => {
@@ -365,6 +391,21 @@ async function readQuotesByBookingIds(bookingIds) {
   }
 }
 
+async function readHandoversByBookingIds(bookingIds) {
+  const records = []
+  try {
+    const ids = [...new Set((bookingIds || []).map((item) => String(item || "").trim()).filter(Boolean))]
+    for (let index = 0; index < ids.length && records.length <= MAX_RECORDS; index += 1) {
+      const res = await db.collection("booking_handovers").where({ bookingId: ids[index] }).field(INVENTORY_FIELDS.booking_handovers).limit(MAX_RECORDS + 1 - records.length).get()
+      records.push(...(res && Array.isArray(res.data) ? res.data : []))
+    }
+    return { available: true, list: sortByCreatedAtDesc(records.slice(0, MAX_RECORDS)), truncated: records.length > MAX_RECORDS }
+  } catch (error) {
+    console.warn({ function: "privacyRequestDataInventory", stage: "readCategory", category: "booking_handovers", errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error) })
+    return { available: false, list: [], truncated: false }
+  }
+}
+
 function normalizeBooking(item) {
   return {
     id: trimText(item && item._id, 128),
@@ -409,6 +450,18 @@ function normalizeQuote(item) {
     status: trimText(item && item.status, 50),
     createdAt: formatTime(item && item.createdAt),
     updatedAt: formatTime(item && item.updatedAt)
+  }
+}
+
+function normalizeHandover(item) {
+  return {
+    id: trimText(item && item._id, 128), bookingId: trimText(item && item.bookingId, 128),
+    stage: trimText(item && item.stage, 20), version: Math.max(0, Number(item && item.version || 0)),
+    status: trimText(item && item.status, 50), mileageKm: Math.max(0, Number(item && item.mileageKm || 0)),
+    energyType: trimText(item && item.energyType, 20), energyLevelPercent: Math.max(0, Number(item && item.energyLevelPercent || 0)),
+    damageNote: limitText(item && item.damageNote, 500), additionalNote: limitText(item && item.additionalNote, 500),
+    capturedAt: formatTime(item && item.capturedAt), submittedAt: formatTime(item && item.submittedAt),
+    confirmedAt: formatTime(item && item.confirmedAt), createdAt: formatTime(item && item.createdAt), updatedAt: formatTime(item && item.updatedAt)
   }
 }
 
@@ -496,6 +549,7 @@ exports.main = async (event) => {
     const quotesResult = await readQuotesByBookingIds(
       bookingsResult.list.map((item) => item && item._id)
     )
+    const handoversResult = await readHandoversByBookingIds(bookingsResult.list.map((item) => item && item._id))
     const unavailable = []
     if (!bookingsResult.available) {
       unavailable.push("bookings")
@@ -506,6 +560,7 @@ exports.main = async (event) => {
     if (!quotesResult.available) {
       unavailable.push("quotes")
     }
+    if (!handoversResult.available) unavailable.push("handovers")
     if (!requestsResult.available) {
       unavailable.push("privacyRequests")
     }
@@ -519,6 +574,7 @@ exports.main = async (event) => {
     if (quotesResult.truncated) {
       truncated.push("quotes")
     }
+    if (handoversResult.truncated) truncated.push("handovers")
     if (requestsResult.truncated) {
       truncated.push("privacyRequests")
     }
@@ -533,6 +589,11 @@ exports.main = async (event) => {
         count: quotesResult.list.length,
         truncated: quotesResult.truncated,
         list: quotesResult.list.map(normalizeQuote)
+      },
+      handovers: {
+        count: handoversResult.list.length,
+        truncated: handoversResult.truncated,
+        list: handoversResult.list.map(normalizeHandover)
       },
       favorites: {
         count: favoritesResult.list.length,
@@ -572,6 +633,7 @@ exports.main = async (event) => {
         requestType: String(request.type || ""),
         bookingCount: categories.bookings.count,
         quoteCount: categories.quotes.count,
+        handoverCount: categories.handovers.count,
         favoriteCount: categories.favorites.count,
         privacyRequestCount: categories.privacyRequests.count,
         partial: false
@@ -582,6 +644,7 @@ exports.main = async (event) => {
         csvText,
         bookingCount: categories.bookings.count,
         quoteCount: categories.quotes.count,
+        handoverCount: categories.handovers.count,
         favoriteCount: categories.favorites.count,
         privacyRequestCount: categories.privacyRequests.count
       }
@@ -594,6 +657,7 @@ exports.main = async (event) => {
       requestType: String(request.type || ""),
       bookingCount: bookingsResult.list.length,
       quoteCount: quotesResult.list.length,
+      handoverCount: handoversResult.list.length,
       favoriteCount: favoritesResult.list.length,
       privacyRequestCount: requestsResult.list.length,
       partial

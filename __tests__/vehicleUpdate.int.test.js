@@ -155,6 +155,54 @@ describe("cloudfunctions/vehicleUpdate integration", () => {
     expect(mocks.update).not.toHaveBeenCalled()
   })
 
+  test("admin 可同时维护公开可信摘要和仅后台可见记录", async () => {
+    const mocks = createMockDb({
+      rolesData: [{ role: "admin" }],
+      duplicateData: [{ _id: "car_1", plateNumber: "京A12345" }],
+      currentData: { _id: "car_1", plateNumber: "京A12345" },
+      updateResult: { stats: { updated: 1 } }
+    })
+    const vehicleUpdate = await loadVehicleUpdateWith({ openid: "admin_openid", mockDb: mocks.db })
+    const res = await vehicleUpdate.main({
+      id: "car_1",
+      plateNumber: "京A12345",
+      vehicleType: "sedan",
+      brandModel: "BMW 740Li",
+      registerDate: "2026-07-08",
+      status: "idle",
+      publicMaterialsUpdatedDate: "2026-07-08",
+      publicInspectionDate: "2026-07-01",
+      publicInspectionSummary: "公开检查摘要",
+      publicExteriorSummary: "公开外观摘要",
+      publicInsuranceSummary: "公开保险摘要",
+      publicAssistanceSummary: "公开救援摘要",
+      publicArchiveReviewStatus: "reviewed",
+      internalMaintenanceRecord: "内部保养工单",
+      internalInspectionRecord: "内部检查原始记录",
+      internalInsuranceRecord: "内部保单索引",
+      internalArchiveNote: "内部档案说明"
+    })
+
+    expect(res).toEqual({ ok: true, id: "car_1" })
+    expect(mocks.update).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        publicArchiveReviewStatus: "reviewed",
+        publicInspectionSummary: "公开检查摘要",
+        internalMaintenanceRecord: "内部保养工单",
+        internalInsuranceRecord: "内部保单索引",
+        updatedAt: mocks.serverDateValue
+      })
+    })
+    const auditPayload = mocks.auditAdd.mock.calls[0][0].data
+    expect(auditPayload.changedKeys).toEqual(expect.arrayContaining([
+      "publicInspectionSummary",
+      "publicArchiveReviewStatus",
+      "internalMaintenanceRecord",
+      "internalInsuranceRecord"
+    ]))
+    expect(JSON.stringify(auditPayload)).not.toContain("内部保养工单")
+  })
+
   test("admin 可以真正清空车辆选填字段", async () => {
     const currentData = {
       _id: "car_1",

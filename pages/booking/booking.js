@@ -157,8 +157,10 @@ Page({
     subscriptionEnabled: false,
     savedContactAvailable: false,
     availabilityState: "idle",
-    availabilityText: "选好取还车日期后，将自动查看同期咨询情况",
+    availabilityText: "选好取还车日期后，将自动查看真实档期与每日参考价",
     availabilityConflictCount: 0,
+    availabilityInquiryCount: 0,
+    priceCalendarSummary: null,
     privacyTip:
       "提交预约即表示您同意我们仅将所填信息用于本次车辆预约沟通与联系确认。您可在【我的预约】查看、修改联系信息与取消；如需查询、更正或删除其他个人信息，请前往【个人信息申请】。车辆档期、价格、押金及取还车规则以客服最终确认为准。",
     form: {
@@ -512,8 +514,10 @@ Page({
     this.clearAvailabilityCheckTimer()
     this.setData({
       availabilityState: "idle",
-      availabilityText: "选好取还车日期后，将自动查看同期咨询情况",
-      availabilityConflictCount: 0
+      availabilityText: "选好取还车日期后，将自动查看真实档期与每日参考价",
+      availabilityConflictCount: 0,
+      availabilityInquiryCount: 0,
+      priceCalendarSummary: null
     })
   },
 
@@ -555,7 +559,9 @@ Page({
       this.setData({
         availabilityState: "unknown",
         availabilityText: "暂时无法查看档期，仍可提交并由顾问确认",
-        availabilityConflictCount: 0
+        availabilityConflictCount: 0,
+        availabilityInquiryCount: 0,
+        priceCalendarSummary: null
       })
       trackEvent("availability_unknown", vehicleId)
       return
@@ -563,8 +569,10 @@ Page({
 
     this.setData({
       availabilityState: "checking",
-      availabilityText: "正在查看同期咨询情况…",
-      availabilityConflictCount: 0
+      availabilityText: "正在查看真实档期与每日参考价…",
+      availabilityConflictCount: 0,
+      availabilityInquiryCount: 0,
+      priceCalendarSummary: null
     })
 
     let settled = false
@@ -583,7 +591,9 @@ Page({
       this.setData({
         availabilityState: "unknown",
         availabilityText: message || "档期查询暂时失败，仍可提交并由顾问确认",
-        availabilityConflictCount: 0
+        availabilityConflictCount: 0,
+        availabilityInquiryCount: 0,
+        priceCalendarSummary: null
       })
       trackEvent("availability_unknown", vehicleId)
     }
@@ -609,13 +619,24 @@ Page({
           this.setData({
             availabilityState: "unknown",
             availabilityText: (result && result.message) || "暂时无法查看档期，仍可提交并由顾问确认",
-            availabilityConflictCount: 0
+            availabilityConflictCount: 0,
+            availabilityInquiryCount: 0,
+            priceCalendarSummary: null
           })
           trackEvent("availability_unknown", vehicleId)
           return
         }
 
         const conflictCount = Math.max(0, Number(result.conflictCount || 0))
+        const inquiryCount = Math.max(0, Number(result.inquiryCount || 0))
+        const priceSummary = result.priceSummary && typeof result.priceSummary === "object"
+          ? {
+              ...result.priceSummary,
+              dailyPreview: Array.isArray(result.priceSummary.daily)
+                ? result.priceSummary.daily.filter((item) => item.label !== "基础日租").slice(0, 4)
+                : []
+            }
+          : null
         const availabilityState =
           result.available === true
             ? "clear"
@@ -625,16 +646,21 @@ Page({
         this.setData({
           availabilityState,
           availabilityText: result.message || "档期请以顾问最终确认为准",
-          availabilityConflictCount: conflictCount
+          availabilityConflictCount: conflictCount,
+          availabilityInquiryCount: inquiryCount,
+          priceCalendarSummary: priceSummary
         })
         trackEvent(
           availabilityState === "clear"
             ? "availability_available"
             : availabilityState === "conflict"
-              ? "availability_conflict"
+              ? "availability_shortage"
               : "availability_unknown",
           vehicleId
         )
+        if (priceSummary && Number(priceSummary.specialDayCount || 0) > 0) {
+          trackEvent("price_change_view", vehicleId)
+        }
       },
       fail: () => {
         handleFailure()

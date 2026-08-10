@@ -89,6 +89,23 @@ function attachStatusClass(car) {
   }
 }
 
+function buildTrustArchiveView(input) {
+  const source = input && typeof input === "object" ? input : {}
+  const status = ["current", "pending", "stale", "missing"].includes(source.status)
+    ? source.status
+    : "missing"
+  return {
+    status,
+    statusText: String(source.statusText || "资料缺失"),
+    statusClass: `trust-status-${status}`,
+    lastUpdatedDate: String(source.lastUpdatedDate || ""),
+    lastUpdatedText: source.lastUpdatedDate ? `最近资料日期 ${source.lastUpdatedDate}` : "暂无有效更新日期",
+    freshnessText: Number.isInteger(source.freshnessDays) ? `${source.freshnessDays} 天前更新` : "新鲜度待补充",
+    missingCount: Number(source.missingCount) || 0,
+    items: Array.isArray(source.items) ? source.items : []
+  }
+}
+
 function formatCarViewModel(car) {
   const transmissionMap = {
     manual: "手动挡",
@@ -146,17 +163,21 @@ function formatCarViewModel(car) {
     fuelTypeText: fuelTypeMap[car.fuelType] || car.fuelType || "—",
     seatsText: car.seatsText || (car.seats ? `${car.seats} 座` : "—"),
     brand: car.brand || "未知品牌",
-    location: car.location || "门店咨询"
+    location: car.location || "门店咨询",
+    trustArchive: buildTrustArchiveView(car.trustArchive),
+    vehicleYear: car.vehicleYear || (car.registerDate ? String(car.registerDate).slice(0, 4) : "—")
   }
 }
 
 Page({
   data: {
+    brandName: "极境车库",
     servicePhone: "15715710090",
     rentalTerms: normalizeRentalTerms(),
     pricingOverview: buildPricingOverview(null, DEFAULT_RENTAL_TERMS),
     pricingExpanded: false,
     rulesExpanded: false,
+    trustExpanded: false,
     carId: "",
     car: null,
     currentImageIndex: 0,
@@ -212,6 +233,7 @@ Page({
         const rentalTerms = normalizeRentalTerms(config.rentalTerms)
 
         this.setData({
+          brandName: String(config.brandName || "").trim() || this.data.brandName,
           servicePhone: servicePhone || this.data.servicePhone,
           rentalTerms,
           pricingOverview: buildPricingOverview(this.data.car, rentalTerms)
@@ -381,6 +403,7 @@ Page({
     this.setData({
       car: null,
       currentImageIndex: 0,
+      trustExpanded: false,
       loading: false,
       loadError: true,
       loadErrorText: String(message || "车辆详情加载失败，请返回车库后重试")
@@ -409,9 +432,11 @@ Page({
       car: formatCarViewModel(targetCar),
       pricingOverview: buildPricingOverview(targetCar, this.data.rentalTerms),
       currentImageIndex: 0,
+      trustExpanded: false,
       loading: false,
       loadError: false
     })
+    this._trustProfileViewTracked = false
 
     wx.setNavigationBarTitle({
       title: targetCar.name || "车辆详情"
@@ -611,6 +636,15 @@ Page({
     if (rulesExpanded && !this._rentalRulesViewTracked) {
       this._rentalRulesViewTracked = true
       trackEvent("rental_rules_view", this.data.carId)
+    }
+  },
+
+  handleToggleTrustArchive() {
+    const trustExpanded = !this.data.trustExpanded
+    this.setData({ trustExpanded })
+    if (trustExpanded && !this._trustProfileViewTracked) {
+      this._trustProfileViewTracked = true
+      trackEvent("trusted_profile_view", this.data.carId)
     }
   },
 

@@ -16,6 +16,13 @@ const PUBLIC_VEHICLE_FIELDS = {
   seats: true,
   priceDay: true,
   publicDescription: true,
+  publicMaterialsUpdatedDate: true,
+  publicInspectionDate: true,
+  publicInspectionSummary: true,
+  publicExteriorSummary: true,
+  publicInsuranceSummary: true,
+  publicAssistanceSummary: true,
+  publicArchiveReviewStatus: true,
   imageList: true,
   coverImage: true,
   updatedAt: true,
@@ -81,6 +88,8 @@ const LUXURY_BRANDS = [
   "腾势"
 ]
 const MINI_FUN_BRANDS = ["MINI", "MAZDA", "MX-5", "ABARTH"]
+const ARCHIVE_STALE_DAYS = 180
+const DAY_MS = 24 * 60 * 60 * 1000
 
 function createError(code, message, details) {
   const result = {
@@ -239,6 +248,67 @@ function buildImages(vehicle) {
   return [coverImage].concat(restImages)
 }
 
+function normalizeArchiveText(value) {
+  return String(value || "").trim().slice(0, 200)
+}
+
+function buildTrustArchive(vehicle) {
+  const materialsUpdatedDate = normalizeArchiveText(vehicle && vehicle.publicMaterialsUpdatedDate)
+  const inspectionDate = normalizeArchiveText(vehicle && vehicle.publicInspectionDate)
+  const inspectionSummary = normalizeArchiveText(vehicle && vehicle.publicInspectionSummary)
+  const exteriorSummary = normalizeArchiveText(vehicle && vehicle.publicExteriorSummary)
+  const insuranceSummary = normalizeArchiveText(vehicle && vehicle.publicInsuranceSummary)
+  const assistanceSummary = normalizeArchiveText(vehicle && vehicle.publicAssistanceSummary)
+  const requiredValues = [
+    materialsUpdatedDate,
+    inspectionDate,
+    inspectionSummary,
+    exteriorSummary,
+    insuranceSummary,
+    assistanceSummary
+  ]
+  const missingCount = requiredValues.filter((value) => !value).length
+  const referenceDates = [materialsUpdatedDate, inspectionDate]
+    .map((value) => new Date(`${value}T00:00:00+08:00`).getTime())
+    .filter((value) => Number.isFinite(value))
+  const latestTimestamp = referenceDates.length ? Math.max(...referenceDates) : 0
+  const freshnessDays = latestTimestamp
+    ? Math.max(0, Math.floor((Date.now() - latestTimestamp) / DAY_MS))
+    : null
+  const isStale = freshnessDays !== null && freshnessDays > ARCHIVE_STALE_DAYS
+  const reviewStatus = String((vehicle && vehicle.publicArchiveReviewStatus) || "").trim()
+
+  let status = "current"
+  let statusText = "资料已复核"
+  if (missingCount) {
+    status = "missing"
+    statusText = "资料缺失"
+  } else if (isStale) {
+    status = "stale"
+    statusText = "资料已过期"
+  } else if (reviewStatus !== "reviewed") {
+    status = "pending"
+    statusText = "资料待复核"
+  }
+
+  return {
+    status,
+    statusText,
+    reviewStatus: reviewStatus || "pending",
+    lastUpdatedDate: materialsUpdatedDate || inspectionDate,
+    freshnessDays,
+    staleAfterDays: ARCHIVE_STALE_DAYS,
+    missingCount,
+    items: [
+      { key: "materials", label: "实拍/资料更新", value: materialsUpdatedDate || "待补充" },
+      { key: "inspection", label: "最近保养/检查", value: inspectionDate || "待补充", summary: inspectionSummary || "待补充" },
+      { key: "exterior", label: "已知外观情况", value: exteriorSummary || "待补充" },
+      { key: "insurance", label: "商业保险摘要", value: insuranceSummary || "待补充" },
+      { key: "assistance", label: "救援能力摘要", value: assistanceSummary || "待补充" }
+    ]
+  }
+}
+
 function mapVehicle(vehicle) {
   const vehicleType = String((vehicle && vehicle.vehicleType) || "").trim()
   const vehicleTypeText = VEHICLE_TYPE_LABEL_MAP[vehicleType] || vehicleType || "其他"
@@ -280,6 +350,8 @@ function mapVehicle(vehicle) {
       `${brandModel || maskedPlateNumber || "该车"}支持到店咨询与预约服务。`,
     sort: new Date(formatTime(vehicle && (vehicle.updatedAt || vehicle.createdAt)) || 0).getTime() || 0,
     registerDate: String((vehicle && vehicle.registerDate) || "").trim(),
+    vehicleYear: String((vehicle && vehicle.registerDate) || "").trim().slice(0, 4) || "—",
+    trustArchive: buildTrustArchive(vehicle),
     updatedAt: formatTime(vehicle && vehicle.updatedAt),
     createdAt: formatTime(vehicle && vehicle.createdAt)
   }

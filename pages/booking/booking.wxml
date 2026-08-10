@@ -260,7 +260,7 @@
       </view>
       <view class="availability-copy">
         <view class="availability-title">
-          {{availabilityState === 'checking' ? '正在查询档期' : availabilityState === 'clear' ? '当前档期较宽松' : availabilityState === 'conflict' ? '同期咨询提醒' : availabilityState === 'unknown' ? '等待顾问确认' : '档期预览'}}
+          {{availabilityState === 'checking' ? '正在查询档期' : availabilityState === 'clear' ? '所选档期可预约' : availabilityState === 'conflict' ? '所选档期不可用' : availabilityState === 'unknown' ? '等待顾问确认' : '档期与价格预览'}}
         </view>
         <view class="availability-desc">{{availabilityText}}</view>
       </view>
@@ -272,6 +272,24 @@
         aria-role="button"
         aria-label="重新检查车辆档期"
       >重试</view>
+    </view>
+
+    <view wx:if="{{priceCalendarSummary}}" class="price-calendar-card">
+      <view class="price-calendar-heading">
+        <view>
+          <view class="price-calendar-kicker">DAILY PRICE SUMMARY</view>
+          <view class="price-calendar-title">每日参考价格</view>
+        </view>
+        <view class="price-calendar-total">{{priceCalendarSummary.estimatedTotalText}}</view>
+      </view>
+      <view class="price-calendar-base">基础日租 {{priceCalendarSummary.baseDailyRateText}} · 所选 {{priceCalendarSummary.daily.length}} 个日期</view>
+      <view wx:if="{{priceCalendarSummary.specialDayCount}}" class="price-calendar-specials">
+        <view class="price-calendar-special" wx:for="{{priceCalendarSummary.dailyPreview}}" wx:key="date">
+          <text>{{item.date}} · {{item.label}}</text><text>￥{{item.dailyRate}}</text>
+        </view>
+        <view wx:if="{{priceCalendarSummary.specialDayCount > priceCalendarSummary.dailyPreview.length}}" class="price-calendar-more">另有 {{priceCalendarSummary.specialDayCount - priceCalendarSummary.dailyPreview.length}} 个特殊价格日期</view>
+      </view>
+      <view class="price-calendar-note">这是按日期汇总的参考价，不含 Phase 12 报价中的押金、服务项和调整；最终金额以顾问发送并由您确认的报价版本为准。</view>
     </view>
 
     <view class="form-item">

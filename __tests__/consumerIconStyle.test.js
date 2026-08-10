@@ -157,9 +157,10 @@ describe("用户主流程原生图标", () => {
     const wxmlFiles = listWxmlFiles("pages")
     const textareaCounterExpressions = {
       "pages/booking/booking.wxml": ["form.note.length"],
+      "pages/booking-calendar/booking-calendar.wxml": ["blockForm.reason.length", "priceForm.reason.length"],
       "pages/booking-detail/booking-detail.wxml": ["editForm.note.length", "adjustmentNote.length"],
       "pages/booking-manage/booking-manage.wxml": ["item.adminRemarkDraft.length"],
-      "pages/booking-manage-detail/booking-manage-detail.wxml": ["booking.adminRemarkDraft.length", "quoteForm.depositText.length", "quoteForm.customerNote.length"],
+      "pages/booking-manage-detail/booking-manage-detail.wxml": ["booking.adminRemarkDraft.length", "quoteForm.depositText.length", "quoteForm.customerNote.length", "handoverForm.damageNote.length", "handoverForm.additionalNote.length"],
       "pages/booking-workbench/booking-workbench.wxml": ["remarkDraft.length"],
       "pages/config-manage/config-manage.wxml": [
         "form.mineUserDesc.length",
@@ -180,7 +181,18 @@ describe("用户主流程原生图标", () => {
       ],
       "pages/privacy-request/privacy-request.wxml": ["descriptionLength"],
       "pages/vehicle-create/vehicle-create.wxml": ["publicDescriptionLength", "noteLength"],
-      "pages/vehicle-edit/vehicle-edit.wxml": ["publicDescriptionLength", "noteLength"]
+      "pages/vehicle-edit/vehicle-edit.wxml": [
+        "publicDescriptionLength",
+        "noteLength",
+        "form.publicInspectionSummary.length",
+        "form.publicExteriorSummary.length",
+        "form.publicInsuranceSummary.length",
+        "form.publicAssistanceSummary.length",
+        "form.internalMaintenanceRecord.length",
+        "form.internalInspectionRecord.length",
+        "form.internalInsuranceRecord.length",
+        "form.internalArchiveNote.length"
+      ]
     }
     let inputControlCount = 0
     let singleLineInputCount = 0
@@ -214,9 +226,9 @@ describe("用户主流程原生图标", () => {
       })
     })
 
-    expect(inputControlCount).toBe(65)
-    expect(singleLineInputCount).toBe(37)
-    expect(textareaCount).toBe(28)
+    expect(inputControlCount).toBe(81)
+    expect(singleLineInputCount).toBe(41)
+    expect(textareaCount).toBe(40)
     expect(Object.values(textareaCounterExpressions).flat()).toHaveLength(textareaCount)
     Object.entries(textareaCounterExpressions).forEach(([relativePath, expressions]) => {
       const source = read(relativePath)
@@ -245,7 +257,7 @@ describe("用户主流程原生图标", () => {
     const privacyCheckbox = bookingMarkup.match(/<checkbox\b[^>]*\/>/)[0]
     const bookingStyle = read("pages/booking/booking.wxss")
 
-    expect(pickerCount).toBe(14)
+    expect(pickerCount).toBe(25)
     expect(privacyGroup).toContain("privacy-agreement-complete")
     expect(privacyGroup).toContain('aria-required="{{true}}"')
     expect(privacyCheckbox).toContain('aria-label="同意隐私政策"')
@@ -338,7 +350,7 @@ describe("用户主流程原生图标", () => {
       })
     })
 
-    expect(dynamicImageCount).toBe(4)
+    expect(dynamicImageCount).toBe(7)
   })
 
   test("高频文字链接与图标操作保留最小点击热区", () => {
@@ -513,7 +525,7 @@ describe("用户主流程原生图标", () => {
       })
     })
 
-    expect(confirmationCount).toBe(30)
+    expect(confirmationCount).toBe(33)
   })
 
   test("原生操作菜单统一使用品牌色与顶部说明", () => {
@@ -694,7 +706,7 @@ describe("用户主流程原生图标", () => {
       expect(source).toContain('title: "拨号失败"')
     })
 
-    expect(phoneCallCount).toBe(7)
+    expect(phoneCallCount).toBe(8)
   })
 
   test("全站页面跳转、返回兜底、滚动定位和图片预览入口均提供失败反馈", () => {
@@ -707,7 +719,7 @@ describe("用户主流程原生图标", () => {
       reLaunch: 17,
       navigateBack: 9,
       pageScrollTo: 1,
-      previewImage: 2
+      previewImage: 4
     }
     const actualCounts = {}
 

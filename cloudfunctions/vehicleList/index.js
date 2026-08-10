@@ -25,6 +25,13 @@ const VEHICLE_MANAGE_LIST_FIELDS = {
   priceDay: true,
   imageList: true,
   coverImage: true,
+  publicMaterialsUpdatedDate: true,
+  publicInspectionDate: true,
+  publicInspectionSummary: true,
+  publicExteriorSummary: true,
+  publicInsuranceSummary: true,
+  publicAssistanceSummary: true,
+  publicArchiveReviewStatus: true,
   createdByOpenid: true,
   createdAt: true,
   updatedAt: true
@@ -190,6 +197,59 @@ function buildDashboardStats(list) {
   }
 }
 
+function buildArchiveHealth(item) {
+  const source = item && typeof item === "object" ? item : {}
+  const requiredValues = [
+    source.publicMaterialsUpdatedDate,
+    source.publicInspectionDate,
+    source.publicInspectionSummary,
+    source.publicExteriorSummary,
+    source.publicInsuranceSummary,
+    source.publicAssistanceSummary
+  ].map((value) => String(value || "").trim())
+  const missingCount = requiredValues.filter((value) => !value).length
+  const timestamps = [source.publicMaterialsUpdatedDate, source.publicInspectionDate]
+    .map((value) => new Date(`${String(value || "").trim()}T00:00:00+08:00`).getTime())
+    .filter((value) => Number.isFinite(value))
+  const latestTimestamp = timestamps.length ? Math.max(...timestamps) : 0
+  const freshnessDays = latestTimestamp
+    ? Math.max(0, Math.floor((Date.now() - latestTimestamp) / (24 * 60 * 60 * 1000)))
+    : null
+  let status = "current"
+  let statusText = "资料已复核"
+  if (missingCount) {
+    status = "missing"
+    statusText = "资料缺失"
+  } else if (freshnessDays !== null && freshnessDays > 180) {
+    status = "stale"
+    statusText = "资料已过期"
+  } else if (String(source.publicArchiveReviewStatus || "") !== "reviewed") {
+    status = "pending"
+    statusText = "资料待复核"
+  }
+  return {
+    status,
+    statusText,
+    missingCount,
+    freshnessDays,
+    lastUpdatedDate: String(source.publicMaterialsUpdatedDate || source.publicInspectionDate || "")
+  }
+}
+
+function buildArchiveDashboard(list) {
+  const counts = { current: 0, pending: 0, stale: 0, missing: 0 }
+  list.forEach((item) => {
+    const status = item && item.archiveHealth && item.archiveHealth.status
+    if (Object.prototype.hasOwnProperty.call(counts, status)) {
+      counts[status] += 1
+    }
+  })
+  return {
+    ...counts,
+    attention: counts.pending + counts.stale + counts.missing
+  }
+}
+
 function matchesKeyword(item, keyword) {
   if (!keyword) {
     return true
@@ -312,6 +372,7 @@ exports.main = async (event) => {
       priceDay: item.priceDay === undefined ? null : item.priceDay,
       imageCount: Array.isArray(item.imageList) ? item.imageList.filter(Boolean).length : 0,
       coverImage: item.coverImage || "",
+      archiveHealth: buildArchiveHealth(item),
       createdByOpenid: item.createdByOpenid || "",
       createdAt: formatTime(item.createdAt),
       updatedAt: formatTime(item.updatedAt)
@@ -345,6 +406,7 @@ exports.main = async (event) => {
       truncated: vehicleRecords.truncated,
       stats: buildStats(filteredList),
       dashboard: buildDashboardStats(formattedList),
+      archiveDashboard: buildArchiveDashboard(formattedList),
       recentAddedList: buildRecentAddedList(formattedList),
       ...pagination,
       list

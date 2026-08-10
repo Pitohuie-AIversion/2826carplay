@@ -296,7 +296,16 @@ describe("cloud function log privacy", () => {
       [
         "bookingUpdateStatus",
         "BOOKING_STATUS_UPDATE_FIELDS",
-        ["_id", "openid", "vehicleName", "status"]
+        [
+          "_id",
+          "openid",
+          "vehicleName",
+          "status",
+          "latestPickupHandoverId",
+          "latestReturnHandoverId",
+          "pickupHandoverConfirmedAt",
+          "returnHandoverConfirmedAt"
+        ]
       ],
       ["bookingUpdateAdminRemark", "BOOKING_EXISTENCE_FIELDS", ["_id"]],
       [
@@ -379,7 +388,18 @@ describe("cloud function log privacy", () => {
       "publicDescription",
       "vin",
       "engineNumber",
-      "note"
+      "note",
+      "publicMaterialsUpdatedDate",
+      "publicInspectionDate",
+      "publicInspectionSummary",
+      "publicExteriorSummary",
+      "publicInsuranceSummary",
+      "publicAssistanceSummary",
+      "publicArchiveReviewStatus",
+      "internalMaintenanceRecord",
+      "internalInspectionRecord",
+      "internalInsuranceRecord",
+      "internalArchiveNote"
     ])
     expect(updateSource).toContain(".field(VEHICLE_UPDATE_CURRENT_FIELDS)")
     expect(updateSource).toContain(".field(VEHICLE_ID_FIELDS)")

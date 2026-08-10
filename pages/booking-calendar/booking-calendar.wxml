@@ -148,7 +148,7 @@
         <view
           wx:for="{{calendarCells}}"
           wx:key="key"
-          class="date-cell {{item.empty ? 'date-cell-empty' : ''}} {{item.isSelected ? 'date-cell-selected' : ''}} {{item.isToday ? 'date-cell-today' : ''}} {{item.hasConflict ? 'date-cell-conflict' : ''}}"
+          class="date-cell {{item.empty ? 'date-cell-empty' : ''}} {{item.isSelected ? 'date-cell-selected' : ''}} {{item.isToday ? 'date-cell-today' : ''}} {{item.hasConflict ? 'date-cell-conflict' : ''}} {{item.hasBlocked ? 'date-cell-blocked' : ''}}"
           data-date="{{item.date}}"
           bindtap="handleDateTap"
           hover-class="{{item.empty ? 'none' : 'date-cell-pressed'}}"
@@ -160,6 +160,7 @@
           <view wx:if="{{!item.empty}}" class="date-number">{{item.day}}</view>
           <view wx:if="{{item.hasBookings}}" class="date-count">{{item.bookingCount}}</view>
           <view wx:if="{{item.pendingCount}}" class="pending-dot"></view>
+          <view wx:if="{{item.hasBlocked}}" class="blocked-dot"></view>
         </view>
       </view>
       <view class="calendar-legend">
@@ -168,6 +169,113 @@
         <view><text class="legend-dot legend-booking"></text>有预约</view>
         <view><text class="legend-dot legend-pending"></text>含待联系</view>
         <view><text class="legend-dot legend-conflict"></text>同车重叠</view>
+        <view><text class="legend-dot legend-blocked"></text>不可用占用</view>
+      </view>
+    </view>
+
+    <view class="day-card ui-card calendar-resource-card">
+      <view class="section-heading">
+        <view>
+          <view class="section-eyebrow">TRUSTED AVAILABILITY</view>
+          <view class="section-title">{{selectedDate}} · {{selectedBlocks.length}} 条真实占用</view>
+        </view>
+        <view class="section-index">03</view>
+      </view>
+      <view wx:if="{{selectedBlocks.length}}" class="resource-list">
+        <view class="resource-item" wx:for="{{selectedBlocks}}" wx:key="id">
+          <view class="resource-main">
+            <view class="resource-title">{{item.vehicleName}} · {{item.kindLabel}}</view>
+            <view class="resource-meta">{{item.startDate}} 至 {{item.endDate}}</view>
+            <view class="resource-reason">{{item.reason || '系统占用'}}</view>
+          </view>
+          <view class="resource-actions">
+            <button class="resource-button" data-id="{{item.id}}" bindtap="handleEditBlock">调整</button>
+            <button class="resource-button resource-button-danger" data-id="{{item.id}}" bindtap="handleReleaseBlock">释放</button>
+          </view>
+        </view>
+      </view>
+      <view wx:else class="inline-empty compact-empty">
+        <view class="inline-empty-title">当天没有真实占用</view>
+        <view class="inline-empty-desc">普通咨询不会锁定车辆。</view>
+      </view>
+    </view>
+
+    <view class="day-card ui-card calendar-resource-card">
+      <view class="section-heading">
+        <view>
+          <view class="section-eyebrow">PRICE RULES</view>
+          <view class="section-title">{{selectedDate}} · {{selectedPriceRules.length}} 条特殊价格</view>
+        </view>
+        <view class="section-index">04</view>
+      </view>
+      <view wx:if="{{selectedPriceRules.length}}" class="resource-list">
+        <view class="resource-item" wx:for="{{selectedPriceRules}}" wx:key="id">
+          <view class="resource-main">
+            <view class="resource-title">{{item.vehicleName}} · {{item.label}}</view>
+            <view class="resource-price">￥{{item.dailyPrice}} / 日</view>
+            <view class="resource-meta">{{item.startDate}} 至 {{item.endDate}}</view>
+          </view>
+          <view class="resource-actions">
+            <button class="resource-button" data-id="{{item.id}}" bindtap="handleEditPriceRule">调整</button>
+            <button class="resource-button resource-button-danger" data-id="{{item.id}}" bindtap="handleReleasePriceRule">停用</button>
+          </view>
+        </view>
+      </view>
+      <view wx:else class="inline-empty compact-empty">
+        <view class="inline-empty-title">当天使用车辆基础日租</view>
+        <view class="inline-empty-desc">最终金额仍以顾问发送的报价版本为准。</view>
+      </view>
+    </view>
+
+    <view class="day-card ui-card calendar-editor-card">
+      <view class="section-heading">
+        <view>
+          <view class="section-eyebrow">INVENTORY CONTROL</view>
+          <view class="section-title">{{editingBlockId ? '调整档期占用' : '新增不可用区间'}}</view>
+        </view>
+        <view class="section-index">05</view>
+      </view>
+      <picker mode="selector" range="{{vehicleOptions}}" value="{{blockVehicleIndex}}" bindchange="handleBlockVehicleChange" aria-label="选择不可用区间车辆">
+        <view class="calendar-form-control" hover-class="calendar-form-control-pressed"><text>{{vehicleOptions[blockVehicleIndex] || '请选择车辆'}}</text><view class="picker-chevron"></view></view>
+      </picker>
+      <picker wx:if="{{!editingBlockId || blockForm.kind !== 'booking'}}" mode="selector" range="{{blockKindLabels}}" value="{{blockKindIndex}}" bindchange="handleBlockKindChange" aria-label="选择不可用区间类型">
+        <view class="calendar-form-control" hover-class="calendar-form-control-pressed"><text>{{blockKindLabels[blockKindIndex]}}</text><view class="picker-chevron"></view></view>
+      </picker>
+      <view wx:else class="calendar-form-control calendar-form-readonly">已确认预约</view>
+      <view class="calendar-form-row">
+        <picker mode="date" value="{{blockForm.startDate}}" bindchange="handleCalendarFormInput" data-form="blockForm" data-field="startDate" aria-label="选择不可用区间开始日期"><view class="calendar-form-control" hover-class="calendar-form-control-pressed"><text>{{blockForm.startDate || '开始日期'}}</text><view class="picker-chevron"></view></view></picker>
+        <picker mode="date" value="{{blockForm.endDate}}" bindchange="handleCalendarFormInput" data-form="blockForm" data-field="endDate" aria-label="选择不可用区间结束日期"><view class="calendar-form-control" hover-class="calendar-form-control-pressed"><text>{{blockForm.endDate || '结束日期'}}</text><view class="picker-chevron"></view></view></picker>
+      </view>
+      <view class="calendar-form-counter">{{blockForm.reason.length || 0}} / 200</view>
+      <textarea class="calendar-form-textarea" value="{{blockForm.reason}}" placeholder="填写新增、延长、调整原因（必填）" maxlength="200" data-form="blockForm" data-field="reason" bindinput="handleCalendarFormInput" aria-label="填写档期占用调整原因" />
+      <view class="calendar-form-actions">
+        <button class="calendar-save-button" loading="{{isSavingCalendar}}" disabled="{{isSavingCalendar}}" bindtap="handleSaveBlock">{{editingBlockId ? '保存调整' : '新增占用'}}</button>
+        <button wx:if="{{editingBlockId}}" class="calendar-cancel-button" bindtap="handleResetBlockForm">取消编辑</button>
+      </view>
+    </view>
+
+    <view class="day-card ui-card calendar-editor-card">
+      <view class="section-heading">
+        <view>
+          <view class="section-eyebrow">SPECIAL DATE PRICE</view>
+          <view class="section-title">{{editingRuleId ? '调整特殊价格' : '新增特殊日期价格'}}</view>
+        </view>
+        <view class="section-index">06</view>
+      </view>
+      <picker mode="selector" range="{{vehicleOptions}}" value="{{priceVehicleIndex}}" bindchange="handlePriceVehicleChange" aria-label="选择特殊价格规则车辆">
+        <view class="calendar-form-control" hover-class="calendar-form-control-pressed"><text>{{vehicleOptions[priceVehicleIndex] || '请选择车辆'}}</text><view class="picker-chevron"></view></view>
+      </picker>
+      <input class="calendar-form-control" value="{{priceForm.label}}" placeholder="规则名称，如国庆假期" maxlength="40" confirm-type="done" data-form="priceForm" data-field="label" bindinput="handleCalendarFormInput" aria-label="填写特殊价格规则名称" />
+      <view class="calendar-form-row">
+        <picker mode="date" value="{{priceForm.startDate}}" bindchange="handleCalendarFormInput" data-form="priceForm" data-field="startDate" aria-label="选择特殊价格开始日期"><view class="calendar-form-control" hover-class="calendar-form-control-pressed"><text>{{priceForm.startDate || '开始日期'}}</text><view class="picker-chevron"></view></view></picker>
+        <picker mode="date" value="{{priceForm.endDate}}" bindchange="handleCalendarFormInput" data-form="priceForm" data-field="endDate" aria-label="选择特殊价格结束日期"><view class="calendar-form-control" hover-class="calendar-form-control-pressed"><text>{{priceForm.endDate || '结束日期'}}</text><view class="picker-chevron"></view></view></picker>
+      </view>
+      <input class="calendar-form-control" type="number" value="{{priceForm.dailyPrice}}" placeholder="每日价格（元）" maxlength="5" confirm-type="done" data-form="priceForm" data-field="dailyPrice" bindinput="handleCalendarFormInput" aria-label="填写特殊日期每日价格" />
+      <view class="calendar-form-counter">{{priceForm.reason.length || 0}} / 200</view>
+      <textarea class="calendar-form-textarea" value="{{priceForm.reason}}" placeholder="填写价格调整原因（必填）" maxlength="200" data-form="priceForm" data-field="reason" bindinput="handleCalendarFormInput" aria-label="填写特殊价格调整原因" />
+      <view class="calendar-form-actions">
+        <button class="calendar-save-button" loading="{{isSavingCalendar}}" disabled="{{isSavingCalendar}}" bindtap="handleSavePriceRule">{{editingRuleId ? '保存价格' : '新增价格规则'}}</button>
+        <button wx:if="{{editingRuleId}}" class="calendar-cancel-button" bindtap="handleResetPriceForm">取消编辑</button>
       </view>
     </view>
 
@@ -177,7 +285,7 @@
           <view class="section-eyebrow">DAILY SCHEDULE</view>
           <view class="section-title">{{selectedDate}} · {{selectedBookings.length}} 条</view>
         </view>
-        <view class="section-index">02</view>
+        <view class="section-index">07</view>
       </view>
       <view wx:if="{{selectedConflictCount}}" class="day-conflict-tip">
         <view class="day-conflict-icon" aria-hidden="true"><view class="conflict-alert-icon"></view></view>
@@ -203,6 +311,7 @@
               </view>
               <view class="booking-vehicle">{{item.vehicleName || '车辆预约'}}</view>
               <view wx:if="{{item.hasConflict}}" class="booking-conflict-chip">同车冲突</view>
+              <view wx:if="{{item.occupancyMissing}}" class="booking-conflict-chip">待同步占用</view>
             </view>
             <view class="booking-meta">
               <view class="booking-document-icon" aria-hidden="true"><view class="booking-document-line"></view></view>
@@ -216,6 +325,7 @@
             </view>
           </view>
           <view class="booking-side">
+            <button wx:if="{{item.occupancyMissing}}" class="resource-button" data-id="{{item.id}}" catchtap="handleSyncBookingOccupancy" aria-label="同步该已确认预约的真实档期占用">同步占用</button>
             <view class="status-pill {{item.statusClass}}"><view class="status-pill-dot"></view><text>{{item.statusLabel}}</text></view>
             <view class="booking-arrow" aria-hidden="true">
               <view class="booking-chevron"></view>
@@ -236,7 +346,7 @@
     </view>
     <view class="mode-tip tip-with-icon">
       <view class="tip-native-icon tip-native-icon-info" aria-hidden="true"><view class="tip-info-mark"></view></view>
-      <view>日历用于人工排期参考，不会自动锁定车辆或替代顾问确认。</view>
+      <view>已确认预约、维修、人工保留和不可用区间会真实锁定车辆；普通咨询只作提示。价格日历为参考，最终金额仍以报价版本为准。</view>
     </view>
   </block>
 </view>

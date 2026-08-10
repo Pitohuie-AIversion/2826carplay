@@ -19,6 +19,12 @@ const BOOKING_MY_DETAIL_FIELDS = {
   quotedAt: true,
   confirmedAt: true,
   adjustmentRequestedAt: true,
+  latestPickupHandoverId: true,
+  latestPickupHandoverVersion: true,
+  latestReturnHandoverId: true,
+  latestReturnHandoverVersion: true,
+  pickupHandoverConfirmedAt: true,
+  returnHandoverConfirmedAt: true,
   status: true,
   createdAt: true,
   updatedAt: true
@@ -48,6 +54,12 @@ const BOOKING_MY_QUOTE_FIELDS = {
   confirmedAt: true,
   adjustmentRequestedAt: true,
   expiredAt: true
+}
+const BOOKING_MY_HANDOVER_FIELDS = {
+  _id: true, bookingId: true, stage: true, version: true, status: true,
+  mileageKm: true, energyType: true, energyLevelPercent: true,
+  damageNote: true, additionalNote: true, photos: true,
+  capturedAt: true, submittedAt: true, confirmedAt: true, archivedAt: true, archivedPhotoCount: true
 }
 
 function createError(code, message, details) {
@@ -138,6 +150,60 @@ async function readLatestQuote(item) {
   }
 }
 
+async function mapHandover(item) {
+  if (!item) return null
+  const photos = Array.isArray(item.photos) ? item.photos : []
+  const urlMap = new Map()
+  if (photos.length && typeof cloud.getTempFileURL === "function") {
+    try {
+      const res = await cloud.getTempFileURL({ fileList: photos.map((photo) => photo.fileId).filter(Boolean) })
+      ;(res && res.fileList || []).forEach((entry) => {
+        const fileId = String(entry && (entry.fileID || entry.fileId) || "")
+        if (fileId && entry.tempFileURL && Number(entry.status || 0) === 0) urlMap.set(fileId, entry.tempFileURL)
+      })
+    } catch (error) {}
+  }
+  return {
+    id: String(item._id || item.id || ""),
+    bookingId: String(item.bookingId || ""),
+    stage: String(item.stage || ""),
+    version: Math.max(0, Number(item.version || 0)),
+    status: String(item.status || ""),
+    mileageKm: Math.max(0, Number(item.mileageKm || 0)),
+    energyType: String(item.energyType || ""),
+    energyLevelPercent: Math.max(0, Number(item.energyLevelPercent || 0)),
+    damageNote: String(item.damageNote || ""),
+    additionalNote: String(item.additionalNote || ""),
+    photos: photos.map((photo) => ({ angle: String(photo.angle || ""), url: urlMap.get(String(photo.fileId || "")) || "" })),
+    capturedAt: formatTime(item.capturedAt),
+    submittedAt: formatTime(item.submittedAt),
+    confirmedAt: formatTime(item.confirmedAt),
+    archivedAt: formatTime(item.archivedAt),
+    archivedPhotoCount: Math.max(0, Number(item.archivedPhotoCount || 0))
+  }
+}
+
+async function readLatestHandovers(item) {
+  const bookingId = String(item && (item._id || item.id) || "")
+  const pairs = [
+    ["pickup", String(item && item.latestPickupHandoverId || "")],
+    ["return", String(item && item.latestReturnHandoverId || "")]
+  ]
+  const result = { pickup: null, return: null }
+  await Promise.all(pairs.map(async ([stage, id]) => {
+    if (!id) return
+    try {
+      const res = await db.collection("booking_handovers").doc(id).field(BOOKING_MY_HANDOVER_FIELDS).get()
+      const record = res && res.data
+      if (record && String(record.bookingId || "") === bookingId && String(record.stage || "") === stage) result[stage] = await mapHandover(record)
+    } catch (error) {
+      const message = String(error && (error.message || error.errMsg) || error)
+      if (!message.includes("Unexpected collection:") && !message.includes("not exist") && !message.includes("not found")) throw error
+    }
+  }))
+  return result
+}
+
 async function writeErrorLogBestEffort(payload) {
   try {
     await db.collection("error_logs").add({
@@ -189,6 +255,7 @@ exports.main = async (event) => {
 
     const vehicleIdentity = buildVehicleDisplayIdentity(item.vehicleName)
     const latestQuote = await readLatestQuote(item)
+    const handovers = await readLatestHandovers(item)
 
     return {
       ok: true,
@@ -207,11 +274,18 @@ exports.main = async (event) => {
         quotedAt: formatTime(item.quotedAt),
         confirmedAt: formatTime(item.confirmedAt),
         adjustmentRequestedAt: formatTime(item.adjustmentRequestedAt),
+        latestPickupHandoverId: item.latestPickupHandoverId || "",
+        latestPickupHandoverVersion: Math.max(0, Number(item.latestPickupHandoverVersion || 0)),
+        latestReturnHandoverId: item.latestReturnHandoverId || "",
+        latestReturnHandoverVersion: Math.max(0, Number(item.latestReturnHandoverVersion || 0)),
+        pickupHandoverConfirmedAt: formatTime(item.pickupHandoverConfirmedAt),
+        returnHandoverConfirmedAt: formatTime(item.returnHandoverConfirmedAt),
         status: item.status || "pending",
         createdAt: formatTime(item.createdAt),
         updatedAt: formatTime(item.updatedAt)
       },
-      latestQuote
+      latestQuote,
+      handovers
     }
   } catch (error) {
     const errorMessage = String(

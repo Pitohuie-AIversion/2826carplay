@@ -1,6 +1,6 @@
 jest.mock("wx-server-sdk")
 
-function loadModule({ openid = "user_openid", vehicle, bookings = [], total = bookings.length }) {
+function loadModule({ openid = "user_openid", vehicle, bookings = [], total = bookings.length, occupiedDates = [], priceRules = [] }) {
   jest.resetModules()
   const cloud = require("wx-server-sdk")
   cloud.__reset()
@@ -36,6 +36,27 @@ function loadModule({ openid = "user_openid", vehicle, bookings = [], total = bo
       }
       if (name === "bookings") {
         return { where: bookingWhere }
+      }
+      if (name === "vehicle_calendar_days") {
+        return {
+          doc: jest.fn((id) => ({
+            field: jest.fn(() => ({
+              get: jest.fn(() => {
+                const date = String(id).slice(-8).replace(/(\d{4})(\d{2})(\d{2})/, "$1-$2-$3")
+                if (occupiedDates.includes(date)) return Promise.resolve({ data: { date, kind: "booking", blockId: "block_1" } })
+                return Promise.reject(new Error("document not found"))
+              })
+            }))
+          }))
+        }
+      }
+      if (name === "vehicle_price_rules") {
+        const chain = {
+          where: jest.fn(() => chain),
+          field: jest.fn(() => chain),
+          limit: jest.fn(() => ({ get: jest.fn().mockResolvedValue({ data: priceRules }) }))
+        }
+        return chain
       }
       throw new Error(`Unexpected collection: ${name}`)
     })
@@ -80,19 +101,18 @@ describe("cloudfunctions/vehicleAvailabilityCheck integration", () => {
       endDate: "2099-08-14"
     })
 
-    expect(res).toEqual({
+    expect(res).toMatchObject({
       ok: true,
       vehicleId: "vehicle_1",
-      startDate: "2099-08-11",
-      endDate: "2099-08-14",
-      available: false,
-      conflictCount: 1,
-      truncated: false,
-      message: "当前已有 1 条同期咨询，仍可提交候补"
+      available: true,
+      conflictCount: 0,
+      inquiryCount: 1,
+      truncated: false
     })
+    expect(res.message).toContain("普通咨询不会锁车")
     expect(JSON.stringify(res)).not.toContain("13800000000")
     expect(JSON.stringify(res)).not.toContain("不应返回")
-    expect(vehicleField).toHaveBeenCalledWith({ status: true })
+    expect(vehicleField).toHaveBeenCalledWith({ status: true, priceDay: true })
     expect(bookingWhere).toHaveBeenCalledWith({ vehicleId: "vehicle_1" })
   })
 
@@ -116,7 +136,7 @@ describe("cloudfunctions/vehicleAvailabilityCheck integration", () => {
 
     expect(res.available).toBe(true)
     expect(res.conflictCount).toBe(0)
-    expect(res.message).toContain("未发现同期")
+    expect(res.message).toContain("可预约")
   })
 
   test("记录超过扫描上限时保守提示顾问确认", async () => {
@@ -132,9 +152,20 @@ describe("cloudfunctions/vehicleAvailabilityCheck integration", () => {
       endDate: "2099-08-02"
     })
 
-    expect(res.available).toBe(false)
+    expect(res.available).toBe(true)
     expect(res.truncated).toBe(true)
     expect(res.message).toContain("顾问确认")
+  })
+
+  test("已确认按日占用会阻止档期并返回特殊日期价格摘要", async () => {
+    const { mod } = loadModule({
+      vehicle: { _id: "vehicle_1", status: "idle", priceDay: 800 },
+      occupiedDates: ["2099-08-02"],
+      priceRules: [{ label: "暑期价", startDate: "2099-08-02", endDate: "2099-08-03", dailyPrice: 980, status: "active" }]
+    })
+    const res = await mod.main({ vehicleId: "vehicle_1", startDate: "2099-08-01", endDate: "2099-08-03" })
+    expect(res).toMatchObject({ ok: true, available: false, occupiedDayCount: 1 })
+    expect(res.priceSummary).toMatchObject({ baseDailyRate: 800, specialDayCount: 2, estimatedTotal: 2760 })
   })
 
   test("未登录、非法日期和停用车辆均不可查询", async () => {

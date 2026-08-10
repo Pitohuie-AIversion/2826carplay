@@ -93,6 +93,8 @@ describe("cloudfunctions/analyticsOverview integration", () => {
         { eventType: "vehicle_detail", vehicleId: "vehicle_1", createdAt: new Date(now - 800) },
         { eventType: "pricing_view", vehicleId: "vehicle_1", createdAt: new Date(now - 750) },
         { eventType: "rental_rules_view", vehicleId: "vehicle_1", createdAt: new Date(now - 725) },
+        { eventType: "trusted_profile_view", vehicleId: "vehicle_1", createdAt: new Date(now - 715) },
+        { eventType: "phone_call", vehicleId: "vehicle_1", createdAt: new Date(now - 710) },
         { eventType: "booking_start", vehicleId: "vehicle_1", createdAt: new Date(now - 700) },
         { eventType: "booking_submit", vehicleId: "vehicle_1", createdAt: new Date(now - 600) },
         { eventType: "favorite_add", vehicleId: "vehicle_1", createdAt: new Date(now - 500) }
@@ -122,10 +124,13 @@ describe("cloudfunctions/analyticsOverview integration", () => {
       favorite_add: 1,
       pricing_view: 1,
       rental_rules_view: 1,
-      phone_call: 0,
+      trusted_profile_view: 1,
+      phone_call: 1,
       share: 0,
       availability_available: 0,
       availability_conflict: 0,
+      availability_shortage: 0,
+      price_change_view: 0,
       availability_unknown: 0
     })
     expect(res.conversionRate).toBe(50)
@@ -138,9 +143,17 @@ describe("cloudfunctions/analyticsOverview integration", () => {
         bookingSubmits: 1,
         favorites: 1,
         pricingViews: 1,
-        rentalRuleViews: 1
+        rentalRuleViews: 1,
+        trustProfileViews: 1
       })
     )
+    expect(res.trustProfileMetrics).toEqual({
+      profileViews: 1,
+      phoneConsultations: 1,
+      bookingStarts: 1,
+      phoneConsultationRate: 100,
+      bookingStartRate: 100
+    })
     expect(res.topVehicles[0]).not.toHaveProperty("vin")
     expect(mocks.vehicleField).toHaveBeenCalledWith("vehicle_1", {
       brandModel: true

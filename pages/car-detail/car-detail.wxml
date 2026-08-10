@@ -210,6 +210,36 @@
     </view>
   </view>
 
+  <view class="info-card trust-profile-card ui-card">
+    <view class="section-heading trust-profile-heading">
+      <view class="section-heading-copy"><view class="section-mark"></view><view><view class="section-title">车辆可信档案</view><view class="section-kicker">TRUST PROFILE</view></view></view>
+      <view class="trust-status {{car.trustArchive.statusClass}}">{{car.trustArchive.statusText}}</view>
+    </view>
+    <view class="trust-profile-summary">
+      <view><view class="trust-profile-date">{{car.trustArchive.lastUpdatedText}}</view><view class="trust-profile-meta">{{car.trustArchive.freshnessText}} · 缺失 {{car.trustArchive.missingCount}} 项</view></view>
+      <view class="trust-profile-year">{{car.vehicleYear}}<text>年</text></view>
+    </view>
+    <view class="trust-boundary">档案状态来自运营人员维护的公开摘要；“已复核”不代表平台或第三方认证。</view>
+    <button class="disclosure-button" bindtap="handleToggleTrustArchive" hover-class="disclosure-button-pressed" aria-expanded="{{trustExpanded}}">
+      <text>{{trustExpanded ? '收起可信档案' : '查看车况与保障摘要'}}</text>
+      <view class="disclosure-chevron {{trustExpanded ? 'disclosure-chevron-open' : ''}}" aria-hidden="true"></view>
+    </button>
+    <view wx:if="{{trustExpanded}}" class="trust-profile-list">
+      <view class="trust-profile-item" wx:for="{{car.trustArchive.items}}" wx:key="key">
+        <view class="trust-profile-item-label">{{item.label}}</view>
+        <view class="trust-profile-item-value">{{item.value}}</view>
+        <view wx:if="{{item.summary}}" class="trust-profile-item-summary">{{item.summary}}</view>
+      </view>
+      <view class="trust-channel-card">
+        <view class="trust-channel-title">经营与客诉渠道</view>
+        <view class="trust-channel-row"><text>服务品牌</text><text>{{brandName}}</text></view>
+        <view class="trust-channel-row"><text>客服、监督与投诉</text><text>{{servicePhone}}</text></view>
+        <view class="trust-channel-note">经营主体材料可通过该渠道进一步核验；来电由人工登记处理，不承诺实时道路救援调度。</view>
+        <button class="trust-channel-call ui-btn ui-btn-ghost" bindtap="handlePhoneCall">电话咨询 / 投诉</button>
+      </view>
+    </view>
+  </view>
+
   <view class="info-card ui-card">
     <view class="section-heading">
       <view class="section-mark"></view>

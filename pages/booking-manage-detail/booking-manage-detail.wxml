@@ -279,12 +279,56 @@
     <button class="save-btn ui-btn ui-btn-primary action-with-icon" loading="{{loading}}" disabled="{{loading || coordinationLoading}}" bindtap="handleSaveRemark"><view wx:if="{{!loading}}" class="save-native-icon" aria-hidden="true"><view class="save-native-line"></view></view><text>{{loading ? '正在保存' : '保存备注'}}</text></button>
   </view>
 
+  <view wx:if="{{booking.status === 'confirmed' || booking.status === 'completed'}}" class="handover-card ui-card">
+    <view class="quote-heading">
+      <view><view class="quote-kicker">VEHICLE HANDOVER</view><view class="quote-title">取还车交接记录</view></view>
+      <view class="quote-version">{{handoverReadyForCompletion ? '可结束预约' : '待完成核对'}}</view>
+    </view>
+    <view class="handover-boundary">记录用于核对车辆现状，不是电子签章、租赁合同、自动定损或扣款依据。</view>
+    <view wx:if="{{booking.status === 'confirmed'}}" class="handover-editor">
+      <view class="handover-tabs">
+        <button class="handover-tab {{handoverStage === 'pickup' ? 'handover-tab-active' : ''}}" data-stage="pickup" disabled="{{handoverLoading}}" bindtap="handleHandoverStageChange">取车记录</button>
+        <button class="handover-tab {{handoverStage === 'return' ? 'handover-tab-active' : ''}}" data-stage="return" disabled="{{handoverLoading}}" bindtap="handleHandoverStageChange">还车记录</button>
+      </view>
+      <view wx:if="{{handoverStage === 'return' && !booking.pickupHandoverConfirmedAt}}" class="handover-warning">还车记录须在用户核对取车记录后提交。</view>
+      <view class="handover-form-grid">
+        <view class="quote-field"><view class="quote-label">当前里程（km）</view><input class="quote-input" type="number" maxlength="7" value="{{handoverForm.mileageKm}}" data-field="mileageKm" disabled="{{handoverLoading}}" bindinput="handleHandoverInput" placeholder="请输入整数" aria-label="当前车辆里程" confirm-type="next" /></view>
+        <view class="quote-field"><view class="quote-label">能源类型</view><picker mode="selector" range="{{handoverEnergyOptions}}" value="{{handoverForm.energyType === 'electric' ? 1 : 0}}" disabled="{{handoverLoading}}" bindchange="handleHandoverEnergyType" aria-label="车辆能源类型" hover-class="quote-picker-pressed"><view class="quote-input quote-date"><text>{{handoverForm.energyType === 'electric' ? '纯电' : '燃油'}}</text><view class="picker-chevron" aria-hidden="true"></view></view></picker></view>
+        <view class="quote-field"><view class="quote-label">油量 / 电量（%）</view><input class="quote-input" type="number" maxlength="3" value="{{handoverForm.energyLevelPercent}}" data-field="energyLevelPercent" disabled="{{handoverLoading}}" bindinput="handleHandoverInput" placeholder="0 - 100" aria-label="车辆油量或电量百分比" confirm-type="done" /></view>
+      </view>
+      <view class="quote-field quote-field-full"><view class="quote-label">已知损伤情况（必填）</view><textarea class="quote-textarea" maxlength="500" value="{{handoverForm.damageNote}}" data-field="damageNote" disabled="{{handoverLoading}}" bindinput="handleHandoverInput" placeholder="无损伤时请明确填写“未发现已知损伤”" aria-label="车辆已知损伤情况" /><view class="quote-count">{{handoverForm.damageNote.length || 0}} / 500</view></view>
+      <view class="quote-field quote-field-full"><view class="quote-label">补充说明</view><textarea class="quote-textarea" maxlength="500" value="{{handoverForm.additionalNote}}" data-field="additionalNote" disabled="{{handoverLoading}}" bindinput="handleHandoverInput" placeholder="可选，补充钥匙、随车物品等情况" aria-label="车辆交接补充说明" /><view class="quote-count">{{handoverForm.additionalNote.length || 0}} / 500</view></view>
+      <view class="handover-photo-grid">
+        <button class="handover-photo" wx:for="{{handoverForm.photos}}" wx:key="angle" data-angle="{{item.angle}}" disabled="{{handoverLoading}}" bindtap="handleChooseHandoverPhoto">
+          <image wx:if="{{item.url}}" class="handover-photo-image" src="{{item.url}}" mode="aspectFill" lazy-load="{{true}}" fade-in="{{true}}" binderror="handleHandoverImageError" />
+          <view wx:else class="handover-photo-placeholder">＋<text>{{item.label}}</text></view>
+        </button>
+      </view>
+      <button class="ui-btn ui-btn-primary handover-submit" loading="{{handoverLoading}}" disabled="{{handoverLoading}}" bindtap="handleSubmitHandover">提交{{handoverStage === 'return' ? '还车' : '取车'}}记录</button>
+    </view>
+    <view wx:if="{{handoverHistory.length}}" class="handover-history">
+      <view class="quote-history-title">版本与审计记录</view>
+      <view class="handover-record" wx:for="{{handoverHistory}}" wx:key="id">
+        <view class="handover-record-head"><text>{{item.stageText}} v{{item.version}}</text><text>{{item.statusText}}</text></view>
+        <view class="handover-record-meta">{{item.mileageKm}} km · {{item.energyText}} · 提交 {{item.submittedAtText || '—'}}</view>
+        <view class="handover-record-note">已知损伤：{{item.damageNote || '—'}}</view>
+        <view wx:if="{{item.additionalNote}}" class="handover-record-note">补充：{{item.additionalNote}}</view>
+        <view wx:if="{{item.confirmedAtText}}" class="handover-confirmed">用户核对于 {{item.confirmedAtText}}</view>
+        <view wx:if="{{item.photos.length}}" class="handover-photo-grid handover-photo-grid-readonly">
+          <image class="handover-photo-image" wx:for="{{item.photos}}" wx:for-item="photo" wx:key="angle" src="{{photo.url}}" mode="aspectFill" lazy-load="{{true}}" fade-in="{{true}}" binderror="handleHandoverImageError" data-url="{{photo.url}}" bindtap="handlePreviewHandoverPhoto" hover-class="manage-detail-button-pressed" aria-role="button" />
+        </view>
+        <button wx:if="{{(item.id === booking.latestPickupHandoverId || item.id === booking.latestReturnHandoverId) && item.status !== 'archived'}}" class="ui-btn ui-btn-danger-ghost quote-expire-btn" data-id="{{item.id}}" data-stage="{{item.stage}}" disabled="{{handoverLoading}}" bindtap="handleArchiveHandover">归档并清理照片</button>
+      </view>
+    </view>
+    <view wx:else class="quote-empty">尚无交接记录。</view>
+  </view>
+
   <view class="action-card ui-card" wx:if="{{booking.status !== 'completed' && booking.status !== 'cancelled'}}">
     <view class="action-title note-title-with-icon"><view class="status-operation-native-icon" aria-hidden="true"><view class="status-operation-dot"></view></view><text>状态操作</text></view>
     <view class="action-tip"><view class="help-native-icon" aria-hidden="true"><view class="help-info-mark"></view></view><view>拨号不会自动改变状态，请在实际沟通完成后再标记“已联系”。</view></view>
     <view class="status-actions">
       <button wx:if="{{booking.status === 'pending'}}" class="status-btn status-btn-alt action-with-icon" disabled="{{loading || coordinationLoading || remarkDirty}}" data-status="contacted" bindtap="handleUpdateStatus" hover-class="{{loading || coordinationLoading || remarkDirty ? 'none' : 'manage-detail-button-pressed'}}"><view class="status-contact-native-icon" aria-hidden="true"></view><text>标记已联系</text></button>
-      <button wx:if="{{booking.status === 'confirmed'}}" class="status-btn action-with-icon" disabled="{{loading || coordinationLoading || quoteLoading || remarkDirty}}" data-status="completed" bindtap="handleUpdateStatus" hover-class="{{loading || coordinationLoading || quoteLoading || remarkDirty ? 'none' : 'manage-detail-button-pressed'}}"><view class="status-complete-native-icon" aria-hidden="true"></view><text>标记已完成</text></button>
+      <button wx:if="{{booking.status === 'confirmed'}}" class="status-btn action-with-icon" disabled="{{loading || coordinationLoading || quoteLoading || handoverLoading || remarkDirty || !handoverReadyForCompletion}}" data-status="completed" bindtap="handleUpdateStatus"><view class="status-complete-native-icon" aria-hidden="true"></view><text>{{handoverReadyForCompletion ? '标记已完成' : '待取还车核对'}}</text></button>
       <button class="status-btn status-btn-alt status-btn-danger status-btn-last action-with-icon" disabled="{{loading || coordinationLoading || quoteLoading || remarkDirty}}" data-status="cancelled" bindtap="handleUpdateStatus" hover-class="{{loading || coordinationLoading || quoteLoading || remarkDirty ? 'none' : 'manage-detail-button-pressed'}}"><view class="status-cancel-native-icon" aria-hidden="true"></view><text>取消预约</text></button>
     </view>
   </view>

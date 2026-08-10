@@ -1084,3 +1084,162 @@
   background: currentColor;
   content: "";
 }
+
+.date-cell-blocked {
+  border-color: rgba(196, 126, 77, 0.38);
+  background: rgba(151, 88, 51, 0.12);
+}
+
+.blocked-dot,
+.legend-blocked {
+  background: #d58b58;
+}
+
+.blocked-dot {
+  position: absolute;
+  right: 9rpx;
+  bottom: 9rpx;
+  width: 7rpx;
+  height: 7rpx;
+  border-radius: 50%;
+}
+
+.calendar-resource-card,
+.calendar-editor-card {
+  margin-top: 18rpx;
+}
+
+.resource-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+
+.resource-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18rpx;
+  padding: 18rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.07);
+  border-radius: 16rpx;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.resource-main {
+  min-width: 0;
+}
+
+.resource-title {
+  color: #d8e0ea;
+  font-size: 21rpx;
+  font-weight: 650;
+}
+
+.resource-meta,
+.resource-reason {
+  margin-top: 6rpx;
+  color: #718096;
+  font-size: 16rpx;
+}
+
+.resource-price {
+  margin-top: 7rpx;
+  color: #d5a36e;
+  font-size: 22rpx;
+  font-weight: 700;
+}
+
+.resource-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8rpx;
+}
+
+.resource-button,
+.calendar-save-button,
+.calendar-cancel-button {
+  margin: 0;
+  border: 1rpx solid rgba(102, 143, 196, 0.28);
+  border-radius: 12rpx;
+  background: rgba(69, 105, 151, 0.12);
+  color: #9fb9da;
+  font-size: 17rpx;
+  line-height: 2.3;
+}
+
+.resource-button-danger {
+  border-color: rgba(190, 103, 85, 0.3);
+  background: rgba(145, 70, 58, 0.12);
+  color: #d59b8f;
+}
+
+.compact-empty {
+  padding: 20rpx;
+}
+
+.calendar-form-control,
+.calendar-form-textarea {
+  width: 100%;
+  margin-top: 12rpx;
+  padding: 17rpx 18rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.08);
+  border-radius: 14rpx;
+  background: rgba(255, 255, 255, 0.035);
+  color: #cbd5e2;
+  font-size: 19rpx;
+  box-sizing: border-box;
+}
+
+.calendar-form-control-pressed {
+  border-color: rgba(91, 143, 210, 0.35);
+  background: rgba(70, 108, 157, 0.12);
+}
+
+.calendar-form-control .picker-chevron {
+  float: right;
+  width: 10rpx;
+  height: 10rpx;
+  margin-top: 5rpx;
+  border-right: 2rpx solid #6f829a;
+  border-bottom: 2rpx solid #6f829a;
+  transform: rotate(45deg);
+}
+
+.calendar-form-counter {
+  margin-top: 10rpx;
+  color: #66758a;
+  font-size: 15rpx;
+  text-align: right;
+}
+
+.calendar-form-readonly {
+  color: #d6a774;
+}
+
+.calendar-form-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12rpx;
+}
+
+.calendar-form-textarea {
+  min-height: 110rpx;
+}
+
+.calendar-form-actions {
+  display: flex;
+  gap: 12rpx;
+  margin-top: 14rpx;
+}
+
+.calendar-save-button,
+.calendar-cancel-button {
+  flex: 1;
+  padding: 5rpx 12rpx;
+}
+
+.calendar-save-button {
+  background: rgba(73, 116, 174, 0.24);
+  color: #c5d8f1;
+}

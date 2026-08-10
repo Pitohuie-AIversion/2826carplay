@@ -1298,3 +1298,27 @@
   border-top: 6rpx solid currentColor;
   content: "";
 }
+.archive-health-chip {
+  flex: 0 0 auto;
+  padding: 8rpx 16rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.14);
+  border-radius: 999rpx;
+  color: #d6dde8;
+  font-size: 22rpx;
+}
+
+.archive-health-current {
+  border-color: rgba(68, 211, 146, 0.45);
+  color: #72dda9;
+}
+
+.archive-health-pending {
+  border-color: rgba(82, 143, 255, 0.5);
+  color: #8ab3ff;
+}
+
+.archive-health-stale,
+.archive-health-missing {
+  border-color: rgba(242, 153, 74, 0.5);
+  color: #f5b46e;
+}

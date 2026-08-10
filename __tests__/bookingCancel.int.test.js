@@ -4,6 +4,8 @@ function createMockDb({ currentData, updateResult }) {
   const currentGet = jest.fn().mockResolvedValue({ data: currentData })
   const update = jest.fn().mockResolvedValue(updateResult)
   const auditAdd = jest.fn().mockResolvedValue({ _id: "audit_1" })
+  const dayRemove = jest.fn().mockResolvedValue({ stats: { removed: 1 } })
+  const blockUpdate = jest.fn().mockResolvedValue({ stats: { updated: 1 } })
 
   const bookingsDoc = jest.fn(() => ({
     get: currentGet
@@ -24,9 +26,19 @@ function createMockDb({ currentData, updateResult }) {
       if (name === "audit_logs") {
         return { add: auditAdd }
       }
+      if (name === "vehicle_calendar_days") {
+        return {
+          where: jest.fn(() => ({ limit: jest.fn(() => ({ get: jest.fn().mockResolvedValue({ data: [{ _id: "day_1", bookingId: "booking_1" }] }) })) })),
+          doc: jest.fn(() => ({ remove: dayRemove }))
+        }
+      }
+      if (name === "vehicle_availability_blocks") {
+        return { doc: jest.fn(() => ({ update: blockUpdate })) }
+      }
       throw new Error(`Unexpected collection: ${name}`)
     }),
-    serverDate
+    serverDate,
+    runTransaction: jest.fn((callback) => callback(db))
   }
 
   return {
@@ -36,7 +48,9 @@ function createMockDb({ currentData, updateResult }) {
     currentGet,
     update,
     auditAdd,
-    serverDateValue
+    serverDateValue,
+    dayRemove,
+    blockUpdate
   }
 }
 
@@ -116,6 +130,18 @@ describe("cloudfunctions/bookingCancel integration", () => {
     expect(res.ok).toBe(false)
     expect(res.code).toBe("STATUS_NOT_ALLOWED")
     expect(mocks.update).not.toHaveBeenCalled()
+  })
+
+  test("取消已确认预约时同步释放按日占用", async () => {
+    const mocks = createMockDb({
+      currentData: { _id: "booking_1", openid: "user_openid", vehicleId: "vehicle_1", status: "confirmed" },
+      updateResult: { stats: { updated: 1 } }
+    })
+    const bookingCancel = await loadBookingCancelWith({ openid: "user_openid", mockDb: mocks.db })
+    const res = await bookingCancel.main({ id: "booking_1" })
+    expect(res.ok).toBe(true)
+    expect(mocks.dayRemove).toHaveBeenCalledTimes(1)
+    expect(mocks.blockUpdate).toHaveBeenCalledWith({ data: expect.objectContaining({ status: "released", releaseReason: "用户取消已确认预约" }) })
   })
 
   test("不能取消别人的预约", async () => {

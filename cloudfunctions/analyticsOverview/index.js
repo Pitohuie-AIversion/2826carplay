@@ -41,10 +41,13 @@ const EVENT_TYPES = [
   "favorite_add",
   "pricing_view",
   "rental_rules_view",
+  "trusted_profile_view",
   "phone_call",
   "share",
   "availability_available",
   "availability_conflict",
+  "availability_shortage",
+  "price_change_view",
   "availability_unknown"
 ]
 
@@ -276,6 +279,7 @@ exports.main = async (event) => {
         favorites: 0,
         pricingViews: 0,
         rentalRuleViews: 0,
+        trustProfileViews: 0,
         score: 0
       }
       if (item.eventType === "vehicle_detail") {
@@ -296,6 +300,9 @@ exports.main = async (event) => {
       } else if (item.eventType === "rental_rules_view") {
         current.rentalRuleViews += 1
         current.score += 1
+      } else if (item.eventType === "trusted_profile_view") {
+        current.trustProfileViews += 1
+        current.score += 1
       }
       vehicleScores[vehicleId] = current
     })
@@ -310,6 +317,17 @@ exports.main = async (event) => {
       truncated: records.truncated,
       metrics,
       quoteMetrics: buildQuoteMetrics(bookingRecords.list, quoteRecords.list, start, now),
+      trustProfileMetrics: {
+        profileViews: metrics.trusted_profile_view,
+        phoneConsultations: metrics.phone_call,
+        bookingStarts: metrics.booking_start,
+        phoneConsultationRate: metrics.trusted_profile_view
+          ? Math.round((metrics.phone_call / metrics.trusted_profile_view) * 1000) / 10
+          : 0,
+        bookingStartRate: metrics.trusted_profile_view
+          ? Math.round((metrics.booking_start / metrics.trusted_profile_view) * 1000) / 10
+          : 0
+      },
       conversionRate:
         metrics.vehicle_detail > 0
           ? Math.round((metrics.booking_submit / metrics.vehicle_detail) * 1000) / 10

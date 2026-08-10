@@ -18,6 +18,10 @@ const OPERATION_CONFIG_FIELDS = {
 }
 const CONFIG_KEY = "operation_settings"
 const REQUIRED_COLLECTIONS = [
+  { key: "vehicle_availability_blocks", label: "车辆档期区间" },
+  { key: "vehicle_calendar_days", label: "车辆按日占用锁" },
+  { key: "vehicle_price_rules", label: "车辆特殊价格规则" },
+  { key: "booking_handovers", label: "预约交接记录" },
   { key: "vehicles", label: "车辆数据" },
   { key: "bookings", label: "预约数据" },
   { key: "booking_quotes", label: "报价版本" },
@@ -31,6 +35,13 @@ const REQUIRED_COLLECTIONS = [
   { key: "analytics_events", label: "匿名分析事件" }
 ]
 const VOLUME_CHECKS = [
+  {
+    key: "vehicle_calendar_days",
+    label: "车辆按日占用规模",
+    warningAt: 4500,
+    featureLimit: 5000,
+    recommendation: "请归档已释放或已完成预约对应的历史日锁"
+  },
   {
     key: "vehicles",
     label: "车辆记录规模",

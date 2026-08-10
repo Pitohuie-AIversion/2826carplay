@@ -14,7 +14,7 @@ function buildMetrics(metrics, conversionRate) {
   const source = metrics && typeof metrics === "object" ? metrics : {}
   return [
     { key: "detail", label: "详情浏览", value: Number(source.vehicle_detail) || 0, tone: "primary", icon: "eye" },
-    { key: "pricing", label: "查看费用", value: Number(source.pricing_view) || 0, tone: "warning", icon: "calendar" },
+    { key: "pricing", label: "查看费用", value: (Number(source.pricing_view) || 0) + (Number(source.price_change_view) || 0), tone: "warning", icon: "calendar" },
     { key: "submit", label: "提交成功", value: Number(source.booking_submit) || 0, tone: "success", icon: "check" },
     { key: "conversion", label: "详情转化率", value: `${Number(conversionRate) || 0}%`, tone: "accent", icon: "chart" }
   ]
@@ -50,8 +50,9 @@ function buildDecisionItems(metrics) {
       value:
         (Number(source.availability_available) || 0) +
         (Number(source.availability_conflict) || 0) +
+        (Number(source.availability_shortage) || 0) +
         (Number(source.availability_unknown) || 0),
-      meta: `可咨询 ${Number(source.availability_available) || 0} · 有冲突 ${Number(source.availability_conflict) || 0} · 未知 ${Number(source.availability_unknown) || 0}`
+      meta: `可预约 ${Number(source.availability_available) || 0} · 档期不足 ${(Number(source.availability_shortage) || 0) + (Number(source.availability_conflict) || 0)} · 特殊价查看 ${Number(source.price_change_view) || 0}`
     }
   ]
 }
@@ -63,6 +64,15 @@ function buildQuoteMetrics(metrics) {
     { key: "confirmed", label: "报价确认率", value: `${Number(source.quoteConfirmationRate) || 0}%`, meta: `${Number(source.confirmedQuoteVersions) || 0} / ${Number(source.sentQuoteVersions) || 0} 个版本` },
     { key: "duration", label: "平均确认耗时", value: `${Number(source.averageConfirmationHours) || 0} 小时`, meta: "从报价发送到用户确认" },
     { key: "adjustment", label: "调整申请", value: Number(source.adjustmentRequests) || 0, meta: "用户主动申请调整次数" }
+  ]
+}
+
+function buildTrustProfileMetrics(metrics) {
+  const source = metrics && typeof metrics === "object" ? metrics : {}
+  return [
+    { key: "views", label: "档案展开查看", value: Number(source.profileViews) || 0, meta: "用户主动展开可信档案" },
+    { key: "phone", label: "电话咨询比", value: `${Number(source.phoneConsultationRate) || 0}%`, meta: `${Number(source.phoneConsultations) || 0} 次电话 / ${Number(source.profileViews) || 0} 次档案查看` },
+    { key: "booking", label: "预约发起比", value: `${Number(source.bookingStartRate) || 0}%`, meta: `${Number(source.bookingStarts) || 0} 次预约 / ${Number(source.profileViews) || 0} 次档案查看` }
   ]
 }
 
@@ -93,6 +103,7 @@ Page({
     funnelItems: [],
     decisionItems: [],
     quoteMetricItems: [],
+    trustProfileMetricItems: [],
     trendItems: [],
     topVehicles: [],
     truncated: false,
@@ -344,6 +355,7 @@ Page({
           funnelItems: buildFunnel(result.metrics),
           decisionItems: buildDecisionItems(result.metrics),
           quoteMetricItems: buildQuoteMetrics(result.quoteMetrics),
+          trustProfileMetricItems: buildTrustProfileMetrics(result.trustProfileMetrics),
           trendItems: buildTrend(result.trend),
           topVehicles: Array.isArray(result.topVehicles) ? result.topVehicles : [],
           truncated: Boolean(result.truncated || result.quoteDataTruncated)

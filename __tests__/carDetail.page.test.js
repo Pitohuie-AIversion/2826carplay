@@ -119,6 +119,36 @@ describe("pages/car-detail 客户侧车辆状态", () => {
     expect(wxmlSource).not.toContain("报价已生效")
   })
 
+  test("可信档案按需展开并只记录一次匿名查看", () => {
+    global.wx = { setNavigationBarTitle: jest.fn() }
+    const page = createPage(loadPageDefinition())
+    const { trackEvent } = require("../shared/analytics")
+    trackEvent.mockClear()
+    page.data.carId = "vehicle-trust"
+    page.applyCar({
+      id: "vehicle-trust",
+      name: "BMW M4",
+      status: "available",
+      images: [],
+      trustArchive: {
+        status: "pending",
+        statusText: "资料待复核",
+        lastUpdatedDate: "2026-08-01",
+        freshnessDays: 8,
+        missingCount: 0,
+        items: [{ key: "inspection", label: "最近检查", value: "2026-08-01" }]
+      }
+    })
+
+    expect(page.data.car.trustArchive.statusClass).toBe("trust-status-pending")
+    page.handleToggleTrustArchive()
+    page.handleToggleTrustArchive()
+    page.handleToggleTrustArchive()
+    expect(trackEvent.mock.calls.filter(([type]) => type === "trusted_profile_view")).toEqual([
+      ["trusted_profile_view", "vehicle-trust"]
+    ])
+  })
+
   test("点击车辆图片可从当前位置打开全屏预览", () => {
     global.wx = {
       setNavigationBarTitle: jest.fn(),

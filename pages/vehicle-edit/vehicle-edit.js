@@ -41,6 +41,11 @@ const FUEL_TYPE_LABEL_MAP = {
   hybrid: "混动"
 }
 
+const ARCHIVE_REVIEW_LABEL_MAP = {
+  pending: "待复核",
+  reviewed: "已复核"
+}
+
 const FIELD_LABEL_MAP = {
   id: "车辆ID",
   plateNumber: "车牌号",
@@ -56,7 +61,18 @@ const FIELD_LABEL_MAP = {
   vin: "VIN",
   engineNumber: "发动机号",
   publicDescription: "公开说明",
-  note: "内部备注"
+  note: "内部备注",
+  publicMaterialsUpdatedDate: "实拍/资料更新日期",
+  publicInspectionDate: "最近保养/检查日期",
+  publicInspectionSummary: "保养/检查摘要",
+  publicExteriorSummary: "已知外观情况",
+  publicInsuranceSummary: "商业保险摘要",
+  publicAssistanceSummary: "救援能力摘要",
+  publicArchiveReviewStatus: "公开档案复核状态",
+  internalMaintenanceRecord: "内部保养记录",
+  internalInspectionRecord: "内部检查记录",
+  internalInsuranceRecord: "内部保险记录",
+  internalArchiveNote: "内部档案说明"
 }
 
 function formatDate(date) {
@@ -86,14 +102,17 @@ Page({
     statusLabels: buildLabels(vehicleUtils.VEHICLE_STATUSES, STATUS_LABEL_MAP),
     transmissionLabels: buildLabels(vehicleUtils.TRANSMISSION_TYPES, TRANSMISSION_LABEL_MAP),
     fuelTypeLabels: buildLabels(vehicleUtils.FUEL_TYPES, FUEL_TYPE_LABEL_MAP),
+    archiveReviewLabels: buildLabels(vehicleUtils.ARCHIVE_REVIEW_STATUSES, ARCHIVE_REVIEW_LABEL_MAP),
     vehicleTypeIndex: 0,
     statusIndex: 0,
     transmissionIndex: 0,
     fuelTypeIndex: 0,
+    archiveReviewIndex: 0,
     vehicleTypeLabel: "",
     statusLabel: "",
     transmissionLabel: "",
     fuelTypeLabel: "",
+    archiveReviewLabel: ARCHIVE_REVIEW_LABEL_MAP.pending,
     form: {
       plateNumber: "",
       vehicleType: "",
@@ -108,7 +127,18 @@ Page({
       vin: "",
       engineNumber: "",
       publicDescription: "",
-      note: ""
+      note: "",
+      publicMaterialsUpdatedDate: "",
+      publicInspectionDate: "",
+      publicInspectionSummary: "",
+      publicExteriorSummary: "",
+      publicInsuranceSummary: "",
+      publicAssistanceSummary: "",
+      publicArchiveReviewStatus: "pending",
+      internalMaintenanceRecord: "",
+      internalInspectionRecord: "",
+      internalInsuranceRecord: "",
+      internalArchiveNote: ""
     }
   },
 
@@ -262,6 +292,10 @@ Page({
         const status = vehicleUtils.VEHICLE_STATUSES[statusIndex] || ""
         const transmission = current.transmission || ""
         const fuelType = current.fuelType || ""
+        const archiveReviewStatus = vehicleUtils.ARCHIVE_REVIEW_STATUSES.includes(current.publicArchiveReviewStatus)
+          ? current.publicArchiveReviewStatus
+          : "pending"
+        const archiveReviewIndex = Math.max(vehicleUtils.ARCHIVE_REVIEW_STATUSES.indexOf(archiveReviewStatus), 0)
 
         this.setData({
           loading: false,
@@ -272,10 +306,12 @@ Page({
           statusIndex,
           transmissionIndex: transmission ? transmissionIndex : 0,
           fuelTypeIndex: fuelType ? fuelTypeIndex : 0,
+          archiveReviewIndex,
           vehicleTypeLabel: VEHICLE_TYPE_LABEL_MAP[vehicleType] || "",
           statusLabel: STATUS_LABEL_MAP[status] || "",
           transmissionLabel: TRANSMISSION_LABEL_MAP[transmission] || "",
           fuelTypeLabel: FUEL_TYPE_LABEL_MAP[fuelType] || "",
+          archiveReviewLabel: ARCHIVE_REVIEW_LABEL_MAP[archiveReviewStatus],
           formProgress: buildVehicleFormProgress({
             plateNumber: current.plateNumber,
             vehicleType,
@@ -297,7 +333,18 @@ Page({
             vin: current.vin || "",
             engineNumber: current.engineNumber || "",
             publicDescription: current.publicDescription || "",
-            note: current.note || ""
+            note: current.note || "",
+            publicMaterialsUpdatedDate: current.publicMaterialsUpdatedDate || "",
+            publicInspectionDate: current.publicInspectionDate || "",
+            publicInspectionSummary: current.publicInspectionSummary || "",
+            publicExteriorSummary: current.publicExteriorSummary || "",
+            publicInsuranceSummary: current.publicInsuranceSummary || "",
+            publicAssistanceSummary: current.publicAssistanceSummary || "",
+            publicArchiveReviewStatus: archiveReviewStatus,
+            internalMaintenanceRecord: current.internalMaintenanceRecord || "",
+            internalInspectionRecord: current.internalInspectionRecord || "",
+            internalInsuranceRecord: current.internalInsuranceRecord || "",
+            internalArchiveNote: current.internalArchiveNote || ""
           }
         })
         clearUnsaved(this)
@@ -354,6 +401,14 @@ Page({
 
     if (field === "publicDescription" || field === "note") {
       value = String(value || "").slice(0, 200)
+    }
+
+    if (vehicleUtils.PUBLIC_ARCHIVE_TEXT_FIELDS.includes(field)) {
+      value = String(value || "").slice(0, 200)
+    }
+
+    if (vehicleUtils.INTERNAL_ARCHIVE_TEXT_FIELDS.includes(field)) {
+      value = String(value || "").slice(0, 500)
     }
 
     if (field === "seats") {
@@ -420,6 +475,32 @@ Page({
     this.setData({
       "form.registerDate": event.detail.value,
       formProgress: buildVehicleFormProgress({ ...this.data.form, registerDate: event.detail.value })
+    })
+    markUnsaved(this, "车辆资料尚未保存，确定离开吗？")
+  },
+
+  handleArchiveDateChange(event) {
+    if (this.data.isSubmitting) {
+      return
+    }
+    const field = String((event.currentTarget.dataset && event.currentTarget.dataset.field) || "")
+    if (!["publicMaterialsUpdatedDate", "publicInspectionDate"].includes(field)) {
+      return
+    }
+    this.setData({ [`form.${field}`]: event.detail.value })
+    markUnsaved(this, "车辆资料尚未保存，确定离开吗？")
+  },
+
+  handleArchiveReviewChange(event) {
+    if (this.data.isSubmitting) {
+      return
+    }
+    const index = Number(event.detail.value) || 0
+    const value = vehicleUtils.ARCHIVE_REVIEW_STATUSES[index] || "pending"
+    this.setData({
+      archiveReviewIndex: index,
+      archiveReviewLabel: ARCHIVE_REVIEW_LABEL_MAP[value],
+      "form.publicArchiveReviewStatus": value
     })
     markUnsaved(this, "车辆资料尚未保存，确定离开吗？")
   },

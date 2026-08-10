@@ -9,6 +9,18 @@ const {
 
 const CURRENT_MONTH_KEY = normalizeMonthKey("")
 const BOOKING_CALENDAR_LOAD_TIMEOUT_MS = 15 * 1000
+const CALENDAR_SAVE_TIMEOUT_MS = 15 * 1000
+const BLOCK_KIND_OPTIONS = [
+  { value: "maintenance", label: "维修保养" },
+  { value: "hold", label: "人工保留" },
+  { value: "unavailable", label: "其他不可用" }
+]
+const BLOCK_KIND_LABELS = {
+  booking: "已确认预约",
+  maintenance: "维修保养",
+  hold: "人工保留",
+  unavailable: "其他不可用"
+}
 
 const STATUS_LABELS = {
   pending: "待联系",
@@ -28,6 +40,15 @@ function formatBooking(item) {
   }
 }
 
+function isInDate(item, date) {
+  return Boolean(date && String(item.startDate || "") <= date && String(item.endDate || item.startDate || "") >= date)
+}
+
+function formatBlock(item) {
+  const kind = String(item.kind || "unavailable")
+  return { ...item, kindLabel: BLOCK_KIND_LABELS[kind] || "不可用", canEdit: true }
+}
+
 Page({
   data: {
     pageAuthorized: false,
@@ -42,6 +63,22 @@ Page({
     calendarCells: [],
     selectedBookings: [],
     allBookings: [],
+    allBlocks: [],
+    allPriceRules: [],
+    selectedBlocks: [],
+    selectedPriceRules: [],
+    vehicles: [],
+    vehicleOptions: [],
+    blockKindOptions: BLOCK_KIND_OPTIONS,
+    blockKindLabels: BLOCK_KIND_OPTIONS.map((item) => item.label),
+    blockKindIndex: 0,
+    blockVehicleIndex: 0,
+    priceVehicleIndex: 0,
+    editingBlockId: "",
+    editingRuleId: "",
+    isSavingCalendar: false,
+    blockForm: { vehicleId: "", kind: "maintenance", startDate: "", endDate: "", reason: "" },
+    priceForm: { vehicleId: "", label: "", startDate: "", endDate: "", dailyPrice: "", reason: "" },
     summary: {
       bookingCount: 0,
       pendingCount: 0,
@@ -76,6 +113,10 @@ Page({
     this._bookingCalendarRequestId =
       Number(this._bookingCalendarRequestId || 0) + 1
     this.finishBookingCalendarRequestEffects()
+    if (this._calendarSaveTimer) {
+      clearTimeout(this._calendarSaveTimer)
+      this._calendarSaveTimer = null
+    }
   },
 
   handlePreviousMonth() {
@@ -113,7 +154,13 @@ Page({
     if (!date) {
       return
     }
-    this.setData({ selectedDate: date })
+    const blockForm = this.data.blockForm || {}
+    const priceForm = this.data.priceForm || {}
+    this.setData({
+      selectedDate: date,
+      blockForm: { ...blockForm, startDate: blockForm.startDate || date, endDate: blockForm.endDate || date },
+      priceForm: { ...priceForm, startDate: priceForm.startDate || date, endDate: priceForm.endDate || date }
+    })
     this.applyCalendar()
   },
 
@@ -137,6 +184,11 @@ Page({
     })
   },
 
+  handleSyncBookingOccupancy(event) {
+    const id = String(event.currentTarget.dataset.id || "")
+    if (id) this.saveCalendarChange("syncBookingOccupancy", { id })
+  },
+
   handleRetry() {
     this.fetchBookings()
   },
@@ -147,13 +199,25 @@ Page({
       this.data.allBookings,
       this.data.selectedDate
     )
+    const blocks = Array.isArray(this.data.allBlocks) ? this.data.allBlocks : []
+    const priceRules = Array.isArray(this.data.allPriceRules) ? this.data.allPriceRules : []
+    const cells = view.cells.map((cell) => {
+      if (cell.empty) return cell
+      const blockCount = blocks.filter((item) => isInDate(item, cell.date)).length
+      return { ...cell, blockCount, hasBlocked: blockCount > 0, ariaLabel: `${cell.ariaLabel}${blockCount ? `，${blockCount} 条不可用占用` : ""}` }
+    })
     this.setData({
       monthKey: view.monthKey,
       isCurrentMonth: view.monthKey === this.data.currentMonthKey,
       monthTitle: view.monthTitle,
       selectedDate: view.selectedDate,
-      calendarCells: view.cells,
-      selectedBookings: view.selectedBookings.map(formatBooking),
+      calendarCells: cells,
+      selectedBookings: view.selectedBookings.map((item) => formatBooking({
+        ...item,
+        occupancyMissing: item.status === "confirmed" && !blocks.some((block) => block.kind === "booking" && block.bookingId === item.id)
+      })),
+      selectedBlocks: blocks.filter((item) => isInDate(item, view.selectedDate)).map(formatBlock),
+      selectedPriceRules: priceRules.filter((item) => isInDate(item, view.selectedDate)),
       selectedConflictCount: view.selectedConflictCount,
       summary: view.summary
     })
@@ -224,6 +288,18 @@ Page({
           loading: false,
           loadError: "",
           allBookings: Array.isArray(result.list) ? result.list : [],
+          allBlocks: Array.isArray(result.blocks) ? result.blocks : [],
+          allPriceRules: Array.isArray(result.priceRules) ? result.priceRules : [],
+          vehicles: Array.isArray(result.vehicles) ? result.vehicles : [],
+          vehicleOptions: Array.isArray(result.vehicles) ? result.vehicles.map((item) => `${item.name} · 日租${item.priceDay ? `￥${item.priceDay}` : "待定"}`) : [],
+          blockForm: {
+            ...this.data.blockForm,
+            vehicleId: this.data.blockForm.vehicleId || String(result.vehicles && result.vehicles[0] && result.vehicles[0].id || "")
+          },
+          priceForm: {
+            ...this.data.priceForm,
+            vehicleId: this.data.priceForm.vehicleId || String(result.vehicles && result.vehicles[0] && result.vehicles[0].id || "")
+          },
           truncated: Boolean(result.truncated)
         })
         this.applyCalendar()
@@ -251,5 +327,142 @@ Page({
       this._bookingCalendarRequestDone = null
       done()
     }
+  },
+
+  handleBlockVehicleChange(event) {
+    const index = Number(event.detail && event.detail.value)
+    const vehicle = this.data.vehicles[index]
+    if (vehicle) this.setData({ blockVehicleIndex: index, blockForm: { ...this.data.blockForm, vehicleId: vehicle.id } })
+  },
+
+  handlePriceVehicleChange(event) {
+    const index = Number(event.detail && event.detail.value)
+    const vehicle = this.data.vehicles[index]
+    if (vehicle) this.setData({ priceVehicleIndex: index, priceForm: { ...this.data.priceForm, vehicleId: vehicle.id } })
+  },
+
+  handleBlockKindChange(event) {
+    const index = Number(event.detail && event.detail.value)
+    const option = BLOCK_KIND_OPTIONS[index]
+    if (option) this.setData({ blockKindIndex: index, blockForm: { ...this.data.blockForm, kind: option.value } })
+  },
+
+  handleCalendarFormInput(event) {
+    const form = String(event.currentTarget.dataset.form || "")
+    const field = String(event.currentTarget.dataset.field || "")
+    if (!["blockForm", "priceForm"].includes(form) || !field) return
+    const value = event.detail && event.detail.value !== undefined ? String(event.detail.value) : ""
+    this.setData({ [form]: { ...this.data[form], [field]: value } })
+  },
+
+  handleEditBlock(event) {
+    const id = String(event.currentTarget.dataset.id || "")
+    const item = this.data.allBlocks.find((block) => block.id === id)
+    if (!item) return
+    const vehicleIndex = Math.max(0, this.data.vehicles.findIndex((vehicle) => vehicle.id === item.vehicleId))
+    const kindIndex = Math.max(0, BLOCK_KIND_OPTIONS.findIndex((option) => option.value === item.kind))
+    this.setData({
+      editingBlockId: id,
+      blockVehicleIndex: vehicleIndex,
+      blockKindIndex: kindIndex,
+      blockForm: { vehicleId: item.vehicleId, kind: item.kind, startDate: item.startDate, endDate: item.endDate, reason: "" }
+    })
+  },
+
+  handleEditPriceRule(event) {
+    const id = String(event.currentTarget.dataset.id || "")
+    const item = this.data.allPriceRules.find((rule) => rule.id === id)
+    if (!item) return
+    const vehicleIndex = Math.max(0, this.data.vehicles.findIndex((vehicle) => vehicle.id === item.vehicleId))
+    this.setData({
+      editingRuleId: id,
+      priceVehicleIndex: vehicleIndex,
+      priceForm: { vehicleId: item.vehicleId, label: item.label, startDate: item.startDate, endDate: item.endDate, dailyPrice: String(item.dailyPrice), reason: "" }
+    })
+  },
+
+  handleResetBlockForm() {
+    const vehicle = this.data.vehicles[this.data.blockVehicleIndex]
+    this.setData({ editingBlockId: "", blockKindIndex: 0, blockForm: { vehicleId: vehicle ? vehicle.id : "", kind: "maintenance", startDate: this.data.selectedDate, endDate: this.data.selectedDate, reason: "" } })
+  },
+
+  handleResetPriceForm() {
+    const vehicle = this.data.vehicles[this.data.priceVehicleIndex]
+    this.setData({ editingRuleId: "", priceForm: { vehicleId: vehicle ? vehicle.id : "", label: "", startDate: this.data.selectedDate, endDate: this.data.selectedDate, dailyPrice: "", reason: "" } })
+  },
+
+  handleSaveBlock() {
+    this.saveCalendarChange(this.data.editingBlockId ? "updateBlock" : "createBlock", { ...this.data.blockForm, id: this.data.editingBlockId })
+  },
+
+  handleSavePriceRule() {
+    this.saveCalendarChange(this.data.editingRuleId ? "updatePriceRule" : "createPriceRule", { ...this.data.priceForm, id: this.data.editingRuleId, dailyPrice: Number(this.data.priceForm.dailyPrice) })
+  },
+
+  handleReleaseBlock(event) {
+    this.confirmRelease("releaseBlock", String(event.currentTarget.dataset.id || ""), "释放档期占用")
+  },
+
+  handleReleasePriceRule(event) {
+    this.confirmRelease("releasePriceRule", String(event.currentTarget.dataset.id || ""), "停用价格规则")
+  },
+
+  confirmRelease(action, id, title) {
+    if (!id || this.data.isSavingCalendar) return
+    const nativeAction = beginPageNativeAction(this)
+    wx.showModal({
+      title,
+      content: "请填写本次操作原因",
+      editable: true,
+      placeholderText: "必填，最多 200 字",
+      confirmText: action === "releaseBlock" ? "释放" : "停用",
+      confirmColor: "#d46868",
+      success: (res) => {
+        if (!isPageNativeActionActive(this, nativeAction)) return
+        if (!res.confirm) return
+        const reason = String(res.content || "").trim()
+        if (!reason) {
+          wx.showToast({ title: "请填写操作原因", icon: "none" })
+          return
+        }
+        this.saveCalendarChange(action, { id, reason })
+      }
+    })
+  },
+
+  saveCalendarChange(action, payload) {
+    if (this.data.isSavingCalendar || !wx.cloud || typeof wx.cloud.callFunction !== "function") return
+    this.setData({ isSavingCalendar: true })
+    let settled = false
+    const finish = () => {
+      if (settled) return false
+      settled = true
+      if (this._calendarSaveTimer) clearTimeout(this._calendarSaveTimer)
+      this._calendarSaveTimer = null
+      this.setData({ isSavingCalendar: false })
+      return true
+    }
+    this._calendarSaveTimer = setTimeout(() => {
+      if (finish()) wx.showToast({ title: "保存超时，请重试", icon: "none" })
+    }, CALENDAR_SAVE_TIMEOUT_MS)
+    wx.cloud.callFunction({
+      name: "vehicleCalendarManage",
+      data: { action, ...payload },
+      success: (res) => {
+        if (!finish()) return
+        const result = res && res.result
+        if (!result || !result.ok) {
+          wx.showToast({ title: result && result.message || "保存失败", icon: "none" })
+          return
+        }
+        wx.showToast({ title: "车辆日历已更新", icon: "success" })
+        this.handleResetBlockForm()
+        this.handleResetPriceForm()
+        this.fetchBookings()
+      },
+      fail: () => {
+        if (finish()) wx.showToast({ title: "保存失败，请重试", icon: "none" })
+      }
+    })
   }
 })

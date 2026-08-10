@@ -95,6 +95,14 @@ describe("cloudfunctions/vehicleList integration", () => {
           engineNumber: "ENGINE-MUST-NOT-BE-LISTED",
           publicDescription: "详情页字段",
           note: "内部备注不得进入列表",
+          publicMaterialsUpdatedDate: new Date(now).toISOString().slice(0, 10),
+          publicInspectionDate: new Date(now).toISOString().slice(0, 10),
+          publicInspectionSummary: "检查摘要",
+          publicExteriorSummary: "外观摘要",
+          publicInsuranceSummary: "保险摘要",
+          publicAssistanceSummary: "救援摘要",
+          publicArchiveReviewStatus: "reviewed",
+          internalMaintenanceRecord: "不得进入列表",
           imageList: ["cloud://img1", "cloud://img2"],
           coverImage: "cloud://img1",
           createdByOpenid: "admin_1",
@@ -142,6 +150,13 @@ describe("cloudfunctions/vehicleList integration", () => {
       maintenance: 1,
       recentAdded7d: 1
     })
+    expect(res.archiveDashboard).toEqual({
+      current: 1,
+      pending: 0,
+      stale: 0,
+      missing: 1,
+      attention: 1
+    })
     expect(res.recentAddedList).toEqual([
       {
         id: "v1",
@@ -163,6 +178,8 @@ describe("cloudfunctions/vehicleList integration", () => {
     expect(res.list[0]).not.toHaveProperty("engineNumber")
     expect(res.list[0]).not.toHaveProperty("publicDescription")
     expect(res.list[0]).not.toHaveProperty("note")
+    expect(res.list[0]).not.toHaveProperty("internalMaintenanceRecord")
+    expect(res.list[0].archiveHealth.status).toBe("current")
     expect(mocks.vehiclesField).toHaveBeenCalledWith({
       _id: true,
       plateNumber: true,
@@ -177,6 +194,13 @@ describe("cloudfunctions/vehicleList integration", () => {
       priceDay: true,
       imageList: true,
       coverImage: true,
+      publicMaterialsUpdatedDate: true,
+      publicInspectionDate: true,
+      publicInspectionSummary: true,
+      publicExteriorSummary: true,
+      publicInsuranceSummary: true,
+      publicAssistanceSummary: true,
+      publicArchiveReviewStatus: true,
       createdByOpenid: true,
       createdAt: true,
       updatedAt: true
@@ -234,6 +258,36 @@ describe("cloudfunctions/vehicleList integration", () => {
     })
     expect(res.recentAddedList).toHaveLength(1)
     expect(res.recentAddedList[0].id).toBe("v1")
+  })
+
+  test("后台列表将长期未更新的完整档案标记为过期", async () => {
+    const mocks = createMockDb({
+      rolesData: [{ role: "admin" }],
+      vehiclesData: [{
+        _id: "v-stale",
+        plateNumber: "京A12345",
+        vehicleType: "sedan",
+        brandModel: "BMW 740Li",
+        registerDate: "2024-01-01",
+        status: "idle",
+        publicMaterialsUpdatedDate: "2025-01-01",
+        publicInspectionDate: "2025-01-01",
+        publicInspectionSummary: "检查摘要",
+        publicExteriorSummary: "外观摘要",
+        publicInsuranceSummary: "保险摘要",
+        publicAssistanceSummary: "救援摘要",
+        publicArchiveReviewStatus: "reviewed",
+        createdAt: "2025-01-01T00:00:00.000Z",
+        updatedAt: "2025-01-01T00:00:00.000Z"
+      }]
+    })
+    const vehicleList = await loadVehicleListWith({ openid: "admin_openid", mockDb: mocks.db })
+    const res = await vehicleList.main({ status: "all" })
+
+    expect(res.ok).toBe(true)
+    expect(res.list[0].archiveHealth.status).toBe("stale")
+    expect(res.list[0].archiveHealth.statusText).toBe("资料已过期")
+    expect(res.archiveDashboard).toMatchObject({ stale: 1, attention: 1 })
   })
 
   test("admin 按关键词筛选车辆", async () => {

@@ -120,6 +120,7 @@ function buildViewData(result) {
   const unavailableLabels = {
     bookings: "预约数据",
     quotes: "报价数据",
+    handovers: "交接数据",
     favorites: "收藏数据",
     privacyRequests: "隐私申请"
   }
@@ -171,7 +172,19 @@ function buildViewData(result) {
     truncated,
     "metric-native-icon-privacy"
   )
-  const categoryList = [bookings, quotes, favorites, privacyRequests]
+  const handovers = decorateCategory(
+    "handovers",
+    normalizeCategory(categories.handovers, (item) => ({
+      ...item,
+      stageLabel: item.stage === "return" ? "还车" : "取车",
+      energyLabel: item.energyType === "electric" ? "电量" : "油量",
+      createdAtText: formatDisplayTime(item.createdAt)
+    })),
+    unavailable,
+    truncated,
+    "metric-native-icon-booking"
+  )
+  const categoryList = [bookings, quotes, handovers, favorites, privacyRequests]
   const verifiedCategoryCount = categoryList.filter((item) => item.isComplete).length
   const totalRecordCount = categoryList.reduce((total, item) => total + item.count, 0)
   const requestTypeMeta = REQUEST_TYPE_META[request.type] || {
@@ -213,6 +226,7 @@ function buildViewData(result) {
     },
     bookings,
     quotes,
+    handovers,
     favorites,
     privacyRequests
   }
@@ -242,6 +256,7 @@ Page({
     request: {},
     bookings: { count: 0, truncated: false, list: [] },
     quotes: { count: 0, truncated: false, list: [] },
+    handovers: { count: 0, truncated: false, list: [] },
     favorites: { count: 0, truncated: false, list: [] },
     privacyRequests: { count: 0, truncated: false, list: [] }
   },

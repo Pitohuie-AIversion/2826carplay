@@ -55,6 +55,14 @@ describe("cloudfunctions/vehiclePublicDetail integration", () => {
         seats: 5,
         priceDay: 1299,
         publicDescription: "公开车辆亮点",
+        publicMaterialsUpdatedDate: "2026-07-08",
+        publicInspectionDate: "2026-07-01",
+        publicInspectionSummary: "已完成常规保养与安全检查",
+        publicExteriorSummary: "左后轮毂有轻微使用痕迹",
+        publicInsuranceSummary: "商业保险在有效期内，具体范围以保单为准",
+        publicAssistanceSummary: "支持人工协调道路救援",
+        publicArchiveReviewStatus: "reviewed",
+        internalMaintenanceRecord: "内部工单 M-001 不得公开",
         note: "内部维修记录不得公开",
         imageList: ["cloud://img1", "cloud://img2"],
         coverImage: "cloud://img2",
@@ -83,7 +91,14 @@ describe("cloudfunctions/vehiclePublicDetail integration", () => {
       baseDailyRateText: "￥1299",
       estimateLabel: "基础日租参考"
     })
+    expect(res.car.trustArchive).toMatchObject({
+      status: "current",
+      statusText: "资料已复核",
+      lastUpdatedDate: "2026-07-08",
+      missingCount: 0
+    })
     expect(JSON.stringify(res.car)).not.toContain("内部维修记录不得公开")
+    expect(JSON.stringify(res.car)).not.toContain("内部工单 M-001")
     expect(mocks.vehiclesDoc).toHaveBeenCalledWith("car_1")
     expect(mocks.vehiclesField).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -97,6 +112,8 @@ describe("cloudfunctions/vehiclePublicDetail integration", () => {
     expect(projection).not.toHaveProperty("vin")
     expect(projection).not.toHaveProperty("engineNumber")
     expect(projection).not.toHaveProperty("note")
+    expect(projection).not.toHaveProperty("internalMaintenanceRecord")
+    expect(projection).not.toHaveProperty("internalInsuranceRecord")
   })
 
   test("缺少 id 返回 VALIDATION_ERROR", async () => {
@@ -127,6 +144,8 @@ describe("cloudfunctions/vehiclePublicDetail integration", () => {
     expect(res.car.seatsText).toBe("—")
     expect(res.car.priceSummary.hasBasePrice).toBe(false)
     expect(res.car.priceSummary.baseDailyRateText).toBe("待顾问确认")
+    expect(res.car.trustArchive.status).toBe("missing")
+    expect(res.car.trustArchive.missingCount).toBe(6)
     expect(JSON.stringify(res.car)).not.toContain("内部维修记录不得公开")
   })
 

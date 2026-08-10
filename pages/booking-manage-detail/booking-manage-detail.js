@@ -9,6 +9,13 @@ const {
 
 const BOOKING_DETAIL_LOAD_TIMEOUT_MS = 15 * 1000
 const BOOKING_DETAIL_WRITE_TIMEOUT_MS = 20 * 1000
+const HANDOVER_ANGLES = [
+  { angle: "front", label: "车头" },
+  { angle: "rear", label: "车尾" },
+  { angle: "left", label: "左侧" },
+  { angle: "right", label: "右侧" }
+]
+const HANDOVER_MAX_IMAGE_BYTES = 10 * 1024 * 1024
 
 const STATUS_TEXT_MAP = {
   pending: "待联系",
@@ -177,6 +184,32 @@ function getChinaToday() {
   return new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10)
 }
 
+function createHandoverForm() {
+  return {
+    mileageKm: "",
+    energyType: "fuel",
+    energyLevelPercent: "",
+    damageNote: "",
+    additionalNote: "",
+    photos: HANDOVER_ANGLES.map((item) => ({ ...item, fileId: "", url: "" }))
+  }
+}
+
+function normalizeHandover(item) {
+  const record = item && typeof item === "object" ? item : {}
+  const status = String(record.status || "")
+  return {
+    ...record,
+    id: String(record.id || ""),
+    stageText: record.stage === "return" ? "还车" : "取车",
+    statusText: { submitted: "待用户核对", confirmed: "用户已核对", superseded: "已被新版本替代", archived: "已归档" }[status] || status,
+    energyText: `${record.energyType === "electric" ? "电量" : "油量"} ${Math.max(0, Number(record.energyLevelPercent || 0))}%`,
+    submittedAtText: formatDisplayTime(record.submittedAt),
+    confirmedAtText: formatDisplayTime(record.confirmedAt),
+    photos: Array.isArray(record.photos) ? record.photos : []
+  }
+}
+
 function normalizeBooking(item) {
   const booking = item && typeof item === "object" ? item : {}
   const status = String(booking.status || "pending").trim() || "pending"
@@ -207,6 +240,12 @@ function normalizeBooking(item) {
     coordinationUpdatedAt: booking.coordinationUpdatedAt || "",
     latestQuoteId: booking.latestQuoteId || "",
     latestQuoteVersion: Math.max(0, Number(booking.latestQuoteVersion || 0)),
+    latestPickupHandoverId: booking.latestPickupHandoverId || "",
+    latestPickupHandoverVersion: Math.max(0, Number(booking.latestPickupHandoverVersion || 0)),
+    latestReturnHandoverId: booking.latestReturnHandoverId || "",
+    latestReturnHandoverVersion: Math.max(0, Number(booking.latestReturnHandoverVersion || 0)),
+    pickupHandoverConfirmedAt: booking.pickupHandoverConfirmedAt || "",
+    returnHandoverConfirmedAt: booking.returnHandoverConfirmedAt || "",
     status,
     createdAt: booking.createdAt || "",
     updatedAt: booking.updatedAt || ""
@@ -273,7 +312,13 @@ Page({
     quoteHistory: [],
     quotesUnavailable: false,
     quoteMinDate: getChinaToday(),
-    quoteForm: createQuoteForm()
+    quoteForm: createQuoteForm(),
+    handoverLoading: false,
+    handoverEnergyOptions: ["燃油", "纯电"],
+    handoverStage: "pickup",
+    handoverForm: createHandoverForm(),
+    handoverHistory: [],
+    handoverReadyForCompletion: false
   },
 
   onLoad(options) {
@@ -345,6 +390,7 @@ Page({
       this.data.loading ||
       this.data.coordinationLoading ||
       this.data.quoteLoading ||
+      this.data.handoverLoading ||
       this._bookingDetailMutationActive ||
       this._bookingDetailStatusFeedbackPending
     )
@@ -372,9 +418,11 @@ Page({
     this.clearBookingDetailMutationTimer()
     this._bookingDetailMutationActive = false
     this._bookingDetailStatusFeedbackPending = false
+    this._handoverRequestId = Number(this._handoverRequestId || 0) + 1
+    this.cleanupPendingHandoverUploads()
   },
 
-  applyBooking(booking, conflictResult, quoteResult) {
+  applyBooking(booking, conflictResult, quoteResult, handoverResult) {
     const conflictData = conflictResult && typeof conflictResult === "object"
       ? conflictResult
       : {}
@@ -383,6 +431,11 @@ Page({
     const quoteHistory = Array.isArray(quoteData.history)
       ? quoteData.history.map(normalizeQuote)
       : []
+    const handoverHistory = Array.isArray(handoverResult)
+      ? handoverResult.map(normalizeHandover)
+      : []
+    const latestPickup = handoverHistory.find((item) => item.id === booking.latestPickupHandoverId)
+    const latestReturn = handoverHistory.find((item) => item.id === booking.latestReturnHandoverId)
     this.setData({
       booking,
       remarkDirty: false,
@@ -402,6 +455,9 @@ Page({
       quoteHistory,
       quotesUnavailable: Boolean(quoteData.unavailable),
       quoteForm: createQuoteForm(quoteDraft),
+      handoverLoading: false,
+      handoverHistory,
+      handoverReadyForCompletion: Boolean(latestPickup && latestPickup.status === "confirmed" && latestReturn && latestReturn.status === "confirmed"),
       conflicts: Array.isArray(conflictData.list)
         ? conflictData.list.map(normalizeConflictBooking)
         : [],
@@ -514,7 +570,7 @@ Page({
           draft: result.quoteDraft,
           history: result.quoteHistory,
           unavailable: result.quotesUnavailable
-        })
+        }, result.handoverHistory)
         this.setData({ loading: false })
       },
       fail: (error) => {
@@ -863,6 +919,185 @@ Page({
         wx.showToast({
           title: `${labels[field]}复制失败`,
           icon: "none"
+        })
+      }
+    })
+  },
+
+  handleHandoverStageChange(event) {
+    if (this.data.handoverLoading) return
+    const stage = String(event.currentTarget.dataset.stage || "")
+    if (!["pickup", "return"].includes(stage) || stage === this.data.handoverStage) return
+    this.cleanupPendingHandoverUploads()
+    this.setData({ handoverStage: stage, handoverForm: createHandoverForm() })
+  },
+
+  handleHandoverInput(event) {
+    if (this.data.handoverLoading) return
+    const field = String(event.currentTarget.dataset.field || "")
+    if (!["mileageKm", "energyLevelPercent", "damageNote", "additionalNote"].includes(field)) return
+    const maxLength = field.includes("Note") ? 500 : 8
+    this.setData({ [`handoverForm.${field}`]: String(event.detail && event.detail.value || "").slice(0, maxLength) })
+  },
+
+  handleHandoverEnergyType(event) {
+    if (this.data.handoverLoading) return
+    const values = ["fuel", "electric"]
+    this.setData({ "handoverForm.energyType": values[Number(event.detail && event.detail.value)] || "fuel" })
+  },
+
+  handleChooseHandoverPhoto(event) {
+    if (this.data.handoverLoading || !wx.chooseImage || !wx.cloud || !wx.cloud.uploadFile) return
+    const angle = String(event.currentTarget.dataset.angle || "")
+    const index = this.data.handoverForm.photos.findIndex((item) => item.angle === angle)
+    if (index < 0) return
+    wx.chooseImage({
+      count: 1,
+      sizeType: ["compressed", "original"],
+      sourceType: ["camera", "album"],
+      success: (selection) => {
+        const path = selection && selection.tempFilePaths && selection.tempFilePaths[0]
+        const file = selection && selection.tempFiles && selection.tempFiles[0]
+        const extension = String(path || "").split(".").pop().toLowerCase()
+        if (!path || !["jpg", "jpeg", "png", "webp"].includes(extension) || Number(file && file.size || 0) > HANDOVER_MAX_IMAGE_BYTES) {
+          wx.showToast({ title: "图片格式或大小有误", icon: "none" })
+          return
+        }
+        const stage = this.data.handoverStage
+        const cloudPath = `handover-images/${this.data.id}/${stage}/${Date.now()}_${angle}.${extension}`
+        this.setData({ handoverLoading: true })
+        wx.cloud.uploadFile({
+          cloudPath,
+          filePath: path,
+          success: (upload) => {
+            const fileId = String(upload && upload.fileID || "")
+            if (!fileId) {
+              wx.showToast({ title: "图片上传失败", icon: "none" })
+              return
+            }
+            const oldFileId = this.data.handoverForm.photos[index].fileId
+            if (oldFileId) this.queueHandoverUploadCleanup([oldFileId], stage)
+            this.setData({
+              [`handoverForm.photos[${index}].fileId`]: fileId,
+              [`handoverForm.photos[${index}].url`]: path
+            })
+          },
+          fail: () => wx.showToast({ title: "图片上传失败，请重试", icon: "none" }),
+          complete: () => this.setData({ handoverLoading: false })
+        })
+      },
+      fail: (error) => {
+        if (!String(error && error.errMsg || "").includes("cancel")) wx.showToast({ title: "选择图片失败，请重试", icon: "none" })
+      }
+    })
+  },
+
+  queueHandoverUploadCleanup(fileList, stage) {
+    const files = (Array.isArray(fileList) ? fileList : []).filter(Boolean)
+    if (!files.length || !wx.cloud || !wx.cloud.callFunction) return
+    wx.cloud.callFunction({
+      name: "bookingHandover",
+      data: { action: "cleanupUpload", bookingId: this.data.id, stage: stage || this.data.handoverStage, fileList: files },
+      fail: () => {}
+    })
+  },
+
+  cleanupPendingHandoverUploads() {
+    const form = this.data && this.data.handoverForm
+    const fileList = form && Array.isArray(form.photos) ? form.photos.map((item) => item.fileId).filter(Boolean) : []
+    if (fileList.length) this.queueHandoverUploadCleanup(fileList, this.data.handoverStage)
+  },
+
+  handleSubmitHandover() {
+    if (this.data.handoverLoading || this.data.booking.status !== "confirmed") return
+    const form = this.data.handoverForm
+    const mileageKm = Number(form.mileageKm)
+    const energyLevelPercent = Number(form.energyLevelPercent)
+    if (!String(form.mileageKm).trim() || !String(form.energyLevelPercent).trim() || !Number.isInteger(mileageKm) || mileageKm < 0 || !Number.isInteger(energyLevelPercent) || energyLevelPercent < 0 || energyLevelPercent > 100 || !String(form.damageNote).trim() || form.photos.some((item) => !item.fileId)) {
+      wx.showToast({ title: "请完善交接信息", icon: "none" })
+      return
+    }
+    const stage = this.data.handoverStage
+    const requestId = `handover_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+    const requestSerial = Number(this._handoverRequestId || 0) + 1
+    this._handoverRequestId = requestSerial
+    this.setData({ handoverLoading: true })
+    wx.cloud.callFunction({
+      name: "bookingHandover",
+      data: {
+        action: "submit", bookingId: this.data.id, stage, requestId,
+        mileageKm, energyType: form.energyType, energyLevelPercent,
+        damageNote: String(form.damageNote).trim(), additionalNote: String(form.additionalNote).trim(),
+        photos: form.photos.map((item) => ({ angle: item.angle, fileId: item.fileId }))
+      },
+      success: (res) => {
+        if (this._handoverRequestId !== requestSerial) return
+        const result = res && res.result
+        if (!result || !result.ok) {
+          wx.showToast({ title: formatToastTitle(result && result.message, "提交失败"), icon: "none" })
+          return
+        }
+        this.setData({ handoverForm: createHandoverForm() })
+        wx.showToast({ title: result.duplicate ? "记录已提交" : "交接记录已提交", icon: "none" })
+        this._reloadHandoverAfterMutation = true
+      },
+      fail: () => wx.showToast({ title: "提交失败，请重试", icon: "none" }),
+      complete: () => {
+        if (this._handoverRequestId === requestSerial) {
+          this.setData({ handoverLoading: false })
+          if (this._reloadHandoverAfterMutation) {
+            this._reloadHandoverAfterMutation = false
+            this.loadDetail()
+          }
+        }
+      }
+    })
+  },
+
+  handlePreviewHandoverPhoto(event) {
+    const url = String(event.currentTarget.dataset.url || "")
+    const urls = (event.currentTarget.dataset.urls || []).filter(Boolean)
+    const action = beginPageNativeAction(this)
+    if (url && wx.previewImage) wx.previewImage({
+      current: url,
+      urls: urls.length ? urls : [url],
+      fail: () => {
+        if (isPageNativeActionActive(this, action)) wx.showToast({ title: "图片预览失败", icon: "none" })
+      }
+    })
+  },
+
+  handleHandoverImageError() {},
+
+  handleArchiveHandover(event) {
+    if (this.data.handoverLoading) return
+    const handoverId = String(event.currentTarget.dataset.id || "")
+    const stage = String(event.currentTarget.dataset.stage || "")
+    const action = beginPageNativeAction(this, { exclusiveKey: "handover-archive-confirmation" })
+    wx.showModal({
+      title: "归档交接记录",
+      content: "归档会清除该版本的交接照片，文字审计信息会保留。确认继续？",
+      confirmText: "确认归档",
+      confirmColor: "#d46868",
+      success: (choice) => {
+        if (!isPageNativeActionActive(this, action) || !choice || !choice.confirm) return
+        this.setData({ handoverLoading: true })
+        wx.cloud.callFunction({
+          name: "bookingHandover",
+          data: { action: "archive", bookingId: this.data.id, handoverId, stage },
+          success: (res) => {
+            const result = res && res.result
+            wx.showToast({ title: result && result.ok ? "已归档并进入清理队列" : formatToastTitle(result && result.message, "归档失败"), icon: "none" })
+            if (result && result.ok) this._reloadHandoverAfterMutation = true
+          },
+          fail: () => wx.showToast({ title: "归档失败，请重试", icon: "none" }),
+          complete: () => {
+            this.setData({ handoverLoading: false })
+            if (this._reloadHandoverAfterMutation) {
+              this._reloadHandoverAfterMutation = false
+              this.loadDetail()
+            }
+          }
         })
       }
     })

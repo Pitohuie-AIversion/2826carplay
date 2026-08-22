@@ -1,4 +1,5 @@
 const { trackEvent } = require("../../shared/analytics")
+const { sanitizeAttribution } = require("../../shared/contentAttribution")
 const { formatToastTitle } = require("../../shared/uiFeedback")
 const { requestOperationConfig } = require("../../shared/operationConfigRequest")
 const {
@@ -133,6 +134,7 @@ function buildBookingSummary(form, carName) {
 Page({
   data: {
     carId: "",
+    attribution: { channel: "", scene: "", contentId: "", vehicleId: "" },
     carName: "",
     loadingCar: true,
     loadError: false,
@@ -192,15 +194,18 @@ Page({
       } catch (error) {}
     }
 
-    const carId = String((options && options.carId) || "").trim()
+    const attribution = sanitizeAttribution(options)
+    const carId = attribution.vehicleId || String((options && options.carId) || "").trim()
     this.setData({
-      carId
+      carId,
+      attribution: sanitizeAttribution({ ...attribution, vehicleId: carId })
     })
 
     this.loadSavedContact()
     this.loadOperationConfig()
     this.loadBookingCar(carId)
     trackEvent("booking_start", carId)
+    if (attribution.contentId) trackEvent("content_booking_start", carId, this.data.attribution)
   },
 
   loadSavedContact() {
@@ -877,6 +882,7 @@ Page({
           endDate: submittedForm.endDate,
           city: submittedForm.city,
           note: submittedForm.note,
+          attribution: this.data.attribution,
           requestId
         },
         success: (res) => {
@@ -897,6 +903,9 @@ Page({
           }
 
           trackEvent("booking_submit", submittedVehicleId)
+          if (this.data.attribution.contentId) {
+            trackEvent("content_booking_submit", submittedVehicleId, this.data.attribution)
+          }
           if (typeof wx.setStorageSync === "function") {
             try {
               wx.setStorageSync(LAST_BOOKING_CONTACT_KEY, {

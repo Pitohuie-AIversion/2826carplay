@@ -4,7 +4,7 @@
   <view class="hero-card ui-card ui-card-gradient">
     <view class="hero-top">
       <view>
-        <view class="hero-kicker">{{type === 'privacy' ? 'PRIVACY & DATA' : type === 'rules' ? 'SERVICE RULES' : 'HELP CENTER'}}</view>
+        <view class="hero-kicker">{{guideMode ? 'SCENARIO GUIDE' : type === 'privacy' ? 'PRIVACY & DATA' : type === 'rules' ? 'SERVICE RULES' : 'HELP CENTER'}}</view>
         <view class="hero-title">{{pageTitle}}</view>
       </view>
       <image class="hero-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
@@ -12,7 +12,7 @@
     <view class="hero-desc">{{heroDesc}}</view>
   </view>
 
-  <view class="content-switcher ui-card">
+  <view wx:if="{{!guideMode}}" class="content-switcher ui-card">
     <view class="switcher-heading">
       <view>
         <view class="switcher-kicker">SERVICE GUIDE</view>
@@ -38,11 +38,16 @@
     </view>
   </view>
 
-  <view class="content-card ui-card">
+  <view wx:if="{{guideLoading}}" class="content-card ui-card guide-state">内容加载中…</view>
+  <view wx:elif="{{guideError}}" class="content-card ui-card guide-state">
+    <view>{{guideError}}</view>
+    <button class="ui-btn ui-btn-ghost guide-retry" bindtap="handleGuideRetry">重新加载</button>
+  </view>
+  <view wx:else class="content-card ui-card">
     <view class="document-head">
       <view class="document-mark"></view>
       <view>
-        <view class="document-label">OFFICIAL DOCUMENT</view>
+        <view class="document-label">{{guideMode ? 'TRAVEL & VEHICLE GUIDE' : 'OFFICIAL DOCUMENT'}}</view>
         <view class="document-title">{{documentTitle}}</view>
       </view>
       <view class="document-count"><block wx:if="{{sections.length}}"><text class="document-count-value">{{sections.length}}</text><text>节内容</text></block><block wx:else>官方内容</block></view>
@@ -91,6 +96,18 @@
     <view wx:else class="content-text">{{content}}</view>
   </view>
 
+  <view wx:if="{{guideMode && relatedVehicles.length}}" class="content-card ui-card guide-vehicles">
+    <view class="document-label">RELATED VEHICLES</view>
+    <view class="guide-vehicle" wx:for="{{relatedVehicles}}" wx:key="id">
+      <image wx:if="{{item.cover}}" class="guide-vehicle-cover" src="{{item.cover}}" mode="aspectFill" lazy-load="{{true}}" fade-in="{{true}}" data-id="{{item.id}}" binderror="handleGuideVehicleImageError" />
+      <view class="guide-vehicle-copy"><view class="guide-vehicle-name">{{item.name}}</view><view class="guide-vehicle-status">{{item.status}}</view></view>
+      <view class="guide-vehicle-actions">
+        <button class="ui-btn ui-btn-ghost" data-id="{{item.id}}" bindtap="handleGuideVehicleTap">查看车辆</button>
+        <button class="ui-btn ui-btn-primary" data-id="{{item.id}}" bindtap="handleGuideBookingTap">开始预约</button>
+      </view>
+    </view>
+  </view>
+
   <view wx:if="{{type === 'privacy'}}" class="rights-card ui-card">
     <view class="rights-icon" aria-hidden="true">
       <view class="rights-document-icon">
@@ -107,7 +124,7 @@
     </button>
   </view>
 
-  <view class="support-card ui-card">
+  <view wx:if="{{!guideMode}}" class="support-card ui-card">
     <view class="support-heading">
       <view>
         <view class="support-kicker">NEED ASSISTANCE</view>

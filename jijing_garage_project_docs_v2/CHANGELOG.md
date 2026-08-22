@@ -23,6 +23,33 @@ Agent 每完成一个 Phase，必须追加记录。
 
 ---
 
+## 2026-08-20 Phase 15 云端闭环
+
+完成阶段：Phase 15 云端结构阻塞修复。
+
+修改文件：
+- `DEPLOY_CHECKLIST.md`
+- `jijing_garage_project_docs_v2/CURRENT_PHASE.md`
+- `jijing_garage_project_docs_v2/CHANGELOG.md`
+
+新增文件：无。
+
+删除文件：无。
+
+主要改动：
+- 通过 CloudBase CLI 创建此前缺失的 `booking_quotes` 与 `booking_handovers` 集合。
+- 补齐报价的 `bookingId + version`、`bookingId + status`、`sentAt` 索引，以及交接记录的 `bookingId + stage + version`、`bookingId + status` 索引。
+- 两张集合均设置为 `ADMINONLY`，阻止小程序客户端直接读写，业务继续统一经过云函数鉴权。
+- 回读确认 15 个必需集合全部存在、53 个云函数全部部署完成，函数级安全规则继续要求已登录且非匿名身份。
+
+测试方式：CloudBase CLI 集合、索引、ACL、函数列表和无身份鉴权冒烟回读；本地 `npm run check:release`。
+
+已知问题：仍需使用真实微信管理员与普通用户身份完成报价、确认占用、交接照片上传和预约完成的端到端真机验收；订阅消息模板尚未配置。
+
+下一步建议：先完成 Phase 13—15 真机验收并记录结果，再决定是否开始 Phase 16。
+
+---
+
 ## 2026-08-10 Phase 15
 
 完成阶段：Phase 15（真实档期与价格日历）

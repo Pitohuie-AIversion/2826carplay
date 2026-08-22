@@ -532,6 +532,36 @@
       "memorySize": 256,
       "installDependency": true,
       "ignore": ["node_modules/**"]
+    },
+    {
+      "name": "contentGuideList",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": ["node_modules/**"]
+    },
+    {
+      "name": "contentGuideDetail",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": ["node_modules/**"]
+    },
+    {
+      "name": "contentGuideManage",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": ["node_modules/**"]
     }
   ]
 }

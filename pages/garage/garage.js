@@ -1,4 +1,5 @@
 const { trackEvent } = require("../../shared/analytics")
+const { sanitizeAttribution, buildQuery, hasAttribution } = require("../../shared/contentAttribution")
 const { requestOperationConfig } = require("../../shared/operationConfigRequest")
 const {
   activatePageNativeActions,
@@ -206,12 +207,17 @@ Page({
     pageSize: 20,
     total: 0,
     truncated: false,
-    hasMore: false
+    hasMore: false,
+    contentGuides: []
   },
 
-  onLoad() {
+  onLoad(options) {
     activatePageNativeActions(this)
     trackEvent("garage_view")
+    const attribution = sanitizeAttribution(options)
+    if (hasAttribution(attribution) && attribution.channel && attribution.channel !== "direct") {
+      trackEvent("share_open", attribution.vehicleId, attribution)
+    }
     const app = getApp()
     const env =
       app &&
@@ -234,6 +240,34 @@ Page({
   onShow() {
     this.loadOperationConfig()
     this.loadCars()
+    this.loadContentGuides()
+  },
+
+  loadContentGuides() {
+    if (!wx.cloud || typeof wx.cloud.callFunction !== "function") return
+    wx.cloud.callFunction({
+      name: "contentGuideList",
+      data: { limit: 4 },
+      success: (res) => {
+        const result = res && res.result
+        if (result && result.ok && Array.isArray(result.list)) {
+          this.setData({ contentGuides: result.list })
+        }
+      }
+    })
+  },
+
+  handleContentGuideTap(event) {
+    const contentId = String(event.currentTarget.dataset.id || "").trim()
+    const scene = String(event.currentTarget.dataset.scene || "").trim()
+    if (!contentId) return
+    const action = beginPageNativeAction(this)
+    wx.navigateTo({
+      url: `/pages/content-page/content-page?${buildQuery({ contentId, scene, channel: "direct" })}`,
+      fail: () => {
+        if (isPageNativeActionActive(this, action)) wx.showToast({ title: "场景指南打开失败", icon: "none" })
+      }
+    })
   },
 
   loadOperationConfig() {
@@ -612,7 +646,7 @@ Page({
     trackEvent("share")
     return {
       title: "极境车库",
-      path: "/pages/garage/garage"
+      path: `/pages/garage/garage?${buildQuery({ channel: "wechat_share" })}`
     }
   }
 })

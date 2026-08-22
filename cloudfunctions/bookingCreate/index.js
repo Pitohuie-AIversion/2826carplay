@@ -28,6 +28,9 @@ const RECENT_BOOKING_LIMIT = 100
 const FALLBACK_BATCH_SIZE = 100
 const FALLBACK_MAX_RECORDS = 1000
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]{12,64}$/
+const ATTRIBUTION_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/
+const ATTRIBUTION_CHANNELS = ["direct", "wechat_share", "moments", "qr", "official_account", "campaign"]
+const ATTRIBUTION_SCENES = ["weekend_trip", "business_reception", "group_travel", "ev_experience"]
 
 function createError(code, message, details) {
   const result = {
@@ -81,6 +84,11 @@ function getBookingVehicleName(vehicle) {
 
 function normalizeEvent(event) {
   const payload = event && typeof event === "object" ? event : {}
+  const source = payload.attribution && typeof payload.attribution === "object" ? payload.attribution : {}
+  const contentId = String(source.contentId || "").trim()
+  const channel = String(source.channel || "").trim()
+  const scene = String(source.scene || "").trim()
+  const sourceVehicleId = String(source.vehicleId || "").trim()
   return {
     vehicleId: normalizeText(payload.vehicleId, 64),
     userName: normalizeText(payload.userName, 20),
@@ -89,7 +97,13 @@ function normalizeEvent(event) {
     endDate: normalizeText(payload.endDate, 20),
     city: normalizeText(payload.city, 20),
     note: normalizeText(payload.note, 200),
-    requestId: String(payload.requestId || "").trim()
+    requestId: String(payload.requestId || "").trim(),
+    attribution: {
+      contentId: ATTRIBUTION_ID_PATTERN.test(contentId) ? contentId : "",
+      channel: ATTRIBUTION_CHANNELS.includes(channel) ? channel : "",
+      scene: ATTRIBUTION_SCENES.includes(scene) ? scene : "",
+      vehicleId: ATTRIBUTION_ID_PATTERN.test(sourceVehicleId) ? sourceVehicleId : ""
+    }
   }
 }
 
@@ -404,6 +418,14 @@ exports.main = async (event) => {
       endDate: input.endDate,
       city: input.city,
       note: input.note,
+      ...(input.attribution.contentId ? {
+        attribution: {
+          contentId: input.attribution.contentId,
+          channel: input.attribution.channel || "direct",
+          scene: input.attribution.scene,
+          vehicleId: input.vehicleId
+        }
+      } : {}),
       ...(input.requestId ? { requestId: input.requestId } : {}),
       status: "pending",
       createdAt: db.serverDate(),

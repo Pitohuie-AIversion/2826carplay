@@ -169,6 +169,14 @@
     <view class="notice-text">{{car.statusNoticeText}}</view>
   </view>
 
+  <view wx:if="{{relatedGuides.length}}" class="info-card related-guide-card ui-card">
+    <view class="section-heading"><view class="section-mark"></view><view><view class="section-title">相关路线与指南</view><view class="section-kicker">SCENARIO GUIDES</view></view></view>
+    <view class="related-guide-item" wx:for="{{relatedGuides}}" wx:key="id" data-id="{{item.id}}" data-scene="{{item.scenario}}" bindtap="handleRelatedGuideTap" hover-class="related-guide-item-pressed" aria-role="button">
+      <view class="related-guide-copy"><view class="related-guide-title">{{item.title}}</view><view class="related-guide-summary">{{item.summary}}</view></view>
+      <view class="related-guide-arrow">→</view>
+    </view>
+  </view>
+
   <view class="info-card ui-card">
     <view class="section-heading">
       <view class="section-mark"></view>

@@ -9,6 +9,58 @@
     #0b0d10;
 }
 
+.garage-guides {
+  margin: 22rpx 24rpx;
+  padding: 26rpx;
+}
+
+.garage-guide-track {
+  display: inline-flex;
+  padding-top: 18rpx;
+}
+
+.garage-guide-card {
+  width: 360rpx;
+  margin-right: 16rpx;
+  padding: 22rpx;
+  border: 1rpx solid rgba(102, 154, 239, 0.18);
+  border-radius: 16rpx;
+  background: rgba(76, 126, 210, 0.07);
+  box-sizing: border-box;
+}
+
+.garage-guide-card-pressed {
+  opacity: 0.72;
+  transform: scale(0.985);
+}
+
+.garage-guide-type,
+.garage-guide-open {
+  color: #7faaf0;
+  font-size: 17rpx;
+  letter-spacing: 1rpx;
+}
+
+.garage-guide-title {
+  margin-top: 10rpx;
+  color: #eef2f7;
+  font-size: 25rpx;
+  font-weight: 650;
+}
+
+.garage-guide-summary {
+  height: 72rpx;
+  margin-top: 10rpx;
+  overflow: hidden;
+  color: #8895a5;
+  font-size: 19rpx;
+  line-height: 1.5;
+}
+
+.garage-guide-open {
+  margin-top: 14rpx;
+}
+
 .ambient {
   position: absolute;
   border-radius: 50%;

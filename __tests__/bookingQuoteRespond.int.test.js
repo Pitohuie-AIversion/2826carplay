@@ -5,6 +5,7 @@ function createMockDb({ booking, quote, occupied = false }) {
   const quoteState = { ...quote, _id: "quote_1" }
   const serverDateValue = { __type: "serverDate" }
   const auditAdd = jest.fn().mockResolvedValue({ _id: "audit_1" })
+  const analyticsAdd = jest.fn().mockResolvedValue({ _id: "analytics_1" })
   const dayWrites = []
   const doc = (state) => ({
     field: () => ({ get: async () => ({ data: { ...state } }) }),
@@ -28,11 +29,12 @@ function createMockDb({ booking, quote, occupied = false }) {
       }
       if (name === "vehicle_availability_blocks") return { doc: (id) => ({ set: async () => ({ _id: id }) }) }
       if (name === "audit_logs") return { add: auditAdd }
+      if (name === "analytics_events") return { add: analyticsAdd }
       if (name === "error_logs") return { add: jest.fn().mockResolvedValue({ _id: "error_1" }) }
       throw new Error(`Unexpected collection: ${name}`)
     })
   }
-  return { db, bookingState, quoteState, auditAdd, dayWrites }
+  return { db, bookingState, quoteState, auditAdd, analyticsAdd, dayWrites }
 }
 
 async function loadModule(openid, db) {
@@ -48,7 +50,7 @@ async function loadModule(openid, db) {
 
 function createQuotedState() {
   return createMockDb({
-    booking: { openid: "user_1", status: "quoted", latestQuoteId: "quote_1", vehicleId: "vehicle_1", vehicleName: "BMW M4", startDate: "2099-08-01", endDate: "2099-08-03" },
+    booking: { openid: "user_1", status: "quoted", latestQuoteId: "quote_1", vehicleId: "vehicle_1", vehicleName: "BMW M4", startDate: "2099-08-01", endDate: "2099-08-03", attribution: { contentId: "guide_1", channel: "wechat_share", scene: "weekend_trip", vehicleId: "vehicle_1" } },
     quote: { bookingId: "booking_1", status: "sent", version: 1, validUntil: "2099-12-31", sentAt: "2026-08-09T01:00:00.000Z" }
   })
 }
@@ -64,6 +66,14 @@ describe("cloudfunctions/bookingQuoteRespond integration", () => {
     expect(mocks.bookingState.status).toBe("confirmed")
     expect(mocks.quoteState.status).toBe("confirmed")
     expect(mocks.dayWrites).toHaveLength(3)
+    expect(mocks.analyticsAdd).toHaveBeenCalledTimes(1)
+    expect(mocks.analyticsAdd.mock.calls[0][0].data).toMatchObject({
+      eventType: "content_booking_confirmed",
+      contentId: "guide_1",
+      vehicleId: "vehicle_1",
+      channel: "wechat_share",
+      scene: "weekend_trip"
+    })
   })
 
   test("并发档期已被占用时拒绝确认且不改变报价状态", async () => {

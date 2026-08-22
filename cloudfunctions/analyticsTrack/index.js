@@ -23,18 +23,28 @@ const ALLOWED_EVENTS = [
   "availability_conflict",
   "availability_shortage",
   "price_change_view",
-  "availability_unknown"
+  "availability_unknown",
+  "content_view",
+  "content_vehicle_click",
+  "share_open",
+  "content_booking_start",
+  "content_booking_submit"
 ]
 const OPTIONAL_VEHICLE_EVENTS = ["phone_call", "share"]
+const CONTENT_EVENTS = ["content_view", "content_vehicle_click", "share_open", "content_booking_start", "content_booking_submit"]
+const CONTENT_VEHICLE_EVENTS = ["content_vehicle_click", "content_booking_start", "content_booking_submit"]
+const CHANNELS = ["direct", "wechat_share", "moments", "qr", "official_account", "campaign"]
+const SCENES = ["weekend_trip", "business_reception", "group_travel", "ev_experience"]
+const ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/
 const VEHICLE_EVENTS = ALLOWED_EVENTS.filter(
-  (item) => item !== "garage_view" && !OPTIONAL_VEHICLE_EVENTS.includes(item)
+  (item) => item !== "garage_view" && !OPTIONAL_VEHICLE_EVENTS.includes(item) && !CONTENT_EVENTS.includes(item)
 )
 
-function buildEventDocumentId(openid, eventType, now) {
+function buildEventDocumentId(openid, eventType, eventKey, now) {
   const windowId = Math.floor(now / DEDUP_WINDOW_MS)
   const digest = crypto
     .createHmac("sha256", INSTANCE_DEDUP_SECRET)
-    .update(`${openid}|${eventType}|${windowId}`)
+    .update(`${openid}|${eventType}|${eventKey}|${windowId}`)
     .digest("hex")
     .slice(0, 32)
   return `analytics_${digest}`
@@ -56,10 +66,13 @@ function pruneRecentEventWrites(now) {
   }
 }
 
-async function writeAnonymousEvent(openid, eventType, vehicleId) {
+async function writeAnonymousEvent(openid, eventType, source) {
   const now = Date.now()
   pruneRecentEventWrites(now)
-  const documentId = buildEventDocumentId(openid, eventType, now)
+  const eventKey = CONTENT_EVENTS.includes(eventType)
+    ? [source.vehicleId, source.contentId, source.channel, source.scene].join("|")
+    : ""
+  const documentId = buildEventDocumentId(openid, eventType, eventKey, now)
   const existed = recentEventWrites.get(documentId)
   if (existed) {
     await existed.promise
@@ -69,7 +82,10 @@ async function writeAnonymousEvent(openid, eventType, vehicleId) {
   const writePromise = db.collection("analytics_events").doc(documentId).set({
     data: {
       eventType,
-      vehicleId: eventType === "garage_view" ? "" : vehicleId,
+      vehicleId: eventType === "garage_view" ? "" : source.vehicleId,
+      ...(source.contentId ? { contentId: source.contentId } : {}),
+      ...(source.channel ? { channel: source.channel } : {}),
+      ...(source.scene ? { scene: source.scene } : {}),
       createdAt: db.serverDate()
     }
   })
@@ -95,6 +111,9 @@ exports.main = async (event) => {
   const input = event && typeof event === "object" ? event : {}
   const eventType = String(input.eventType || "").trim()
   const vehicleId = String(input.vehicleId || "").trim()
+  const contentId = String(input.contentId || "").trim()
+  const channel = String(input.channel || "").trim()
+  const scene = String(input.scene || "").trim()
 
   try {
     if (!openid) {
@@ -125,8 +144,20 @@ exports.main = async (event) => {
         message: "车辆 ID 格式不正确"
       }
     }
+    if (CONTENT_EVENTS.includes(eventType)) {
+      if ((eventType !== "share_open" && !ID_PATTERN.test(contentId)) ||
+        (contentId && !ID_PATTERN.test(contentId)) ||
+        (CONTENT_VEHICLE_EVENTS.includes(eventType) && !ID_PATTERN.test(vehicleId)) ||
+        (vehicleId && !ID_PATTERN.test(vehicleId)) ||
+        (channel && !CHANNELS.includes(channel)) ||
+        (scene && !SCENES.includes(scene))) {
+        return { ok: false, code: "VALIDATION_ERROR", message: "内容归因参数格式不正确" }
+      }
+    } else if (contentId || channel || scene) {
+      return { ok: false, code: "VALIDATION_ERROR", message: "该事件不接受内容归因参数" }
+    }
 
-    await writeAnonymousEvent(openid, eventType, vehicleId)
+    await writeAnonymousEvent(openid, eventType, { vehicleId, contentId, channel, scene })
 
     return {
       ok: true

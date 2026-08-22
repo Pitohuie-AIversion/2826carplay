@@ -4,6 +4,46 @@
   background: linear-gradient(180deg, #121722 0%, #0b0d10 620rpx);
 }
 
+.related-guide-item {
+  display: flex;
+  align-items: center;
+  margin-top: 18rpx;
+  padding: 20rpx;
+  border: 1rpx solid rgba(94, 145, 229, 0.18);
+  border-radius: 14rpx;
+  background: rgba(65, 111, 184, 0.06);
+}
+
+.related-guide-item-pressed {
+  opacity: 0.72;
+  transform: scale(0.99);
+}
+
+.related-guide-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.related-guide-title {
+  color: #e9eef5;
+  font-size: 23rpx;
+  font-weight: 650;
+}
+
+.related-guide-summary {
+  margin-top: 7rpx;
+  overflow: hidden;
+  color: #8491a1;
+  font-size: 18rpx;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.related-guide-arrow {
+  margin-left: 18rpx;
+  color: #80aaf0;
+}
+
 .hero-shell,
 .hero-swiper {
   position: relative;

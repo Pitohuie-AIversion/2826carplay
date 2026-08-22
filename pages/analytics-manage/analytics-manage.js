@@ -76,6 +76,16 @@ function buildTrustProfileMetrics(metrics) {
   ]
 }
 
+function buildContentMetrics(metrics) {
+  const source = metrics && typeof metrics === "object" ? metrics : {}
+  return [
+    { key: "views", label: "内容浏览量", value: Number(source.views) || 0, meta: "已发布场景内容详情浏览" },
+    { key: "shares", label: "分享落地量", value: Number(source.shareOpens) || 0, meta: "携带合法来源参数的打开" },
+    { key: "submit", label: "内容到预约转化率", value: `${Number(source.bookingConversionRate) || 0}%`, meta: `${Number(source.bookingSubmits) || 0} 次预约提交` },
+    { key: "confirmed", label: "内容到确认预约转化率", value: `${Number(source.confirmedConversionRate) || 0}%`, meta: `${Number(source.confirmedBookings) || 0} 次报价确认` }
+  ]
+}
+
 function buildTrend(trend) {
   const list = Array.isArray(trend) ? trend : []
   const max = Math.max(...list.map((item) => Number(item.value) || 0), 1)
@@ -104,6 +114,10 @@ Page({
     decisionItems: [],
     quoteMetricItems: [],
     trustProfileMetricItems: [],
+    contentMetricItems: [],
+    topContents: [],
+    topContentVehicles: [],
+    topContentSources: [],
     trendItems: [],
     topVehicles: [],
     truncated: false,
@@ -356,6 +370,10 @@ Page({
           decisionItems: buildDecisionItems(result.metrics),
           quoteMetricItems: buildQuoteMetrics(result.quoteMetrics),
           trustProfileMetricItems: buildTrustProfileMetrics(result.trustProfileMetrics),
+          contentMetricItems: buildContentMetrics(result.contentAnalytics),
+          topContents: result.contentAnalytics && Array.isArray(result.contentAnalytics.topContents) ? result.contentAnalytics.topContents : [],
+          topContentVehicles: result.contentAnalytics && Array.isArray(result.contentAnalytics.topVehicles) ? result.contentAnalytics.topVehicles : [],
+          topContentSources: result.contentAnalytics && Array.isArray(result.contentAnalytics.topSources) ? result.contentAnalytics.topSources : [],
           trendItems: buildTrend(result.trend),
           topVehicles: Array.isArray(result.topVehicles) ? result.topVehicles : [],
           truncated: Boolean(result.truncated || result.quoteDataTruncated)

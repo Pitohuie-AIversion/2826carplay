@@ -16,6 +16,9 @@ const ANALYTICS_VEHICLE_FIELDS = {
 const ANALYTICS_EVENT_FIELDS = {
   eventType: true,
   vehicleId: true,
+  contentId: true,
+  channel: true,
+  scene: true,
   createdAt: true
 }
 const QUOTE_ANALYTICS_FIELDS = {
@@ -48,8 +51,68 @@ const EVENT_TYPES = [
   "availability_conflict",
   "availability_shortage",
   "price_change_view",
-  "availability_unknown"
+  "availability_unknown",
+  "content_view",
+  "content_vehicle_click",
+  "share_open",
+  "content_booking_start",
+  "content_booking_submit",
+  "content_booking_confirmed"
 ]
+
+function percent(numerator, denominator) {
+  return denominator ? Math.round((numerator / denominator) * 1000) / 10 : 0
+}
+
+function buildContentAnalytics(events) {
+  const types = ["content_view", "content_vehicle_click", "share_open", "content_booking_start", "content_booking_submit", "content_booking_confirmed"]
+  const contentEvents = events.filter((item) => types.includes(item.eventType))
+  const counts = types.reduce((result, type) => {
+    result[type] = contentEvents.filter((item) => item.eventType === type).length
+    return result
+  }, {})
+  const rank = (field) => {
+    const map = {}
+    contentEvents.forEach((item) => {
+      const key = String(item[field] || "").trim()
+      if (!key) return
+      const current = map[key] || { key, views: 0, vehicleClicks: 0, bookingStarts: 0, bookingSubmits: 0, confirmed: 0, shareOpens: 0 }
+      if (item.eventType === "content_view") current.views += 1
+      else if (item.eventType === "content_vehicle_click") current.vehicleClicks += 1
+      else if (item.eventType === "content_booking_start") current.bookingStarts += 1
+      else if (item.eventType === "content_booking_submit") current.bookingSubmits += 1
+      else if (item.eventType === "content_booking_confirmed") current.confirmed += 1
+      else if (item.eventType === "share_open") current.shareOpens += 1
+      current.score = current.views + current.shareOpens * 2 + current.vehicleClicks * 2 + current.bookingStarts * 3 + current.bookingSubmits * 5 + current.confirmed * 8
+      map[key] = current
+    })
+    return Object.values(map).sort((a, b) => b.score - a.score).slice(0, 10)
+  }
+  const sourceMap = {}
+  contentEvents.forEach((item) => {
+    const channel = String(item.channel || "direct")
+    const scene = String(item.scene || "")
+    const key = `${channel}:${scene || "all"}`
+    const current = sourceMap[key] || { key, channel, scene, events: 0, bookingSubmits: 0, confirmed: 0 }
+    current.events += 1
+    if (item.eventType === "content_booking_submit") current.bookingSubmits += 1
+    if (item.eventType === "content_booking_confirmed") current.confirmed += 1
+    sourceMap[key] = current
+  })
+  return {
+    views: counts.content_view,
+    shareOpens: counts.share_open,
+    vehicleClicks: counts.content_vehicle_click,
+    bookingStarts: counts.content_booking_start,
+    bookingSubmits: counts.content_booking_submit,
+    confirmedBookings: counts.content_booking_confirmed,
+    bookingConversionRate: percent(counts.content_booking_submit, counts.content_view),
+    confirmedConversionRate: percent(counts.content_booking_confirmed, counts.content_view),
+    topContents: rank("contentId"),
+    topVehicles: rank("vehicleId"),
+    topSources: Object.values(sourceMap).sort((a, b) => b.confirmed - a.confirmed || b.events - a.events).slice(0, 10)
+  }
+}
 
 function normalizeStringArray(value) {
   return Array.isArray(value)
@@ -316,6 +379,7 @@ exports.main = async (event) => {
       days,
       truncated: records.truncated,
       metrics,
+      contentAnalytics: buildContentAnalytics(events),
       quoteMetrics: buildQuoteMetrics(bookingRecords.list, quoteRecords.list, start, now),
       trustProfileMetrics: {
         profileViews: metrics.trusted_profile_view,

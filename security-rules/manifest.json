@@ -1,6 +1,7 @@
 {
   "database": {
     "ruleFile": "database-deny-client.json",
+    "indexFile": "database-indexes.json",
     "collections": [
       "analytics_events",
       "app_configs",
@@ -8,6 +9,7 @@
       "booking_handovers",
       "booking_quotes",
       "bookings",
+      "content_guides",
       "error_logs",
       "favorites",
       "pending_file_deletions",

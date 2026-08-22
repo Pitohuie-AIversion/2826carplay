@@ -86,6 +86,30 @@
 
     <view class="section-card ui-card">
       <view class="section-heading">
+        <view><view class="section-eyebrow">CONTENT ATTRIBUTION</view><view class="section-title">内容增长与渠道归因</view></view>
+        <view class="section-index">16</view>
+      </view>
+      <view class="decision-grid">
+        <view class="decision-item" wx:for="{{contentMetricItems}}" wx:key="key">
+          <view class="decision-label">{{item.label}}</view><view class="decision-value">{{item.value}}</view><view class="decision-meta">{{item.meta}}</view>
+        </view>
+      </view>
+      <view wx:if="{{topContents.length}}" class="content-rank-group">
+        <view class="decision-label">按内容排名</view>
+        <view class="rank-item" wx:for="{{topContents}}" wx:key="key"><view class="rank-number">{{index + 1}}</view><view class="rank-copy"><view class="rank-name">{{item.key}}</view><view class="rank-meta">浏览 {{item.views}} · 预约 {{item.bookingSubmits}} · 确认 {{item.confirmed}}</view></view><view class="rank-score">{{item.score}}</view></view>
+      </view>
+      <view wx:if="{{topContentVehicles.length}}" class="content-rank-group">
+        <view class="decision-label">按车辆排名</view>
+        <view class="rank-item" wx:for="{{topContentVehicles}}" wx:key="key"><view class="rank-number">{{index + 1}}</view><view class="rank-copy"><view class="rank-name">{{item.key}}</view><view class="rank-meta">内容点击 {{item.vehicleClicks}} · 预约 {{item.bookingSubmits}} · 确认 {{item.confirmed}}</view></view><view class="rank-score">{{item.score}}</view></view>
+      </view>
+      <view wx:if="{{topContentSources.length}}" class="content-rank-group">
+        <view class="decision-label">按来源排名</view>
+        <view class="rank-item" wx:for="{{topContentSources}}" wx:key="key"><view class="rank-number">{{index + 1}}</view><view class="rank-copy"><view class="rank-name">{{item.channel}} / {{item.scene || 'all'}}</view><view class="rank-meta">事件 {{item.events}} · 预约 {{item.bookingSubmits}} · 确认 {{item.confirmed}}</view></view></view>
+      </view>
+    </view>
+
+    <view class="section-card ui-card">
+      <view class="section-heading">
         <view>
           <view class="section-eyebrow">DECISION SIGNALS</view>
           <view class="section-title">用户决策行为</view>
@@ -213,7 +237,7 @@
     </view>
 
     <view wx:if="{{truncated}}" class="scope-tip"><view class="analytics-tip-native-icon analytics-warning-native-icon" aria-hidden="true"><view class="analytics-warning-native-mark"></view></view><text>数据量超过 5000 条，当前统计为最近记录的汇总结果。</text></view>
-    <view class="privacy-tip"><view class="analytics-tip-native-icon analytics-lock-native-icon" aria-hidden="true"><view class="analytics-lock-native-shackle"></view></view><text>仅统计事件类型、车辆 ID 与时间，不保存用户身份和预约表单内容。</text></view>
+    <view class="privacy-tip"><view class="analytics-tip-native-icon analytics-lock-native-icon" aria-hidden="true"><view class="analytics-lock-native-shackle"></view></view><text>仅统计事件类型、可选内容 ID、车辆 ID、渠道/场景枚举与时间，不保存用户身份、预约 ID 和表单内容。</text></view>
 
     <view wx:if="{{canCleanup}}" class="section-card cleanup-card ui-card">
       <view class="section-heading">

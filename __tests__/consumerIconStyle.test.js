@@ -350,7 +350,7 @@ describe("用户主流程原生图标", () => {
       })
     })
 
-    expect(dynamicImageCount).toBe(7)
+    expect(dynamicImageCount).toBe(8)
   })
 
   test("高频文字链接与图标操作保留最小点击热区", () => {
@@ -464,7 +464,7 @@ describe("用户主流程原生图标", () => {
       })
     })
 
-    expect(horizontalScrollCount).toBe(9)
+    expect(horizontalScrollCount).toBe(10)
   })
 
   test("全站用户可见缺省值不使用技术双短横或 N/A", () => {
@@ -714,7 +714,7 @@ describe("用户主流程原生图标", () => {
     const componentScripts = ["components/core-nav/core-nav.js"]
     const scripts = appConfig.pages.map((route) => `${route}.js`).concat(componentScripts)
     const expectedCounts = {
-      navigateTo: 25,
+      navigateTo: 29,
       redirectTo: 19,
       reLaunch: 17,
       navigateBack: 9,

@@ -114,6 +114,9 @@ describe("cloudfunctions/analyticsOverview integration", () => {
     expect(mocks.eventField).toHaveBeenCalledWith({
       eventType: true,
       vehicleId: true,
+      contentId: true,
+      channel: true,
+      scene: true,
       createdAt: true
     })
     expect(res.metrics).toEqual({
@@ -131,7 +134,13 @@ describe("cloudfunctions/analyticsOverview integration", () => {
       availability_conflict: 0,
       availability_shortage: 0,
       price_change_view: 0,
-      availability_unknown: 0
+      availability_unknown: 0,
+      content_view: 0,
+      content_vehicle_click: 0,
+      share_open: 0,
+      content_booking_start: 0,
+      content_booking_submit: 0,
+      content_booking_confirmed: 0
     })
     expect(res.conversionRate).toBe(50)
     expect(res.topVehicles[0]).toEqual(
@@ -239,5 +248,33 @@ describe("cloudfunctions/analyticsOverview integration", () => {
     expect(mocks.eventOrderBy).toHaveBeenCalledWith("createdAt", "desc")
     expect(mocks.eventSkip).toHaveBeenCalledWith(100)
     expect(mocks.eventSkip).toHaveBeenCalledWith(200)
+  })
+
+  test("内容归因按内容、车辆和来源汇总到确认预约", async () => {
+    const now = Date.now()
+    const base = { contentId: "guide_1", vehicleId: "vehicle_1", channel: "wechat_share", scene: "weekend_trip" }
+    const mocks = loadModule({
+      openid: "admin_openid",
+      roles: [{ openid: "admin_openid", role: "admin" }],
+      events: [
+        { ...base, eventType: "content_view", createdAt: new Date(now - 500) },
+        { ...base, eventType: "share_open", createdAt: new Date(now - 400) },
+        { ...base, eventType: "content_booking_submit", createdAt: new Date(now - 300) },
+        { ...base, eventType: "content_booking_confirmed", createdAt: new Date(now - 200) }
+      ],
+      vehicles: { vehicle_1: { brandModel: "Test Car" } }
+    })
+    const res = await mocks.mod.main({ days: 7 })
+    expect(res.contentAnalytics).toMatchObject({
+      views: 1,
+      shareOpens: 1,
+      bookingSubmits: 1,
+      confirmedBookings: 1,
+      bookingConversionRate: 100,
+      confirmedConversionRate: 100
+    })
+    expect(res.contentAnalytics.topContents[0]).toMatchObject({ key: "guide_1", confirmed: 1 })
+    expect(res.contentAnalytics.topVehicles[0]).toMatchObject({ key: "vehicle_1", bookingSubmits: 1 })
+    expect(res.contentAnalytics.topSources[0]).toMatchObject({ channel: "wechat_share", scene: "weekend_trip", confirmed: 1 })
   })
 })

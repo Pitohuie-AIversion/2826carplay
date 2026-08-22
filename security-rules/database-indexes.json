@@ -1,0 +1,25 @@
+{
+  "content_guides": [
+    {
+      "name": "content_guides_slug_unique",
+      "unique": true,
+      "fields": [{ "field": "slug", "order": "asc" }]
+    },
+    {
+      "name": "content_guides_status_publishedAt",
+      "unique": false,
+      "fields": [
+        { "field": "status", "order": "asc" },
+        { "field": "publishedAt", "order": "desc" }
+      ]
+    },
+    {
+      "name": "content_guides_scenario_status",
+      "unique": false,
+      "fields": [
+        { "field": "scenario", "order": "asc" },
+        { "field": "status", "order": "asc" }
+      ]
+    }
+  ]
+}

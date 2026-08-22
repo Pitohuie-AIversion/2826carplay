@@ -1,4 +1,5 @@
 const { trackEvent } = require("../../shared/analytics")
+const { sanitizeAttribution, buildQuery, hasAttribution } = require("../../shared/contentAttribution")
 const { formatToastTitle } = require("../../shared/uiFeedback")
 const { requestOperationConfig } = require("../../shared/operationConfigRequest")
 const {
@@ -180,6 +181,8 @@ Page({
     trustExpanded: false,
     carId: "",
     car: null,
+    relatedGuides: [],
+    attribution: { channel: "", scene: "", contentId: "", vehicleId: "" },
     currentImageIndex: 0,
     favoriteLoading: false,
     favorited: false,
@@ -213,15 +216,47 @@ Page({
       } catch (error) {}
     }
 
-    const carId = String((options && options.carId) || "").trim()
+    const attribution = sanitizeAttribution(options)
+    const carId = attribution.vehicleId || String((options && options.carId) || "").trim()
     this.setData({
-      carId
+      carId,
+      attribution: sanitizeAttribution({ ...attribution, vehicleId: carId })
     })
 
     this.loadOperationConfig()
     this.loadCarDetail(carId)
     this.loadFavoriteStatus(carId)
+    this.loadRelatedGuides(carId)
     trackEvent("vehicle_detail", carId)
+    if (hasAttribution(attribution) && attribution.channel && attribution.channel !== "direct") {
+      trackEvent("share_open", carId, this.data.attribution)
+    }
+  },
+
+  loadRelatedGuides(vehicleId) {
+    if (!vehicleId || !wx.cloud || typeof wx.cloud.callFunction !== "function") return
+    wx.cloud.callFunction({
+      name: "contentGuideList",
+      data: { vehicleId, limit: 4 },
+      success: (res) => {
+        const result = res && res.result
+        if (result && result.ok && Array.isArray(result.list)) this.setData({ relatedGuides: result.list })
+      }
+    })
+  },
+
+  handleRelatedGuideTap(event) {
+    const contentId = String(event.currentTarget.dataset.id || "").trim()
+    const scene = String(event.currentTarget.dataset.scene || "").trim()
+    if (!contentId) return
+    const attribution = sanitizeAttribution({ ...this.data.attribution, channel: this.data.attribution.channel || "direct", contentId, scene, vehicleId: this.data.carId })
+    const action = beginPageNativeAction(this)
+    wx.navigateTo({
+      url: `/pages/content-page/content-page?${buildQuery(attribution)}`,
+      fail: () => {
+        if (isPageNativeActionActive(this, action)) wx.showToast({ title: "场景指南打开失败", icon: "none" })
+      }
+    })
   },
 
   loadOperationConfig() {
@@ -607,8 +642,10 @@ Page({
     }
 
     const action = beginPageNativeAction(this)
+    const attribution = sanitizeAttribution({ ...this.data.attribution, vehicleId: this.data.carId })
+    if (attribution.contentId) trackEvent("content_booking_start", this.data.carId, attribution)
     wx.navigateTo({
-      url: `/pages/booking/booking?carId=${this.data.carId}`,
+      url: `/pages/booking/booking?${buildQuery(attribution)}`,
       fail: () => {
         if (!isPageNativeActionActive(this, action)) {
           return
@@ -761,7 +798,7 @@ Page({
 
     return {
       title: `${car.nickname} ${car.name}`,
-      path: `/pages/car-detail/car-detail?carId=${car.id}`
+      path: `/pages/car-detail/car-detail?${buildQuery({ ...this.data.attribution, channel: "wechat_share", vehicleId: car.id })}`
     }
   }
 })

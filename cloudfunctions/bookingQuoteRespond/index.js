@@ -4,7 +4,7 @@ const crypto = require("crypto")
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
-const BOOKING_FIELDS = { _id: true, openid: true, status: true, latestQuoteId: true, vehicleId: true, vehicleName: true, startDate: true, endDate: true }
+const BOOKING_FIELDS = { _id: true, openid: true, status: true, latestQuoteId: true, vehicleId: true, vehicleName: true, startDate: true, endDate: true, attribution: true }
 const QUOTE_FIELDS = { _id: true, bookingId: true, status: true, validUntil: true, version: true, sentAt: true, confirmedAt: true, adjustmentRequestedAt: true }
 const VEHICLE_FIELDS = { status: true, brandModel: true, plateNumber: true }
 const MAX_OCCUPANCY_DAYS = 90
@@ -80,6 +80,22 @@ async function writeErrorLogBestEffort(payload) {
   }
 }
 
+async function writeContentConfirmationBestEffort(attribution, vehicleId) {
+  if (!attribution || !attribution.contentId) return
+  try {
+    await db.collection("analytics_events").add({ data: {
+      eventType: "content_booking_confirmed",
+      contentId: String(attribution.contentId || ""),
+      vehicleId: String(vehicleId || ""),
+      channel: String(attribution.channel || "direct"),
+      scene: String(attribution.scene || ""),
+      createdAt: db.serverDate()
+    } })
+  } catch (error) {
+    console.warn({ function: "bookingQuoteRespond", stage: "contentAttribution", errorMessage: String(error && (error.message || error.errMsg) || error) })
+  }
+}
+
 exports.main = async (event) => {
   const context = cloud.getWXContext()
   const openid = String(context && context.OPENID || "").trim()
@@ -98,7 +114,7 @@ exports.main = async (event) => {
       if (!quote || String(quote.bookingId || "") !== input.bookingId) return { error: createError("NOT_FOUND", "报价不存在") }
 
       const targetStatus = input.action === "confirm" ? "confirmed" : "adjustment_requested"
-      if (booking.status === targetStatus && quote.status === targetStatus) return { duplicate: true, targetStatus, quote }
+      if (booking.status === targetStatus && quote.status === targetStatus) return { duplicate: true, targetStatus, quote, attribution: booking.attribution, vehicleId: booking.vehicleId }
       if (booking.status !== "quoted" || booking.latestQuoteId !== input.quoteId || quote.status !== "sent") return { error: createError("STATUS_NOT_ALLOWED", "当前报价状态已变化，请刷新后重试") }
 
       if (String(quote.validUntil || "") < todayInChina()) {
@@ -169,7 +185,7 @@ exports.main = async (event) => {
           } })
         }
       }
-      return { duplicate: false, targetStatus, quote }
+      return { duplicate: false, targetStatus, quote, attribution: booking.attribution, vehicleId: booking.vehicleId }
     })
 
     if (outcome.error) return outcome.error
@@ -178,6 +194,7 @@ exports.main = async (event) => {
       return createError("QUOTE_EXPIRED", "报价已过有效期，请联系顾问重新报价")
     }
     if (!outcome.duplicate) await writeAuditLogBestEffort({ openid, action: input.action === "confirm" ? "bookingQuoteConfirm" : "bookingQuoteAdjustmentRequest", bookingId: input.bookingId, quoteId: input.quoteId, version: Number(outcome.quote.version || 0), fromStatus: "quoted", toStatus: outcome.targetStatus })
+    if (!outcome.duplicate && input.action === "confirm") await writeContentConfirmationBestEffort(outcome.attribution, outcome.vehicleId)
     return { ok: true, action: input.action, updated: !outcome.duplicate, bookingStatus: outcome.targetStatus, quoteId: input.quoteId, message: input.action === "confirm" ? "报价已确认（尚未付款）" : "调整申请已提交" }
   } catch (error) {
     const errorMessage = String(error && (error.message || error.errMsg) || error).slice(0, 300)

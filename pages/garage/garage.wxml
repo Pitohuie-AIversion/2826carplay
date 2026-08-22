@@ -179,6 +179,24 @@
     </view>
   </view>
 
+  <view wx:if="{{contentGuides.length}}" class="garage-guides ui-card">
+    <view class="list-heading">
+      <view><view class="list-kicker">SCENARIO GUIDES</view><view class="list-title">真实用车场景</view></view>
+      <view class="list-count">{{contentGuides.length}} GUIDES</view>
+    </view>
+    <scroll-view class="garage-guide-scroll" scroll-x scroll-with-animation="{{true}}" scroll-into-view="garage-guide-{{contentGuides[0].id}}" enhanced show-scrollbar="{{false}}" aria-label="场景内容推荐，可横向滑动">
+      <view class="garage-guide-track">
+        <view id="garage-guide-{{item.id}}" class="garage-guide-card" wx:for="{{contentGuides}}" wx:key="id" data-id="{{item.id}}" data-scene="{{item.scenario}}" bindtap="handleContentGuideTap" hover-class="garage-guide-card-pressed" aria-role="button">
+          <view class="garage-guide-type">{{item.contentType}}</view>
+          <view class="garage-guide-title">{{item.title}}</view>
+          <view class="garage-guide-summary">{{item.summary}}</view>
+          <view class="garage-guide-open">查看指南 →</view>
+        </view>
+      </view>
+    </scroll-view>
+    <view wx:if="{{contentGuides.length > 1}}" class="ui-scroll-cue horizontal-scroll-cue" aria-hidden="true"></view>
+  </view>
+
   <view class="empty-state" wx:if="{{loadError}}">
     <view class="garage-state-icon garage-error-native-icon" aria-hidden="true"><view class="garage-error-native-mark"></view></view>
     <view class="empty-title">加载失败</view>

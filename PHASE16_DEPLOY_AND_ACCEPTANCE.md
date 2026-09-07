@@ -29,8 +29,9 @@
 | 新云函数 | `contentGuideList`、`contentGuideDetail`、`contentGuideManage`，Node.js 20.19，状态均为 `Active/Available` |
 | 更新云函数 | `analyticsTrack`、`analyticsOverview`、`bookingCreate`、`bookingQuoteRespond`，状态均为部署完成；保留既有运行时配置 |
 | 发布内容冒烟样本 | `handover-checklist-2026`（文档 ID：`6a87c7eb3df9c6ceee5bcab0`），关联真实在库 BMW 525 Li 与奥迪 A6L |
-| 本地发布检查 | `npm run check:release` 通过：113 个测试套件、981 项测试；主包约 1.65 MiB |
-| 真机预览 | 首次生成被微信开发者工具以 `code 10` 拒绝：开发者登录已过期；已生成重新登录二维码，等待有权限账号扫码后继续 |
+| 本地发布检查 | `npm run check:release` 通过：113 个测试套件、985 项测试；主包约 1.65 MiB |
+| 统计口径加固 | 2026-08-22 收敛分享落地和内容预约开始的重复计数；`bookingQuoteRespond` 增加匿名归因写入前服务端白名单复核并已重新部署 |
+| 真机预览 | 首次生成被微信开发者工具以 `code 10` 拒绝：开发者登录已过期；按 2026-08-22 用户指令，Phase 13–16 双账号真机验收延期统一执行 |
 
 云端无身份调用冒烟结果：公开列表和详情正常返回已发布内容及关联车辆公开字段；内容管理返回 `FORBIDDEN`；匿名调用预约、报价响应和分析管理函数返回 `UNAUTHORIZED` 或 `FORBIDDEN`。这些结果只验证云端部署、公开字段边界和无身份拒绝，不替代下方双账号真机验收。
 

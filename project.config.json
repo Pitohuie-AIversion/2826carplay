@@ -14,6 +14,10 @@
       },
       {
         "type": "folder",
+        "value": "__mocks__"
+      },
+      {
+        "type": "folder",
         "value": "security-rules"
       },
       {
@@ -27,6 +31,10 @@
       {
         "type": "folder",
         "value": "scripts"
+      },
+      {
+        "type": "folder",
+        "value": ".trae"
       },
       {
         "type": "folder",

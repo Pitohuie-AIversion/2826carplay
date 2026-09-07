@@ -1,5 +1,5 @@
 const { trackEvent } = require("../../shared/analytics")
-const { sanitizeAttribution, buildQuery, hasAttribution } = require("../../shared/contentAttribution")
+const { sanitizeAttribution, buildQuery, hasAttribution, isShareLanding } = require("../../shared/contentAttribution")
 const { formatToastTitle } = require("../../shared/uiFeedback")
 const { requestOperationConfig } = require("../../shared/operationConfigRequest")
 const {
@@ -8,6 +8,7 @@ const {
   cancelPageNativeActions,
   isPageNativeActionActive
 } = require("../../shared/pageNativeAction")
+const { resolveImage, getCachedPath, preloadImages } = require("../../shared/imageCache")
 const CAR_DETAIL_LOAD_TIMEOUT_MS = 15 * 1000
 const FAVORITE_STATUS_TIMEOUT_MS = 10 * 1000
 const FAVORITE_UPDATE_TIMEOUT_MS = 12 * 1000
@@ -147,6 +148,7 @@ function formatCarViewModel(car) {
   const imageItems = images.map((src, index) => ({
     key: `vehicle-image-${index}`,
     src,
+    displaySrc: getCachedPath(src),
     loaded: false,
     failed: false
   }))
@@ -228,7 +230,7 @@ Page({
     this.loadFavoriteStatus(carId)
     this.loadRelatedGuides(carId)
     trackEvent("vehicle_detail", carId)
-    if (hasAttribution(attribution) && attribution.channel && attribution.channel !== "direct") {
+    if (hasAttribution(attribution) && attribution.channel && attribution.channel !== "direct" && isShareLanding()) {
       trackEvent("share_open", carId, this.data.attribution)
     }
   },
@@ -415,6 +417,7 @@ Page({
     this._favoriteStatusRequestId = Number(this._favoriteStatusRequestId || 0) + 1
     this._favoriteUpdateSerial = Number(this._favoriteUpdateSerial || 0) + 1
     this.cancelOperationConfigRequest()
+    this.cancelImageResolves()
     this.clearCarDetailLoadTimer()
     this.clearFavoriteStatusTimer()
     this.clearFavoriteUpdateTimer()
@@ -450,6 +453,7 @@ Page({
   },
 
   applyCar(targetCar) {
+    this.cancelImageResolves()
     if (!targetCar) {
       this.setData({
         car: null,
@@ -463,8 +467,9 @@ Page({
       return
     }
 
+    const viewModel = formatCarViewModel(targetCar)
     this.setData({
-      car: formatCarViewModel(targetCar),
+      car: viewModel,
       pricingOverview: buildPricingOverview(targetCar, this.data.rentalTerms),
       currentImageIndex: 0,
       trustExpanded: false,
@@ -472,10 +477,56 @@ Page({
       loadError: false
     })
     this._trustProfileViewTracked = false
+    this.scheduleImageResolves(viewModel.imageItems, 0)
 
     wx.setNavigationBarTitle({
       title: targetCar.name || "车辆详情"
     })
+  },
+
+  scheduleImageResolves(imageItems, currentIndex) {
+    this.cancelImageResolves()
+    const serial = Number(this._imageResolveSerial || 0) + 1
+    this._imageResolveSerial = serial
+    const items = Array.isArray(imageItems) ? imageItems : []
+    if (!items.length) return
+
+    const order = []
+    order.push({ index: currentIndex, priority: 100 })
+    if (items.length > 1) {
+      order.push({ index: (currentIndex + 1) % items.length, priority: 70 })
+    }
+    if (items.length > 2) {
+      order.push({ index: (currentIndex - 1 + items.length) % items.length, priority: 60 })
+    }
+    items.forEach((item, idx) => {
+      if (!order.find((o) => o.index === idx)) {
+        order.push({ index: idx, priority: Math.max(10, 40 - idx * 5) })
+      }
+    })
+
+    order.forEach((entry) => {
+      const item = items[entry.index]
+      if (!item || !item.src) return
+      if (item.displaySrc && item.displaySrc !== item.src) return
+      resolveImage(item.src, { priority: entry.priority })
+        .then((result) => {
+          if (this._imageResolveSerial !== serial || !result || !result.localPath) return
+          const car = this.data.car
+          if (!car || !Array.isArray(car.imageItems)) return
+          const current = car.imageItems[entry.index]
+          if (!current || current.src !== item.src) return
+          if (result.localPath === current.displaySrc) return
+          this.setData({
+            [`car.imageItems[${entry.index}].displaySrc`]: result.localPath
+          })
+        })
+        .catch(() => {})
+    })
+  },
+
+  cancelImageResolves() {
+    this._imageResolveSerial = Number(this._imageResolveSerial || 0) + 1
   },
 
   handleHeroImageLoad(event) {
@@ -496,6 +547,15 @@ Page({
       return
     }
 
+    const car = this.data.car
+    const item = car && car.imageItems && car.imageItems[index]
+    if (item && item.displaySrc && item.src && item.displaySrc !== item.src) {
+      this.setData({
+        [`car.imageItems[${index}].displaySrc`]: item.src
+      })
+      return
+    }
+
     this.setData({
       [`car.imageItems[${index}].loaded`]: false,
       [`car.imageItems[${index}].failed`]: true
@@ -506,10 +566,11 @@ Page({
     const current = Number(event && event.detail && event.detail.current)
     const car = this.data.car
     const imageCount = car && Array.isArray(car.imageItems) ? car.imageItems.length : 0
-    this.setData({
-      currentImageIndex:
-        Number.isInteger(current) && current >= 0 && current < imageCount ? current : 0
-    })
+    const nextIndex = Number.isInteger(current) && current >= 0 && current < imageCount ? current : 0
+    this.setData({ currentImageIndex: nextIndex })
+    if (car && Array.isArray(car.imageItems)) {
+      this.scheduleImageResolves(car.imageItems, nextIndex)
+    }
   },
 
   handleHeroImageTap(event) {
@@ -643,7 +704,6 @@ Page({
 
     const action = beginPageNativeAction(this)
     const attribution = sanitizeAttribution({ ...this.data.attribution, vehicleId: this.data.carId })
-    if (attribution.contentId) trackEvent("content_booking_start", this.data.carId, attribution)
     wx.navigateTo({
       url: `/pages/booking/booking?${buildQuery(attribution)}`,
       fail: () => {

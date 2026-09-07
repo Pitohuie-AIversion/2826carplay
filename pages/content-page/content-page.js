@@ -1,6 +1,6 @@
 const { requestOperationConfig } = require("../../shared/operationConfigRequest")
 const { trackEvent } = require("../../shared/analytics")
-const { sanitizeAttribution, buildQuery, hasAttribution } = require("../../shared/contentAttribution")
+const { sanitizeAttribution, buildQuery, hasAttribution, isShareLanding } = require("../../shared/contentAttribution")
 const {
   activatePageNativeActions,
   beginPageNativeAction,
@@ -113,7 +113,7 @@ Page({
         heroDesc: "正在加载真实用车场景内容"
       })
       this.loadGuide(attribution.contentId)
-      if (hasAttribution(attribution) && attribution.channel && attribution.channel !== "direct") {
+      if (hasAttribution(attribution) && attribution.channel && attribution.channel !== "direct" && isShareLanding()) {
         trackEvent("share_open", attribution.vehicleId, attribution)
       }
       return
@@ -207,7 +207,6 @@ Page({
     const vehicleId = String(event.currentTarget.dataset.id || this.data.attribution.vehicleId || "").trim()
     if (!vehicleId) return
     const attribution = sanitizeAttribution({ ...this.data.attribution, vehicleId })
-    trackEvent("content_booking_start", vehicleId, attribution)
     const action = beginPageNativeAction(this)
     wx.navigateTo({
       url: `/pages/booking/booking?${buildQuery(attribution)}`,
@@ -370,6 +369,7 @@ Page({
     const attribution = sanitizeAttribution({
       ...this.data.attribution,
       channel: "wechat_share",
+      scene: this.data.attribution.scene || this.data.guide.scenario || "",
       contentId: this.data.guide.slug || this.data.guide.id
     })
     return {

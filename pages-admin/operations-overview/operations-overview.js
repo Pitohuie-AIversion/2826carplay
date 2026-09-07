@@ -1,4 +1,4 @@
-const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
+﻿const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
 const {
   activatePageNativeActions,
   beginPageNativeAction,
@@ -366,7 +366,7 @@ Page({
             desc: maintenanceVehicles ? "请确认恢复时间和公开展示状态" : "当前没有维护中车辆",
             value: maintenanceVehicles,
             tone: maintenanceVehicles ? "primary" : "success",
-            url: "/pages/vehicle-manage/vehicle-manage"
+            url: "/pages-admin/vehicle-manage/vehicle-manage"
           })
         } else if (permissions.canManageVehicles) {
           alerts.push({
@@ -375,7 +375,7 @@ Page({
             desc: "其他运营数据仍可正常查看",
             value: 0,
             tone: "neutral",
-            url: "/pages/vehicle-manage/vehicle-manage"
+            url: "/pages-admin/vehicle-manage/vehicle-manage"
           })
         }
         if (permissions.canManageRoles && privacyCountAvailable) {
@@ -388,7 +388,7 @@ Page({
                 : "当前没有进行中的隐私申请",
             value: pendingPrivacyCount + processingPrivacyCount,
             tone: pendingPrivacyCount || processingPrivacyCount ? "warning" : "success",
-            url: "/pages/privacy-request-manage/privacy-request-manage"
+            url: "/pages-admin/privacy-request-manage/privacy-request-manage"
           })
         } else if (permissions.canManageRoles) {
           alerts.push({
@@ -397,7 +397,7 @@ Page({
             desc: "其他运营数据仍可正常查看",
             value: 0,
             tone: "neutral",
-            url: "/pages/privacy-request-manage/privacy-request-manage"
+            url: "/pages-admin/privacy-request-manage/privacy-request-manage"
           })
         }
         if (permissions.canManageRoles && storageCountAvailable) {

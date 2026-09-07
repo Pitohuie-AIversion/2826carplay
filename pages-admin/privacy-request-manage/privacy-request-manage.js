@@ -1,4 +1,4 @@
-const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
+﻿const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
 const { formatToastTitle } = require("../../shared/uiFeedback")
 const {
   activatePageNativeActions,
@@ -312,7 +312,7 @@ Page({
     }
     const action = beginPageNativeAction(this)
     wx.navigateTo({
-      url: `/pages/privacy-data-inventory/privacy-data-inventory?id=${encodeURIComponent(id)}`,
+      url: `/pages-admin/privacy-data-inventory/privacy-data-inventory?id=${encodeURIComponent(id)}`,
       fail: () => {
         if (!isPageNativeActionActive(this, action)) {
           return

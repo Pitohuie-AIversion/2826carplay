@@ -1,4 +1,4 @@
-const fs = require("fs")
+﻿const fs = require("fs")
 const path = require("path")
 
 function loadPageDefinition() {
@@ -7,7 +7,7 @@ function loadPageDefinition() {
   global.Page = jest.fn((input) => {
     definition = input
   })
-  require("../pages/analytics-manage/analytics-manage")
+  require("../pages-admin/analytics-manage/analytics-manage")
   return definition
 }
 
@@ -65,42 +65,81 @@ describe("pages/analytics-manage cleanup", () => {
     expect(page.data.loadError).toBe("数据分析加载超时，请检查网络后重试")
   })
 
-  test("新分析周期请求覆盖旧请求并固定周期参数", () => {
+  test("新分析周期请求覆盖旧请求并固定周期参数与 TOP N", () => {
     const requests = []
     global.wx = {
       cloud: {
         callFunction: jest.fn((options) => requests.push(options))
       }
     }
-    const page = createPage(loadPageDefinition(), { days: 7 })
+    const page = createPage(loadPageDefinition(), { days: 7, topN: 3 })
 
     page.fetchOverview()
     page.data.days = 30
+    page.data.topN = 5
     page.fetchOverview()
     expect(requests[0].data.days).toBe(7)
+    expect(requests[0].data.topN).toBe(3)
     expect(requests[1].data.days).toBe(30)
+    expect(requests[1].data.topN).toBe(5)
 
     requests[1].success({
       result: {
         ok: true,
+        topN: 5,
         metrics: { vehicle_detail: 30 },
         conversionRate: 20,
         trend: [],
+        contentTrend: [],
         topVehicles: []
       }
     })
     requests[0].success({
       result: {
         ok: true,
+        topN: 3,
         metrics: { vehicle_detail: 7 },
         conversionRate: 10,
         trend: [],
+        contentTrend: [],
         topVehicles: []
       }
     })
 
     expect(page.data.metricItems[0].value).toBe(30)
     expect(page.data.metricItems[3].value).toBe("20%")
+    expect(page.data.topN).toBe(5)
+  })
+
+  test("TOP N chip 切换后重新调用 analyticsOverview 并携带新的 topN", () => {
+    const requests = []
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn((options) => requests.push(options))
+      }
+    }
+    const page = createPage(loadPageDefinition(), { days: 7, topN: 3, loading: false, cleanupLoading: false })
+
+    page.fetchOverview()
+    expect(requests).toHaveLength(1)
+    expect(requests[0].data.topN).toBe(3)
+    requests[0].success({
+      result: {
+        ok: true,
+        topN: 3,
+        metrics: {},
+        conversionRate: 0,
+        trend: [],
+        contentTrend: [],
+        topVehicles: []
+      }
+    })
+
+    page.handleTopNTap({ currentTarget: { dataset: { topn: 10 } } })
+    expect(requests).toHaveLength(2)
+    expect(page.data.topN).toBe(10)
+    expect(requests[1].data.topN).toBe(10)
+    expect(requests[1].data.days).toBe(7)
   })
 
   test("匿名数据清理无回调时超时收尾并忽略迟到结果", () => {
@@ -344,6 +383,7 @@ describe("pages/analytics-manage cleanup", () => {
           success({
             result: {
               ok: true,
+              topN: 3,
               metrics: {
                 garage_view: 100,
                 vehicle_detail: 60,
@@ -358,9 +398,93 @@ describe("pages/analytics-manage cleanup", () => {
                 availability_unknown: 1
               },
               conversionRate: 20,
+              contentAnalytics: {
+                views: 80,
+                shareOpens: 12,
+                bookingSubmits: 6,
+                confirmedBookings: 3,
+                topContents: [
+                  {
+                    key: "guide-weekend-001",
+                    title: "莫干山周末敞篷自驾指南",
+                    contentType: "guide",
+                    views: 22,
+                    shareOpens: 5,
+                    bookingSubmits: 2,
+                    confirmed: 1,
+                    score: 77
+                  },
+                  {
+                    key: "route-2",
+                    title: "",
+                    contentType: "",
+                    views: 10,
+                    shareOpens: 2,
+                    bookingSubmits: 1,
+                    confirmed: 0,
+                    score: 24
+                  }
+                ],
+                topVehicles: [],
+                topSources: []
+              },
               trend: [
                 { key: "day-1", label: "07-01", value: 4 },
                 { key: "day-2", label: "07-02", value: 9 }
+              ],
+              contentTrend: [
+                { key: "2026-07-01", label: "07-01", views: 5, vehicleClicks: 2, submits: 1, confirmed: 0, total: 8 },
+                { key: "2026-07-02", label: "07-02", views: 8, vehicleClicks: 4, submits: 2, confirmed: 1, total: 15 }
+              ],
+              sceneFunnels: [
+                {
+                  scene: "weekend_trip",
+                  views: 100,
+                  shareOpens: 30,
+                  vehicleClicks: 20,
+                  bookingStarts: 15,
+                  bookingSubmits: 10,
+                  confirmed: 3,
+                  viewToSubmitRate: 10,
+                  submitToConfirmRate: 30,
+                  viewToConfirmRate: 3
+                },
+                {
+                  scene: "ev_experience",
+                  views: 40,
+                  shareOpens: 10,
+                  vehicleClicks: 8,
+                  bookingStarts: 4,
+                  bookingSubmits: 2,
+                  confirmed: 0,
+                  viewToSubmitRate: 5,
+                  submitToConfirmRate: 0,
+                  viewToConfirmRate: 0
+                },
+                {
+                  scene: "business_reception",
+                  views: 0,
+                  shareOpens: 0,
+                  vehicleClicks: 0,
+                  bookingStarts: 0,
+                  bookingSubmits: 0,
+                  confirmed: 0,
+                  viewToSubmitRate: 0,
+                  submitToConfirmRate: 0,
+                  viewToConfirmRate: 0
+                },
+                {
+                  scene: "group_travel",
+                  views: 0,
+                  shareOpens: 0,
+                  vehicleClicks: 0,
+                  bookingStarts: 0,
+                  bookingSubmits: 0,
+                  confirmed: 0,
+                  viewToSubmitRate: 0,
+                  submitToConfirmRate: 0,
+                  viewToConfirmRate: 0
+                }
               ],
               topVehicles: []
             }
@@ -387,10 +511,41 @@ describe("pages/analytics-manage cleanup", () => {
       ])
     )
     expect(page.data.trendItems.map((item) => item.isPeak)).toEqual([false, true])
+    expect(page.data.topN).toBe(3)
+    expect(page.data.topContents).toHaveLength(2)
+    expect(page.data.topContents[0].title).toBe("莫干山周末敞篷自驾指南")
+    expect(page.data.topContents[0].contentType).toBe("guide")
+    expect(page.data.topContents[0].key).toBe("guide-weekend-001")
+    expect(page.data.topContents[1].title).toBe("")
+    expect(page.data.contentTrendItems).toHaveLength(2)
+    expect(page.data.contentTrendItems[0]).toEqual(expect.objectContaining({
+      key: "2026-07-01",
+      label: "07-01",
+      views: 5,
+      vehicleClicks: 2,
+      submits: 1,
+      confirmed: 0,
+      total: 8,
+      isPeak: false
+    }))
+    expect(page.data.contentTrendItems[1].isPeak).toBe(true)
+    expect(page.data.contentTrendItems[1].total).toBe(15)
+    expect(page.data.sceneFunnelItems).toHaveLength(4)
+    const weekendScene = page.data.sceneFunnelItems.find((item) => item.key === "weekend_trip")
+    expect(weekendScene.label).toBe("周末自驾")
+    expect(weekendScene.viewToSubmitRate).toBe(10)
+    expect(weekendScene.submitToConfirmRate).toBe(30)
+    expect(weekendScene.viewToConfirmRate).toBe(3)
+    expect(weekendScene.stages).toHaveLength(6)
+    expect(weekendScene.stages[0]).toEqual(expect.objectContaining({ key: "views", label: "内容浏览", value: 100, topRate: 100 }))
+    expect(weekendScene.stages[5]).toEqual(expect.objectContaining({ key: "confirmed", label: "报价确认", value: 3, index: 6 }))
+    const evScene = page.data.sceneFunnelItems.find((item) => item.key === "ev_experience")
+    expect(evScene.label).toBe("新能源试驾")
+    expect(evScene.viewToConfirmRate).toBe(0)
   })
 
   test("首次加载使用指标、漏斗与趋势骨架", () => {
-    const pageDir = path.resolve(__dirname, "../pages/analytics-manage")
+    const pageDir = path.resolve(__dirname, "../pages-admin/analytics-manage")
     const wxml = fs.readFileSync(path.join(pageDir, "analytics-manage.wxml"), "utf8")
     const wxss = fs.readFileSync(path.join(pageDir, "analytics-manage.wxss"), "utf8")
 
@@ -403,7 +558,7 @@ describe("pages/analytics-manage cleanup", () => {
   })
 
   test("失败、统计上限、隐私与清理区域使用原生图标", () => {
-    const pageDir = path.resolve(__dirname, "../pages/analytics-manage")
+    const pageDir = path.resolve(__dirname, "../pages-admin/analytics-manage")
     const wxml = fs.readFileSync(path.join(pageDir, "analytics-manage.wxml"), "utf8")
     const wxss = fs.readFileSync(path.join(pageDir, "analytics-manage.wxss"), "utf8")
 
@@ -420,11 +575,35 @@ describe("pages/analytics-manage cleanup", () => {
     expect(wxml).toContain('aria-pressed="{{days === item.value}}"')
     expect(wxml).toContain('class="ui-scroll-cue trend-scroll-cue"')
     expect(wxml).toContain("{{item.isPeak ? '，本周期峰值' : ''}}")
+    expect(wxml).toContain('bindtap="handleTopNTap"')
+    expect(wxml).toContain('data-topn="{{item.value}}"')
+    expect(wxml).toContain('<view class="section-index">17</view>')
+    expect(wxml).toContain('<view class="section-index">18</view>')
+    expect(wxml).toContain("CONTENT TREND")
+    expect(wxml).toContain("SCENE FUNNEL")
+    expect(wxml).toContain("场景维度漏斗")
+    expect(wxml).toContain("scene-funnel-list")
+    expect(wxml).toContain("scene-funnel-inner")
+    expect(wxml).toContain("legend-swatch-views")
+    expect(wxml).toContain("content-stacked-column")
+    expect(wxml).toContain("content-trend-breakdown")
+    expect(wxml).toContain("rank-tag")
+    expect(wxml).toContain("内容每日趋势")
     expect(wxss).toContain(".analytics-action-content")
     expect(wxss).toContain(".period-chip-pressed")
     expect(wxss).toContain(".analytics-tip-native-icon")
     expect(wxss).toContain(".analytics-empty-desc")
     expect(wxss).toContain(".trend-fill-peak")
+    expect(wxss).toContain(".rank-tag")
+    expect(wxss).toContain(".legend-swatch-views")
+    expect(wxss).toContain(".content-fill-views")
+    expect(wxss).toContain(".content-trend-breakdown")
+    expect(wxss).toContain(".scene-funnel-list")
+    expect(wxss).toContain(".scene-funnel-card")
+    expect(wxss).toContain(".scene-rate-pill")
+    expect(wxss).toContain(".scene-rate-pill-accent")
+    expect(wxss).toContain(".scene-funnel-fill-views")
+    expect(wxss).toContain(".scene-funnel-fill-confirmed")
     expect(wxss).toMatch(/\.rank-name\s*\{[^}]*-webkit-line-clamp:\s*2/s)
   })
 })

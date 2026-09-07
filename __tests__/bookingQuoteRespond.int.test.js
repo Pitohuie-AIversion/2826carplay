@@ -89,6 +89,19 @@ describe("cloudfunctions/bookingQuoteRespond integration", () => {
     expect(mocks.quoteState.status).toBe("sent")
   })
 
+  test("历史预约中的非法归因字段不会写入匿名分析", async () => {
+    const mocks = createQuotedState()
+    mocks.bookingState.attribution = {
+      contentId: "../private-note",
+      channel: "unknown-channel",
+      scene: "private-itinerary"
+    }
+    const mod = await loadModule("user_1", mocks.db)
+    const res = await mod.main({ bookingId: "booking_1", quoteId: "quote_1", action: "confirm" })
+    expect(res).toMatchObject({ ok: true, updated: true, bookingStatus: "confirmed" })
+    expect(mocks.analyticsAdd).not.toHaveBeenCalled()
+  })
+
   test("用户可申请调整且审计日志不保存调整正文", async () => {
     const mocks = createQuotedState()
     const mod = await loadModule("user_1", mocks.db)

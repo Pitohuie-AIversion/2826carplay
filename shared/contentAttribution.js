@@ -27,6 +27,16 @@ function hasAttribution(input) {
   return Boolean(source.channel || source.scene || source.contentId)
 }
 
+function isShareLanding() {
+  try {
+    if (typeof getCurrentPages !== "function") return true
+    const pages = getCurrentPages()
+    return !Array.isArray(pages) || pages.length <= 1
+  } catch (error) {
+    return true
+  }
+}
+
 function buildQuery(input) {
   const source = sanitizeAttribution(input)
   return Object.keys(source)
@@ -40,5 +50,6 @@ module.exports = {
   SCENES,
   sanitizeAttribution,
   hasAttribution,
+  isShareLanding,
   buildQuery
 }

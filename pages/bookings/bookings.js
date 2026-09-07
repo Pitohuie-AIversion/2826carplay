@@ -1,3 +1,4 @@
+const { createPerformanceHelpers } = require('../../shared/performance');
 const { formatToastTitle } = require("../../shared/uiFeedback")
 const { buildVehicleDisplayIdentity } = require("../../shared/vehicle")
 const {
@@ -203,7 +204,10 @@ Page({
     hasMore: false
   },
 
+  applyState(patch) { this.setData(patch) },
+
   onLoad() {
+    const perf = createPerformanceHelpers(this); this._perf = perf; this.applyState = perf.applyState; this.flushStateNow = perf.flushStateNow;
     activatePageNativeActions(this)
     const app = getApp()
     const env =
@@ -236,6 +240,7 @@ Page({
     this._bookingCancelSerial = Number(this._bookingCancelSerial || 0) + 1
     this.clearBookingsLoadTimer()
     this.clearBookingCancelTimer()
+    if (this._perf && typeof this._perf.dispose === 'function') try { this._perf.dispose(); } catch(e) {}
   },
 
   loadList(input) {
@@ -246,7 +251,7 @@ Page({
     this.clearBookingsLoadTimer()
 
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
-      this.setData({
+      this.applyState({
         initialLoading: false,
         loading: false,
         loadFailed: true,
@@ -260,7 +265,7 @@ Page({
       return
     }
 
-    this.setData({
+    this.applyState({
       loading: true,
       loadFailed: false
     })
@@ -282,7 +287,7 @@ Page({
         title: "加载失败",
         icon: "none"
       })
-      this.setData({
+      this.applyState({
         initialLoading: false,
         loading: false,
         loadFailed: true,
@@ -315,7 +320,7 @@ Page({
           title: formatToastTitle(result && result.message, "加载失败"),
             icon: "none"
           })
-          this.setData({
+          this.applyState({
             initialLoading: false,
             loading: false,
             loadFailed: true,
@@ -346,9 +351,7 @@ Page({
         const nextList = append ? this.data.list.concat(list) : list
         this.applyBookingList(nextList, {
           page: Number.isInteger(result.page) ? result.page : nextPage,
-          hasMore: Boolean(result.hasMore)
-        })
-        this.setData({
+          hasMore: Boolean(result.hasMore),
           initialLoading: false,
           loading: false,
           loadFailed: false
@@ -393,7 +396,16 @@ Page({
     if (typeof input.hasMore === "boolean") {
       patch.hasMore = input.hasMore
     }
-    this.setData(patch)
+    if (typeof input.initialLoading !== undefined) {
+      patch.initialLoading = input.initialLoading
+    }
+    if (typeof input.loading !== undefined) {
+      patch.loading = input.loading
+    }
+    if (typeof input.loadFailed !== undefined) {
+      patch.loadFailed = input.loadFailed
+    }
+    this.applyState(patch)
   },
 
   handleFilterTap(event) {
@@ -498,7 +510,7 @@ Page({
     const cancelSerial = Number(this._bookingCancelSerial || 0) + 1
     this._bookingCancelSerial = cancelSerial
     this.clearBookingCancelTimer()
-    this.setData({
+    this.applyState({
       loading: true
     })
 
@@ -519,7 +531,7 @@ Page({
         title: formatToastTitle(message, "取消失败"),
         icon: "none"
       })
-      this.setData({
+      this.applyState({
         loading: false
       })
     }
@@ -541,7 +553,7 @@ Page({
           title: formatToastTitle(result && result.message, "取消失败"),
             icon: "none"
           })
-          this.setData({
+          this.applyState({
             loading: false
           })
           return
@@ -551,6 +563,7 @@ Page({
           title: "预约已取消",
           icon: "none"
         })
+        this.applyState({ loading: false })
         this.loadList()
       },
       fail: (error) => {

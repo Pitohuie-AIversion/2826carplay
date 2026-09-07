@@ -14,6 +14,9 @@ const AUTH_ROLE_FIELDS = {
 const BOOKING_STATUSES = ["pending", "contacted", "quoted", "adjustment_requested", "confirmed", "completed", "cancelled"]
 const BOOKING_BATCH_SIZE = 100
 const MAX_EXPORT_SOURCE_RECORDS = 2000
+const ATTRIBUTION_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/
+const ATTRIBUTION_CHANNELS = ["direct", "wechat_share", "moments", "qr", "official_account", "campaign"]
+const ATTRIBUTION_SCENES = ["weekend_trip", "business_reception", "group_travel", "ev_experience"]
 const BOOKING_EXPORT_FIELDS = {
   _id: true,
   id: true,
@@ -29,6 +32,7 @@ const BOOKING_EXPORT_FIELDS = {
   schedulePriority: true,
   coordinationStatus: true,
   status: true,
+  attribution: true,
   createdAt: true,
   updatedAt: true
 }
@@ -360,6 +364,9 @@ function buildCsv(items) {
     "结束日期",
     "用户备注",
     "管理员备注",
+    "内容ID",
+    "归因渠道",
+    "归因场景",
     "最后更新时间",
     "预约ID"
   ]
@@ -380,6 +387,9 @@ function buildCsv(items) {
         item.endDate,
         item.note,
         item.adminRemark,
+        item.contentId,
+        item.attributionChannel,
+        item.attributionScene,
         item.updatedAt,
         item.id
       ]
@@ -419,7 +429,12 @@ exports.main = async (event) => {
     const rawList = bookingRecords.list
 
     const matchedList = rawList
-      .map((item) => ({
+      .map((item) => {
+        const attributionSource = item.attribution && typeof item.attribution === "object" ? item.attribution : {}
+        const rawContentId = String(attributionSource.contentId || "").trim()
+        const rawChannel = String(attributionSource.channel || "").trim()
+        const rawScene = String(attributionSource.scene || "").trim()
+        return {
         id: normalizeText(item._id || item.id, 128),
         vehicleId: normalizeText(item.vehicleId, 128),
         vehicleName: limitText(item.vehicleName, 100),
@@ -430,6 +445,9 @@ exports.main = async (event) => {
         city: limitText(item.city, 50),
         note: limitText(item.note, 500),
         adminRemark: limitText(item.adminRemark, 200),
+        contentId: ATTRIBUTION_ID_PATTERN.test(rawContentId) ? rawContentId : "",
+        attributionChannel: ATTRIBUTION_CHANNELS.includes(rawChannel) ? rawChannel : "",
+        attributionScene: ATTRIBUTION_SCENES.includes(rawScene) ? rawScene : "",
         schedulePriority: ["priority", "normal", "standby"].includes(item.schedulePriority)
           ? item.schedulePriority
           : "normal",
@@ -454,7 +472,8 @@ exports.main = async (event) => {
         status: item.status || "pending",
         createdAt: formatTime(item.createdAt),
         updatedAt: formatTime(item.updatedAt)
-      }))
+      }
+      })
       .filter((item) => {
         if (filters.status && filters.status !== "all" && item.status !== filters.status) {
           return false

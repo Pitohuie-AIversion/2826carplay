@@ -27,6 +27,16 @@ function listWxssFiles(relativeDirectory) {
   })
 }
 
+function collectAllPageRoutes() {
+  const appConfig = JSON.parse(read("app.json"))
+  return appConfig.pages.concat(
+    (appConfig.subPackages || []).flatMap((sub) =>
+      sub.pages.map((p) => `${sub.root}/${p}`)
+    )
+  )
+}
+
+
 function extractCallHeaders(source, marker) {
   const headers = []
   let cursor = 0
@@ -118,7 +128,7 @@ function extractBalancedCallBodies(source, marker) {
 
 describe("用户主流程原生图标", () => {
   test("全站极境车库徽标均作为文字内容旁的装饰图形", () => {
-    const wxmlFiles = [...listWxmlFiles("pages"), ...listWxmlFiles("components")]
+    const wxmlFiles = [...[...listWxmlFiles("pages"), ...listWxmlFiles("pages-admin")], ...listWxmlFiles("components")]
     let emblemCount = 0
 
     wxmlFiles.forEach((relativePath) => {
@@ -133,7 +143,7 @@ describe("用户主流程原生图标", () => {
   })
 
   test("全站首屏加载骨架均作为装饰结构隐藏", () => {
-    const wxmlFiles = listWxmlFiles("pages")
+    const wxmlFiles = [...listWxmlFiles("pages"), ...listWxmlFiles("pages-admin")]
     let loadingSkeletonCount = 0
 
     wxmlFiles.forEach((relativePath) => {
@@ -154,7 +164,7 @@ describe("用户主流程原生图标", () => {
   })
 
   test("全站输入控件均提供字段说明与输入边界", () => {
-    const wxmlFiles = listWxmlFiles("pages")
+    const wxmlFiles = [...listWxmlFiles("pages"), ...listWxmlFiles("pages-admin")]
     const textareaCounterExpressions = {
       "pages/booking/booking.wxml": ["form.note.length"],
       "pages/booking-calendar/booking-calendar.wxml": ["blockForm.reason.length", "priceForm.reason.length"],
@@ -162,7 +172,7 @@ describe("用户主流程原生图标", () => {
       "pages/booking-manage/booking-manage.wxml": ["item.adminRemarkDraft.length"],
       "pages/booking-manage-detail/booking-manage-detail.wxml": ["booking.adminRemarkDraft.length", "quoteForm.depositText.length", "quoteForm.customerNote.length", "handoverForm.damageNote.length", "handoverForm.additionalNote.length"],
       "pages/booking-workbench/booking-workbench.wxml": ["remarkDraft.length"],
-      "pages/config-manage/config-manage.wxml": [
+      "pages-admin/config-manage/config-manage.wxml": [
         "form.mineUserDesc.length",
         "form.garagePageSubtitle.length",
         "form.cityOptionsText.length",
@@ -180,8 +190,8 @@ describe("用户主流程原生图标", () => {
         "form.rentalEstimateDisclaimer.length"
       ],
       "pages/privacy-request/privacy-request.wxml": ["descriptionLength"],
-      "pages/vehicle-create/vehicle-create.wxml": ["publicDescriptionLength", "noteLength"],
-      "pages/vehicle-edit/vehicle-edit.wxml": [
+      "pages-admin/vehicle-create/vehicle-create.wxml": ["publicDescriptionLength", "noteLength"],
+      "pages-admin/vehicle-edit/vehicle-edit.wxml": [
         "publicDescriptionLength",
         "noteLength",
         "form.publicInspectionSummary.length",
@@ -237,7 +247,7 @@ describe("用户主流程原生图标", () => {
   })
 
   test("全站原生选择器与隐私勾选提供一致状态反馈", () => {
-    const wxmlFiles = listWxmlFiles("pages")
+    const wxmlFiles = [...listWxmlFiles("pages"), ...listWxmlFiles("pages-admin")]
     let pickerCount = 0
 
     wxmlFiles.forEach((relativePath) => {
@@ -269,23 +279,23 @@ describe("用户主流程原生图标", () => {
   test("全站关键进度组件集中说明状态并平滑更新", () => {
     const progressGroups = [
       ["pages/booking/booking.wxml", "form-progress", "预约信息完成度", "form-progress-track"],
-      ["pages/vehicle-create/vehicle-create.wxml", "vehicle-form-progress", "车辆必填信息完成度", "vehicle-form-progress-track"],
-      ["pages/vehicle-edit/vehicle-edit.wxml", "vehicle-form-progress", "车辆必填信息完成度", "vehicle-form-progress-track"],
-      ["pages/system-health/system-health.wxml", "completion-card", "上线准备完成度", "completion-track"],
-      ["pages/privacy-data-inventory/privacy-data-inventory.wxml", "inventory-progress-card", "数据核验覆盖", "inventory-progress-track"],
-      ["pages/operations-overview/operations-overview.wxml", "hero-sync", "运营数据同步进度", "hero-sync-track"],
+      ["pages-admin/vehicle-create/vehicle-create.wxml", "vehicle-form-progress", "车辆必填信息完成度", "vehicle-form-progress-track"],
+      ["pages-admin/vehicle-edit/vehicle-edit.wxml", "vehicle-form-progress", "车辆必填信息完成度", "vehicle-form-progress-track"],
+      ["pages-admin/system-health/system-health.wxml", "completion-card", "上线准备完成度", "completion-track"],
+      ["pages-admin/privacy-data-inventory/privacy-data-inventory.wxml", "inventory-progress-card", "数据核验覆盖", "inventory-progress-track"],
+      ["pages-admin/operations-overview/operations-overview.wxml", "hero-sync", "运营数据同步进度", "hero-sync-track"],
       ["pages/bookings/bookings.wxml", "booking-progress", "预约进度", "booking-progress-track"],
       ["pages/booking-detail/booking-detail.wxml", "progress-track", "预约进度", "progress-visual"],
-      ["pages/privacy-request-manage/privacy-request-manage.wxml", "request-journey", "申请处理进度", "request-journey-track"]
+      ["pages-admin/privacy-request-manage/privacy-request-manage.wxml", "request-journey", "申请处理进度", "request-journey-track"]
     ]
     const animatedBars = [
       ["pages/booking/booking.wxss", "form-progress-bar"],
       ["shared/vehicle-form.wxss", "vehicle-form-progress-fill"],
-      ["pages/system-health/system-health.wxss", "completion-bar"],
+      ["pages-admin/system-health/system-health.wxss", "completion-bar"],
       ["pages/bookings/bookings.wxss", "booking-progress-fill"],
-      ["pages/operations-overview/operations-overview.wxss", "hero-sync-progress"],
-      ["pages/privacy-data-inventory/privacy-data-inventory.wxss", "inventory-progress-value"],
-      ["pages/privacy-request-manage/privacy-request-manage.wxss", "request-journey-progress"]
+      ["pages-admin/operations-overview/operations-overview.wxss", "hero-sync-progress"],
+      ["pages-admin/privacy-data-inventory/privacy-data-inventory.wxss", "inventory-progress-value"],
+      ["pages-admin/privacy-request-manage/privacy-request-manage.wxss", "request-journey-progress"]
     ]
 
     progressGroups.forEach(([relativePath, groupClass, labelText, trackClass]) => {
@@ -305,7 +315,7 @@ describe("用户主流程原生图标", () => {
 
   test("全站微文案保持可读的最小字号", () => {
     const styleFiles = [
-      ...listWxssFiles("pages"),
+      ...[...listWxssFiles("pages"), ...listWxssFiles("pages-admin")],
       ...listWxssFiles("components"),
       ...listWxssFiles("shared"),
       "app.wxss"
@@ -330,7 +340,7 @@ describe("用户主流程原生图标", () => {
   })
 
   test("动态车辆图片统一使用懒加载、淡入与失败兜底", () => {
-    const wxmlFiles = [...listWxmlFiles("pages"), ...listWxmlFiles("components")]
+    const wxmlFiles = [...[...listWxmlFiles("pages"), ...listWxmlFiles("pages-admin")], ...listWxmlFiles("components")]
     let dynamicImageCount = 0
 
     wxmlFiles.forEach((relativePath) => {
@@ -362,9 +372,9 @@ describe("用户主流程原生图标", () => {
       ["pages/booking-workbench/booking-workbench.wxss", /\.reset-view\s*\{/, 1],
       ["pages/garage/garage.wxss", /\.search-clear\s*\{/, 1],
       ["shared/management-shell.wxss", /\.management-page\s+\.management-search-clear\s*\{/, 1],
-      ["pages/operations-overview/operations-overview.wxss", /\.refresh-link,\s*\.section-link\s*\{/, 2],
-      ["pages/privacy-data-inventory/privacy-data-inventory.wxss", /\.refresh-link\s*\{/, 1],
-      ["pages/system-health/system-health.wxss", /\.refresh-link\s*\{/, 1]
+      ["pages-admin/operations-overview/operations-overview.wxss", /\.refresh-link,\s*\.section-link\s*\{/, 2],
+      ["pages-admin/privacy-data-inventory/privacy-data-inventory.wxss", /\.refresh-link\s*\{/, 1],
+      ["pages-admin/system-health/system-health.wxss", /\.refresh-link\s*\{/, 1]
     ]
     let protectedControlCount = 0
 
@@ -395,7 +405,7 @@ describe("用户主流程原生图标", () => {
       ["pages/mine/mine.wxss", /\.section-count\s*\{/],
       ["pages/mine/mine.wxss", /\.menu-group-kicker\s*\{/],
       ["pages/privacy-request/privacy-request.wxss", /\.summary-kicker\s*\{/],
-      ["pages/system-health/system-health.wxss", /\.completion-stat-label\s*\{/],
+      ["pages-admin/system-health/system-health.wxss", /\.completion-stat-label\s*\{/],
       ["shared/management-shell.wxss", /\.management-page\s+\.log-kind\s*\{/]
     ]
     const luminance = (hexColor) => {
@@ -428,7 +438,7 @@ describe("用户主流程原生图标", () => {
   })
 
   test("全站自定义点击区域均提供按压反馈与交互语义", () => {
-    const wxmlFiles = [...listWxmlFiles("pages"), ...listWxmlFiles("components")]
+    const wxmlFiles = [...[...listWxmlFiles("pages"), ...listWxmlFiles("pages-admin")], ...listWxmlFiles("components")]
     let tapTargetCount = 0
 
     wxmlFiles.forEach((relativePath) => {
@@ -444,7 +454,7 @@ describe("用户主流程原生图标", () => {
   })
 
   test("全站横向滚动区域统一提供增强滚动与小屏提示", () => {
-    const wxmlFiles = [...listWxmlFiles("pages"), ...listWxmlFiles("components")]
+    const wxmlFiles = [...[...listWxmlFiles("pages"), ...listWxmlFiles("pages-admin")], ...listWxmlFiles("components")]
     let horizontalScrollCount = 0
 
     wxmlFiles.forEach((relativePath) => {
@@ -464,12 +474,13 @@ describe("用户主流程原生图标", () => {
       })
     })
 
-    expect(horizontalScrollCount).toBe(10)
+    expect(horizontalScrollCount).toBe(11)
   })
 
   test("全站用户可见缺省值不使用技术双短横或 N/A", () => {
     const appConfig = JSON.parse(read("app.json"))
-    const pageFiles = appConfig.pages.flatMap((route) => [
+    const allPageRoutes = collectAllPageRoutes()
+    const pageFiles = allPageRoutes.flatMap((route) => [
       `${route}.wxml`,
       `${route}.js`
     ])
@@ -483,12 +494,13 @@ describe("用户主流程原生图标", () => {
 
   test("进行中的按钮和系统加载提示统一使用中文省略号", () => {
     const appConfig = JSON.parse(read("app.json"))
-    const pageTemplates = appConfig.pages.map((route) => read(`${route}.wxml`))
+    const allPageRoutes = collectAllPageRoutes()
+    const pageTemplates = allPageRoutes.map((route) => read(`${route}.wxml`))
     const loadingScripts = [
-      "pages/config-manage/config-manage.js",
-      "pages/role-manage/role-manage.js",
-      "pages/vehicle-detail-manage/vehicle-detail-manage.js",
-      "pages/vehicle-manage/vehicle-manage.js"
+      "pages-admin/config-manage/config-manage.js",
+      "pages-admin/role-manage/role-manage.js",
+      "pages-admin/vehicle-detail-manage/vehicle-detail-manage.js",
+      "pages-admin/vehicle-manage/vehicle-manage.js"
     ].map(read)
 
     pageTemplates.forEach((source) => {
@@ -497,15 +509,16 @@ describe("用户主流程原生图标", () => {
     loadingScripts.forEach((source) => {
       expect(source).not.toMatch(/title:\s*["'](?:保存中|更新中|上传中|设置中|处理中)["']/)
     })
-    expect(read("pages/error-log-manage/error-log-manage.js")).not.toContain(')}...`')
+    expect(read("pages-admin/error-log-manage/error-log-manage.js")).not.toContain(')}...`')
   })
 
   test("原生确认弹窗统一使用明确动词和品牌层级颜色", () => {
     const appConfig = JSON.parse(read("app.json"))
+    const allPageRoutes = collectAllPageRoutes()
     const allowedColors = new Set(["#528fff", "#d46868"])
     let confirmationCount = 0
 
-    appConfig.pages.forEach((route) => {
+    allPageRoutes.forEach((route) => {
       const source = read(`${route}.js`)
       extractModalHeaders(source).forEach(({ header, hasCallback }) => {
         if (/showCancel:\s*false/.test(header)) {
@@ -531,7 +544,7 @@ describe("用户主流程原生图标", () => {
   test("原生操作菜单统一使用品牌色与顶部说明", () => {
     const actionSheetSources = [
       read("pages/booking-workbench/booking-workbench.js"),
-      read("pages/privacy-request-manage/privacy-request-manage.js")
+      read("pages-admin/privacy-request-manage/privacy-request-manage.js")
     ]
     let actionSheetCount = 0
 
@@ -549,8 +562,9 @@ describe("用户主流程原生图标", () => {
 
   test("全站原生轻提示均显式声明语义图标", () => {
     const appConfig = JSON.parse(read("app.json"))
+    const allPageRoutes = collectAllPageRoutes()
     const toastSources = [
-      ...appConfig.pages.map((route) => read(`${route}.js`)),
+      ...allPageRoutes.map((route) => read(`${route}.js`)),
       read("shared/pageAuth.js")
     ]
     let toastCount = 0
@@ -567,8 +581,9 @@ describe("用户主流程原生图标", () => {
 
   test("全站原生轻提示使用短业务文案且不展示技术错误原文", () => {
     const appConfig = JSON.parse(read("app.json"))
+    const allPageRoutes = collectAllPageRoutes()
     const toastSources = [
-      ...appConfig.pages.map((route) => read(`${route}.js`)),
+      ...allPageRoutes.map((route) => read(`${route}.js`)),
       read("components/core-nav/core-nav.js"),
       read("shared/pageAuth.js")
     ]
@@ -593,9 +608,10 @@ describe("用户主流程原生图标", () => {
 
   test("全站纯信息弹窗统一使用知道了与品牌蓝按钮", () => {
     const appConfig = JSON.parse(read("app.json"))
+    const allPageRoutes = collectAllPageRoutes()
     let infoModalCount = 0
 
-    appConfig.pages.forEach((route) => {
+    allPageRoutes.forEach((route) => {
       const source = read(`${route}.js`)
       extractBalancedCallBodies(source, "wx.showModal({").forEach((body) => {
         if (!/showCancel\s*:\s*false/.test(body)) {
@@ -611,13 +627,14 @@ describe("用户主流程原生图标", () => {
       })
     })
 
-    expect(infoModalCount).toBe(20)
+    expect(infoModalCount).toBe(21)
   })
 
   test("动态轻提示保留短消息并为长消息使用业务回退", () => {
     const { formatToastTitle } = require("../shared/uiFeedback")
     const appConfig = JSON.parse(read("app.json"))
-    const toastSources = appConfig.pages.map((route) => read(`${route}.js`))
+    const allPageRoutes = collectAllPageRoutes()
+    const toastSources = allPageRoutes.map((route) => read(`${route}.js`))
 
     expect(formatToastTitle("档期已更新", "更新失败")).toBe("档期已更新")
     expect(formatToastTitle("云函数返回了一段过长的内部错误说明", "更新失败")).toBe("更新失败")
@@ -642,9 +659,10 @@ describe("用户主流程原生图标", () => {
 
   test("复制入口统一使用单次自定义反馈且不传入非微信参数", () => {
     const appConfig = JSON.parse(read("app.json"))
+    const allPageRoutes = collectAllPageRoutes()
     let clipboardCount = 0
 
-    appConfig.pages.forEach((route) => {
+    allPageRoutes.forEach((route) => {
       const source = read(`${route}.js`)
       extractBalancedCallBodies(source, "wx.setClipboardData({").forEach((body) => {
         clipboardCount += 1
@@ -661,7 +679,8 @@ describe("用户主流程原生图标", () => {
 
   test("轻量系统反馈只在操作来源仍是当前页面时展示", () => {
     const appConfig = JSON.parse(read("app.json"))
-    const pageSources = appConfig.pages.map((route) => read(`${route}.js`))
+    const allPageRoutes = collectAllPageRoutes()
+    const pageSources = allPageRoutes.map((route) => read(`${route}.js`))
     const currentOnlyActionCount = pageSources.reduce(
       (count, source) =>
         count +
@@ -679,6 +698,7 @@ describe("用户主流程原生图标", () => {
 
   test("全站拨号入口仅在真实失败时提示并静默处理用户取消", () => {
     const appConfig = JSON.parse(read("app.json"))
+    const allPageRoutes = collectAllPageRoutes()
     const servicePhoneRoutes = [
       "pages/garage/garage.js",
       "pages/car-detail/car-detail.js",
@@ -687,7 +707,7 @@ describe("用户主流程原生图标", () => {
     ]
     let phoneCallCount = 0
 
-    appConfig.pages.forEach((route) => {
+    allPageRoutes.forEach((route) => {
       const source = read(`${route}.js`)
       extractBalancedCallBodies(source, "wx.makePhoneCall({").forEach((body) => {
         phoneCallCount += 1
@@ -711,8 +731,9 @@ describe("用户主流程原生图标", () => {
 
   test("全站页面跳转、返回兜底、滚动定位和图片预览入口均提供失败反馈", () => {
     const appConfig = JSON.parse(read("app.json"))
+    const allPageRoutes = collectAllPageRoutes()
     const componentScripts = ["components/core-nav/core-nav.js"]
-    const scripts = appConfig.pages.map((route) => `${route}.js`).concat(componentScripts)
+    const scripts = allPageRoutes.map((route) => `${route}.js`).concat(componentScripts)
     const expectedCounts = {
       navigateTo: 29,
       redirectTo: 19,
@@ -747,9 +768,10 @@ describe("用户主流程原生图标", () => {
 
   test("接入原生生命周期守卫的确认弹窗不会在离页后启动操作", () => {
     const appConfig = JSON.parse(read("app.json"))
+    const allPageRoutes = collectAllPageRoutes()
     let guardedCallbackCount = 0
 
-    appConfig.pages.forEach((route) => {
+    allPageRoutes.forEach((route) => {
       const source = read(`${route}.js`)
       if (!source.includes("activatePageNativeActions(this)")) {
         return
@@ -769,13 +791,13 @@ describe("用户主流程原生图标", () => {
   })
 
   test("图片选择与文件分享会静默处理用户主动取消", () => {
-    const vehicleSource = read("pages/vehicle-detail-manage/vehicle-detail-manage.js")
+    const vehicleSource = read("pages-admin/vehicle-detail-manage/vehicle-detail-manage.js")
     const chooseImageCalls = extractBalancedCallBodies(vehicleSource, "wx.chooseImage({")
     const csvSharePages = [
       "pages/booking-manage/booking-manage.js",
-      "pages/audit-log-manage/audit-log-manage.js",
-      "pages/error-log-manage/error-log-manage.js",
-      "pages/privacy-data-inventory/privacy-data-inventory.js"
+      "pages-admin/audit-log-manage/audit-log-manage.js",
+      "pages-admin/error-log-manage/error-log-manage.js",
+      "pages-admin/privacy-data-inventory/privacy-data-inventory.js"
     ]
 
     expect(chooseImageCalls).toHaveLength(1)
@@ -789,9 +811,10 @@ describe("用户主流程原生图标", () => {
 
   test("全站系统加载层统一遮罩底层操作并使用进行中文案", () => {
     const appConfig = JSON.parse(read("app.json"))
+    const allPageRoutes = collectAllPageRoutes()
     let loadingCount = 0
 
-    appConfig.pages.forEach((route) => {
+    allPageRoutes.forEach((route) => {
       const source = read(`${route}.js`)
       const matches = source.match(/wx\.showLoading\(\{[\s\S]*?\}\)/g) || []
       matches.forEach((markup) => {
@@ -804,7 +827,7 @@ describe("用户主流程原生图标", () => {
     })
 
     expect(loadingCount).toBeGreaterThanOrEqual(7)
-    const vehicleManageSource = read("pages/vehicle-manage/vehicle-manage.js")
+    const vehicleManageSource = read("pages-admin/vehicle-manage/vehicle-manage.js")
     const mutationLoadingTitles = ["更新中…", "停用中…", "恢复中…", "删除中…"]
     expect(vehicleManageSource).toContain("runVehicleMutation(options)")
     mutationLoadingTitles.forEach((title) => {
@@ -816,13 +839,13 @@ describe("用户主流程原生图标", () => {
     mineLoadingTitles.forEach((title) => {
       expect(mineSource).toContain(`loadingTitle: "${title}"`)
     })
-    const vehicleDetailSource = read("pages/vehicle-detail-manage/vehicle-detail-manage.js")
+    const vehicleDetailSource = read("pages-admin/vehicle-detail-manage/vehicle-detail-manage.js")
     const vehicleDetailLoadingTitles = ["更新中…", "停用中…", "恢复中…"]
     expect(vehicleDetailSource).toContain("runVehicleStatusOperation(input)")
     vehicleDetailLoadingTitles.forEach((title) => {
       expect(vehicleDetailSource).toContain(`loadingTitle: "${title}"`)
     })
-    expect(read("pages/vehicle-detail-manage/vehicle-detail-manage.wxml")).toContain("upload-progress-panel")
+    expect(read("pages-admin/vehicle-detail-manage/vehicle-detail-manage.wxml")).toContain("upload-progress-panel")
   })
 
   test("车辆详情使用放大预览、收藏与转化操作图标", () => {
@@ -884,7 +907,7 @@ describe("用户主流程原生图标", () => {
   })
 
   test("运营概览行动项使用原生箭头", () => {
-    const wxml = read("pages/operations-overview/operations-overview.wxml")
+    const wxml = read("pages-admin/operations-overview/operations-overview.wxml")
 
     expect(wxml).toContain("alert-chevron")
     expect(wxml).toContain('aria-label="{{item.title}}，{{item.desc}}"')
@@ -912,8 +935,8 @@ describe("用户主流程原生图标", () => {
 
   test.each([
     "pages/booking/booking.wxml",
-    "pages/vehicle-create/vehicle-create.wxml",
-    "pages/vehicle-edit/vehicle-edit.wxml"
+    "pages-admin/vehicle-create/vehicle-create.wxml",
+    "pages-admin/vehicle-edit/vehicle-edit.wxml"
   ])("%s 的选择控件使用原生下拉箭头", (relativePath) => {
     const wxml = read(relativePath)
 
@@ -932,7 +955,7 @@ describe("用户主流程原生图标", () => {
   })
 
   test("车辆录入提示使用原生信息图标", () => {
-    const wxml = read("pages/vehicle-create/vehicle-create.wxml")
+    const wxml = read("pages-admin/vehicle-create/vehicle-create.wxml")
 
     expect(wxml).toContain("tip-info-icon")
     expect(wxml).not.toContain('<view class="tip-mark">i</view>')

@@ -2,9 +2,13 @@ const fs = require("fs")
 const path = require("path")
 
 const PROJECT_ROOT = path.resolve(__dirname, "..")
-const PAGES_ROOT = path.join(PROJECT_ROOT, "pages")
+const PAGES_ROOTS = [
+  path.join(PROJECT_ROOT, "pages"),
+  path.join(PROJECT_ROOT, "pages-admin")
+]
 
 function collectFiles(directory, suffix, list = []) {
+  if (!fs.existsSync(directory)) return list
   fs.readdirSync(directory, { withFileTypes: true }).forEach((entry) => {
     const fullPath = path.join(directory, entry.name)
     if (entry.isDirectory()) {
@@ -17,7 +21,8 @@ function collectFiles(directory, suffix, list = []) {
 }
 
 function getProtectedPages() {
-  return collectFiles(PAGES_ROOT, ".js")
+  const allFiles = PAGES_ROOTS.flatMap((root) => collectFiles(root, ".js"))
+  return allFiles
     .filter((filePath) => fs.readFileSync(filePath, "utf8").includes("requirePagePermission"))
     .map((filePath) => ({
       jsPath: filePath,

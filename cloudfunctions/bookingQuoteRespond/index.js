@@ -8,6 +8,9 @@ const BOOKING_FIELDS = { _id: true, openid: true, status: true, latestQuoteId: t
 const QUOTE_FIELDS = { _id: true, bookingId: true, status: true, validUntil: true, version: true, sentAt: true, confirmedAt: true, adjustmentRequestedAt: true }
 const VEHICLE_FIELDS = { status: true, brandModel: true, plateNumber: true }
 const MAX_OCCUPANCY_DAYS = 90
+const ATTRIBUTION_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/
+const ATTRIBUTION_CHANNELS = ["direct", "wechat_share", "moments", "qr", "official_account", "campaign"]
+const ATTRIBUTION_SCENES = ["weekend_trip", "business_reception", "group_travel", "ev_experience"]
 
 function createError(code, message, details) {
   const result = { ok: false, code: String(code || "VALIDATION_ERROR"), message: String(message || "参数校验失败") }
@@ -81,14 +84,20 @@ async function writeErrorLogBestEffort(payload) {
 }
 
 async function writeContentConfirmationBestEffort(attribution, vehicleId) {
-  if (!attribution || !attribution.contentId) return
+  const contentId = String(attribution && attribution.contentId || "").trim()
+  const normalizedVehicleId = String(vehicleId || "").trim()
+  if (!ATTRIBUTION_ID_PATTERN.test(contentId) || !ATTRIBUTION_ID_PATTERN.test(normalizedVehicleId)) return
+  const requestedChannel = String(attribution && attribution.channel || "").trim()
+  const requestedScene = String(attribution && attribution.scene || "").trim()
+  const channel = ATTRIBUTION_CHANNELS.includes(requestedChannel) ? requestedChannel : "direct"
+  const scene = ATTRIBUTION_SCENES.includes(requestedScene) ? requestedScene : ""
   try {
     await db.collection("analytics_events").add({ data: {
       eventType: "content_booking_confirmed",
-      contentId: String(attribution.contentId || ""),
-      vehicleId: String(vehicleId || ""),
-      channel: String(attribution.channel || "direct"),
-      scene: String(attribution.scene || ""),
+      contentId,
+      vehicleId: normalizedVehicleId,
+      channel,
+      ...(scene ? { scene } : {}),
       createdAt: db.serverDate()
     } })
   } catch (error) {

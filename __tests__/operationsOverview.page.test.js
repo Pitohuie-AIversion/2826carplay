@@ -1,4 +1,4 @@
-jest.mock("../shared/pageAuth", () => ({
+﻿jest.mock("../shared/pageAuth", () => ({
   cancelPagePermissionCheck: jest.fn(),
   requirePagePermission: jest.fn()
 }))
@@ -12,7 +12,7 @@ function loadPageDefinition() {
   global.Page = jest.fn((input) => {
     definition = input
   })
-  require("../pages/operations-overview/operations-overview")
+  require("../pages-admin/operations-overview/operations-overview")
   return definition
 }
 
@@ -360,7 +360,7 @@ describe("pages/operations-overview", () => {
   })
 
   test("运营总览使用同步进度、业务图标和原生导航箭头", () => {
-    const pageDir = path.resolve(__dirname, "../pages/operations-overview")
+    const pageDir = path.resolve(__dirname, "../pages-admin/operations-overview")
     const wxmlSource = fs.readFileSync(path.join(pageDir, "operations-overview.wxml"), "utf8")
     const wxssSource = fs.readFileSync(path.join(pageDir, "operations-overview.wxss"), "utf8")
 

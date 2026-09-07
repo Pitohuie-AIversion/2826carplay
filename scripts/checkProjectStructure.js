@@ -32,27 +32,30 @@ function findDuplicates(values) {
   return Array.from(duplicates).sort()
 }
 
-function collectPageRoutes(projectRoot) {
+function collectPageRoutes(projectRoot, extraRootDirs) {
   const routes = []
-  const pagesRoot = path.join(projectRoot, "pages")
-  if (!fs.existsSync(pagesRoot)) {
-    return routes
-  }
-  const walk = (directory) => {
-    fs.readdirSync(directory, { withFileTypes: true }).forEach((entry) => {
-      const absolutePath = path.join(directory, entry.name)
-      if (entry.isDirectory()) {
-        walk(absolutePath)
-      } else if (entry.isFile() && entry.name.endsWith(".wxml")) {
-        routes.push(
-          normalizePath(
-            path.relative(projectRoot, absolutePath).replace(/\.wxml$/, "")
+  const rootDirs = ["pages"].concat(Array.isArray(extraRootDirs) ? extraRootDirs : [])
+  rootDirs.forEach((dirName) => {
+    const pagesRoot = path.join(projectRoot, dirName)
+    if (!fs.existsSync(pagesRoot)) {
+      return
+    }
+    const walk = (directory) => {
+      fs.readdirSync(directory, { withFileTypes: true }).forEach((entry) => {
+        const absolutePath = path.join(directory, entry.name)
+        if (entry.isDirectory()) {
+          walk(absolutePath)
+        } else if (entry.isFile() && entry.name.endsWith(".wxml")) {
+          routes.push(
+            normalizePath(
+              path.relative(projectRoot, absolutePath).replace(/\.wxml$/, "")
+            )
           )
-        )
-      }
-    })
-  }
-  walk(pagesRoot)
+        }
+      })
+    }
+    walk(pagesRoot)
+  })
   return routes.sort()
 }
 
@@ -81,7 +84,18 @@ function checkProjectStructure(projectRoot) {
     appConfig && Array.isArray(appConfig.pages)
       ? appConfig.pages.map(normalizePath)
       : []
-  const discoveredPages = collectPageRoutes(resolvedRoot)
+  const subRoots = []
+  if (appConfig && Array.isArray(appConfig.subPackages)) {
+    appConfig.subPackages.forEach((sub) => {
+      const root = normalizePath((sub && sub.root) || "")
+      if (!root) return
+      subRoots.push(root)
+      if (Array.isArray(sub.pages)) {
+        sub.pages.forEach((p) => declaredPages.push(normalizePath(`${root}/${p}`)))
+      }
+    })
+  }
+  const discoveredPages = collectPageRoutes(resolvedRoot, subRoots)
 
   if (appConfig && !Array.isArray(appConfig.pages)) {
     violations.push({

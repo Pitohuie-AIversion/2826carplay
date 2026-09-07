@@ -1,4 +1,4 @@
-const vehicleUtils = require("../../shared/vehicle")
+﻿const vehicleUtils = require("../../shared/vehicle")
 const { buildVehicleFormProgress } = require("../../shared/vehicleFormProgress")
 const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
 const { formatToastTitle } = require("../../shared/uiFeedback")
@@ -109,13 +109,13 @@ Page({
     }
 
     wx.redirectTo({
-      url: `/pages/vehicle-detail-manage/vehicle-detail-manage?id=${id}`,
+      url: `/pages-admin/vehicle-detail-manage/vehicle-detail-manage?id=${id}`,
       fail: () => {
         if (!this.isVehicleCreateActive()) {
           return
         }
         wx.navigateTo({
-          url: `/pages/vehicle-detail-manage/vehicle-detail-manage?id=${id}`,
+          url: `/pages-admin/vehicle-detail-manage/vehicle-detail-manage?id=${id}`,
           fail: () => {
             if (this.isVehicleCreateActive()) {
               this.finishSubmitFlow()

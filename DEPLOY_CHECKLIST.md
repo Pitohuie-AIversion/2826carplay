@@ -6,17 +6,19 @@
 - 云函数根目录：`cloudfunctions/`
 - 本地部署目标：`Nodejs20.19`；当前环境中的既有函数仍为受支持的 `Nodejs16.13`。CloudBase 不支持原地切换既有函数运行时，迁移必须安排维护窗口并逐个重建验证，禁止在正常营业期间批量删除重建
 - 云函数 SDK：全部固定为 `wx-server-sdk@4.0.2` 并包含锁文件；禁止使用 `^`、`~` 或 `latest` 等浮动版本
-- `npm run check:release` 通过，当前为 `109 suites / 969 tests`
-- `npm run check:structure` 通过，当前已核对 `26` 个页面与 `53` 个云函数，页面路由、必需文件、云函数目录和部署清单保持一致
+- `npm run check:release` 通过，当前为 `113 suites / 985 tests`
+- `npm run check:structure` 通过，当前已核对 `26` 个页面与 `56` 个云函数，页面路由、必需文件、云函数目录和部署清单保持一致
 - `npm run check:secrets` 通过，仓库未发现私钥、环境文件或硬编码生产凭据
-- `npm run check:package` 通过，当前源码主包估算约 `1.64 MiB`，距离 `2 MiB` 保守阻断线约 `0.36 MiB`
-- 2026-08-20 已通过 CloudBase CLI 回读确认：`53/53` 个云函数部署完成，`15/15` 个业务集合存在；`booking_quotes` 与 `booking_handovers` 已补齐下述 5 个索引并设为 `ADMINONLY`
+- `npm run check:package` 通过，当前源码主包估算约 `1.65 MiB`，距离 `2 MiB` 保守阻断线约 `0.35 MiB`
+- 2026-08-21 已通过 CloudBase CLI 回读确认：`56/56` 个云函数部署完成，`16/16` 个业务集合存在；`content_guides` 已补齐 3 个索引并设为客户端不可读写。2026-08-22 已重新部署归因加固后的 `bookingQuoteRespond` 并确认 `Active/Available`
 
 ## 2. 必须部署的云函数
 
 以下函数已在 `cloudbaserc.json` 中纳入部署清单，部署时应全部同步：
 
 Phase 15 需要新增部署 `vehicleCalendarManage`，并重新部署 `vehicleAvailabilityCheck`、`bookingQuoteRespond`、`bookingCancel`、`bookingUpdateStatus`、`bookingCalendarList`、`analyticsTrack`、`analyticsOverview` 和 `systemHealthCheck`。
+
+Phase 16 需要新增部署 `contentGuideList`、`contentGuideDetail`、`contentGuideManage`，并重新部署 `analyticsTrack`、`analyticsOverview`、`bookingCreate`、`bookingQuoteRespond`。
 
 部署 3 个新集合后先打开预约日历：历史 `confirmed` 预约若显示“待同步占用”，按车逐条点击“同步占用”。遇到 `AVAILABILITY_CONFLICT` 时不得覆盖现有日锁，应先核对旧确认预约和维修/保留安排；全部历史确认预约同步完成后再开放新报价确认。
 
@@ -39,6 +41,9 @@ Phase 15 需要新增部署 `vehicleCalendarManage`，并重新部署 `vehicleAv
 - `bookingUpdateMyContact`
 - `bookingUpdateStatus`
 - `bootstrapAdmin`
+- `contentGuideDetail`
+- `contentGuideList`
+- `contentGuideManage`
 - `errorLogList`
 - `favoriteMyList`
 - `favoriteSet`
@@ -82,6 +87,7 @@ Phase 15 需要新增部署 `vehicleCalendarManage`，并重新部署 `vehicleAv
 - `bookings`
 - `booking_quotes`
 - `booking_handovers`
+- `content_guides`
 - `roles`
 - `app_configs`
 - `audit_logs`
@@ -115,6 +121,9 @@ Phase 15 需要新增部署 `vehicleCalendarManage`，并重新部署 `vehicleAv
 - `booking_quotes.sentAt`
 - `booking_handovers.bookingId + stage + version`
 - `booking_handovers.bookingId + status`
+- `content_guides.slug`（唯一索引）
+- `content_guides.status + publishedAt`
+- `content_guides.scenario + status`
 - `vehicle_availability_blocks.status + startDate + endDate`
 - `vehicle_availability_blocks.vehicleId + status`
 - `vehicle_calendar_days.blockId`

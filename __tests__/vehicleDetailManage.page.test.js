@@ -1,4 +1,4 @@
-const fs = require("fs")
+﻿const fs = require("fs")
 const path = require("path")
 
 function loadVehicleDetailDefinition(wxMock) {
@@ -8,7 +8,7 @@ function loadVehicleDetailDefinition(wxMock) {
   })
   global.wx = wxMock
   jest.resetModules()
-  require("../pages/vehicle-detail-manage/vehicle-detail-manage")
+  require("../pages-admin/vehicle-detail-manage/vehicle-detail-manage")
   return definition
 }
 
@@ -28,7 +28,7 @@ function createVehicleDetailPage(definition, overrides = {}) {
 }
 
 describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
-  const pageDir = path.resolve(__dirname, "../pages/vehicle-detail-manage")
+  const pageDir = path.resolve(__dirname, "../pages-admin/vehicle-detail-manage")
   const wxmlSource = fs.readFileSync(path.join(pageDir, "vehicle-detail-manage.wxml"), "utf8")
   const wxssSource = fs.readFileSync(path.join(pageDir, "vehicle-detail-manage.wxss"), "utf8")
 
@@ -98,7 +98,7 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
     })
     global.wx = {}
     jest.resetModules()
-    require("../pages/vehicle-detail-manage/vehicle-detail-manage")
+    require("../pages-admin/vehicle-detail-manage/vehicle-detail-manage")
     const page = {
       ...definition,
       data: {
@@ -137,7 +137,7 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
       showToast: jest.fn()
     }
     jest.resetModules()
-    require("../pages/vehicle-detail-manage/vehicle-detail-manage")
+    require("../pages-admin/vehicle-detail-manage/vehicle-detail-manage")
     const page = {
       ...definition,
       data: {
@@ -170,7 +170,7 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
       chooseImage: jest.fn()
     }
     jest.resetModules()
-    require("../pages/vehicle-detail-manage/vehicle-detail-manage")
+    require("../pages-admin/vehicle-detail-manage/vehicle-detail-manage")
     const page = {
       ...definition,
       data: {
@@ -200,7 +200,7 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
       showToast: jest.fn()
     }
     jest.resetModules()
-    require("../pages/vehicle-detail-manage/vehicle-detail-manage")
+    require("../pages-admin/vehicle-detail-manage/vehicle-detail-manage")
     const page = {
       ...definition,
       data: {
@@ -236,7 +236,7 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
       showToast: jest.fn()
     }
     jest.resetModules()
-    require("../pages/vehicle-detail-manage/vehicle-detail-manage")
+    require("../pages-admin/vehicle-detail-manage/vehicle-detail-manage")
     const page = {
       ...definition,
       data: {
@@ -270,7 +270,7 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
       showToast: jest.fn()
     }
     jest.resetModules()
-    require("../pages/vehicle-detail-manage/vehicle-detail-manage")
+    require("../pages-admin/vehicle-detail-manage/vehicle-detail-manage")
     const page = {
       ...definition,
       data: {
@@ -312,7 +312,7 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
       showToast: jest.fn()
     }
     jest.resetModules()
-    require("../pages/vehicle-detail-manage/vehicle-detail-manage")
+    require("../pages-admin/vehicle-detail-manage/vehicle-detail-manage")
     const page = {
       ...definition,
       data: {
@@ -365,7 +365,7 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
       showToast: jest.fn()
     }
     jest.resetModules()
-    require("../pages/vehicle-detail-manage/vehicle-detail-manage")
+    require("../pages-admin/vehicle-detail-manage/vehicle-detail-manage")
     const page = {
       ...definition,
       data: {
@@ -405,7 +405,7 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
       showToast: jest.fn()
     }
     jest.resetModules()
-    require("../pages/vehicle-detail-manage/vehicle-detail-manage")
+    require("../pages-admin/vehicle-detail-manage/vehicle-detail-manage")
     const page = {
       ...definition,
       data: {
@@ -443,7 +443,7 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
       showToast: jest.fn()
     }
     jest.resetModules()
-    require("../pages/vehicle-detail-manage/vehicle-detail-manage")
+    require("../pages-admin/vehicle-detail-manage/vehicle-detail-manage")
     const page = {
       ...definition,
       data: {
@@ -484,7 +484,7 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
       showToast: jest.fn()
     }
     jest.resetModules()
-    require("../pages/vehicle-detail-manage/vehicle-detail-manage")
+    require("../pages-admin/vehicle-detail-manage/vehicle-detail-manage")
     const page = {
       ...definition,
       data: {
@@ -527,7 +527,7 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
       showToast: jest.fn()
     }
     jest.resetModules()
-    require("../pages/vehicle-detail-manage/vehicle-detail-manage")
+    require("../pages-admin/vehicle-detail-manage/vehicle-detail-manage")
     const page = {
       ...definition,
       data: {
@@ -574,7 +574,7 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
       showToast: jest.fn()
     }
     jest.resetModules()
-    require("../pages/vehicle-detail-manage/vehicle-detail-manage")
+    require("../pages-admin/vehicle-detail-manage/vehicle-detail-manage")
     const page = {
       ...definition,
       data: {
@@ -622,7 +622,7 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
       showToast: jest.fn()
     }
     jest.resetModules()
-    require("../pages/vehicle-detail-manage/vehicle-detail-manage")
+    require("../pages-admin/vehicle-detail-manage/vehicle-detail-manage")
     const page = {
       ...definition,
       data: {
@@ -658,7 +658,7 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
       showToast: jest.fn()
     }
     jest.resetModules()
-    require("../pages/vehicle-detail-manage/vehicle-detail-manage")
+    require("../pages-admin/vehicle-detail-manage/vehicle-detail-manage")
     const page = {
       ...definition,
       data: {
@@ -701,7 +701,7 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
       showToast: jest.fn()
     }
     jest.resetModules()
-    require("../pages/vehicle-detail-manage/vehicle-detail-manage")
+    require("../pages-admin/vehicle-detail-manage/vehicle-detail-manage")
     const page = {
       ...definition,
       data: {
@@ -760,7 +760,7 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
       showToast: jest.fn()
     }
     jest.resetModules()
-    require("../pages/vehicle-detail-manage/vehicle-detail-manage")
+    require("../pages-admin/vehicle-detail-manage/vehicle-detail-manage")
     const page = {
       ...definition,
       data: {
@@ -795,7 +795,7 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
       showToast: jest.fn()
     }
     jest.resetModules()
-    require("../pages/vehicle-detail-manage/vehicle-detail-manage")
+    require("../pages-admin/vehicle-detail-manage/vehicle-detail-manage")
     const page = {
       ...definition,
       data: {
@@ -838,7 +838,7 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
       showToast: jest.fn()
     }
     jest.resetModules()
-    require("../pages/vehicle-detail-manage/vehicle-detail-manage")
+    require("../pages-admin/vehicle-detail-manage/vehicle-detail-manage")
     const page = {
       ...definition,
       data: { ...definition.data, loading: false, id: "car_1" },
@@ -886,7 +886,7 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
       showToast: jest.fn()
     }
     jest.resetModules()
-    require("../pages/vehicle-detail-manage/vehicle-detail-manage")
+    require("../pages-admin/vehicle-detail-manage/vehicle-detail-manage")
     const page = {
       ...definition,
       data: { ...definition.data, loading: false, id: "car_1" }
@@ -920,7 +920,7 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
       showToast: jest.fn()
     }
     jest.resetModules()
-    require("../pages/vehicle-detail-manage/vehicle-detail-manage")
+    require("../pages-admin/vehicle-detail-manage/vehicle-detail-manage")
     const page = {
       ...definition,
       data: { ...definition.data, loading: false, id: "car_1" }

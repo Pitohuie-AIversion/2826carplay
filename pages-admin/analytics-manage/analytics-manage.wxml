@@ -89,6 +89,21 @@
         <view><view class="section-eyebrow">CONTENT ATTRIBUTION</view><view class="section-title">内容增长与渠道归因</view></view>
         <view class="section-index">16</view>
       </view>
+      <view class="period-row">
+        <view
+          wx:for="{{topNOptions}}"
+          wx:key="value"
+          class="period-chip {{topN === item.value ? 'period-chip-active' : ''}} {{loading || cleanupLoading ? 'period-chip-disabled' : ''}}"
+          data-topn="{{item.value}}"
+          bindtap="handleTopNTap"
+          hover-class="period-chip-pressed"
+          aria-role="button"
+          aria-pressed="{{topN === item.value}}"
+          aria-disabled="{{loading || cleanupLoading}}"
+        >
+          {{item.label}}
+        </view>
+      </view>
       <view class="decision-grid">
         <view class="decision-item" wx:for="{{contentMetricItems}}" wx:key="key">
           <view class="decision-label">{{item.label}}</view><view class="decision-value">{{item.value}}</view><view class="decision-meta">{{item.meta}}</view>
@@ -96,7 +111,14 @@
       </view>
       <view wx:if="{{topContents.length}}" class="content-rank-group">
         <view class="decision-label">按内容排名</view>
-        <view class="rank-item" wx:for="{{topContents}}" wx:key="key"><view class="rank-number">{{index + 1}}</view><view class="rank-copy"><view class="rank-name">{{item.key}}</view><view class="rank-meta">浏览 {{item.views}} · 预约 {{item.bookingSubmits}} · 确认 {{item.confirmed}}</view></view><view class="rank-score">{{item.score}}</view></view>
+        <view class="rank-item" wx:for="{{topContents}}" wx:key="key">
+          <view class="rank-number">{{index + 1}}</view>
+          <view class="rank-copy">
+            <view class="rank-name">{{item.title || item.key}}<text wx:if="{{item.contentType}}" class="rank-tag"> · {{item.contentType}}</text></view>
+            <view class="rank-meta">内容ID {{item.key}} · 浏览 {{item.views}} · 分享落地 {{item.shareOpens}} · 预约 {{item.bookingSubmits}} · 确认 {{item.confirmed}}</view>
+          </view>
+          <view class="rank-score">{{item.score}}</view>
+        </view>
       </view>
       <view wx:if="{{topContentVehicles.length}}" class="content-rank-group">
         <view class="decision-label">按车辆排名</view>
@@ -105,6 +127,83 @@
       <view wx:if="{{topContentSources.length}}" class="content-rank-group">
         <view class="decision-label">按来源排名</view>
         <view class="rank-item" wx:for="{{topContentSources}}" wx:key="key"><view class="rank-number">{{index + 1}}</view><view class="rank-copy"><view class="rank-name">{{item.channel}} / {{item.scene || 'all'}}</view><view class="rank-meta">事件 {{item.events}} · 预约 {{item.bookingSubmits}} · 确认 {{item.confirmed}}</view></view></view>
+      </view>
+    </view>
+
+    <view class="section-card ui-card">
+      <view class="section-heading">
+        <view>
+          <view class="section-eyebrow">CONTENT TREND</view>
+          <view class="section-title">内容每日趋势</view>
+        </view>
+        <view class="section-index">17</view>
+      </view>
+      <view class="content-trend-legend">
+        <view class="legend-item"><view class="legend-swatch legend-swatch-views"></view><text>内容浏览</text></view>
+        <view class="legend-item"><view class="legend-swatch legend-swatch-vehicles"></view><text>点击车辆</text></view>
+        <view class="legend-item"><view class="legend-swatch legend-swatch-submits"></view><text>预约提交</text></view>
+        <view class="legend-item"><view class="legend-swatch legend-swatch-confirmed"></view><text>报价确认</text></view>
+      </view>
+      <view class="trend-scroll-shell ui-scroll-shell">
+        <scroll-view class="trend-scroll" scroll-x enhanced show-scrollbar="{{false}}" aria-label="近 {{days}} 天内容每日趋势，可横向滑动查看">
+          <view class="trend-chart">
+            <view class="trend-item content-trend-item {{item.isPeak ? 'trend-item-peak' : ''}}" wx:for="{{contentTrendItems}}" wx:key="key" aria-label="{{item.label}}，内容浏览 {{item.views}}，点击车辆 {{item.vehicleClicks}}，预约提交 {{item.submits}}，报价确认 {{item.confirmed}}{{item.isPeak ? '，本周期峰值' : ''}}">
+              <view class="trend-value content-trend-value">{{item.total}}</view>
+              <view class="trend-column content-trend-column">
+                <view class="content-stacked-column">
+                  <view wx:if="{{item.views > 0}}" class="content-fill content-fill-views" style="flex: {{item.views}};"></view>
+                  <view wx:if="{{item.vehicleClicks > 0}}" class="content-fill content-fill-vehicles" style="flex: {{item.vehicleClicks}};"></view>
+                  <view wx:if="{{item.submits > 0}}" class="content-fill content-fill-submits" style="flex: {{item.submits}};"></view>
+                  <view wx:if="{{item.confirmed > 0}}" class="content-fill content-fill-confirmed" style="flex: {{item.confirmed}};"></view>
+                </view>
+              </view>
+              <view class="trend-label">{{item.label}}</view>
+              <view class="content-trend-breakdown">
+                <text>{{item.views}}</text>·<text>{{item.vehicleClicks}}</text>·<text>{{item.submits}}</text>·<text>{{item.confirmed}}</text>
+              </view>
+            </view>
+          </view>
+        </scroll-view>
+        <view wx:if="{{contentTrendItems.length > 10}}" class="ui-scroll-cue trend-scroll-cue" aria-hidden="true"></view>
+      </view>
+    </view>
+
+    <view class="section-card ui-card">
+      <view class="section-heading">
+        <view>
+          <view class="section-eyebrow">SCENE FUNNEL</view>
+          <view class="section-title">场景维度漏斗</view>
+        </view>
+        <view class="section-index">18</view>
+      </view>
+      <view class="scene-funnel-list">
+        <view class="scene-funnel-card ui-card" wx:for="{{sceneFunnelItems}}" wx:key="key">
+          <view class="scene-funnel-head">
+            <view class="scene-funnel-label">{{item.label}}</view>
+            <view class="scene-funnel-rates">
+              <text class="scene-rate-pill">浏览→预约 {{item.viewToSubmitRate}}%</text>
+              <text class="scene-rate-pill">预约→确认 {{item.submitToConfirmRate}}%</text>
+              <text class="scene-rate-pill scene-rate-pill-accent">浏览→确认 {{item.viewToConfirmRate}}%</text>
+            </view>
+          </view>
+          <view class="funnel-list scene-funnel-inner">
+            <view class="funnel-item" wx:for="{{item.stages}}" wx:for-item="stage" wx:key="key">
+              <view class="funnel-head">
+                <view class="funnel-stage">
+                  <view class="funnel-stage-index">{{stage.index}}</view>
+                  <view>{{stage.label}}</view>
+                </view>
+                <view class="funnel-metric">
+                  <text class="funnel-value">{{stage.value}}</text>
+                  <text class="funnel-rate">{{stage.topRate}}%</text>
+                </view>
+              </view>
+              <view class="bar-track">
+                <view class="bar-fill funnel-fill scene-funnel-fill-{{stage.key}}" style="width: {{stage.width}}%;"></view>
+              </view>
+            </view>
+          </view>
+        </view>
       </view>
     </view>
 

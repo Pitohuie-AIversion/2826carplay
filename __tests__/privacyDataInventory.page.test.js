@@ -1,4 +1,4 @@
-jest.mock("../shared/pageAuth", () => ({
+﻿jest.mock("../shared/pageAuth", () => ({
   cancelPagePermissionCheck: jest.fn(),
   requirePagePermission: jest.fn()
 }))
@@ -33,7 +33,7 @@ function loadPageDefinition() {
   global.Page = jest.fn((input) => {
     definition = input
   })
-  require("../pages/privacy-data-inventory/privacy-data-inventory")
+  require("../pages-admin/privacy-data-inventory/privacy-data-inventory")
   return definition
 }
 
@@ -429,7 +429,7 @@ describe("pages/privacy-data-inventory", () => {
   })
 
   test("清单页面使用覆盖进度、分类图标和原生文件操作", () => {
-    const pageDir = path.resolve(__dirname, "../pages/privacy-data-inventory")
+    const pageDir = path.resolve(__dirname, "../pages-admin/privacy-data-inventory")
     const wxmlSource = fs.readFileSync(path.join(pageDir, "privacy-data-inventory.wxml"), "utf8")
     const wxssSource = fs.readFileSync(path.join(pageDir, "privacy-data-inventory.wxss"), "utf8")
 

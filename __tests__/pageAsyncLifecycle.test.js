@@ -12,8 +12,12 @@ describe("页面异步生命周期覆盖", () => {
     const appConfig = JSON.parse(read("app.json"))
     const asyncPages = []
     const missingUnload = []
+    const allPageRoutes = [
+      ...appConfig.pages,
+      ...((appConfig.subPackages || []).flatMap((sub) => (sub.pages || []).map((p) => `${sub.root}/${p}`)))
+    ]
 
-    appConfig.pages.forEach((route) => {
+    allPageRoutes.forEach((route) => {
       const source = read(`${route}.js`)
       const usesCloudTask =
         /wx\.cloud\.(?:callFunction|uploadFile|deleteFile)\s*\(/.test(source) ||
@@ -33,11 +37,11 @@ describe("页面异步生命周期覆盖", () => {
 
   test("列表搜索清空后的渲染回调会校验当前请求序号", () => {
     const guardedPages = [
-      ["pages/vehicle-manage/vehicle-manage.js", "_vehicleListRequestId", 1],
+      ["pages-admin/vehicle-manage/vehicle-manage.js", "_vehicleListRequestId", 1],
       ["pages/booking-manage/booking-manage.js", "_bookingListRequestId", 1],
-      ["pages/audit-log-manage/audit-log-manage.js", "_auditListRequestId", 2],
-      ["pages/error-log-manage/error-log-manage.js", "_errorListRequestId", 2],
-      ["pages/privacy-request-manage/privacy-request-manage.js", "_privacyManageListRequestId", 2]
+      ["pages-admin/audit-log-manage/audit-log-manage.js", "_auditListRequestId", 2],
+      ["pages-admin/error-log-manage/error-log-manage.js", "_errorListRequestId", 2],
+      ["pages-admin/privacy-request-manage/privacy-request-manage.js", "_privacyManageListRequestId", 2]
     ]
 
     guardedPages.forEach(([relativePath, requestField, minimumCount]) => {
@@ -51,8 +55,12 @@ describe("页面异步生命周期覆盖", () => {
   test("页面实例上的超时句柄均提供离页入口与对应清理", () => {
     const appConfig = JSON.parse(read("app.json"))
     let timerCount = 0
+    const allPageRoutes = [
+      ...appConfig.pages,
+      ...((appConfig.subPackages || []).flatMap((sub) => (sub.pages || []).map((p) => `${sub.root}/${p}`)))
+    ]
 
-    appConfig.pages.forEach((route) => {
+    allPageRoutes.forEach((route) => {
       const source = read(`${route}.js`)
       const timerFields = new Set(
         Array.from(source.matchAll(/this\.(_[A-Za-z0-9]+Timer)\s*=\s*setTimeout\s*\(/g))
@@ -96,7 +104,7 @@ describe("页面异步生命周期覆盖", () => {
 
   test("恢复刷新与进行中的写操作保持互斥", () => {
     const expectations = [
-      ["pages/vehicle-manage/vehicle-manage.js", "this.data.updatingId", "this.data.deletingId"],
+      ["pages-admin/vehicle-manage/vehicle-manage.js", "this.data.updatingId", "this.data.deletingId"],
       ["pages/bookings/bookings.js", "this._bookingCancelTimer", "this.data.loading"],
       ["pages/booking-workbench/booking-workbench.js", "this.isWorkbenchWriteBusy()", "this.data.refreshing"],
       ["pages/booking-detail/booking-detail.js", "this.data.editing", "this.data.saving"],
@@ -112,13 +120,13 @@ describe("页面异步生命周期覆盖", () => {
 
   test("列表读取与重试入口声明忙碌态保护", () => {
     const expectations = [
-      ["pages/vehicle-manage/vehicle-manage.js", "isVehicleMutationBusy()"],
+      ["pages-admin/vehicle-manage/vehicle-manage.js", "isVehicleMutationBusy()"],
       ["pages/booking-manage/booking-manage.js", "if (this.data.loading)"],
-      ["pages/role-manage/role-manage.js", "this.data.saving"],
-      ["pages/analytics-manage/analytics-manage.js", "this.data.cleanupLoading"],
+      ["pages-admin/role-manage/role-manage.js", "this.data.saving"],
+      ["pages-admin/analytics-manage/analytics-manage.js", "this.data.cleanupLoading"],
       ["pages/favorites/favorites.js", "this.data.removingId"],
       ["pages/privacy-request/privacy-request.js", "this.data.submitting"],
-      ["pages/config-manage/config-manage.js", "this.data.isDirty"],
+      ["pages-admin/config-manage/config-manage.js", "this.data.isDirty"],
       ["pages/booking-detail/booking-detail.js", "this.data.editing"],
       ["pages/booking-manage-detail/booking-manage-detail.js", "this._bookingDetailMutationActive"]
     ]

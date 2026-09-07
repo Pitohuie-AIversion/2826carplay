@@ -39,7 +39,7 @@ describe("production security rules", () => {
   })
 
   test("小程序业务代码不绕过云函数直接访问数据库", () => {
-    const clientRoots = ["pages", "components", "shared"]
+    const clientRoots = ["pages", "pages-admin", "components", "shared"]
     const javascriptFiles = []
     const walk = (directory) => {
       fs.readdirSync(directory, { withFileTypes: true }).forEach((entry) => {
@@ -169,7 +169,7 @@ describe("production security rules", () => {
   test("客户端图片预检与生产存储规则保持一致", () => {
     const manifest = readJson("manifest.json")
     const uploadSource = fs.readFileSync(
-      path.join(PROJECT_ROOT, "pages", "vehicle-detail-manage", "vehicle-detail-manage.js"),
+      path.join(PROJECT_ROOT, "pages-admin", "vehicle-detail-manage", "vehicle-detail-manage.js"),
       "utf8"
     )
 

@@ -3,8 +3,8 @@ const cloud = require("wx-server-sdk")
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
 const AUTH_ROLE_FIELDS = { role: true, roles: true, permissions: true, isAdmin: true, admin: true }
-const CONTENT_TYPES = ["route", "vehicle_advice", "handover_guide", "vehicle_tip"]
-const SCENARIOS = ["weekend_trip", "business_reception", "group_travel", "ev_experience"]
+const CONTENT_TYPES = ["route", "guide", "vehicle_advice", "handover_guide", "vehicle_tip"]
+const SCENARIOS = ["weekend_trip", "business_reception", "group_travel", "ev_experience", "handover_tips"]
 const ACTIONS = ["create", "update", "publish", "archive"]
 const ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/
 
@@ -54,12 +54,12 @@ function normalizeGuide(input) {
 
 function validateGuide(guide) {
   const fields = []
-  if (!ID_PATTERN.test(guide.slug)) fields.push("slug")
+  if (!ID_PATTERN.test(guide.slug)) fields.push(`slug(${guide.slug})`)
   if (!guide.title) fields.push("title")
   if (!guide.summary) fields.push("summary")
   if (!guide.body) fields.push("body")
-  if (!CONTENT_TYPES.includes(guide.contentType)) fields.push("contentType")
-  if (!SCENARIOS.includes(guide.scenario)) fields.push("scenario")
+  if (!CONTENT_TYPES.includes(guide.contentType)) fields.push(`contentType(${guide.contentType})`)
+  if (!SCENARIOS.includes(guide.scenario)) fields.push(`scenario(${guide.scenario})`)
   return fields
 }
 

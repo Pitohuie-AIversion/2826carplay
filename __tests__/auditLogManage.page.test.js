@@ -22,7 +22,7 @@ function loadPageDefinition() {
   global.Page = jest.fn((input) => {
     definition = input
   })
-  require("../pages/audit-log-manage/audit-log-manage")
+  require("../pages-admin/audit-log-manage/audit-log-manage")
   return definition
 }
 
@@ -308,7 +308,7 @@ describe("pages/audit-log-manage 安全摘要展示", () => {
   })
 
   test("审计时间线使用原生图标并支持一键重置筛选", () => {
-    const pageDir = path.join(__dirname, "..", "pages", "audit-log-manage")
+    const pageDir = path.join(__dirname, "..", "pages-admin", "audit-log-manage")
     const wxml = fs.readFileSync(path.join(pageDir, "audit-log-manage.wxml"), "utf8")
     const wxss = fs.readFileSync(path.join(pageDir, "audit-log-manage.wxss"), "utf8")
 

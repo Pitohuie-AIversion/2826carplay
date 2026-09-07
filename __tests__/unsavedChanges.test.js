@@ -27,10 +27,10 @@ describe("未保存修改提醒", () => {
 
   test("车辆、权限与运营配置表单统一接入离开提醒", () => {
     ;[
-      "pages/vehicle-create/vehicle-create.js",
-      "pages/vehicle-edit/vehicle-edit.js",
-      "pages/role-manage/role-manage.js",
-      "pages/config-manage/config-manage.js"
+      "pages-admin/vehicle-create/vehicle-create.js",
+      "pages-admin/vehicle-edit/vehicle-edit.js",
+      "pages-admin/role-manage/role-manage.js",
+      "pages-admin/config-manage/config-manage.js"
     ].forEach((relativePath) => {
       const source = fs.readFileSync(path.resolve(__dirname, `../${relativePath}`), "utf8")
       expect(source).toContain("markUnsaved(this")

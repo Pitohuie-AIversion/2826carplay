@@ -9,8 +9,21 @@
     "check:structure": "node scripts/checkProjectStructure.js",
     "check:package": "node scripts/checkMiniProgramPackage.js",
     "check:secrets": "node scripts/checkRepositorySecrets.js",
+    "check:drafts": "node scripts/contentDraftsValidate.js",
+    "bootstrap:seeds": "node scripts/bootstrapContentDrafts.js",
     "audit:cloud": "npm audit --package-lock-only --omit=dev --audit-level=critical --prefix cloudfunctions/bookingCreate",
-    "check:release": "npm run check:structure && npm run check:secrets && npm run check:package && npm test -- --runInBand"
+    "check:deploy": "npm run check:release && npm run bootstrap:seeds",
+    "check:release": "npm run check:structure && npm run check:secrets && npm run check:drafts && npm run check:package && npm test -- --runInBand",
+    "cloud:audit": "node scripts/cloudAudit.js",
+    "cloud:sdk:check": "node scripts/cloudSdkCheck.js",
+    "cloud:sdk:bump": "node scripts/cloudSdkBump.js",
+    "cloud:nm:check": "node scripts/cloudNmCheck.js",
+    "cloud:nm:clean": "node scripts/cloudNmClean.js",
+    "cloud:rc:sync": "node scripts/cloudRcSync.js",
+    "cloud:auth:audit": "node scripts/cloudAuthAudit.js",
+    "cloud:spec:check": "node scripts/cloudSpecCheck.js",
+    "cloud:check": "node scripts/cloudCheck.js",
+    "cloud:help": "node scripts/cloudHelp.js"
   },
   "devDependencies": {
     "jest": "^29.7.0"

@@ -1,4 +1,4 @@
-const fs = require("fs")
+﻿const fs = require("fs")
 const path = require("path")
 
 jest.mock("../shared/pageAuth", () => ({
@@ -12,7 +12,7 @@ function loadPageDefinition() {
   global.Page = jest.fn((input) => {
     definition = input
   })
-  require("../pages/config-manage/config-manage")
+  require("../pages-admin/config-manage/config-manage")
   return definition
 }
 
@@ -194,7 +194,7 @@ describe("pages/config-manage 运营配置体验", () => {
   })
 
   test("五个配置分组使用对应原生图标并提供吸底保存状态", () => {
-    const pageDir = path.resolve(__dirname, "../pages/config-manage")
+    const pageDir = path.resolve(__dirname, "../pages-admin/config-manage")
     const wxmlSource = fs.readFileSync(path.join(pageDir, "config-manage.wxml"), "utf8")
     const wxssSource = fs.readFileSync(path.join(pageDir, "config-manage.wxss"), "utf8")
 

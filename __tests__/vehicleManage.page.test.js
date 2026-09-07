@@ -1,4 +1,4 @@
-const fs = require("fs")
+﻿const fs = require("fs")
 const path = require("path")
 
 jest.mock("../shared/pageAuth", () => ({
@@ -12,7 +12,7 @@ function loadPageDefinition() {
   global.Page = jest.fn((input) => {
     definition = input
   })
-  require("../pages/vehicle-manage/vehicle-manage")
+  require("../pages-admin/vehicle-manage/vehicle-manage")
   return definition
 }
 
@@ -206,7 +206,7 @@ describe("pages/vehicle-manage 车辆管理列表体验", () => {
   })
 
   test("卡片将核心资料、档案记录与维护操作分层展示", () => {
-    const pageDir = path.resolve(__dirname, "../pages/vehicle-manage")
+    const pageDir = path.resolve(__dirname, "../pages-admin/vehicle-manage")
     const wxmlSource = fs.readFileSync(path.join(pageDir, "vehicle-manage.wxml"), "utf8")
     const wxssSource = fs.readFileSync(path.join(pageDir, "vehicle-manage.wxss"), "utf8")
 
@@ -224,11 +224,11 @@ describe("pages/vehicle-manage 车辆管理列表体验", () => {
 
   test("图片占位使用品牌徽标，详情编辑和危险操作使用对应原生图标", () => {
     const wxmlSource = fs.readFileSync(
-      path.resolve(__dirname, "../pages/vehicle-manage/vehicle-manage.wxml"),
+      path.resolve(__dirname, "../pages-admin/vehicle-manage/vehicle-manage.wxml"),
       "utf8"
     )
     const wxssSource = fs.readFileSync(
-      path.resolve(__dirname, "../pages/vehicle-manage/vehicle-manage.wxss"),
+      path.resolve(__dirname, "../pages-admin/vehicle-manage/vehicle-manage.wxss"),
       "utf8"
     )
 
@@ -282,7 +282,7 @@ describe("pages/vehicle-manage 车辆管理列表体验", () => {
   })
 
   test("筛选、分页与读取上限使用对应原生图标", () => {
-    const pageDir = path.resolve(__dirname, "../pages/vehicle-manage")
+    const pageDir = path.resolve(__dirname, "../pages-admin/vehicle-manage")
     const wxmlSource = fs.readFileSync(path.join(pageDir, "vehicle-manage.wxml"), "utf8")
     const wxssSource = fs.readFileSync(path.join(pageDir, "vehicle-manage.wxss"), "utf8")
 

@@ -1,4 +1,4 @@
-function loadPageDefinition(modulePath) {
+﻿function loadPageDefinition(modulePath) {
   jest.resetModules()
   let definition = null
   global.Page = jest.fn((input) => {
@@ -34,8 +34,8 @@ describe("multi-level navigation lifecycle", () => {
     ["booking", "../pages/booking/booking", "handleBackGarage"],
     ["car detail", "../pages/car-detail/car-detail", "handleBackGarage"],
     ["booking management detail", "../pages/booking-manage-detail/booking-manage-detail", "handleBackManage"],
-    ["vehicle detail management", "../pages/vehicle-detail-manage/vehicle-detail-manage", "handleBackList"],
-    ["vehicle edit", "../pages/vehicle-edit/vehicle-edit", "handleBackList"]
+    ["vehicle detail management", "../pages-admin/vehicle-detail-manage/vehicle-detail-manage", "handleBackList"],
+    ["vehicle edit", "../pages-admin/vehicle-edit/vehicle-edit", "handleBackList"]
   ])("does not redirect after %s unloads during navigateBack", (label, modulePath, handler) => {
     let backOptions
     global.getCurrentPages = jest.fn(() => [{ route: "from" }, { route: "current" }])

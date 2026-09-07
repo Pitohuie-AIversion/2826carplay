@@ -1,4 +1,4 @@
-function loadPageDefinition(modulePath) {
+﻿function loadPageDefinition(modulePath) {
   jest.resetModules()
   let definition = null
   global.Page = jest.fn((input) => {
@@ -56,7 +56,7 @@ describe("native callback lifecycle", () => {
       }),
       showToast: jest.fn()
     }
-    const page = createPage(loadPageDefinition("../pages/analytics-manage/analytics-manage"), {
+    const page = createPage(loadPageDefinition("../pages-admin/analytics-manage/analytics-manage"), {
       canCleanup: true,
       loading: false
     })
@@ -77,7 +77,7 @@ describe("native callback lifecycle", () => {
       }),
       showToast: jest.fn()
     }
-    const page = createPage(loadPageDefinition("../pages/vehicle-manage/vehicle-manage"))
+    const page = createPage(loadPageDefinition("../pages-admin/vehicle-manage/vehicle-manage"))
     page.updateVehicleStatus = jest.fn()
 
     page.handleUpdateStatus({
@@ -128,7 +128,7 @@ describe("native callback lifecycle", () => {
       showToast: jest.fn()
     }
     const page = createPage(
-      loadPageDefinition("../pages/privacy-data-inventory/privacy-data-inventory"),
+      loadPageDefinition("../pages-admin/privacy-data-inventory/privacy-data-inventory"),
       {
         loading: false,
         refreshing: false,
@@ -192,7 +192,7 @@ describe("native callback lifecycle", () => {
       canHandle: true
     }
     const page = createPage(
-      loadPageDefinition("../pages/privacy-request-manage/privacy-request-manage"),
+      loadPageDefinition("../pages-admin/privacy-request-manage/privacy-request-manage"),
       { list: [request] }
     )
     page.updateStatus = jest.fn()
@@ -228,11 +228,11 @@ describe("native callback lifecycle", () => {
   })
 
   test.each([
-    ["vehicle management", "../pages/vehicle-manage/vehicle-manage"],
+    ["vehicle management", "../pages-admin/vehicle-manage/vehicle-manage"],
     ["booking management", "../pages/booking-manage/booking-manage"],
-    ["audit log management", "../pages/audit-log-manage/audit-log-manage"],
-    ["error log management", "../pages/error-log-manage/error-log-manage"],
-    ["privacy request management", "../pages/privacy-request-manage/privacy-request-manage"]
+    ["audit log management", "../pages-admin/audit-log-manage/audit-log-manage"],
+    ["error log management", "../pages-admin/error-log-manage/error-log-manage"],
+    ["privacy request management", "../pages-admin/privacy-request-manage/privacy-request-manage"]
   ])("does not reload %s after a delayed clear-search render callback", (_label, modulePath) => {
     global.wx = {}
     const page = createPage(loadPageDefinition(modulePath), { keyword: "待清空" })
@@ -313,7 +313,7 @@ describe("native callback lifecycle", () => {
   test.each([
     [
       "vehicle management mutation",
-      "../pages/vehicle-manage/vehicle-manage",
+      "../pages-admin/vehicle-manage/vehicle-manage",
       { pageAuthorized: true, updatingId: "vehicle-writing" },
       "fetchList",
       (page) => {
@@ -366,7 +366,7 @@ describe("native callback lifecycle", () => {
   test.each([
     [
       "vehicle management",
-      "../pages/vehicle-manage/vehicle-manage",
+      "../pages-admin/vehicle-manage/vehicle-manage",
       { pageAuthorized: true, updatingId: "vehicle-writing" },
       "fetchList"
     ],
@@ -388,15 +388,15 @@ describe("native callback lifecycle", () => {
   })
 
   test.each([
-    ["analytics", "../pages/analytics-manage/analytics-manage", { loading: true }, "handleRetry", "fetchOverview"],
+    ["analytics", "../pages-admin/analytics-manage/analytics-manage", { loading: true }, "handleRetry", "fetchOverview"],
     ["favorites", "../pages/favorites/favorites", { loading: true }, "handleRetry", "fetchList"],
     ["privacy requests", "../pages/privacy-request/privacy-request", { loading: true }, "handleRetry", "fetchList"],
     ["workbench", "../pages/booking-workbench/booking-workbench", { loading: true }, "handleRetry", "fetchBookings"],
     ["booking detail", "../pages/booking-detail/booking-detail", { loading: true }, "handleRetryLoad", "loadDetail"],
     ["managed booking detail", "../pages/booking-manage-detail/booking-manage-detail", { loading: true }, "handleRetryLoad", "loadDetail"],
-    ["configuration", "../pages/config-manage/config-manage", { loading: true }, "handleRetryLoad", "fetchConfig"],
+    ["configuration", "../pages-admin/config-manage/config-manage", { loading: true }, "handleRetryLoad", "fetchConfig"],
     ["bookings", "../pages/bookings/bookings", { loading: true }, "handleRetryLoad", "loadList"],
-    ["vehicle edit", "../pages/vehicle-edit/vehicle-edit", { id: "vehicle-busy", loading: true }, "handleRetryLoad", "fetchDetail"],
+    ["vehicle edit", "../pages-admin/vehicle-edit/vehicle-edit", { id: "vehicle-busy", loading: true }, "handleRetryLoad", "fetchDetail"],
     ["booking form", "../pages/booking/booking", { loadingCar: true }, "handleRetryLoad", "loadBookingCar"],
     ["car detail", "../pages/car-detail/car-detail", { loading: true }, "handleRetryLoad", "loadCarDetail"],
     ["garage", "../pages/garage/garage", { loadingCars: true }, "handleRetryLoad", "loadCars"]
@@ -444,7 +444,7 @@ describe("native callback lifecycle", () => {
     ],
     [
       "vehicle management edit navigation",
-      "../pages/vehicle-manage/vehicle-manage",
+      "../pages-admin/vehicle-manage/vehicle-manage",
       { updatingId: "vehicle-writing" },
       () => {},
       "handleEdit",
@@ -453,7 +453,7 @@ describe("native callback lifecycle", () => {
     ],
     [
       "vehicle image preview",
-      "../pages/vehicle-detail-manage/vehicle-detail-manage",
+      "../pages-admin/vehicle-detail-manage/vehicle-detail-manage",
       {
         uploading: true,
         detail: { imageList: ["cloud://vehicle/image.jpg"] }
@@ -465,7 +465,7 @@ describe("native callback lifecycle", () => {
     ],
     [
       "privacy request account copy",
-      "../pages/privacy-request-manage/privacy-request-manage",
+      "../pages-admin/privacy-request-manage/privacy-request-manage",
       { updatingId: "privacy-writing" },
       () => {},
       "handleCopyOpenid",
@@ -474,7 +474,7 @@ describe("native callback lifecycle", () => {
     ],
     [
       "privacy inventory booking navigation",
-      "../pages/privacy-data-inventory/privacy-data-inventory",
+      "../pages-admin/privacy-data-inventory/privacy-data-inventory",
       { exporting: true },
       () => {},
       "handleBookingTap",
@@ -497,9 +497,9 @@ describe("native callback lifecycle", () => {
 
   test.each([
     ["booking export", "../pages/booking-manage/booking-manage", { loading: true }],
-    ["audit export", "../pages/audit-log-manage/audit-log-manage", { exporting: true }],
-    ["error export", "../pages/error-log-manage/error-log-manage", { exporting: true }],
-    ["privacy export", "../pages/privacy-data-inventory/privacy-data-inventory", { exporting: true }]
+    ["audit export", "../pages-admin/audit-log-manage/audit-log-manage", { exporting: true }],
+    ["error export", "../pages-admin/error-log-manage/error-log-manage", { exporting: true }],
+    ["privacy export", "../pages-admin/privacy-data-inventory/privacy-data-inventory", { exporting: true }]
   ])("does not use a replacing %s file", (_label, modulePath, busyData) => {
     global.wx = {
       shareFileMessage: jest.fn(),
@@ -587,7 +587,7 @@ describe("native callback lifecycle", () => {
     global.wx = {
       showModal: jest.fn((options) => modalOptions.push(options))
     }
-    const page = createPage(loadPageDefinition("../pages/vehicle-manage/vehicle-manage"), {
+    const page = createPage(loadPageDefinition("../pages-admin/vehicle-manage/vehicle-manage"), {
       loading: false,
       updatingId: "",
       deletingId: ""
@@ -638,7 +638,7 @@ describe("native callback lifecycle", () => {
       showModal: jest.fn((options) => modalOptions.push(options)),
       showToast: jest.fn()
     }
-    const page = createPage(loadPageDefinition("../pages/privacy-data-inventory/privacy-data-inventory"), {
+    const page = createPage(loadPageDefinition("../pages-admin/privacy-data-inventory/privacy-data-inventory"), {
       loading: false,
       refreshing: false,
       exporting: false,
@@ -658,9 +658,9 @@ describe("native callback lifecycle", () => {
 
   test.each([
     ["booking", "../pages/booking-manage/booking-manage", "loading"],
-    ["audit", "../pages/audit-log-manage/audit-log-manage", "exporting"],
-    ["error", "../pages/error-log-manage/error-log-manage", "exporting"],
-    ["privacy", "../pages/privacy-data-inventory/privacy-data-inventory", "exporting"]
+    ["audit", "../pages-admin/audit-log-manage/audit-log-manage", "exporting"],
+    ["error", "../pages-admin/error-log-manage/error-log-manage", "exporting"],
+    ["privacy", "../pages-admin/privacy-data-inventory/privacy-data-inventory", "exporting"]
   ])("ignores a stale %s file deletion confirmation after replacement starts", (_label, modulePath, busyField) => {
     let modalOptions
     global.wx = {
@@ -686,7 +686,7 @@ describe("native callback lifecycle", () => {
   test.each([
     [
       "vehicle create",
-      "../pages/vehicle-create/vehicle-create",
+      "../pages-admin/vehicle-create/vehicle-create",
       { isSubmitting: true },
       (page) => {
         page.handlePlateInput({ detail: { value: "沪A00001" } })
@@ -700,7 +700,7 @@ describe("native callback lifecycle", () => {
     ],
     [
       "vehicle edit",
-      "../pages/vehicle-edit/vehicle-edit",
+      "../pages-admin/vehicle-edit/vehicle-edit",
       { isSubmitting: true },
       (page) => {
         page.handlePlateInput({ detail: { value: "沪A00001" } })
@@ -747,7 +747,7 @@ describe("native callback lifecycle", () => {
     ],
     [
       "configuration save",
-      "../pages/config-manage/config-manage",
+      "../pages-admin/config-manage/config-manage",
       { saving: true, hasLoadedConfig: true, loadFailed: false },
       (page) => {
         page.handleInput({ currentTarget: { dataset: { field: "brandName" } }, detail: { value: "迟到品牌" } })
@@ -756,7 +756,7 @@ describe("native callback lifecycle", () => {
     ],
     [
       "role save",
-      "../pages/role-manage/role-manage",
+      "../pages-admin/role-manage/role-manage",
       { saving: true },
       (page) => {
         page.handleOpenidInput({ detail: { value: "openid-late" } })
@@ -776,7 +776,7 @@ describe("native callback lifecycle", () => {
 
   test("does not start vehicle or booking management reads during writes", () => {
     global.wx = { stopPullDownRefresh: jest.fn() }
-    const vehiclePage = createPage(loadPageDefinition("../pages/vehicle-manage/vehicle-manage"), {
+    const vehiclePage = createPage(loadPageDefinition("../pages-admin/vehicle-manage/vehicle-manage"), {
       keyword: "车辆",
       currentStatus: "all",
       hasMore: true,
@@ -814,19 +814,19 @@ describe("native callback lifecycle", () => {
   test.each([
     [
       "audit logs",
-      "../pages/audit-log-manage/audit-log-manage",
+      "../pages-admin/audit-log-manage/audit-log-manage",
       { keyword: "审计", currentAction: "create" },
       "handleResetFilters"
     ],
     [
       "error logs",
-      "../pages/error-log-manage/error-log-manage",
+      "../pages-admin/error-log-manage/error-log-manage",
       { keyword: "错误", currentFunc: "bookingCreate" },
       "handleResetFilters"
     ],
     [
       "privacy requests",
-      "../pages/privacy-request-manage/privacy-request-manage",
+      "../pages-admin/privacy-request-manage/privacy-request-manage",
       { keyword: "申请", currentType: "delete", currentStatus: "completed" },
       "handleResetFilters"
     ]

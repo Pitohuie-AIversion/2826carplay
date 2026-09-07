@@ -1,3 +1,4 @@
+const { createPerformanceHelpers } = require('../../shared/performance');
 const { formatToastTitle } = require("../../shared/uiFeedback")
 const { buildVehicleDisplayIdentity } = require("../../shared/vehicle")
 const { requestOperationConfig } = require("../../shared/operationConfigRequest")
@@ -266,7 +267,10 @@ Page({
     }
   },
 
+  applyState(patch) { this.setData(patch) },
+
   onLoad(options) {
+    const perf = createPerformanceHelpers(this); this._perf = perf; this.applyState = perf.applyState; this.flushStateNow = perf.flushStateNow;
     this._bookingDetailUnloaded = false
     const id = String((options && options.id) || "").trim()
     this.setData({
@@ -354,16 +358,18 @@ Page({
     this.clearCancelRequestTimer()
     this.clearSubscriptionRequestTimer()
     this.clearQuoteResponseTimer()
+    if (this._perf && typeof this._perf.dispose === 'function') try { this._perf.dispose(); } catch(e) {}
   },
 
   applyBooking(booking, latestQuote, handovers) {
     const quote = normalizeQuote(latestQuote)
     const pickupHandover = normalizeHandover(handovers && handovers.pickup)
     const returnHandover = normalizeHandover(handovers && handovers.return)
-    this.setData({
+    this.applyState({
       booking,
       initialLoading: false,
       loadFailed: false,
+      loading: false,
       statusText: mapStatusText(booking.status),
       statusClass: mapStatusClass(booking.status),
       createdAtText: formatDisplayTime(booking.createdAt),
@@ -442,7 +448,7 @@ Page({
     const requestId = Number(this._subscriptionRequestId || 0) + 1
     this._subscriptionRequestId = requestId
     this.clearSubscriptionRequestTimer()
-    this.setData({ subscriptionRequesting: true })
+    this.applyState({ subscriptionRequesting: true })
     let settled = false
     const finishRequest = (callback) => {
       if (settled || this._subscriptionRequestId !== requestId) {
@@ -450,7 +456,7 @@ Page({
       }
       settled = true
       this.clearSubscriptionRequestTimer()
-      this.setData({ subscriptionRequesting: false })
+      this.applyState({ subscriptionRequesting: false })
       if (typeof callback === "function") {
         callback()
       }
@@ -517,7 +523,7 @@ Page({
     this.clearDetailLoadTimer()
 
     if (!this.data.id) {
-      this.setData({
+      this.applyState({
         initialLoading: false,
         loading: false,
         cancelling: false
@@ -526,7 +532,7 @@ Page({
     }
 
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
-      this.setData({
+      this.applyState({
         initialLoading: false,
         loading: false,
         cancelling: false,
@@ -536,7 +542,7 @@ Page({
       return
     }
 
-    this.setData({
+    this.applyState({
       loading: true,
       loadFailed: false
     })
@@ -558,7 +564,7 @@ Page({
         title: "加载失败",
         icon: "none"
       })
-      this.setData({
+      this.applyState({
         initialLoading: false,
         loading: false,
         cancelling: false,
@@ -587,7 +593,7 @@ Page({
           title: formatToastTitle(result && result.message, "预约不存在"),
             icon: "none"
           })
-          this.setData({
+          this.applyState({
             initialLoading: false,
             loading: false,
             cancelling: false,
@@ -598,7 +604,6 @@ Page({
         }
 
         this.applyBooking(normalizeBooking(current), result.latestQuote, result.handovers)
-        this.setData({ loading: false })
       },
       fail: (error) => {
         handleFailure((error && (error.errMsg || error.message)) || "预约详情加载失败，请稍后重试")
@@ -652,7 +657,7 @@ Page({
     const requestId = Number(this._quoteResponseRequestId || 0) + 1
     this._quoteResponseRequestId = requestId
     this.clearQuoteResponseTimer()
-    this.setData({ quoteResponding: true })
+    this.applyState({ quoteResponding: true })
     let settled = false
     const finish = () => {
       if (settled || requestId !== this._quoteResponseRequestId) return false
@@ -662,7 +667,7 @@ Page({
     }
     const fail = (message) => {
       if (!finish()) return
-      this.setData({ quoteResponding: false })
+      this.applyState({ quoteResponding: false })
       wx.showToast({ title: formatToastTitle(message, "报价操作失败"), icon: "none" })
     }
     this._quoteResponseTimer = setTimeout(() => fail("报价操作超时，请重试"), BOOKING_DETAIL_MUTATION_TIMEOUT_MS)
@@ -679,13 +684,13 @@ Page({
           if (!finish()) return
           const result = res && res.result
           if (!result || !result.ok) {
-            this.setData({ quoteResponding: false })
+            this.applyState({ quoteResponding: false })
             wx.showToast({ title: formatToastTitle(result && result.message, "报价操作失败"), icon: "none" })
             if (result && result.code === "QUOTE_EXPIRED") this.loadDetail()
             return
           }
+          this.applyState({ quoteResponding: false })
           wx.showToast({ title: action === "confirm" ? "报价已确认（尚未付款）" : "调整申请已提交", icon: "none" })
-          this.setData({ quoteResponding: false })
           this.loadDetail()
         },
         fail: (error) => fail(error && (error.errMsg || error.message))
@@ -717,7 +722,7 @@ Page({
     const bookingId = String(this.data.id || "").trim()
     const confirmationSerial = Number(this._cancelConfirmationSerial || 0) + 1
     this._cancelConfirmationSerial = confirmationSerial
-    this.setData({ cancelling: true })
+    this.applyState({ cancelling: true })
     let confirmationSettled = false
     const finishConfirmation = () => {
       if (
@@ -728,7 +733,7 @@ Page({
         return false
       }
       confirmationSettled = true
-      this.setData({ cancelling: false })
+      this.applyState({ cancelling: false })
       return true
     }
     try {
@@ -895,7 +900,7 @@ Page({
     const saveSerial = Number(this._saveRequestSerial || 0) + 1
     this._saveRequestSerial = saveSerial
     this.clearSaveRequestTimer()
-    this.setData({ saving: true })
+    this.applyState({ saving: true })
 
     let settled = false
     const finishRequest = () => {
@@ -910,7 +915,7 @@ Page({
       if (!finishRequest()) {
         return
       }
-      this.setData({ saving: false })
+      this.applyState({ saving: false })
       wx.showToast({
         title: formatToastTitle(message, "保存失败"),
         icon: "none"
@@ -933,13 +938,13 @@ Page({
         }
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
-          this.setData({ saving: false })
+          this.applyState({ saving: false })
           wx.showToast({
             title: formatToastTitle(result && result.message, "保存失败"),
             icon: "none"
           })
           if (result && ["STATUS_CONFLICT", "STATUS_NOT_ALLOWED"].includes(result.code)) {
-            this.setData({ editing: false })
+            this.applyState({ editing: false })
             this.loadDetail()
           }
           return
@@ -949,7 +954,7 @@ Page({
           title: result.updated ? "联系信息已更新" : "信息未发生变化",
           icon: "none"
         })
-        this.setData({ editing: false, saving: false })
+        this.applyState({ editing: false, saving: false })
         this.loadDetail()
       },
       fail: (error) => {
@@ -996,7 +1001,7 @@ Page({
     const cancelSerial = Number(this._cancelRequestSerial || 0) + 1
     this._cancelRequestSerial = cancelSerial
     this.clearCancelRequestTimer()
-    this.setData({ loading: true, cancelling: true })
+    this.applyState({ loading: true, cancelling: true })
 
     let settled = false
     const finishRequest = () => {
@@ -1015,7 +1020,7 @@ Page({
         title: formatToastTitle(message, "取消失败"),
         icon: "none"
       })
-      this.setData({ loading: false, cancelling: false })
+      this.applyState({ loading: false, cancelling: false })
     }
 
     this._cancelRequestTimer = setTimeout(() => {
@@ -1035,7 +1040,7 @@ Page({
           title: formatToastTitle(result && result.message, "取消失败"),
             icon: "none"
           })
-          this.setData({ loading: false, cancelling: false })
+          this.applyState({ loading: false, cancelling: false })
           return
         }
 
@@ -1043,7 +1048,7 @@ Page({
           title: "预约已取消",
           icon: "none"
         })
-        this.setData({ cancelling: false })
+        this.applyState({ loading: false, cancelling: false })
         this.loadDetail()
       },
       fail: (error) => {
@@ -1089,7 +1094,7 @@ Page({
         if (!isPageNativeActionActive(this, modalAction) || !choice || !choice.confirm) return
         const requestId = Number(this._handoverResponseRequestId || 0) + 1
         this._handoverResponseRequestId = requestId
-        this.setData({ handoverResponding: true })
+        this.applyState({ handoverResponding: true })
         wx.cloud.callFunction({
           name: "bookingHandover",
           data: { action: "confirm", bookingId: this.data.id, handoverId: record.id, stage },
@@ -1106,7 +1111,7 @@ Page({
           fail: () => wx.showToast({ title: "核对失败，请重试", icon: "none" }),
           complete: () => {
             if (this._handoverResponseRequestId !== requestId) return
-            this.setData({ handoverResponding: false })
+            this.applyState({ handoverResponding: false })
             if (this._reloadAfterHandoverResponse) {
               this._reloadAfterHandoverResponse = false
               this.loadDetail()

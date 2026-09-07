@@ -33,8 +33,11 @@ describe("release hygiene", () => {
     const packageConfig = readJson("package.json")
 
     expect(packageConfig.scripts["check:release"]).toBe(
-      "npm run check:structure && npm run check:secrets && npm run check:package && npm test -- --runInBand"
+      "npm run check:structure && npm run check:secrets && npm run check:drafts && npm run check:package && npm test -- --runInBand"
     )
+    expect(packageConfig.scripts["check:drafts"]).toBe("node scripts/contentDraftsValidate.js")
+    expect(packageConfig.scripts["bootstrap:seeds"]).toBe("node scripts/bootstrapContentDrafts.js")
+    expect(packageConfig.scripts["check:deploy"]).toBe("npm run check:release && npm run bootstrap:seeds")
     expect(packageConfig.scripts["audit:cloud"]).toBe(
       "npm audit --package-lock-only --omit=dev --audit-level=critical --prefix cloudfunctions/bookingCreate"
     )
@@ -67,7 +70,7 @@ describe("release hygiene", () => {
   })
 
   test("业务代码不包含日志输出或调试断点", () => {
-    const roots = ["pages", "components", "shared", "cloudfunctions"]
+    const roots = ["pages", "pages-admin", "components", "shared", "cloudfunctions"]
     const violations = []
     roots
       .flatMap(collectJavaScriptFiles)

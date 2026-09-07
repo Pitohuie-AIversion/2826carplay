@@ -4,484 +4,16 @@
   "functionRoot": "./cloudfunctions",
   "functions": [
     {
-      "name": "bookingHandover",
+      "name": "analyticsCleanup",
       "type": "Event",
       "handler": "index.main",
       "timeout": 20,
       "runtime": "Nodejs20.19",
       "memorySize": 256,
       "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "auditLogList",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 15,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "vehicleImageUpdate",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 15,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "pendingFileDeletionProcess",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 15,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "vehicleDelete",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 15,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "vehicleList",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 15,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "bookingCreate",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 15,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "vehicleAvailabilityCheck",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 15,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "vehicleCalendarManage",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 20,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "bookingDetail",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 15,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "bookingMyDetail",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 15,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "bookingMyList",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 15,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "bookingList",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 15,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "bookingUpdateStatus",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 15,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "bookingCancel",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 15,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "bookingUpdateAdminRemark",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 15,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "bookingUpdateCoordination",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 15,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "bookingExportCsv",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 15,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "errorLogList",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 15,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "logExportCsv",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 15,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "vehicleUpdateStatus",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 15,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "vehicleUpdate",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 15,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "vehicleRetire",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 15,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "vehicleRestore",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 15,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "vehicleCreate",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 15,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "vehicleDetail",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 15,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "bootstrapAdmin",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 15,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "getMyPermissions",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 15,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "getOpenid",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 15,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "operationConfigGet",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 15,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "operationConfigUpdate",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 15,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "roleList",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 15,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "roleUpsert",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 15,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "garageVehicleList",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 15,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "vehiclePublicDetail",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 15,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "privacyRequestCreate",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 15,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "privacyRequestMyList",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 15,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "privacyRequestList",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 15,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "privacyRequestDataInventory",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 15,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "privacyRequestUpdateStatus",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 15,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "bookingUpdateMyContact",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 15,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "operationSummaryGet",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 15,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "systemHealthCheck",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 15,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "privacyRequestCancel",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 15,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "favoriteSet",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 15,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "favoriteStatus",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 15,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "favoriteMyList",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 15,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
-    },
-    {
-      "name": "analyticsTrack",
-      "type": "Event",
-      "handler": "index.main",
-      "timeout": 15,
-      "runtime": "Nodejs20.19",
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": ["node_modules/**"]
+      "ignore": [
+        "node_modules/**"
+      ]
     },
     {
       "name": "analyticsOverview",
@@ -491,17 +23,33 @@
       "runtime": "Nodejs20.19",
       "memorySize": 256,
       "installDependency": true,
-      "ignore": ["node_modules/**"]
+      "ignore": [
+        "node_modules/**"
+      ]
     },
     {
-      "name": "analyticsCleanup",
+      "name": "analyticsTrack",
       "type": "Event",
       "handler": "index.main",
-      "timeout": 20,
+      "timeout": 15,
       "runtime": "Nodejs20.19",
       "memorySize": 256,
       "installDependency": true,
-      "ignore": ["node_modules/**"]
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "auditLogList",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
     },
     {
       "name": "bookingCalendarList",
@@ -511,7 +59,105 @@
       "runtime": "Nodejs20.19",
       "memorySize": 256,
       "installDependency": true,
-      "ignore": ["node_modules/**"]
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "bookingCancel",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "bookingCreate",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "bookingDetail",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "bookingExportCsv",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "bookingHandover",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 20,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "bookingList",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "bookingMyDetail",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "bookingMyList",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
     },
     {
       "name": "bookingQuoteManage",
@@ -521,7 +167,9 @@
       "runtime": "Nodejs20.19",
       "memorySize": 256,
       "installDependency": true,
-      "ignore": ["node_modules/**"]
+      "ignore": [
+        "node_modules/**"
+      ]
     },
     {
       "name": "bookingQuoteRespond",
@@ -531,17 +179,69 @@
       "runtime": "Nodejs20.19",
       "memorySize": 256,
       "installDependency": true,
-      "ignore": ["node_modules/**"]
+      "ignore": [
+        "node_modules/**"
+      ]
     },
     {
-      "name": "contentGuideList",
+      "name": "bookingUpdateAdminRemark",
       "type": "Event",
       "handler": "index.main",
       "timeout": 15,
       "runtime": "Nodejs20.19",
       "memorySize": 256,
       "installDependency": true,
-      "ignore": ["node_modules/**"]
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "bookingUpdateCoordination",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "bookingUpdateMyContact",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "bookingUpdateStatus",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "bootstrapAdmin",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
     },
     {
       "name": "contentGuideDetail",
@@ -551,7 +251,21 @@
       "runtime": "Nodejs20.19",
       "memorySize": 256,
       "installDependency": true,
-      "ignore": ["node_modules/**"]
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "contentGuideList",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
     },
     {
       "name": "contentGuideManage",
@@ -561,7 +275,405 @@
       "runtime": "Nodejs20.19",
       "memorySize": 256,
       "installDependency": true,
-      "ignore": ["node_modules/**"]
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "errorLogList",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "favoriteMyList",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "favoriteSet",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "favoriteStatus",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "garageVehicleList",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "getMyPermissions",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "getOpenid",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "logExportCsv",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "operationConfigGet",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "operationConfigUpdate",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "operationSummaryGet",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "pendingFileDeletionProcess",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "privacyRequestCancel",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "privacyRequestCreate",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "privacyRequestDataInventory",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "privacyRequestList",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "privacyRequestMyList",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "privacyRequestUpdateStatus",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "roleList",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "roleUpsert",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "systemHealthCheck",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "vehicleAvailabilityCheck",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "vehicleCalendarManage",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 20,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "vehicleCreate",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "vehicleDelete",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "vehicleDetail",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "vehicleImageUpdate",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "vehicleList",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "vehiclePublicDetail",
+      "type": "Event",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 15,
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "vehicleRestore",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "vehicleRetire",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "vehicleUpdate",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
+      "name": "vehicleUpdateStatus",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs20.19",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
     }
   ]
 }

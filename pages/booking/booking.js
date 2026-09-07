@@ -1,3 +1,4 @@
+const { createPerformanceHelpers } = require('../../shared/performance');
 const { trackEvent } = require("../../shared/analytics")
 const { sanitizeAttribution } = require("../../shared/contentAttribution")
 const { formatToastTitle } = require("../../shared/uiFeedback")
@@ -175,7 +176,10 @@ Page({
     }
   },
 
+  applyState(patch) { this.setData(patch) },
+
   onLoad(options) {
+    const perf = createPerformanceHelpers(this); this._perf = perf; this.applyState = perf.applyState; this.flushStateNow = perf.flushStateNow;
     activatePageNativeActions(this)
     const app = getApp()
     const env =
@@ -282,7 +286,7 @@ Page({
       return
     }
 
-    this.setData({
+    this.applyState({
       loadingCar: true,
       loadError: false
     })
@@ -357,6 +361,7 @@ Page({
     }
     this.clearAvailabilityCheckTimer()
     this.clearBookingSubmitTimer()
+    if (this._perf && typeof this._perf.dispose === 'function') try { this._perf.dispose(); } catch(e) {}
   },
 
   cancelOperationConfigRequest() {
@@ -367,7 +372,7 @@ Page({
   },
 
   setLoadError(message) {
-    this.setData({
+    this.applyState({
       loadingCar: false,
       loadError: true,
       loadErrorText: String(message || "车辆信息加载失败，请稍后重试"),
@@ -385,7 +390,7 @@ Page({
       ...this.data.form,
       city: car ? car.location || "" : ""
     }
-    this.setData({
+    this.applyState({
       loadingCar: false,
       loadError: false,
       carName,
@@ -561,7 +566,7 @@ Page({
     this.clearAvailabilityCheckTimer()
 
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
-      this.setData({
+      this.applyState({
         availabilityState: "unknown",
         availabilityText: "暂时无法查看档期，仍可提交并由顾问确认",
         availabilityConflictCount: 0,
@@ -572,7 +577,7 @@ Page({
       return
     }
 
-    this.setData({
+    this.applyState({
       availabilityState: "checking",
       availabilityText: "正在查看真实档期与每日参考价…",
       availabilityConflictCount: 0,
@@ -593,7 +598,7 @@ Page({
       if (!finishRequest()) {
         return
       }
-      this.setData({
+      this.applyState({
         availabilityState: "unknown",
         availabilityText: message || "档期查询暂时失败，仍可提交并由顾问确认",
         availabilityConflictCount: 0,
@@ -621,7 +626,7 @@ Page({
 
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
-          this.setData({
+          this.applyState({
             availabilityState: "unknown",
             availabilityText: (result && result.message) || "暂时无法查看档期，仍可提交并由顾问确认",
             availabilityConflictCount: 0,
@@ -648,7 +653,7 @@ Page({
             : conflictCount > 0
               ? "conflict"
               : "unknown"
-        this.setData({
+        this.applyState({
           availabilityState,
           availabilityText: result.message || "档期请以顾问最终确认为准",
           availabilityConflictCount: conflictCount,
@@ -821,7 +826,7 @@ Page({
     const submitSerial = Number(this._bookingSubmitSerial || 0) + 1
     this._bookingSubmitSerial = submitSerial
 
-    this.setData({
+    this.applyState({
       isSubmitting: true,
       submitButtonText: "正在提交",
       submitRequestId: requestId
@@ -833,7 +838,7 @@ Page({
         icon: "none"
       })
 
-      this.setData({
+      this.applyState({
         isSubmitting: false,
         submitButtonText: "提交预约"
       })
@@ -862,7 +867,7 @@ Page({
           title: formatToastTitle(message, "预约提交失败"),
           icon: "none"
         })
-        this.setData({
+        this.applyState({
           isSubmitting: false,
           submitButtonText: "提交预约"
         })
@@ -895,7 +900,7 @@ Page({
               title: formatToastTitle(result && result.message, "预约提交失败"),
               icon: "none"
             })
-            this.setData({
+            this.applyState({
               isSubmitting: false,
               submitButtonText: "提交预约"
             })
@@ -914,7 +919,7 @@ Page({
               })
             } catch (error) {}
           }
-          this.setData({
+          this.applyState({
             isSubmitting: false,
             submitButtonText: "提交预约",
             submitSuccess: true,

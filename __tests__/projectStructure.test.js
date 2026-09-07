@@ -40,7 +40,7 @@ describe("project structure check", () => {
 
     Object.entries(expectedTitles).forEach(([pageName, title]) => {
       const config = JSON.parse(fs.readFileSync(
-        path.join(PROJECT_ROOT, "pages", pageName, `${pageName}.json`),
+        path.join(PROJECT_ROOT, "pages-admin", pageName, `${pageName}.json`),
         "utf8"
       ))
 
@@ -53,10 +53,19 @@ describe("project structure check", () => {
       path.join(PROJECT_ROOT, "app.json"),
       "utf8"
     ))
+    const allRoutes = [].concat(appConfig.pages || [])
+    if (Array.isArray(appConfig.subPackages)) {
+      appConfig.subPackages.forEach((sub) => {
+        if (sub && Array.isArray(sub.pages)) {
+          const root = String(sub.root || "")
+          sub.pages.forEach((p) => allRoutes.push(`${root}/${p}`))
+        }
+      })
+    }
 
-    expect(appConfig.pages).toHaveLength(26)
+    expect(allRoutes).toHaveLength(26)
 
-    appConfig.pages.forEach((route) => {
+    allRoutes.forEach((route) => {
       const configPath = path.join(PROJECT_ROOT, `${route}.json`)
       const pagePath = path.join(PROJECT_ROOT, `${route}.js`)
 

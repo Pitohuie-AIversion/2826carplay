@@ -1,6 +1,10 @@
-const { sanitizeAttribution, buildQuery, hasAttribution } = require("../shared/contentAttribution")
+const { sanitizeAttribution, buildQuery, hasAttribution, isShareLanding } = require("../shared/contentAttribution")
 
 describe("shared/contentAttribution", () => {
+  afterEach(() => {
+    delete global.getCurrentPages
+  })
+
   test("保留合法的受控来源字段", () => {
     expect(sanitizeAttribution({
       channel: "wechat_share",
@@ -29,5 +33,15 @@ describe("shared/contentAttribution", () => {
     const query = buildQuery({ channel: "qr", contentId: "guide_1", url: "https://bad.example" })
     expect(query).toBe("channel=qr&contentId=guide_1")
     expect(hasAttribution({ channel: "qr" })).toBe(true)
+  })
+
+  test("只把页面栈首层识别为分享落地", () => {
+    global.getCurrentPages = jest.fn(() => [{ route: "pages/content-page/content-page" }])
+    expect(isShareLanding()).toBe(true)
+    global.getCurrentPages.mockReturnValue([
+      { route: "pages/content-page/content-page" },
+      { route: "pages/car-detail/car-detail" }
+    ])
+    expect(isShareLanding()).toBe(false)
   })
 })

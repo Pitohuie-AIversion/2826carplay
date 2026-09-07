@@ -1,4 +1,4 @@
-const fs = require("fs")
+﻿const fs = require("fs")
 const path = require("path")
 
 jest.mock("../shared/pageAuth", () => ({
@@ -12,7 +12,7 @@ function loadPageDefinition() {
   global.Page = jest.fn((input) => {
     definition = input
   })
-  require("../pages/system-health/system-health")
+  require("../pages-admin/system-health/system-health")
   return definition
 }
 
@@ -246,7 +246,7 @@ describe("pages/system-health", () => {
   })
 
   test("整体状态与人工确认使用原生图标和复选语义", () => {
-    const pageDir = path.resolve(__dirname, "../pages/system-health")
+    const pageDir = path.resolve(__dirname, "../pages-admin/system-health")
     const wxml = fs.readFileSync(path.join(pageDir, "system-health.wxml"), "utf8")
     const wxss = fs.readFileSync(path.join(pageDir, "system-health.wxss"), "utf8")
 

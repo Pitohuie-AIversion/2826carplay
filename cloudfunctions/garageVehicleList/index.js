@@ -3,8 +3,10 @@ const cloud = require("wx-server-sdk")
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
+const _ = db.command
 const VEHICLE_BATCH_SIZE = 100
-const MAX_VEHICLE_RECORDS = 2000
+const MAX_VEHICLE_RECORDS = 500
+const STATS_PROJECTION_LIMIT = 500
 const PUBLIC_VEHICLE_FIELDS = {
   _id: true,
   plateNumber: true,
@@ -360,6 +362,199 @@ async function readVehicles() {
   }
 }
 
+async function queryNativePage(page, pageSize, ordered) {
+  const skip = page * pageSize
+  let query = db
+    .collection("vehicles")
+    .field(PUBLIC_VEHICLE_FIELDS)
+    .where({ status: _.neq("retired") })
+
+  if (ordered) {
+    query = query.orderBy("updatedAt", "desc")
+  }
+
+  const res = await query.skip(skip).limit(pageSize).get()
+  return {
+    list: res && Array.isArray(res.data) ? res.data : [],
+    ordered
+  }
+}
+
+async function queryNativePageWithFallback(page, pageSize) {
+  try {
+    return await queryNativePage(page, pageSize, true)
+  } catch (indexError) {
+    console.warn({
+      function: "garageVehicleList",
+      stage: "nativeOrderByFallback",
+      errorMessage:
+        indexError && (indexError.message || indexError.errMsg)
+          ? indexError.message || indexError.errMsg
+          : String(indexError),
+      createdAt: new Date().toISOString()
+    })
+    return queryNativePage(page, pageSize, false)
+  }
+}
+
+async function countTotalActive() {
+  const res = await db
+    .collection("vehicles")
+    .where({ status: _.neq("retired") })
+    .count()
+  return res && typeof res.total === "number" ? res.total : 0
+}
+
+const STATS_PROJECTION_FIELDS = {
+  _id: true,
+  plateNumber: true,
+  vehicleType: true,
+  brandModel: true,
+  registerDate: true,
+  status: true,
+  location: true,
+  transmission: true,
+  fuelType: true,
+  seats: true,
+  priceDay: true,
+  publicDescription: true,
+  coverImage: true,
+  updatedAt: true,
+  createdAt: true
+}
+
+async function queryStatsProjection(ordered) {
+  let query = db
+    .collection("vehicles")
+    .field(STATS_PROJECTION_FIELDS)
+    .where({ status: _.neq("retired") })
+
+  if (ordered) {
+    query = query.orderBy("updatedAt", "desc")
+  }
+
+  const res = await query.limit(STATS_PROJECTION_LIMIT).get()
+  const data = res && Array.isArray(res.data) ? res.data : []
+  return {
+    list: data.slice(0, STATS_PROJECTION_LIMIT),
+    truncated: data.length >= STATS_PROJECTION_LIMIT
+  }
+}
+
+async function queryStatsProjectionWithFallback() {
+  try {
+    return await queryStatsProjection(true)
+  } catch (indexError) {
+    console.warn({
+      function: "garageVehicleList",
+      stage: "statsOrderByFallback",
+      errorMessage:
+        indexError && (indexError.message || indexError.errMsg)
+          ? indexError.message || indexError.errMsg
+          : String(indexError),
+      createdAt: new Date().toISOString()
+    })
+    return queryStatsProjection(false)
+  }
+}
+
+function buildFilteredLists(publicList, keyword, category, availableOnly) {
+  const searchedList = publicList.filter((item) => matchesVehicleSearch(item, keyword))
+  const categoryCounts = buildCategoryCounts(searchedList)
+  const categoryList = category === "all"
+    ? searchedList
+    : searchedList.filter((item) => item.category === category)
+  const availableCount = categoryList.filter((item) => item.status === "available").length
+  const fullList = availableOnly
+    ? categoryList.filter((item) => item.status === "available")
+    : categoryList
+  return { searchedList, categoryCounts, categoryList, availableCount, fullList }
+}
+
+async function runLegacyFallback(page, pageSize, keyword, category, availableOnly) {
+  const vehicleRecords = await readVehicles()
+  const publicList = vehicleRecords.list
+    .filter((item) => item && item.status !== "retired")
+    .map(mapVehicle)
+    .sort((prev, next) => next.sort - prev.sort)
+  const { searchedList, categoryCounts, categoryList, availableCount, fullList } = buildFilteredLists(
+    publicList,
+    keyword,
+    category,
+    availableOnly
+  )
+  const offset = page * pageSize
+  const list = fullList.slice(offset, offset + pageSize)
+
+  return {
+    ok: true,
+    page,
+    pageSize,
+    total: fullList.length,
+    searchedTotal: searchedList.length,
+    categoryTotal: categoryList.length,
+    availableCount,
+    categoryCounts,
+    keyword,
+    category,
+    availableOnly,
+    truncated: vehicleRecords.truncated,
+    hasMore: offset + pageSize < fullList.length,
+    list
+  }
+}
+
+async function runNativeOptimized(page, pageSize, keyword, category, availableOnly) {
+  const [totalCountResult, statsResult, pageResult] = await Promise.all([
+    countTotalActive().catch(() => null),
+    queryStatsProjectionWithFallback(),
+    queryNativePageWithFallback(page, pageSize)
+  ])
+
+  if (!statsResult || !pageResult) {
+    throw new Error("NATIVE_QUERY_EMPTY_RESULT")
+  }
+
+  const statsPublicList = statsResult.list
+    .filter((item) => item && item.status !== "retired")
+    .map(mapVehicle)
+    .sort((prev, next) => next.sort - prev.sort)
+
+  const statsFiltered = buildFilteredLists(statsPublicList, keyword, category, availableOnly)
+  const { searchedList, categoryCounts, categoryList, availableCount, fullList } = statsFiltered
+
+  const pagePublicList = pageResult.list
+    .filter((item) => item && item.status !== "retired")
+    .map(mapVehicle)
+    .sort((prev, next) => next.sort - prev.sort)
+
+  const pageFiltered = buildFilteredLists(pagePublicList, keyword, category, availableOnly)
+  const offset = page * pageSize
+  const hasMore = offset + pageSize < fullList.length
+
+  const categoryTotalForMeta = categoryList.length
+  const totalForMeta = fullList.length
+
+  const truncated = Boolean(statsResult.truncated) || (totalCountResult !== null && totalCountResult > STATS_PROJECTION_LIMIT)
+
+  return {
+    ok: true,
+    page,
+    pageSize,
+    total: totalForMeta,
+    searchedTotal: searchedList.length,
+    categoryTotal: categoryTotalForMeta,
+    availableCount,
+    categoryCounts,
+    keyword,
+    category,
+    availableOnly,
+    truncated,
+    hasMore,
+    list: pageFiltered.fullList
+  }
+}
+
 exports.main = async (event) => {
   try {
     const payload = event && typeof event === "object" ? event : {}
@@ -370,38 +565,20 @@ exports.main = async (event) => {
     const keyword = normalizeSearchKeyword(payload.keyword)
     const category = String(payload.category || "all").trim().slice(0, 50) || "all"
     const availableOnly = payload.availableOnly === true
-    const vehicleRecords = await readVehicles()
-    const publicList = vehicleRecords.list
-      .filter((item) => item && item.status !== "retired")
-      .map(mapVehicle)
-      .sort((prev, next) => next.sort - prev.sort)
-    const searchedList = publicList.filter((item) => matchesVehicleSearch(item, keyword))
-    const categoryCounts = buildCategoryCounts(searchedList)
-    const categoryList = category === "all"
-      ? searchedList
-      : searchedList.filter((item) => item.category === category)
-    const availableCount = categoryList.filter((item) => item.status === "available").length
-    const fullList = availableOnly
-      ? categoryList.filter((item) => item.status === "available")
-      : categoryList
-    const offset = page * pageSize
-    const list = fullList.slice(offset, offset + pageSize)
 
-    return {
-      ok: true,
-      page,
-      pageSize,
-      total: fullList.length,
-      searchedTotal: searchedList.length,
-      categoryTotal: categoryList.length,
-      availableCount,
-      categoryCounts,
-      keyword,
-      category,
-      availableOnly,
-      truncated: vehicleRecords.truncated,
-      hasMore: offset + pageSize < fullList.length,
-      list
+    try {
+      return await runNativeOptimized(page, pageSize, keyword, category, availableOnly)
+    } catch (nativeError) {
+      console.warn({
+        function: "garageVehicleList",
+        stage: "nativeToLegacyFallback",
+        errorMessage:
+          nativeError && (nativeError.message || nativeError.errMsg)
+            ? nativeError.message || nativeError.errMsg
+            : String(nativeError),
+        createdAt: new Date().toISOString()
+      })
+      return runLegacyFallback(page, pageSize, keyword, category, availableOnly)
     }
   } catch (error) {
     console.error({

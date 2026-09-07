@@ -1,4 +1,4 @@
-function loadPageDefinition() {
+﻿function loadPageDefinition() {
   jest.resetModules()
   let definition = null
   global.Page = jest.fn((input) => {
@@ -110,25 +110,25 @@ describe("pages/mine 常用服务快捷入口", () => {
   })
 
   test.each([
-    ["analyticsManage", "数据分析", "/pages/analytics-manage/analytics-manage"],
-    ["auditLogManage", "审计日志", "/pages/audit-log-manage/audit-log-manage"],
+    ["analyticsManage", "数据分析", "/pages-admin/analytics-manage/analytics-manage"],
+    ["auditLogManage", "审计日志", "/pages-admin/audit-log-manage/audit-log-manage"],
     ["bookingCalendar", "预约日历", "/pages/booking-calendar/booking-calendar"],
     ["bookingManage", "预约管理", "/pages/booking-manage/booking-manage"],
     ["bookings", "我的预约", "/pages/bookings/bookings"],
     ["bookingWorkbench", "待协调工作台", "/pages/booking-workbench/booking-workbench"],
-    ["configManage", "运营配置", "/pages/config-manage/config-manage"],
-    ["errorLogManage", "错误日志", "/pages/error-log-manage/error-log-manage"],
+    ["configManage", "运营配置", "/pages-admin/config-manage/config-manage"],
+    ["errorLogManage", "错误日志", "/pages-admin/error-log-manage/error-log-manage"],
     ["faq", "常见问题", "/pages/content-page/content-page?type=faq"],
     ["favorites", "我的收藏", "/pages/favorites/favorites"],
-    ["operationsOverview", "运营概览", "/pages/operations-overview/operations-overview"],
+    ["operationsOverview", "运营概览", "/pages-admin/operations-overview/operations-overview"],
     ["privacy", "隐私政策", "/pages/content-page/content-page?type=privacy"],
     ["privacyRequest", "信息申请", "/pages/privacy-request/privacy-request"],
-    ["privacyRequestManage", "隐私申请处理", "/pages/privacy-request-manage/privacy-request-manage"],
-    ["roleManage", "权限管理", "/pages/role-manage/role-manage"],
+    ["privacyRequestManage", "隐私申请处理", "/pages-admin/privacy-request-manage/privacy-request-manage"],
+    ["roleManage", "权限管理", "/pages-admin/role-manage/role-manage"],
     ["rules", "平台规则", "/pages/content-page/content-page?type=rules"],
-    ["systemHealth", "上线检查", "/pages/system-health/system-health"],
-    ["vehicleCreate", "新增车辆", "/pages/vehicle-create/vehicle-create"],
-    ["vehicleManage", "车辆管理", "/pages/vehicle-manage/vehicle-manage"]
+    ["systemHealth", "上线检查", "/pages-admin/system-health/system-health"],
+    ["vehicleCreate", "新增车辆", "/pages-admin/vehicle-create/vehicle-create"],
+    ["vehicleManage", "车辆管理", "/pages-admin/vehicle-manage/vehicle-manage"]
   ])("%s 菜单入口可直达对应页面", (key, title, url) => {
     global.wx = {
       navigateTo: jest.fn(),

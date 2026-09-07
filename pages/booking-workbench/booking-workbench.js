@@ -10,6 +10,7 @@ const {
   buildBookingWorkbench,
   normalizeUsablePhone
 } = require("../../shared/bookingWorkbench")
+const { createPerformanceHelpers } = require('../../shared/performance')
 
 const WORKBENCH_LOAD_TIMEOUT_MS = 15 * 1000
 const WORKBENCH_WRITE_TIMEOUT_MS = 20 * 1000
@@ -181,7 +182,13 @@ Page({
     viewCustomized: false
   },
 
+  applyState(patch) { this.setData(patch) },
+
   onLoad() {
+    const perf = createPerformanceHelpers(this)
+    this._perf = perf
+    this.applyState = perf.applyState
+    this.flushStateNow = perf.flushStateNow
     activatePageNativeActions(this)
     requirePagePermission(this, {
       required: "canManageBookings",
@@ -229,6 +236,7 @@ Page({
   },
 
   onUnload() {
+    if (this._perf && this._perf.dispose) try { this._perf.dispose() } catch(e) {}
     cancelPagePermissionCheck(this)
     cancelPageNativeActions(this)
     this._workbenchLoadRequestId =
@@ -487,7 +495,7 @@ Page({
     ) {
       return
     }
-    this.setData({
+    this.applyState({
       editingRemarkId: id,
       remarkDraft: String(dataset.remark || "").slice(0, 200)
     })
@@ -503,7 +511,7 @@ Page({
     if (this.data.savingRemark) {
       return
     }
-    this.setData({
+    this.applyState({
       editingRemarkId: "",
       remarkDraft: ""
     })
@@ -522,7 +530,7 @@ Page({
       (item) => String(item.id || item._id || "").trim() === id
     )
     if (String((current && current.adminRemark) || "").trim() === adminRemark) {
-      this.setData({
+      this.applyState({
         editingRemarkId: "",
         remarkDraft: ""
       })
@@ -532,7 +540,7 @@ Page({
       })
       return
     }
-    this.setData({
+    this.applyState({
       savingRemark: true
     })
     this.runWorkbenchWrite({
@@ -543,10 +551,10 @@ Page({
       },
       timeoutTitle: "备注保存超时，请重试",
       failureFallback: "内部备注保存失败",
-      clearState: () => this.setData({ savingRemark: false }),
+      clearState: () => this.applyState({ savingRemark: false }),
       onResult: (result, isCurrent) => {
         if (!result || !result.ok) {
-          this.setData({
+          this.applyState({
             savingRemark: false
           })
           wx.showToast({
@@ -555,7 +563,7 @@ Page({
           })
           return
         }
-        this.setData({
+        this.applyState({
           editingRemarkId: "",
           remarkDraft: "",
           savingRemark: false
@@ -583,7 +591,7 @@ Page({
       return
     }
 
-    this.setData({
+    this.applyState({
       statusUpdatingId: id
     })
     const action = beginPageNativeAction(this)
@@ -600,7 +608,7 @@ Page({
           this.updateContactedStatus(id)
           return
         }
-        this.setData({
+        this.applyState({
           statusUpdatingId: ""
         })
       },
@@ -608,7 +616,7 @@ Page({
         if (!isPageNativeActionActive(this, action)) {
           return
         }
-        this.setData({
+        this.applyState({
           statusUpdatingId: ""
         })
       }
@@ -629,7 +637,7 @@ Page({
     ) {
       return
     }
-    this.setData({
+    this.applyState({
       statusUpdatingId: bookingId
     })
     this.runWorkbenchWrite({
@@ -640,10 +648,10 @@ Page({
       },
       timeoutTitle: "状态更新超时，请重试",
       failureFallback: "客户状态更新失败",
-      clearState: () => this.setData({ statusUpdatingId: "" }),
+      clearState: () => this.applyState({ statusUpdatingId: "" }),
       onResult: (result, isCurrent) => {
         if (!result || !result.ok) {
-          this.setData({
+          this.applyState({
             statusUpdatingId: ""
           })
           wx.showToast({
@@ -665,7 +673,7 @@ Page({
             if (!isCurrent()) {
               return
             }
-            this.setData({ statusUpdatingId: "" })
+            this.applyState({ statusUpdatingId: "" })
             this.fetchBookings()
           }
           if (typeof wx.showModal !== "function") {
@@ -687,7 +695,7 @@ Page({
           return
         }
 
-        this.setData({
+        this.applyState({
           statusUpdatingId: ""
         })
         const title =
@@ -736,7 +744,7 @@ Page({
     }
 
     if (nextStatus === "resolved") {
-      this.setData({
+      this.applyState({
         updatingId: id
       })
       const action = beginPageNativeAction(this)
@@ -753,7 +761,7 @@ Page({
             update()
             return
           }
-          this.setData({
+          this.applyState({
             updatingId: ""
           })
         },
@@ -761,7 +769,7 @@ Page({
           if (!isPageNativeActionActive(this, action)) {
             return
           }
-          this.setData({
+          this.applyState({
             updatingId: ""
           })
         }
@@ -799,7 +807,7 @@ Page({
       return
     }
 
-    this.setData({
+    this.applyState({
       updatingId: coordinationPayload.id
     })
     this.runWorkbenchWrite({
@@ -807,10 +815,10 @@ Page({
       data: coordinationPayload,
       timeoutTitle: "协调更新超时，请重试",
       failureFallback: "协调状态更新失败",
-      clearState: () => this.setData({ updatingId: "" }),
+      clearState: () => this.applyState({ updatingId: "" }),
       onResult: (result, isCurrent) => {
         if (!result || !result.ok) {
-          this.setData({
+          this.applyState({
             updatingId: ""
           })
           wx.showToast({
@@ -819,7 +827,7 @@ Page({
           })
           return
         }
-        this.setData({
+        this.applyState({
           updatingId: ""
         })
         wx.showToast({
@@ -967,7 +975,7 @@ Page({
     this._workbenchLoadDone = typeof done === "function" ? done : null
 
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
-      this.setData({
+      this.applyState({
         loading: false,
         refreshing: false,
         loadError: "云能力未初始化"
@@ -976,7 +984,7 @@ Page({
       return
     }
 
-    this.setData({
+    this.applyState({
       loading: !this.data.allBookings.length,
       refreshing: Boolean(this.data.allBookings.length),
       loadError: ""
@@ -994,7 +1002,7 @@ Page({
       if (!finishRequest()) {
         return
       }
-      this.setData({
+      this.applyState({
         loading: false,
         refreshing: false,
         loadError: message || "待协调预约加载失败"
@@ -1017,14 +1025,14 @@ Page({
         }
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
-          this.setData({
+          this.applyState({
             loading: false,
             refreshing: false,
             loadError: (result && result.message) || "待协调预约加载失败"
           })
           return
         }
-        this.setData({
+        this.applyState({
           loading: false,
           refreshing: false,
           allBookings: Array.isArray(result.list) ? result.list : [],

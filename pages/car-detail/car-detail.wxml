@@ -38,9 +38,9 @@
             <view class="hero-placeholder-text">该图片暂时无法显示</view>
           </view>
           <image
-            wx:if="{{!item.failed}}"
+            wx:if="{{!item.failed && item.displaySrc}}"
             class="hero-image {{item.loaded ? 'hero-image-loaded' : ''}}"
-            src="{{item.src}}"
+            src="{{item.displaySrc}}"
             mode="aspectFill"
             lazy-load="{{true}}"
             fade-in="{{false}}"

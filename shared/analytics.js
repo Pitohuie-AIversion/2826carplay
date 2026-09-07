@@ -1,3 +1,5 @@
+const { sanitizeAttribution } = require("./contentAttribution")
+
 const ALLOWED_EVENTS = [
   "garage_view",
   "vehicle_detail",
@@ -20,15 +22,18 @@ const ALLOWED_EVENTS = [
   "content_booking_start",
   "content_booking_submit"
 ]
+const CONTENT_EVENTS = ["content_view", "content_vehicle_click", "share_open", "content_booking_start", "content_booking_submit"]
+const CONTENT_ID_REQUIRED_EVENTS = ["content_view", "content_vehicle_click", "content_booking_start", "content_booking_submit"]
 const TRACK_COOLDOWN_MS = 5000
 const recentEvents = new Map()
 
 function trackEvent(eventType, vehicleId, context) {
   const type = String(eventType || "").trim()
   const targetVehicleId = String(vehicleId || "").trim()
-  const source = context && typeof context === "object" ? context : {}
+  const source = CONTENT_EVENTS.includes(type) ? sanitizeAttribution(context) : {}
   if (
     !ALLOWED_EVENTS.includes(type) ||
+    (CONTENT_ID_REQUIRED_EVENTS.includes(type) && !source.contentId) ||
     !wx.cloud ||
     typeof wx.cloud.callFunction !== "function"
   ) {

@@ -1,4 +1,4 @@
-<view wx:if="{{pageAuthorized}}" class="overview-page management-page">
+﻿<view wx:if="{{pageAuthorized}}" class="overview-page management-page">
   <view class="page-glow"></view>
 
   <view class="hero-card ui-card ui-card-gradient">
@@ -139,7 +139,7 @@
           <view class="section-native-icon vehicle-section-native-icon" aria-hidden="true"></view>
           <view><view class="section-eyebrow">FLEET STATUS</view><view class="section-title">车辆概况</view></view>
         </view>
-        <view class="section-link" data-url="/pages/vehicle-manage/vehicle-manage" bindtap="handleRouteTap" hover-class="section-link-pressed" aria-role="button" aria-label="查看车辆管理">查看车库<view class="section-link-chevron" aria-hidden="true"></view></view>
+        <view class="section-link" data-url="/pages-admin/vehicle-manage/vehicle-manage" bindtap="handleRouteTap" hover-class="section-link-pressed" aria-role="button" aria-label="查看车辆管理">查看车库<view class="section-link-chevron" aria-hidden="true"></view></view>
       </view>
       <view wx:if="{{vehicleLoaded}}" class="metric-grid">
         <view class="metric-item metric-{{item.tone}}" wx:for="{{vehicleMetrics}}" wx:key="key">
@@ -196,7 +196,7 @@
         class="recent-item {{item.itemClass}}"
         wx:for="{{recentVehicles}}"
         wx:key="id"
-        data-url="/pages/vehicle-detail-manage/vehicle-detail-manage?id={{item.id}}"
+        data-url="/pages-admin/vehicle-detail-manage/vehicle-detail-manage?id={{item.id}}"
         bindtap="handleRouteTap"
         hover-class="recent-item-pressed"
         aria-role="button"

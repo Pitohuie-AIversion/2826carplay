@@ -1,0 +1,53 @@
+{
+  "generatedAt": "2026-09-06T06:14:41.426Z",
+  "total": 5,
+  "passed": 5,
+  "failed": 0,
+  "expectedContentTypes": [
+    "route",
+    "guide",
+    "vehicle_advice",
+    "handover_guide",
+    "vehicle_tip"
+  ],
+  "expectedScenarios": [
+    "weekend_trip",
+    "business_reception",
+    "group_travel",
+    "ev_experience",
+    "handover_tips"
+  ],
+  "outputDir": "G:\\Autosave\\2826carplay\\scripts\\content_drafts_seed",
+  "results": [
+    {
+      "slug": "weekend-short-trip-prep-2026",
+      "ok": true,
+      "invalid": [],
+      "duplicate": false
+    },
+    {
+      "slug": "business-reception-guide-2026",
+      "ok": true,
+      "invalid": [],
+      "duplicate": false
+    },
+    {
+      "slug": "ev-first-rental-tips-2026",
+      "ok": true,
+      "invalid": [],
+      "duplicate": false
+    },
+    {
+      "slug": "long-distance-road-trip-2026",
+      "ok": true,
+      "invalid": [],
+      "duplicate": false
+    },
+    {
+      "slug": "handover-checklist-2026",
+      "ok": true,
+      "invalid": [],
+      "duplicate": false
+    }
+  ]
+}

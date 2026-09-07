@@ -227,15 +227,11 @@ describe("预约管理状态提醒反馈", () => {
   })
 
   test("离开详情页后提醒弹窗不再触发刷新", () => {
+    let pendingSuccess
     global.wx = {
       cloud: {
         callFunction: jest.fn(({ success }) => {
-          success({
-            result: {
-              ok: true,
-              notificationStatus: "failed"
-            }
-          })
+          pendingSuccess = success
         })
       },
       showModal: jest.fn(),
@@ -249,6 +245,9 @@ describe("预约管理状态提醒反馈", () => {
 
     page.updateStatus("contacted")
     expect(page.data.loading).toBe(true)
+    pendingSuccess({
+      result: { ok: true, notificationStatus: "failed" }
+    })
     page.onUnload()
     global.wx.showModal.mock.calls[0][0].complete()
     global.wx.showModal.mock.calls[0][0].complete()

@@ -1,4 +1,4 @@
-const fs = require("fs")
+﻿const fs = require("fs")
 const path = require("path")
 
 describe("全局交互视觉基础", () => {
@@ -40,20 +40,20 @@ describe("全局交互视觉基础", () => {
     const managementStyles = [
       "../shared/management-shell.wxss",
       "../shared/vehicle-form.wxss",
-      "../pages/audit-log-manage/audit-log-manage.wxss",
-      "../pages/analytics-manage/analytics-manage.wxss",
+      "../pages-admin/audit-log-manage/audit-log-manage.wxss",
+      "../pages-admin/analytics-manage/analytics-manage.wxss",
       "../pages/booking-workbench/booking-workbench.wxss",
-      "../pages/config-manage/config-manage.wxss",
-      "../pages/vehicle-manage/vehicle-manage.wxss",
-      "../pages/privacy-data-inventory/privacy-data-inventory.wxss",
-      "../pages/operations-overview/operations-overview.wxss",
-      "../pages/role-manage/role-manage.wxss",
-      "../pages/vehicle-detail-manage/vehicle-detail-manage.wxss",
-      "../pages/error-log-manage/error-log-manage.wxss",
+      "../pages-admin/config-manage/config-manage.wxss",
+      "../pages-admin/vehicle-manage/vehicle-manage.wxss",
+      "../pages-admin/privacy-data-inventory/privacy-data-inventory.wxss",
+      "../pages-admin/operations-overview/operations-overview.wxss",
+      "../pages-admin/role-manage/role-manage.wxss",
+      "../pages-admin/vehicle-detail-manage/vehicle-detail-manage.wxss",
+      "../pages-admin/error-log-manage/error-log-manage.wxss",
       "../pages/booking-manage-detail/booking-manage-detail.wxss",
-      "../pages/privacy-request-manage/privacy-request-manage.wxss",
+      "../pages-admin/privacy-request-manage/privacy-request-manage.wxss",
       "../pages/booking-calendar/booking-calendar.wxss",
-      "../pages/system-health/system-health.wxss",
+      "../pages-admin/system-health/system-health.wxss",
       "../pages/booking-manage/booking-manage.wxss"
     ]
 

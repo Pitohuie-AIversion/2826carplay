@@ -22,7 +22,7 @@ function loadPageDefinition() {
   global.Page = jest.fn((input) => {
     definition = input
   })
-  require("../pages/error-log-manage/error-log-manage")
+  require("../pages-admin/error-log-manage/error-log-manage")
   return definition
 }
 
@@ -282,7 +282,7 @@ describe("pages/error-log-manage 诊断时间线", () => {
   })
 
   test("错误页使用诊断时间线、结构化详情和原生操作图标", () => {
-    const pageDir = path.join(__dirname, "..", "pages", "error-log-manage")
+    const pageDir = path.join(__dirname, "..", "pages-admin", "error-log-manage")
     const wxml = fs.readFileSync(path.join(pageDir, "error-log-manage.wxml"), "utf8")
     const wxss = fs.readFileSync(path.join(pageDir, "error-log-manage.wxss"), "utf8")
 

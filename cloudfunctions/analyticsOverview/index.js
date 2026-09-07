@@ -13,6 +13,11 @@ const AUTH_ROLE_FIELDS = {
 const ANALYTICS_VEHICLE_FIELDS = {
   brandModel: true
 }
+const ANALYTICS_CONTENT_FIELDS = {
+  slug: true,
+  title: true,
+  contentType: true
+}
 const ANALYTICS_EVENT_FIELDS = {
   eventType: true,
   vehicleId: true,
@@ -64,14 +69,16 @@ function percent(numerator, denominator) {
   return denominator ? Math.round((numerator / denominator) * 1000) / 10 : 0
 }
 
-function buildContentAnalytics(events) {
+const SCENE_WHITELIST = ["weekend_trip", "business_reception", "group_travel", "ev_experience"]
+
+function buildContentAnalytics(events, topN) {
   const types = ["content_view", "content_vehicle_click", "share_open", "content_booking_start", "content_booking_submit", "content_booking_confirmed"]
   const contentEvents = events.filter((item) => types.includes(item.eventType))
   const counts = types.reduce((result, type) => {
     result[type] = contentEvents.filter((item) => item.eventType === type).length
     return result
   }, {})
-  const rank = (field) => {
+  const rank = (field, limit) => {
     const map = {}
     contentEvents.forEach((item) => {
       const key = String(item[field] || "").trim()
@@ -86,7 +93,7 @@ function buildContentAnalytics(events) {
       current.score = current.views + current.shareOpens * 2 + current.vehicleClicks * 2 + current.bookingStarts * 3 + current.bookingSubmits * 5 + current.confirmed * 8
       map[key] = current
     })
-    return Object.values(map).sort((a, b) => b.score - a.score).slice(0, 10)
+    return Object.values(map).sort((a, b) => b.score - a.score).slice(0, limit)
   }
   const sourceMap = {}
   contentEvents.forEach((item) => {
@@ -108,10 +115,44 @@ function buildContentAnalytics(events) {
     confirmedBookings: counts.content_booking_confirmed,
     bookingConversionRate: percent(counts.content_booking_submit, counts.content_view),
     confirmedConversionRate: percent(counts.content_booking_confirmed, counts.content_view),
-    topContents: rank("contentId"),
-    topVehicles: rank("vehicleId"),
-    topSources: Object.values(sourceMap).sort((a, b) => b.confirmed - a.confirmed || b.events - a.events).slice(0, 10)
+    topContents: rank("contentId", Math.max(3, Math.min(10, topN || 3))),
+    topVehicles: rank("vehicleId", Math.max(3, Math.min(10, topN || 3))),
+    topSources: Object.values(sourceMap).sort((a, b) => b.confirmed - a.confirmed || b.events - a.events).slice(0, Math.max(3, Math.min(10, topN || 3)))
   }
+}
+
+function buildSceneFunnel(events) {
+  const types = ["content_view", "share_open", "content_vehicle_click", "content_booking_start", "content_booking_submit", "content_booking_confirmed"]
+  const contentEvents = events.filter((item) => types.includes(item.eventType))
+  const sceneMap = {}
+  SCENE_WHITELIST.forEach((scene) => {
+    sceneMap[scene] = {
+      scene,
+      views: 0,
+      shareOpens: 0,
+      vehicleClicks: 0,
+      bookingStarts: 0,
+      bookingSubmits: 0,
+      confirmed: 0
+    }
+  })
+  contentEvents.forEach((item) => {
+    const scene = String(item.scene || "").trim()
+    if (!SCENE_WHITELIST.includes(scene)) return
+    const current = sceneMap[scene]
+    if (item.eventType === "content_view") current.views += 1
+    else if (item.eventType === "share_open") current.shareOpens += 1
+    else if (item.eventType === "content_vehicle_click") current.vehicleClicks += 1
+    else if (item.eventType === "content_booking_start") current.bookingStarts += 1
+    else if (item.eventType === "content_booking_submit") current.bookingSubmits += 1
+    else if (item.eventType === "content_booking_confirmed") current.confirmed += 1
+  })
+  return Object.values(sceneMap).map((item) => ({
+    ...item,
+    viewToSubmitRate: percent(item.bookingSubmits, item.views),
+    submitToConfirmRate: percent(item.confirmed, item.bookingSubmits),
+    viewToConfirmRate: percent(item.confirmed, item.views)
+  }))
 }
 
 function normalizeStringArray(value) {
@@ -298,11 +339,66 @@ function buildTrend(events, days, now) {
   return list
 }
 
+function buildContentTrend(events, days, now) {
+  const types = ["content_view", "content_vehicle_click", "content_booking_submit", "content_booking_confirmed"]
+  const contentEvents = events.filter((item) => types.includes(String(item.eventType || "")))
+  const dayMap = {}
+  contentEvents.forEach((item) => {
+    const timestamp = toTimestamp(item.createdAt)
+    if (!timestamp) return
+    const key = toChinaDayKey(timestamp)
+    const current = dayMap[key] || { key, views: 0, vehicleClicks: 0, submits: 0, confirmed: 0 }
+    if (item.eventType === "content_view") current.views += 1
+    else if (item.eventType === "content_vehicle_click") current.vehicleClicks += 1
+    else if (item.eventType === "content_booking_submit") current.submits += 1
+    else if (item.eventType === "content_booking_confirmed") current.confirmed += 1
+    dayMap[key] = current
+  })
+  const list = []
+  for (let offset = days - 1; offset >= 0; offset -= 1) {
+    const key = toChinaDayKey(now - offset * DAY_MS)
+    const item = dayMap[key] || { key, views: 0, vehicleClicks: 0, submits: 0, confirmed: 0 }
+    list.push({
+      key,
+      label: key.slice(5),
+      views: item.views,
+      vehicleClicks: item.vehicleClicks,
+      submits: item.submits,
+      confirmed: item.confirmed,
+      total: item.views + item.vehicleClicks + item.submits + item.confirmed
+    })
+  }
+  return list
+}
+
+async function readContentName(contentId) {
+  if (!contentId) {
+    return { title: "", contentType: "" }
+  }
+  try {
+    const res = await db
+      .collection("content_guides")
+      .doc(contentId)
+      .field(ANALYTICS_CONTENT_FIELDS)
+      .get()
+    const record = res && res.data ? res.data : null
+    if (!record) return { title: "已下架或未发布内容", contentType: "" }
+    return {
+      title: String(record.title || "").trim() || "未命名内容",
+      contentType: String(record.contentType || "").trim()
+    }
+  } catch (error) {
+    return { title: "已下架或未发布内容", contentType: "" }
+  }
+}
+
 exports.main = async (event) => {
   const wxContext = cloud.getWXContext()
   const openid = wxContext && wxContext.OPENID ? wxContext.OPENID : ""
   const requestedDays = Number(event && event.days)
   const days = requestedDays === 30 ? 30 : 7
+  const requestedTopN = Number(event && event.topN)
+  const topN = requestedTopN === 5 || requestedTopN === 10 ? requestedTopN : 3
 
   try {
     if (!(await canView(openid))) {
@@ -371,15 +467,29 @@ exports.main = async (event) => {
     })
     const topVehicles = Object.values(vehicleScores)
       .sort((prev, next) => next.score - prev.score)
-      .slice(0, 5)
+      .slice(0, topN)
     const names = await Promise.all(topVehicles.map((item) => readVehicleName(item.vehicleId)))
+
+    const contentAnalytics = buildContentAnalytics(events, topN)
+    const contentNames = await Promise.all(contentAnalytics.topContents.map((item) => readContentName(item.key)))
+    const hydratedTopContents = contentAnalytics.topContents.map((item, index) => ({
+      ...item,
+      title: contentNames[index].title,
+      contentType: contentNames[index].contentType
+    }))
 
     return {
       ok: true,
       days,
+      topN,
       truncated: records.truncated,
       metrics,
-      contentAnalytics: buildContentAnalytics(events),
+      contentAnalytics: {
+        ...contentAnalytics,
+        topContents: hydratedTopContents
+      },
+      sceneFunnels: buildSceneFunnel(events),
+      contentTrend: buildContentTrend(events, days, now),
       quoteMetrics: buildQuoteMetrics(bookingRecords.list, quoteRecords.list, start, now),
       trustProfileMetrics: {
         profileViews: metrics.trusted_profile_view,

@@ -38,7 +38,7 @@ describe("mini program package budget", () => {
   })
 
   test("运行时代码不依赖已排除的本地示例车辆数据", () => {
-    const runtimeRoots = ["app.js", "pages", "components", "shared"]
+    const runtimeRoots = ["app.js", "pages", "pages-admin", "components", "shared"]
     const sourceFiles = []
     const collect = (target) => {
       const absolutePath = path.join(PROJECT_ROOT, target)

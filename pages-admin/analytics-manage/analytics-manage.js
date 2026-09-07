@@ -99,6 +99,70 @@ function buildTrend(trend) {
   })
 }
 
+function buildContentTrendItems(trend) {
+  const list = Array.isArray(trend) ? trend : []
+  const max = Math.max(...list.map((item) => Number(item.total) || 0), 1)
+  return list.map((item) => {
+    const total = Number(item.total) || 0
+    const views = Number(item.views) || 0
+    const vehicleClicks = Number(item.vehicleClicks) || 0
+    const submits = Number(item.submits) || 0
+    const confirmed = Number(item.confirmed) || 0
+    return {
+      key: item.key,
+      label: item.label,
+      total,
+      views,
+      vehicleClicks,
+      submits,
+      confirmed,
+      height: Math.max(Math.round((total / max) * 100), total ? 6 : 0),
+      isPeak: total > 0 && total === max
+    }
+  })
+}
+
+const SCENE_LABEL_MAP = {
+  weekend_trip: "周末自驾",
+  business_reception: "商务接待",
+  group_travel: "组队出游",
+  ev_experience: "新能源试驾"
+}
+
+function buildSceneFunnelItems(sceneFunnels) {
+  const list = Array.isArray(sceneFunnels) ? sceneFunnels : []
+  return list.map((item) => {
+    const views = Number(item.views) || 0
+    const shareOpens = Number(item.shareOpens) || 0
+    const vehicleClicks = Number(item.vehicleClicks) || 0
+    const bookingStarts = Number(item.bookingStarts) || 0
+    const bookingSubmits = Number(item.bookingSubmits) || 0
+    const confirmed = Number(item.confirmed) || 0
+    const stages = [
+      { key: "views", label: "内容浏览", value: views },
+      { key: "shareOpens", label: "分享落地", value: shareOpens },
+      { key: "vehicleClicks", label: "点击车辆", value: vehicleClicks },
+      { key: "bookingStarts", label: "发起预约", value: bookingStarts },
+      { key: "bookingSubmits", label: "提交预约", value: bookingSubmits },
+      { key: "confirmed", label: "报价确认", value: confirmed }
+    ]
+    const max = Math.max(...stages.map((s) => s.value), 1)
+    return {
+      key: item.scene || "scene",
+      label: SCENE_LABEL_MAP[item.scene] || String(item.scene || "未知场景"),
+      viewToSubmitRate: Number(item.viewToSubmitRate) || 0,
+      submitToConfirmRate: Number(item.submitToConfirmRate) || 0,
+      viewToConfirmRate: Number(item.viewToConfirmRate) || 0,
+      stages: stages.map((stage, index) => ({
+        ...stage,
+        index: index + 1,
+        width: Math.max(Math.round((stage.value / max) * 100), stage.value ? 8 : 0),
+        topRate: views ? Math.min(100, Math.round((stage.value / views) * 100)) : 0
+      }))
+    }
+  })
+}
+
 Page({
   data: {
     pageAuthorized: false,
@@ -108,6 +172,12 @@ Page({
     periodOptions: [
       { value: 7, label: "近 7 天" },
       { value: 30, label: "近 30 天" }
+    ],
+    topN: 3,
+    topNOptions: [
+      { value: 3, label: "TOP 3" },
+      { value: 5, label: "TOP 5" },
+      { value: 10, label: "TOP 10" }
     ],
     metricItems: [],
     funnelItems: [],
@@ -119,6 +189,8 @@ Page({
     topContentVehicles: [],
     topContentSources: [],
     trendItems: [],
+    contentTrendItems: [],
+    sceneFunnelItems: [],
     topVehicles: [],
     truncated: false,
     canCleanup: false,
@@ -168,6 +240,20 @@ Page({
       return
     }
     this.setData({ days })
+    this.fetchOverview()
+  },
+
+  handleTopNTap(event) {
+    const topN = Number(event.currentTarget.dataset.topn)
+    if (
+      ![3, 5, 10].includes(topN) ||
+      topN === this.data.topN ||
+      this.data.loading ||
+      this.data.cleanupLoading
+    ) {
+      return
+    }
+    this.setData({ topN })
     this.fetchOverview()
   },
 
@@ -317,6 +403,7 @@ Page({
 
     this._overviewRequestDone = typeof done === "function" ? done : null
     const days = this.data.days
+    const topN = this.data.topN
     this.setData({
       loading: true,
       loadError: ""
@@ -348,7 +435,8 @@ Page({
     const requestOptions = {
       name: "analyticsOverview",
       data: {
-        days
+        days,
+        topN
       },
       success: (res) => {
         if (!finishRequest()) {
@@ -365,6 +453,7 @@ Page({
         this.setData({
           loading: false,
           loadError: "",
+          topN: Number(result.topN) || 3,
           metricItems: buildMetrics(result.metrics, result.conversionRate),
           funnelItems: buildFunnel(result.metrics),
           decisionItems: buildDecisionItems(result.metrics),
@@ -375,6 +464,8 @@ Page({
           topContentVehicles: result.contentAnalytics && Array.isArray(result.contentAnalytics.topVehicles) ? result.contentAnalytics.topVehicles : [],
           topContentSources: result.contentAnalytics && Array.isArray(result.contentAnalytics.topSources) ? result.contentAnalytics.topSources : [],
           trendItems: buildTrend(result.trend),
+          contentTrendItems: buildContentTrendItems(result.contentTrend),
+          sceneFunnelItems: buildSceneFunnelItems(result.sceneFunnels),
           topVehicles: Array.isArray(result.topVehicles) ? result.topVehicles : [],
           truncated: Boolean(result.truncated || result.quoteDataTruncated)
         })

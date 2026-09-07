@@ -1,4 +1,4 @@
-jest.mock("../shared/pageAuth", () => ({
+﻿jest.mock("../shared/pageAuth", () => ({
   cancelPagePermissionCheck: jest.fn(),
   requirePagePermission: jest.fn()
 }))
@@ -74,7 +74,7 @@ describe("log management CSV export", () => {
       showModal: jest.fn()
     }
     const page = createPage(
-      loadPageDefinition("../pages/audit-log-manage/audit-log-manage"),
+      loadPageDefinition("../pages-admin/audit-log-manage/audit-log-manage"),
       {
         currentAction: "vehicleUpdate",
         keyword: "vehicle_1"
@@ -119,7 +119,7 @@ describe("log management CSV export", () => {
       showModal: jest.fn()
     }
     const page = createPage(
-      loadPageDefinition("../pages/error-log-manage/error-log-manage"),
+      loadPageDefinition("../pages-admin/error-log-manage/error-log-manage"),
       {
         currentFunc: "bookingCreate",
         keyword: "RATE_LIMIT"
@@ -149,7 +149,7 @@ describe("log management CSV export", () => {
       showToast: jest.fn()
     }
     const page = createPage(
-      loadPageDefinition("../pages/audit-log-manage/audit-log-manage"),
+      loadPageDefinition("../pages-admin/audit-log-manage/audit-log-manage"),
       {
         exportFilePath: "/user-data/audit-logs.csv",
         exportFileName: "audit-logs.csv"
@@ -175,7 +175,7 @@ describe("log management CSV export", () => {
       showToast: jest.fn()
     }
     const page = createPage(
-      loadPageDefinition("../pages/audit-log-manage/audit-log-manage"),
+      loadPageDefinition("../pages-admin/audit-log-manage/audit-log-manage"),
       {
         exportFilePath: "/user-data/audit-logs.csv",
         exportFileName: "audit-logs.csv"
@@ -203,7 +203,7 @@ describe("log management CSV export", () => {
       showToast: jest.fn()
     }
     const page = createPage(
-      loadPageDefinition("../pages/error-log-manage/error-log-manage"),
+      loadPageDefinition("../pages-admin/error-log-manage/error-log-manage"),
       {
         exportFilePath: "/user-data/error-logs.csv",
         exportFileName: "error-logs.csv"
@@ -231,7 +231,7 @@ describe("log management CSV export", () => {
       showToast: jest.fn()
     }
     const page = createPage(
-      loadPageDefinition("../pages/privacy-data-inventory/privacy-data-inventory"),
+      loadPageDefinition("../pages-admin/privacy-data-inventory/privacy-data-inventory"),
       {
         exportFilePath: "/user-data/privacy-old.csv",
         exportFileName: "privacy-old.csv"

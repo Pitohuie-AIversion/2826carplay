@@ -183,4 +183,128 @@ describe("pages/content-page 服务指南", () => {
 
     expect(page.data.sections[0].title).toBe("默认问题")
   })
+
+  test("场景内容分享时固定 wechat_share 渠道并携带 contentId 与场景", () => {
+    global.wx = {
+      setNavigationBarTitle: jest.fn(),
+      cloud: {
+        callFunction: jest.fn()
+      }
+    }
+    global.getCurrentPages = jest.fn(() => [{ route: "pages/content-page/content-page" }])
+    const page = createPage(loadPageDefinition())
+    page.setData({
+      guideMode: true,
+      guide: {
+        id: "guide_8",
+        slug: "weekend-mogan-mountain",
+        title: "莫干山周末敞篷自驾",
+        shareTitle: "莫干山周末敞篷自驾：看云海和日落",
+        scenario: "weekend_trip"
+      },
+      attribution: { channel: "qr", scene: "", contentId: "guide_8", vehicleId: "" }
+    })
+
+    const shareCfg = page.onShareAppMessage()
+    expect(shareCfg.title).toBe("莫干山周末敞篷自驾：看云海和日落")
+    expect(shareCfg.path).toContain("/pages/content-page/content-page?")
+    expect(shareCfg.path).toContain("channel=wechat_share")
+    expect(shareCfg.path).toContain("contentId=weekend-mogan-mountain")
+    expect(shareCfg.path).toContain("scene=weekend_trip")
+    expect(shareCfg.path).not.toContain("vehicleId=")
+  })
+
+  test("分享落地时触发 share_open 与 content_view 两条匿名埋点带三字段", () => {
+    const requests = []
+    global.wx = {
+      setNavigationBarTitle: jest.fn(),
+      cloud: {
+        callFunction: jest.fn((options) => {
+          requests.push(options)
+          if (options.name === "contentGuideDetail") {
+            options.success({
+              result: {
+                ok: true,
+                guide: {
+                  id: "guide_share_01",
+                  slug: "guide_share_01",
+                  title: "试驾全流程避坑",
+                  summary: "避坑摘要",
+                  body: "正文",
+                  scenario: "ev_experience",
+                  vehicleIds: ["car_ev_1"]
+                },
+                vehicles: [{ id: "car_ev_1", name: "小鹏 P7" }]
+              }
+            })
+          }
+        })
+      }
+    }
+    global.getCurrentPages = jest.fn(() => [{ route: "pages/content-page/content-page" }])
+    const page = createPage(loadPageDefinition())
+
+    page.onLoad({
+      channel: "wechat_share",
+      scene: "ev_experience",
+      contentId: "guide_share_01"
+    })
+
+    expect(page.data.guideMode).toBe(true)
+    expect(page.data.attribution).toEqual({
+      channel: "wechat_share",
+      scene: "ev_experience",
+      contentId: "guide_share_01",
+      vehicleId: ""
+    })
+    expect(requests[0].name).toBe("contentGuideDetail")
+    const trackCalls = requests.filter((r) => r.name === "analyticsTrack").map((r) => r.data)
+    expect(trackCalls).toHaveLength(2)
+    expect(trackCalls).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ eventType: "share_open", contentId: "guide_share_01", channel: "wechat_share", scene: "ev_experience" }),
+        expect.objectContaining({ eventType: "content_view", contentId: "guide_share_01", channel: "wechat_share", scene: "ev_experience" })
+      ])
+    )
+  })
+
+  test("车辆点击埋点 content_vehicle_click 并携带 attribution 跳转 car-detail", () => {
+    const requests = []
+    const navigations = []
+    global.wx = {
+      navigateTo: jest.fn((options) => navigations.push(options)),
+      cloud: {
+        callFunction: jest.fn((options) => requests.push(options))
+      }
+    }
+    const page = createPage(loadPageDefinition())
+    page.setData({
+      attribution: {
+        channel: "wechat_share",
+        scene: "weekend_trip",
+        contentId: "guide_drive_02",
+        vehicleId: ""
+      }
+    })
+
+    page.handleGuideVehicleTap({
+      currentTarget: { dataset: { id: "car_mx5" } }
+    })
+
+    expect(requests[0].name).toBe("analyticsTrack")
+    expect(requests[0].data).toMatchObject({
+      eventType: "content_vehicle_click",
+      vehicleId: "car_mx5",
+      contentId: "guide_drive_02",
+      channel: "wechat_share",
+      scene: "weekend_trip"
+    })
+    expect(navigations).toHaveLength(1)
+    const url = navigations[0].url
+    expect(url).toContain("/pages/car-detail/car-detail?")
+    expect(url).toContain("channel=wechat_share")
+    expect(url).toContain("scene=weekend_trip")
+    expect(url).toContain("contentId=guide_drive_02")
+    expect(url).toContain("vehicleId=car_mx5")
+  })
 })

@@ -1,4 +1,4 @@
-const fs = require("fs")
+﻿const fs = require("fs")
 const path = require("path")
 
 jest.mock("../shared/pageAuth", () => ({
@@ -12,7 +12,7 @@ function loadPageDefinition() {
   global.Page = jest.fn((input) => {
     definition = input
   })
-  require("../pages/role-manage/role-manage")
+  require("../pages-admin/role-manage/role-manage")
   return definition
 }
 
@@ -198,7 +198,7 @@ describe("pages/role-manage 权限视觉与选择", () => {
   })
 
   test("成员列表使用盾牌和成员图标而非字母头像", () => {
-    const pageDir = path.resolve(__dirname, "../pages/role-manage")
+    const pageDir = path.resolve(__dirname, "../pages-admin/role-manage")
     const wxml = fs.readFileSync(path.join(pageDir, "role-manage.wxml"), "utf8")
     const wxss = fs.readFileSync(path.join(pageDir, "role-manage.wxss"), "utf8")
 
@@ -212,7 +212,7 @@ describe("pages/role-manage 权限视觉与选择", () => {
   })
 
   test("权限表单和成员列表操作使用对应原生图标", () => {
-    const pageDir = path.resolve(__dirname, "../pages/role-manage")
+    const pageDir = path.resolve(__dirname, "../pages-admin/role-manage")
     const wxml = fs.readFileSync(path.join(pageDir, "role-manage.wxml"), "utf8")
     const wxss = fs.readFileSync(path.join(pageDir, "role-manage.wxss"), "utf8")
 

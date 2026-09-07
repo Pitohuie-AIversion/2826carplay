@@ -1,3 +1,4 @@
+const { createPerformanceHelpers } = require('../../shared/performance');
 const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
 const { formatToastTitle } = require("../../shared/uiFeedback")
 const {
@@ -321,7 +322,10 @@ Page({
     handoverReadyForCompletion: false
   },
 
+  applyState(patch) { this.setData(patch) },
+
   onLoad(options) {
+    const perf = createPerformanceHelpers(this); this._perf = perf; this.applyState = perf.applyState; this.flushStateNow = perf.flushStateNow;
     activatePageNativeActions(this)
     const id = String((options && options.id) || "").trim()
     this.setData({ id })
@@ -420,6 +424,7 @@ Page({
     this._bookingDetailStatusFeedbackPending = false
     this._handoverRequestId = Number(this._handoverRequestId || 0) + 1
     this.cleanupPendingHandoverUploads()
+    if (this._perf && typeof this._perf.dispose === 'function') try { this._perf.dispose(); } catch(e) {}
   },
 
   applyBooking(booking, conflictResult, quoteResult, handoverResult) {
@@ -436,10 +441,11 @@ Page({
       : []
     const latestPickup = handoverHistory.find((item) => item.id === booking.latestPickupHandoverId)
     const latestReturn = handoverHistory.find((item) => item.id === booking.latestReturnHandoverId)
-    this.setData({
+    this.applyState({
       booking,
       remarkDirty: false,
       initialLoading: false,
+      loading: false,
       loadFailed: false,
       statusText: STATUS_TEXT_MAP[booking.status] || "待联系",
       statusClass: STATUS_CLASS_MAP[booking.status] || "status-pending",
@@ -471,7 +477,7 @@ Page({
   loadDetail() {
     const id = String(this.data.id || "").trim()
     if (!id) {
-      this.setData({
+      this.applyState({
         initialLoading: false,
         loading: false
       })
@@ -492,7 +498,7 @@ Page({
     this.clearBookingDetailTimer()
 
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
-      this.setData({
+      this.applyState({
         initialLoading: false,
         loading: false,
         loadFailed: true,
@@ -501,7 +507,7 @@ Page({
       return
     }
 
-    this.setData({
+    this.applyState({
       loading: true,
       loadFailed: false
     })
@@ -523,7 +529,7 @@ Page({
         title: formatToastTitle(message, "加载失败"),
         icon: "none"
       })
-      this.setData({
+      this.applyState({
         initialLoading: false,
         loading: false,
         loadFailed: true,
@@ -551,7 +557,7 @@ Page({
             title: formatToastTitle(result && result.message, "预约不存在"),
             icon: "none"
           })
-          this.setData({
+          this.applyState({
             initialLoading: false,
             loading: false,
             loadFailed: true,
@@ -571,7 +577,6 @@ Page({
           history: result.quoteHistory,
           unavailable: result.quotesUnavailable
         }, result.handoverHistory)
-        this.setData({ loading: false })
       },
       fail: (error) => {
         handleFailure(error && (error.errMsg || error.message))
@@ -628,7 +633,7 @@ Page({
             title: formatToastTitle(result && result.message, "保存失败"),
             icon: "none"
           })
-          this.setData({ loading: false })
+          this.applyState({ loading: false })
           return
         }
 
@@ -637,7 +642,7 @@ Page({
           icon: "none"
         })
         if (isCurrent()) {
-          this.setData({ remarkDirty: false })
+          this.applyState({ remarkDirty: false, loading: false })
           this.loadDetail()
         }
       }
@@ -686,11 +691,11 @@ Page({
       onResult: (result, isCurrent) => {
         if (!result || !result.ok) {
           wx.showToast({ title: formatToastTitle(result && result.message, "报价保存失败"), icon: "none" })
-          this.setData({ quoteLoading: false })
+          this.applyState({ quoteLoading: false })
           return
         }
         wx.showToast({ title: "报价草稿已保存", icon: "none" })
-        this.setData({ quoteLoading: false, quoteDirty: false })
+        this.applyState({ quoteLoading: false, quoteDirty: false })
         if (isCurrent()) this.loadDetail()
       }
     })
@@ -717,11 +722,11 @@ Page({
           onResult: (result, isCurrent) => {
             if (!result || !result.ok) {
               wx.showToast({ title: formatToastTitle(result && result.message, "报价发送失败"), icon: "none" })
-              this.setData({ quoteLoading: false })
+              this.applyState({ quoteLoading: false })
               return
             }
             showStatusUpdateFeedback(result, () => {
-              this.setData({ quoteLoading: false })
+              this.applyState({ quoteLoading: false })
               if (isCurrent()) this.loadDetail()
             })
           }
@@ -743,7 +748,7 @@ Page({
       failureFallback: "报价失效操作失败",
       onResult: (result, isCurrent) => {
         wx.showToast({ title: formatToastTitle(result && result.message, result && result.ok ? "报价已失效" : "操作失败"), icon: "none" })
-        this.setData({ quoteLoading: false })
+        this.applyState({ quoteLoading: false })
         if (result && result.ok && isCurrent()) this.loadDetail()
       }
     })
@@ -802,7 +807,7 @@ Page({
             title: formatToastTitle(result && result.message, "协调更新失败"),
             icon: "none"
           })
-          this.setData({ coordinationLoading: false })
+          this.applyState({ coordinationLoading: false })
           return
         }
 
@@ -810,7 +815,7 @@ Page({
           title: result.changed === false ? "协调安排未变化" : "协调安排已更新",
           icon: "none"
         })
-        this.setData({ coordinationLoading: false })
+        this.applyState({ coordinationLoading: false })
         if (isCurrent()) {
           this.loadDetail()
         }
@@ -965,7 +970,7 @@ Page({
         }
         const stage = this.data.handoverStage
         const cloudPath = `handover-images/${this.data.id}/${stage}/${Date.now()}_${angle}.${extension}`
-        this.setData({ handoverLoading: true })
+        this.applyState({ handoverLoading: true })
         wx.cloud.uploadFile({
           cloudPath,
           filePath: path,
@@ -983,7 +988,7 @@ Page({
             })
           },
           fail: () => wx.showToast({ title: "图片上传失败，请重试", icon: "none" }),
-          complete: () => this.setData({ handoverLoading: false })
+          complete: () => this.applyState({ handoverLoading: false })
         })
       },
       fail: (error) => {
@@ -1021,7 +1026,7 @@ Page({
     const requestId = `handover_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
     const requestSerial = Number(this._handoverRequestId || 0) + 1
     this._handoverRequestId = requestSerial
-    this.setData({ handoverLoading: true })
+    this.applyState({ handoverLoading: true })
     wx.cloud.callFunction({
       name: "bookingHandover",
       data: {
@@ -1044,7 +1049,7 @@ Page({
       fail: () => wx.showToast({ title: "提交失败，请重试", icon: "none" }),
       complete: () => {
         if (this._handoverRequestId === requestSerial) {
-          this.setData({ handoverLoading: false })
+          this.applyState({ handoverLoading: false })
           if (this._reloadHandoverAfterMutation) {
             this._reloadHandoverAfterMutation = false
             this.loadDetail()
@@ -1081,7 +1086,7 @@ Page({
       confirmColor: "#d46868",
       success: (choice) => {
         if (!isPageNativeActionActive(this, action) || !choice || !choice.confirm) return
-        this.setData({ handoverLoading: true })
+        this.applyState({ handoverLoading: true })
         wx.cloud.callFunction({
           name: "bookingHandover",
           data: { action: "archive", bookingId: this.data.id, handoverId, stage },
@@ -1092,7 +1097,7 @@ Page({
           },
           fail: () => wx.showToast({ title: "归档失败，请重试", icon: "none" }),
           complete: () => {
-            this.setData({ handoverLoading: false })
+            this.applyState({ handoverLoading: false })
             if (this._reloadHandoverAfterMutation) {
               this._reloadHandoverAfterMutation = false
               this.loadDetail()
@@ -1171,10 +1176,11 @@ Page({
             title: formatToastTitle(result && result.message, "更新失败"),
             icon: "none"
           })
-          this.setData({ loading: false })
+          this.applyState({ loading: false })
           return
         }
 
+        this.applyState({ loading: false })
         this._bookingDetailStatusFeedbackPending = true
         showStatusUpdateFeedback(result, () => {
           this._bookingDetailStatusFeedbackPending = false
@@ -1198,7 +1204,7 @@ Page({
     }
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       if (input.endState) {
-        this.setData(input.endState)
+        this.applyState(input.endState)
       }
       wx.showToast({
         title: "云能力未初始化",
@@ -1212,7 +1218,7 @@ Page({
     this._bookingDetailMutationActive = true
     this.clearBookingDetailMutationTimer()
     if (input.startState) {
-      this.setData(input.startState)
+      this.applyState(input.startState)
     }
 
     let settled = false
@@ -1232,7 +1238,7 @@ Page({
         return
       }
       if (input.endState) {
-        this.setData(input.endState)
+        this.applyState(input.endState)
       }
       wx.showToast({
         title: formatToastTitle(message, input.failureFallback || "操作失败"),

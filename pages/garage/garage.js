@@ -1,5 +1,5 @@
 const { trackEvent } = require("../../shared/analytics")
-const { sanitizeAttribution, buildQuery, hasAttribution } = require("../../shared/contentAttribution")
+const { sanitizeAttribution, buildQuery, hasAttribution, isShareLanding } = require("../../shared/contentAttribution")
 const { requestOperationConfig } = require("../../shared/operationConfigRequest")
 const {
   activatePageNativeActions,
@@ -7,12 +7,14 @@ const {
   cancelPageNativeActions,
   isPageNativeActionActive
 } = require("../../shared/pageNativeAction")
+const { preloadImages, clearExpiredCache } = require("../../shared/imageCache")
+const { createPerformanceHelpers } = require("../../shared/performance")
 const mockCategories = require("../../data/categories")
 
 const DEFAULT_GARAGE_SUBTITLE = "甄选座驾，为每一次出发预留专属席位"
 const LEGACY_GARAGE_SUBTITLE = "后台车辆资料已接入首页展示，上传封面后会同步展示到车库首页"
 const GARAGE_LOAD_TIMEOUT_MS = 15 * 1000
-const SEARCH_DEBOUNCE_MS = 350
+const SEARCH_DEBOUNCE_MS = 250
 
 const CATEGORY_LABEL_MAP = {
   all: "全部",
@@ -180,6 +182,29 @@ function canLoadGarageRemotely() {
   return typeof wx !== "undefined" && wx.cloud && typeof wx.cloud.callFunction === "function"
 }
 
+function pickListCarFields(car) {
+  if (!car || typeof car !== "object") {
+    return car
+  }
+  const images = Array.isArray(car.images) ? car.images.slice(0, 4) : car.cover ? [car.cover] : []
+  return {
+    id: car.id,
+    name: car.name,
+    nickname: car.nickname,
+    brand: car.brand,
+    category: car.category,
+    priceText: car.priceText,
+    status: car.status,
+    statusText: car.statusText,
+    location: car.location,
+    tags: car.tags,
+    cover: car.cover,
+    coverPlaceholderText: car.coverPlaceholderText,
+    sort: car.sort,
+    images
+  }
+}
+
 Page({
   data: {
     pageTitle: "极境车库",
@@ -211,11 +236,43 @@ Page({
     contentGuides: []
   },
 
+  applyState(patch) { this.setData(patch) },
+
+  _initStubSearchDebounce() {
+    if (this._debouncedFilterSearch) return
+    let timer = null
+    const self = this
+    const fn = function (keyword) {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(function () {
+        timer = null
+        self._runFilteredCarsSearch(keyword)
+      }, 250)
+    }
+    fn.cancel = function () {
+      if (timer) {
+        clearTimeout(timer)
+        timer = null
+      }
+    }
+    this._debouncedFilterSearch = fn
+  },
+
   onLoad(options) {
     activatePageNativeActions(this)
+    const perf = createPerformanceHelpers(this)
+    this._perf = perf
+    this.applyState = perf.applyState
+    this.flushStateNow = perf.flushStateNow
+    this._debouncedFilterSearch = perf.debounce(
+      (keyword) => {
+        this._runFilteredCarsSearch(keyword)
+      },
+      SEARCH_DEBOUNCE_MS
+    )
     trackEvent("garage_view")
     const attribution = sanitizeAttribution(options)
-    if (hasAttribution(attribution) && attribution.channel && attribution.channel !== "direct") {
+    if (hasAttribution(attribution) && attribution.channel && attribution.channel !== "direct" && isShareLanding()) {
       trackEvent("share_open", attribution.vehicleId, attribution)
     }
     const app = getApp()
@@ -241,6 +298,7 @@ Page({
     this.loadOperationConfig()
     this.loadCars()
     this.loadContentGuides()
+    try { clearExpiredCache() } catch (e) {}
   },
 
   loadContentGuides() {
@@ -274,7 +332,7 @@ Page({
     this.cancelOperationConfigRequest()
     this._cancelOperationConfigRequest = requestOperationConfig({
       onSuccess: (config) => {
-        this.setData({
+        this.applyState({
           pageTitle: config.garagePageTitle || this.data.pageTitle,
           pageSubtitle: normalizeGarageSubtitle(config.garagePageSubtitle, this.data.pageSubtitle),
           servicePhone: config.servicePhone || this.data.servicePhone
@@ -301,7 +359,7 @@ Page({
       return
     }
 
-    this.setData({
+    this.applyState({
       loadingCars: true
     })
 
@@ -325,7 +383,7 @@ Page({
         return
       }
       if (append) {
-        this.setData({ loadingCars: false })
+        this.applyState({ loadingCars: false })
         wx.showToast({
           title: "加载超时，请重试",
           icon: "none"
@@ -340,7 +398,7 @@ Page({
         return
       }
       if (append) {
-        this.setData({
+        this.applyState({
           loadingCars: false
         })
         wx.showToast({
@@ -402,6 +460,10 @@ Page({
       this._carsLoadTimer = null
     }
     this.clearSearchDebounce()
+    if (this._perf && typeof this._perf.dispose === "function") {
+      try { this._perf.dispose() } catch (e) {}
+      this._perf = null
+    }
   },
 
   cancelOperationConfigRequest() {
@@ -412,6 +474,9 @@ Page({
   },
 
   clearSearchDebounce() {
+    if (this._debouncedFilterSearch && typeof this._debouncedFilterSearch.cancel === "function") {
+      try { this._debouncedFilterSearch.cancel() } catch (e) {}
+    }
     if (!this._searchDebounceTimer) {
       return
     }
@@ -420,7 +485,7 @@ Page({
   },
 
   setCarsLoadError(message) {
-    this.setData({
+    this.applyState({
       loadError: true,
       initialLoading: false,
       loadingCars: false,
@@ -449,29 +514,59 @@ Page({
         return
       }
       ids.add(id)
-      uniqueCars.push(car)
+      uniqueCars.push(pickListCarFields(car))
     })
     const sortedCars = sortCars(uniqueCars)
     const categories = buildCategoriesWithCount(sortedCars, pagination && pagination.categoryCounts)
     const categoryIds = categories.map((item) => item.id)
     const nextCategory = categoryIds.includes(this.data.currentCategory) ? this.data.currentCategory : "all"
+    const nextPagination = pagination || {}
+    const currentCategory = nextCategory
+    const availableOnly = typeof this.data.availableOnly === "boolean" ? this.data.availableOnly : false
+    const searchKeyword = typeof this.data.searchKeyword === "string" ? this.data.searchKeyword : ""
 
-    this.setData({
+    const categoryCars =
+      currentCategory === "all"
+        ? sortedCars
+        : sortedCars.filter((car) => car.category === currentCategory)
+    const statusCars = availableOnly
+      ? categoryCars.filter((car) => normalizeGarageStatus(car.status) === "idle")
+      : categoryCars
+    const filteredCars = statusCars.filter((car) => matchesCarSearch(car, searchKeyword))
+    const serverSummary = nextPagination
+
+    const searchResultCount = serverSummary && Number.isFinite(serverSummary.total)
+      ? serverSummary.total
+      : filteredCars.length
+    const categorySummary = serverSummary && Number.isFinite(serverSummary.categoryTotal)
+      ? {
+          name: (categories.find((item) => item.id === currentCategory) || {}).name || "",
+          total: serverSummary.categoryTotal,
+          available: Number.isFinite(serverSummary.availableCount) ? serverSummary.availableCount : 0
+        }
+      : buildCategorySummary(currentCategory, categories, categoryCars)
+
+    this.applyState({
       loadError: false,
       initialLoading: false,
       loadingCars: false,
       categories,
       cars: sortedCars,
-      page: pagination && Number.isInteger(pagination.page) ? pagination.page : 0,
-      total: pagination ? pagination.total : sortedCars.length,
-      truncated: Boolean(pagination && pagination.truncated),
-      hasMore: Boolean(pagination && pagination.hasMore)
+      filteredCars,
+      currentCategory,
+      availableOnly,
+      searchKeyword,
+      searchResultCount,
+      categorySummary,
+      searchDebouncing: false,
+      page: Number.isInteger(nextPagination.page) ? nextPagination.page : 0,
+      total: nextPagination && "total" in nextPagination ? nextPagination.total : sortedCars.length,
+      truncated: Boolean(nextPagination && nextPagination.truncated),
+      hasMore: Boolean(nextPagination && nextPagination.hasMore)
     })
-
-    this.filterCars(nextCategory, this.data.availableOnly, this.data.searchKeyword, pagination)
   },
 
-  filterCars(categoryId, availableOnlyInput, searchKeywordInput, serverSummary) {
+  filterCars(categoryId, availableOnlyInput, searchKeywordInput, serverSummary, keepSearchDebouncing) {
     const nextCategory = categoryId || "all"
     const availableOnly =
       typeof availableOnlyInput === "boolean" ? availableOnlyInput : this.data.availableOnly
@@ -486,7 +581,7 @@ Page({
       : categoryCars
     const filteredCars = statusCars.filter((car) => matchesCarSearch(car, searchKeyword))
 
-    this.setData({
+    this.applyState({
       currentCategory: nextCategory,
       availableOnly,
       searchKeyword,
@@ -501,25 +596,32 @@ Page({
             available: Number.isFinite(serverSummary.availableCount) ? serverSummary.availableCount : 0
           }
         : buildCategorySummary(nextCategory, this.data.categories, categoryCars),
-      searchDebouncing: false
+      searchDebouncing: keepSearchDebouncing ? Boolean(this.data.searchDebouncing) : false
     })
+  },
+
+  _runFilteredCarsSearch(keyword) {
+    const resolvedKeyword = typeof keyword === "string" ? keyword : this.data.searchKeyword
+    this.filterCars(this.data.currentCategory, this.data.availableOnly, resolvedKeyword)
+    if (canLoadGarageRemotely()) {
+      this.setData({ searchDebouncing: false })
+      this.loadCars({ force: true })
+    } else {
+      this.applyState({ searchDebouncing: false })
+    }
   },
 
   handleSearchInput(event) {
     const keyword = String((event.detail && event.detail.value) || "").slice(0, 50)
-    this.filterCars(this.data.currentCategory, this.data.availableOnly, keyword)
-    if (!canLoadGarageRemotely()) {
-      return
-    }
-    this.clearSearchDebounce()
-    this.setData({
+    this.applyState({
       searchKeyword: keyword,
-      searchDebouncing: true
+      searchDebouncing: Boolean(keyword)
     })
-    this._searchDebounceTimer = setTimeout(() => {
-      this._searchDebounceTimer = null
-      this.loadCars({ force: true })
-    }, SEARCH_DEBOUNCE_MS)
+    this.filterCars(this.data.currentCategory, this.data.availableOnly, keyword, null, true)
+    this._initStubSearchDebounce()
+    if (this._debouncedFilterSearch) {
+      this._debouncedFilterSearch(keyword)
+    }
   },
 
   handleClearSearch() {
@@ -583,6 +685,30 @@ Page({
 
     if (!carId) {
       return
+    }
+
+    const findCar = (list) => {
+      const arr = Array.isArray(list) ? list : []
+      for (let i = 0; i < arr.length; i++) {
+        const c = arr[i]
+        if (c && String(c.id || "") === String(carId)) return c
+      }
+      return null
+    }
+    const targetCar = findCar(this.data.filteredCars) || findCar(this.data.cars)
+    if (targetCar) {
+      const preloadUrls = []
+      if (targetCar.cover) preloadUrls.push(targetCar.cover)
+      if (Array.isArray(targetCar.images)) {
+        targetCar.images.forEach((img) => {
+          if (img && preloadUrls.indexOf(img) === -1) preloadUrls.push(img)
+        })
+      }
+      if (preloadUrls.length) {
+        try {
+          preloadImages(preloadUrls.slice(0, 4), { priority: 90 })
+        } catch (e) {}
+      }
     }
 
     const action = beginPageNativeAction(this)

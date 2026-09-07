@@ -1,4 +1,4 @@
-const fs = require("fs")
+﻿const fs = require("fs")
 const path = require("path")
 
 jest.mock("../shared/pageAuth", () => ({
@@ -12,7 +12,7 @@ function loadPageDefinition() {
   global.Page = jest.fn((input) => {
     definition = input
   })
-  require("../pages/privacy-request-manage/privacy-request-manage")
+  require("../pages-admin/privacy-request-manage/privacy-request-manage")
   return definition
 }
 
@@ -72,7 +72,7 @@ describe("pages/privacy-request-manage", () => {
   })
 
   test("首次加载使用管理申请卡片骨架", () => {
-    const pageDir = path.resolve(__dirname, "../pages/privacy-request-manage")
+    const pageDir = path.resolve(__dirname, "../pages-admin/privacy-request-manage")
     const wxmlSource = fs.readFileSync(path.join(pageDir, "privacy-request-manage.wxml"), "utf8")
     const wxssSource = fs.readFileSync(path.join(pageDir, "privacy-request-manage.wxss"), "utf8")
 
@@ -298,7 +298,7 @@ describe("pages/privacy-request-manage", () => {
   })
 
   test("申请卡片使用原生图标、分层内容和独立处理轨迹", () => {
-    const pageDir = path.resolve(__dirname, "../pages/privacy-request-manage")
+    const pageDir = path.resolve(__dirname, "../pages-admin/privacy-request-manage")
     const wxmlSource = fs.readFileSync(path.join(pageDir, "privacy-request-manage.wxml"), "utf8")
     const wxssSource = fs.readFileSync(path.join(pageDir, "privacy-request-manage.wxss"), "utf8")
 

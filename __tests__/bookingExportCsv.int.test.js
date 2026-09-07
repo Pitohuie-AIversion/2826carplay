@@ -350,4 +350,177 @@ describe("cloudfunctions/bookingExportCsv integration", () => {
       })
     })
   })
+
+  test("CSV header 包含 17 列且带归因三列中文标题", async () => {
+    const mocks = createMockDb({
+      rolesData: [{ role: "admin" }],
+      bookingData: [
+        {
+          _id: "b1",
+          vehicleName: "MX-5",
+          status: "pending",
+          createdAt: "2026-07-14T00:00:00.000Z",
+          updatedAt: "2026-07-14T00:00:00.000Z"
+        }
+      ]
+    })
+    const mod = await loadBookingExportCsvWith({ openid: "admin_openid", mockDb: mocks.db })
+    const res = await mod.main({ status: "all" })
+    expect(res.ok).toBe(true)
+    const lines = res.csvText.replace(/^\ufeff/, "").split(/\r?\n/)
+    const header = lines[0].split(",").map((cell) => cell.replace(/^"/, "").replace(/"$/, ""))
+    expect(header).toHaveLength(17)
+    expect(header.indexOf("内容ID")).toBeGreaterThan(-1)
+    expect(header.indexOf("归因渠道")).toBeGreaterThan(-1)
+    expect(header.indexOf("归因场景")).toBeGreaterThan(-1)
+    expect(header.indexOf("提交时间")).toBe(0)
+    expect(header.indexOf("预约ID")).toBe(16)
+  })
+
+  test("合法 attribution 导出内容ID/渠道/场景三列", async () => {
+    const mocks = createMockDb({
+      rolesData: [{ role: "admin" }],
+      bookingData: [
+        {
+          _id: "b_attr_ok",
+          vehicleName: "MX-5",
+          userName: "张三",
+          phone: "13800000000",
+          city: "杭州",
+          status: "confirmed",
+          attribution: {
+            contentId: "guide-weekend-001",
+            channel: "wechat_share",
+            scene: "weekend_trip",
+            vehicleId: "shall_not_appear",
+            userName: "张三_should_not_appear"
+          },
+          createdAt: "2026-07-14T00:00:00.000Z",
+          updatedAt: "2026-07-14T00:00:00.000Z"
+        }
+      ]
+    })
+    const mod = await loadBookingExportCsvWith({ openid: "admin_openid", mockDb: mocks.db })
+    const res = await mod.main({ status: "all" })
+    expect(res.ok).toBe(true)
+    expect(res.csvText).toContain("guide-weekend-001")
+    expect(res.csvText).toContain("wechat_share")
+    expect(res.csvText).toContain("weekend_trip")
+    expect(res.csvText).not.toContain("shall_not_appear")
+    expect(res.csvText).not.toContain("attribution.vehicleId")
+    expect(res.csvText).not.toContain("张三_should_not_appear")
+    const fieldSpec = mocks.bookingsField.mock.calls[0][0]
+    expect(fieldSpec).toEqual(expect.objectContaining({ attribution: true }))
+    expect(fieldSpec).not.toHaveProperty("openid")
+  })
+
+  test("非法 contentId / 渠道 / 场景 三列清空为空串不落值", async () => {
+    const mocks = createMockDb({
+      rolesData: [{ role: "admin" }],
+      bookingData: [
+        {
+          _id: "b_attr_bad",
+          vehicleName: "MX-5",
+          userName: "李四",
+          phone: "13800000001",
+          city: "上海",
+          status: "pending",
+          attribution: {
+            contentId: "contains space and /slash",
+            channel: "unknown",
+            scene: "family",
+            vehicleId: "bad_vehicle_id"
+          },
+          createdAt: "2026-07-14T00:00:00.000Z",
+          updatedAt: "2026-07-14T00:00:00.000Z"
+        },
+        {
+          _id: "b_attr_missing",
+          vehicleName: "S2000",
+          userName: "王五",
+          phone: "13800000002",
+          city: "北京",
+          status: "pending",
+          createdAt: "2026-07-13T00:00:00.000Z",
+          updatedAt: "2026-07-13T00:00:00.000Z"
+        }
+      ]
+    })
+    const mod = await loadBookingExportCsvWith({ openid: "admin_openid", mockDb: mocks.db })
+    const res = await mod.main({ status: "all" })
+    expect(res.ok).toBe(true)
+    expect(res.csvText).not.toContain("contains space and")
+    expect(res.csvText).not.toContain("unknown")
+    expect(res.csvText).not.toContain("family")
+    expect(res.csvText).not.toContain("bad_vehicle_id")
+    const lines = res.csvText.replace(/^\ufeff/, "").split(/\r?\n/)
+    const headerIdx = lines[0].split(",").map((c) => c.replace(/"/g, ""))
+    const cidIdx = headerIdx.indexOf("内容ID")
+    const chIdx = headerIdx.indexOf("归因渠道")
+    const scIdx = headerIdx.indexOf("归因场景")
+    expect(cidIdx).toBeGreaterThan(-1)
+    lines.slice(1).filter(Boolean).forEach((line) => {
+      const cells = []
+      let buf = ""
+      let inQ = false
+      for (let i = 0; i < line.length; i += 1) {
+        const ch = line[i]
+        if (ch === '"') { inQ = !inQ; continue }
+        if (ch === "," && !inQ) { cells.push(buf); buf = ""; continue }
+        buf += ch
+      }
+      cells.push(buf)
+      expect(cells[cidIdx]).toBe("")
+      expect(cells[chIdx]).toBe("")
+      expect(cells[scIdx]).toBe("")
+    })
+  })
+
+  test("合法归因干净落值且其他字段的公式注入仍被转义", async () => {
+    const mocks = createMockDb({
+      rolesData: [{ role: "admin" }],
+      bookingData: [
+        {
+          _id: "b_attr_formula",
+          vehicleName: '=HYPERLINK("https://evil.example")',
+          userName: "+SUM(1,1)",
+          phone: "13800000003",
+          city: "深圳",
+          status: "confirmed",
+          attribution: {
+            contentId: "guide-ev-charging-007",
+            channel: "qr",
+            scene: "ev_experience"
+          },
+          createdAt: "2026-07-14T00:00:00.000Z",
+          updatedAt: "2026-07-14T00:00:00.000Z"
+        }
+      ]
+    })
+    const mod = await loadBookingExportCsvWith({ openid: "admin_openid", mockDb: mocks.db })
+    const res = await mod.main({ status: "all" })
+    expect(res.ok).toBe(true)
+    expect(res.csvText).toContain("guide-ev-charging-007")
+    expect(res.csvText).toContain("qr")
+    expect(res.csvText).toContain("ev_experience")
+    expect(res.csvText).toContain(`"'=HYPERLINK(""https://evil.example"")"`)
+    expect(res.csvText).toContain(`"'+SUM(1,1)"`)
+    const lines = res.csvText.replace(/^\ufeff/, "").split(/\r?\n/)
+    const headerIdx = lines[0].split(",").map((c) => c.replace(/"/g, ""))
+    const cidIdx = headerIdx.indexOf("内容ID")
+    lines.slice(1).filter(Boolean).forEach((line) => {
+      const cells = []
+      let buf = ""
+      let inQ = false
+      for (let i = 0; i < line.length; i += 1) {
+        const ch = line[i]
+        if (ch === '"') { inQ = !inQ; continue }
+        if (ch === "," && !inQ) { cells.push(buf); buf = ""; continue }
+        buf += ch
+      }
+      cells.push(buf)
+      expect(cells[cidIdx]).toBe("guide-ev-charging-007")
+      expect(cells[cidIdx].startsWith("'")).toBe(false)
+    })
+  })
 })

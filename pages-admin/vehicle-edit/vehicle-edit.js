@@ -1,4 +1,4 @@
-const vehicleUtils = require("../../shared/vehicle")
+﻿const vehicleUtils = require("../../shared/vehicle")
 const { buildVehicleFormProgress } = require("../../shared/vehicleFormProgress")
 const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
 const { formatToastTitle } = require("../../shared/uiFeedback")
@@ -544,7 +544,7 @@ Page({
 
     const action = beginPageNativeAction(this)
     wx.navigateTo({
-      url: `/pages/vehicle-detail-manage/vehicle-detail-manage?id=${this.data.id}`,
+      url: `/pages-admin/vehicle-detail-manage/vehicle-detail-manage?id=${this.data.id}`,
       fail: () => {
         if (!isPageNativeActionActive(this, action)) {
           return
@@ -580,13 +580,13 @@ Page({
             return
           }
           wx.redirectTo({
-            url: "/pages/vehicle-manage/vehicle-manage",
+            url: "/pages-admin/vehicle-manage/vehicle-manage",
             fail: () => {
               if (!isPageNativeActionActive(this, action)) {
                 return
               }
               wx.reLaunch({
-                url: "/pages/vehicle-manage/vehicle-manage",
+                url: "/pages-admin/vehicle-manage/vehicle-manage",
                 fail: () => {
                   if (!isPageNativeActionActive(this, action)) {
                     return
@@ -605,13 +605,13 @@ Page({
     }
 
     wx.redirectTo({
-      url: "/pages/vehicle-manage/vehicle-manage",
+      url: "/pages-admin/vehicle-manage/vehicle-manage",
       fail: () => {
         if (!isPageNativeActionActive(this, action)) {
           return
         }
         wx.reLaunch({
-          url: "/pages/vehicle-manage/vehicle-manage",
+          url: "/pages-admin/vehicle-manage/vehicle-manage",
           fail: () => {
             if (!isPageNativeActionActive(this, action)) {
               return
@@ -796,14 +796,14 @@ Page({
           return
         }
         wx.redirectTo({
-          url: "/pages/vehicle-manage/vehicle-manage",
+          url: "/pages-admin/vehicle-manage/vehicle-manage",
           fail: () => {
             if (!canNavigate()) {
               deferNavigation()
               return
             }
             wx.reLaunch({
-              url: "/pages/vehicle-manage/vehicle-manage",
+              url: "/pages-admin/vehicle-manage/vehicle-manage",
               fail: () => {
                 if (!isCurrent()) {
                   return

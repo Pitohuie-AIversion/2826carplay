@@ -1,4 +1,4 @@
-const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
+﻿const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
 const { formatToastTitle } = require("../../shared/uiFeedback")
 const {
   activatePageNativeActions,
@@ -485,7 +485,7 @@ Page({
 
     const action = beginPageNativeAction(this)
     wx.navigateTo({
-      url: `/pages/vehicle-edit/vehicle-edit?id=${this.data.id}`,
+      url: `/pages-admin/vehicle-edit/vehicle-edit?id=${this.data.id}`,
       fail: () => {
         if (!isPageNativeActionActive(this, action)) {
           return
@@ -745,13 +745,13 @@ Page({
           return
         }
         wx.redirectTo({
-          url: "/pages/vehicle-manage/vehicle-manage",
+          url: "/pages-admin/vehicle-manage/vehicle-manage",
           fail: () => {
             if (!isPageNativeActionActive(this, action)) {
               return
             }
             wx.reLaunch({
-              url: "/pages/vehicle-manage/vehicle-manage",
+              url: "/pages-admin/vehicle-manage/vehicle-manage",
               fail: () => {
                 if (!isPageNativeActionActive(this, action)) {
                   return

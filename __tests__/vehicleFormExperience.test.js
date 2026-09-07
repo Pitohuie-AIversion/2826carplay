@@ -1,4 +1,4 @@
-const fs = require("fs")
+﻿const fs = require("fs")
 const path = require("path")
 
 const { buildVehicleFormProgress } = require("../shared/vehicleFormProgress")
@@ -115,15 +115,15 @@ describe("车辆新增与编辑表单体验", () => {
 
   test("新增和编辑页共享进度、分组图标及吸底提交栏", () => {
     const createSource = fs.readFileSync(
-      path.resolve(__dirname, "../pages/vehicle-create/vehicle-create.wxml"),
+      path.resolve(__dirname, "../pages-admin/vehicle-create/vehicle-create.wxml"),
       "utf8"
     )
     const editSource = fs.readFileSync(
-      path.resolve(__dirname, "../pages/vehicle-edit/vehicle-edit.wxml"),
+      path.resolve(__dirname, "../pages-admin/vehicle-edit/vehicle-edit.wxml"),
       "utf8"
     )
     const detailSource = fs.readFileSync(
-      path.resolve(__dirname, "../pages/vehicle-detail-manage/vehicle-detail-manage.wxml"),
+      path.resolve(__dirname, "../pages-admin/vehicle-detail-manage/vehicle-detail-manage.wxml"),
       "utf8"
     )
     const styleSource = fs.readFileSync(
@@ -173,7 +173,7 @@ describe("车辆新增与编辑表单体验", () => {
       showModal: jest.fn()
     }
     const page = createPage(
-      loadPageDefinition("../pages/vehicle-create/vehicle-create"),
+      loadPageDefinition("../pages-admin/vehicle-create/vehicle-create"),
       { form: VALID_FORM }
     )
 
@@ -203,7 +203,7 @@ describe("车辆新增与编辑表单体验", () => {
       showToast: jest.fn()
     }
     const page = createPage(
-      loadPageDefinition("../pages/vehicle-create/vehicle-create"),
+      loadPageDefinition("../pages-admin/vehicle-create/vehicle-create"),
       { form: VALID_FORM }
     )
 
@@ -227,7 +227,7 @@ describe("车辆新增与编辑表单体验", () => {
       showModal: jest.fn()
     }
     const page = createPage(
-      loadPageDefinition("../pages/vehicle-create/vehicle-create"),
+      loadPageDefinition("../pages-admin/vehicle-create/vehicle-create"),
       { form: VALID_FORM }
     )
 
@@ -253,7 +253,7 @@ describe("车辆新增与编辑表单体验", () => {
       })
     }
     const page = createPage(
-      loadPageDefinition("../pages/vehicle-create/vehicle-create"),
+      loadPageDefinition("../pages-admin/vehicle-create/vehicle-create"),
       { form: VALID_FORM }
     )
 
@@ -286,7 +286,7 @@ describe("车辆新增与编辑表单体验", () => {
       reLaunch: jest.fn((options) => options.fail())
     }
     page = createPage(
-      loadPageDefinition("../pages/vehicle-create/vehicle-create"),
+      loadPageDefinition("../pages-admin/vehicle-create/vehicle-create"),
       { form: VALID_FORM }
     )
 
@@ -312,7 +312,7 @@ describe("车辆新增与编辑表单体验", () => {
       showToast: jest.fn()
     }
     const page = createPage(
-      loadPageDefinition("../pages/vehicle-edit/vehicle-edit")
+      loadPageDefinition("../pages-admin/vehicle-edit/vehicle-edit")
     )
 
     page.fetchDetail("vehicle-timeout")
@@ -344,7 +344,7 @@ describe("车辆新增与编辑表单体验", () => {
       showToast: jest.fn()
     }
     const page = createPage(
-      loadPageDefinition("../pages/vehicle-edit/vehicle-edit")
+      loadPageDefinition("../pages-admin/vehicle-edit/vehicle-edit")
     )
 
     page.fetchDetail("vehicle-old")
@@ -392,7 +392,7 @@ describe("车辆新增与编辑表单体验", () => {
       },
       showToast: jest.fn()
     }
-    const page = createPage(loadPageDefinition("../pages/vehicle-edit/vehicle-edit"))
+    const page = createPage(loadPageDefinition("../pages-admin/vehicle-edit/vehicle-edit"))
 
     page.fetchDetail("vehicle-trust")
 
@@ -426,7 +426,7 @@ describe("车辆新增与编辑表单体验", () => {
       navigateBack: jest.fn()
     }
     const page = createPage(
-      loadPageDefinition("../pages/vehicle-edit/vehicle-edit"),
+      loadPageDefinition("../pages-admin/vehicle-edit/vehicle-edit"),
       { id: "vehicle-1", loading: false, form: VALID_FORM }
     )
 
@@ -455,7 +455,7 @@ describe("车辆新增与编辑表单体验", () => {
       showToast: jest.fn()
     }
     const page = createPage(
-      loadPageDefinition("../pages/vehicle-edit/vehicle-edit"),
+      loadPageDefinition("../pages-admin/vehicle-edit/vehicle-edit"),
       { id: "vehicle-1", loading: false, form: VALID_FORM }
     )
 
@@ -481,7 +481,7 @@ describe("车辆新增与编辑表单体验", () => {
       reLaunch: jest.fn()
     }
     const page = createPage(
-      loadPageDefinition("../pages/vehicle-edit/vehicle-edit"),
+      loadPageDefinition("../pages-admin/vehicle-edit/vehicle-edit"),
       { id: "vehicle-1", loading: false, form: VALID_FORM }
     )
 
@@ -512,7 +512,7 @@ describe("车辆新增与编辑表单体验", () => {
       reLaunch: jest.fn()
     }
     page = createPage(
-      loadPageDefinition("../pages/vehicle-edit/vehicle-edit"),
+      loadPageDefinition("../pages-admin/vehicle-edit/vehicle-edit"),
       { id: "vehicle-1", loading: false, form: VALID_FORM }
     )
 

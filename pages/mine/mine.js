@@ -1,4 +1,4 @@
-const { formatToastTitle } = require("../../shared/uiFeedback")
+﻿const { formatToastTitle } = require("../../shared/uiFeedback")
 const { requestOperationConfig } = require("../../shared/operationConfigRequest")
 const {
   activatePageNativeActions,
@@ -21,6 +21,8 @@ const MENU_ITEMS = [
   { key: "vehicleManage", title: "车辆管理", desc: "查看已录入车辆并按状态筛选", section: "运营管理", sectionKicker: "OPERATIONS", icon: "car" },
   { key: "vehicleCreate", title: "新增车辆", desc: "录入新的车辆信息", section: "运营管理", sectionKicker: "OPERATIONS", icon: "plus" },
   { key: "bookingManage", title: "预约管理", desc: "查看全部预约并更新状态", section: "运营管理", sectionKicker: "OPERATIONS", icon: "calendar" },
+  { key: "contentGuideMaintain", title: "内容维护", desc: "后续版本提供：维护内容攻略、草稿与发布排期", section: "运营管理", sectionKicker: "OPERATIONS", icon: "book", soon: true,
+    soonReason: "暂未开放内容维护页，当前请通过云开发控制台 contentGuideManage 维护 content_guides 集合。" },
   { key: "roleManage", title: "权限管理", desc: "按 OpenID 分配车辆与预约管理权限", section: "系统管理", sectionKicker: "SYSTEM", icon: "users" },
   { key: "configManage", title: "运营配置", desc: "配置品牌、电话、首页文案与预约说明", section: "系统管理", sectionKicker: "SYSTEM", icon: "sliders" },
   { key: "auditLogManage", title: "审计日志", desc: "查看权限分配与配置变更记录", section: "系统管理", sectionKicker: "SYSTEM", icon: "document" },
@@ -60,25 +62,25 @@ const MEMBER_QUICK_ACTIONS = [
 ]
 const MEMBER_QUICK_ACTION_KEYS = new Set(MEMBER_QUICK_ACTIONS.map((item) => item.key))
 const MENU_ROUTE_MAP = Object.freeze({
-  analyticsManage: "/pages/analytics-manage/analytics-manage",
-  auditLogManage: "/pages/audit-log-manage/audit-log-manage",
+  analyticsManage: "/pages-admin/analytics-manage/analytics-manage",
+  auditLogManage: "/pages-admin/audit-log-manage/audit-log-manage",
   bookingCalendar: "/pages/booking-calendar/booking-calendar",
   bookingManage: "/pages/booking-manage/booking-manage",
   bookings: "/pages/bookings/bookings",
   bookingWorkbench: "/pages/booking-workbench/booking-workbench",
-  configManage: "/pages/config-manage/config-manage",
-  errorLogManage: "/pages/error-log-manage/error-log-manage",
+  configManage: "/pages-admin/config-manage/config-manage",
+  errorLogManage: "/pages-admin/error-log-manage/error-log-manage",
   faq: "/pages/content-page/content-page?type=faq",
   favorites: "/pages/favorites/favorites",
-  operationsOverview: "/pages/operations-overview/operations-overview",
+  operationsOverview: "/pages-admin/operations-overview/operations-overview",
   privacy: "/pages/content-page/content-page?type=privacy",
   privacyRequest: "/pages/privacy-request/privacy-request",
-  privacyRequestManage: "/pages/privacy-request-manage/privacy-request-manage",
-  roleManage: "/pages/role-manage/role-manage",
+  privacyRequestManage: "/pages-admin/privacy-request-manage/privacy-request-manage",
+  roleManage: "/pages-admin/role-manage/role-manage",
   rules: "/pages/content-page/content-page?type=rules",
-  systemHealth: "/pages/system-health/system-health",
-  vehicleCreate: "/pages/vehicle-create/vehicle-create",
-  vehicleManage: "/pages/vehicle-manage/vehicle-manage"
+  systemHealth: "/pages-admin/system-health/system-health",
+  vehicleCreate: "/pages-admin/vehicle-create/vehicle-create",
+  vehicleManage: "/pages-admin/vehicle-manage/vehicle-manage"
 })
 
 function buildVisibleMenuItems(options) {
@@ -706,6 +708,18 @@ Page({
     const route = MENU_ROUTE_MAP[key]
     if (route) {
       this.navigateToPage(route)
+      return
+    }
+
+    if (key === "contentGuideMaintain") {
+      const menuItem = Array.isArray(MENU_ITEMS) ? MENU_ITEMS.find((entry) => entry.key === "contentGuideMaintain") : null
+      wx.showModal({
+        title: (menuItem && menuItem.title) || "内容维护",
+        content: (menuItem && menuItem.soonReason) || "功能开发中，请稍后再试。",
+        confirmText: "知道了",
+        confirmColor: "#528fff",
+        showCancel: false
+      })
       return
     }
 

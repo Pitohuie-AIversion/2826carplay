@@ -168,6 +168,7 @@ Page({
     pageAuthorized: false,
     loading: true,
     loadError: "",
+    noPermission: false,
     days: 7,
     periodOptions: [
       { value: 7, label: "近 7 天" },
@@ -406,7 +407,8 @@ Page({
     const topN = this.data.topN
     this.setData({
       loading: true,
-      loadError: ""
+      loadError: "",
+      noPermission: false
     })
 
     let settled = false
@@ -424,7 +426,8 @@ Page({
       }
       this.setData({
         loading: false,
-        loadError: String(message || "数据分析加载失败")
+        loadError: String(message || "数据分析加载失败"),
+        noPermission: false
       })
     }
 
@@ -444,15 +447,27 @@ Page({
         }
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
+          const code = String(result && result.code || "")
+          const message = (result && result.message) || "数据分析加载失败"
+          if (code === "FORBIDDEN" || code === "UNAUTHORIZED") {
+            this.setData({
+              loading: false,
+              loadError: "",
+              noPermission: true
+            })
+            return
+          }
           this.setData({
             loading: false,
-            loadError: (result && result.message) || "数据分析加载失败"
+            loadError: message,
+            noPermission: false
           })
           return
         }
         this.setData({
           loading: false,
           loadError: "",
+          noPermission: false,
           topN: Number(result.topN) || 3,
           metricItems: buildMetrics(result.metrics, result.conversionRate),
           funnelItems: buildFunnel(result.metrics),

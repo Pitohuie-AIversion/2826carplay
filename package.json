@@ -26,6 +26,7 @@
     "cloud:help": "node scripts/cloudHelp.js"
   },
   "devDependencies": {
+    "@cloudbase/node-sdk": "^3.18.3",
     "jest": "^29.7.0"
   }
 }

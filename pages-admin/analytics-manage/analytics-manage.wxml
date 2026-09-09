@@ -71,6 +71,13 @@
     <button class="retry-button ui-btn ui-btn-ghost" bindtap="handleRetry"><view class="analytics-action-content"><view class="analytics-action-native-icon analytics-retry-native-icon" aria-hidden="true"></view><text>重新加载</text></view></button>
   </view>
 
+  <view wx:elif="{{noPermission}}" class="state-card ui-card no-permission-state">
+    <view class="analytics-state-icon no-permission-icon" aria-hidden="true"><view class="analytics-state-mark no-permission-mark"></view></view>
+    <view class="state-title">无权查看数据分析</view>
+    <view class="state-desc">当前账号没有数据分析查看权限。请联系管理员在角色管理里授予「车辆管理」「预约管理」或「角色管理」任意一项权限。</view>
+    <button class="retry-button ui-btn ui-btn-ghost" bindtap="handleRetry"><view class="analytics-action-content"><view class="analytics-action-native-icon analytics-retry-native-icon" aria-hidden="true"></view><text>重新检测权限</text></view></button>
+  </view>
+
   <block wx:else>
     <view class="metric-grid">
       <view class="metric-card metric-{{item.tone}} ui-card" wx:for="{{metricItems}}" wx:key="key">

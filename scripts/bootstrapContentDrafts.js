@@ -59,13 +59,13 @@ function summarize(seedResults) {
   }
 }
 
-function buildPayloads({ items, publish }) {
+function buildPayloads({ items, duplicates, publish }) {
   return items
     .filter((item) => item.invalidFields.length === 0 && !duplicates.includes(item.guide.slug))
     .map((item) => {
       const createPayload = { action: "create", guide: item.guide }
       if (!publish) return [createPayload]
-      return [createPayload, { action: "publish", id: "__PLACEHOLDER__" }]
+      return [createPayload, { action: "publish", id: "__PLACEHOLDER__", slug: item.guide.slug }]
     })
     .flat()
 }
@@ -105,20 +105,42 @@ if (require.main === module) {
   const flags = parseArgs(process.argv)
   const seedResults = loadAndValidateSeeds()
   const summary = summarize(seedResults)
-  summary.items = summary.items.map((item) => ({ ...item, guide: { ...item.guide, body: undefined } }))
-  printReport(summary, flags)
+  const validItemsFull = summary.items
+    .filter((item) => item.invalidFields.length === 0 && !summary.duplicates.includes(item.guide.slug))
+  const reportSummary = {
+    ...summary,
+    items: summary.items.map((item) => ({ ...item, guide: { ...item.guide, body: undefined } }))
+  }
+  printReport(reportSummary, flags)
   if (summary.failed > 0) {
     process.exit(1)
   }
   if (!flags.dryRun) {
-    console.log("[bootstrapContentDrafts] APPLY mode will be executed by cloud call with admin openid. Local CLI outputs CREATE payloads:")
-    summary.items.forEach((item) => {
-      if (item.invalidFields.length || summary.duplicates.includes(item.guide.slug)) return
-      console.log(JSON.stringify({ action: "create", guide: item.guide, _hint: "Invoke contentGuideManage with admin wx cloud call then record id for step 2 publish." }))
-      if (flags.publish) {
-        console.log(JSON.stringify({ action: "publish", id: "__REPLACE_WITH_CREATE_RESULT_ID__", _hint: "Step 2: publish after create returns valid id." }))
-      }
+    const payloads = []
+    validItemsFull.forEach((item, i) => {
+      payloads.push({
+        seq: i + 1,
+        step: "A_CREATE",
+        slug: item.guide.slug,
+        payload: { action: "create", guide: item.guide },
+        hint: "Paste into cloud console test panel -> contentGuideManage, then record the returned id."
+      })
     })
+    validItemsFull.forEach((item, i) => {
+      payloads.push({
+        seq: validItemsFull.length + i + 1,
+        step: "B_PUBLISH",
+        slug: item.guide.slug,
+        payload: { action: "publish", id: "__REPLACE_WITH_CREATE_RESULT_ID__", slug: item.guide.slug },
+        hint: "Replace id with matching create id then invoke."
+      })
+    })
+    const payloadsPath = path.join(SEED_DIR, "apply_payloads.json")
+    fs.writeFileSync(payloadsPath, JSON.stringify({ generatedAt: new Date().toISOString(), count: payloads.length, payloads }, null, 2), "utf8")
+    console.log("[bootstrapContentDrafts] APPLY mode instructions:")
+    console.log(`  Step A (1-${validItemsFull.length}): Open ${payloadsPath} -> find each seq with step=A_CREATE -> paste JSON {action,guide} into cloud console test panel (contentGuideManage).`)
+    console.log(`  Step B (${validItemsFull.length + 1}-${validItemsFull.length * 2}): Same file -> find matching step=B_PUBLISH -> replace __REPLACE_WITH_CREATE_RESULT_ID__ with the id from Step A.`)
+    console.log(`  Payloads file written: ${payloadsPath} (UTF-8, no console garble).`)
   }
   process.exit(0)
 }

@@ -1054,3 +1054,29 @@
 .scene-funnel-fill-confirmed {
   background: linear-gradient(90deg, #d98fa8, #b35a7c);
 }
+
+.no-permission-state {
+  padding: 44rpx 28rpx;
+}
+
+.no-permission-icon {
+  width: 48rpx;
+  height: 48rpx;
+  border-color: #d46868;
+  color: #d46868;
+}
+
+.no-permission-mark {
+  position: absolute;
+  top: 12rpx;
+  left: 21rpx;
+  width: 4rpx;
+  height: 14rpx;
+  border-radius: 999rpx;
+  background: currentColor;
+}
+
+.no-permission-mark::after {
+  width: 0;
+  height: 0;
+}

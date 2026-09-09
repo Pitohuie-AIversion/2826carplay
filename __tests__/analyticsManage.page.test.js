@@ -552,9 +552,43 @@ describe("pages/analytics-manage cleanup", () => {
     expect(wxml).toContain('class="analytics-skeleton"')
     expect(wxml).toContain("metric-skeleton-card")
     expect(wxml).toContain("analytics-skeleton-columns")
+    expect(wxml).toContain('wx:elif="{{noPermission}}"')
+    expect(wxml).toContain("no-permission-state")
+    expect(wxml).toContain("无权查看数据分析")
+    expect(wxml).toContain("重新检测权限")
     expect(wxml).not.toContain("正在汇总匿名运营数据…")
     expect(wxss).toContain(".metric-icon-eye")
     expect(wxss).toContain(".rank-item:nth-child(1) .rank-number")
+    expect(wxss).toContain(".no-permission-state")
+    expect(wxss).toContain(".no-permission-icon")
+  })
+
+  test("fetchOverview 收到 code=FORBIDDEN/UNAUTHORIZED 时切换 noPermission=true 且清空 loadError，普通 error 仍走 loadError", () => {
+    jest.useFakeTimers()
+    const callFunction = jest.fn()
+    global.wx = {
+      cloud: { callFunction }
+    }
+    const page = createPage(loadPageDefinition())
+    page.fetchOverview()
+    const { success } = callFunction.mock.calls[0][0]
+
+    success({ result: { ok: false, code: "FORBIDDEN", message: "权限不足" } })
+    expect(page.data.loading).toBe(false)
+    expect(page.data.noPermission).toBe(true)
+    expect(page.data.loadError).toBe("")
+
+    page.fetchOverview()
+    const success2 = callFunction.mock.calls[1][0].success
+    success2({ result: { ok: false, code: "UNKNOWN", message: "后端服务出错" } })
+    expect(page.data.loadError).toBe("后端服务出错")
+    expect(page.data.noPermission).toBe(false)
+
+    page.fetchOverview()
+    const success3 = callFunction.mock.calls[2][0].success
+    success3({ result: { ok: false, code: "UNAUTHORIZED", message: "登录态过期" } })
+    expect(page.data.noPermission).toBe(true)
+    expect(page.data.loadError).toBe("")
   })
 
   test("失败、统计上限、隐私与清理区域使用原生图标", () => {
@@ -604,6 +638,7 @@ describe("pages/analytics-manage cleanup", () => {
     expect(wxss).toContain(".scene-rate-pill-accent")
     expect(wxss).toContain(".scene-funnel-fill-views")
     expect(wxss).toContain(".scene-funnel-fill-confirmed")
+    expect(wxss).toContain(".no-permission-mark")
     expect(wxss).toMatch(/\.rank-name\s*\{[^}]*-webkit-line-clamp:\s*2/s)
   })
 })

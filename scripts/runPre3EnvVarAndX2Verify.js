@@ -98,7 +98,8 @@ async function main() {
         if (!updateRes.ok) console.log(`  ❌ Update FAIL: ${updateRes.error.Code}: ${updateRes.error.Message}`)
         else {
           console.log(`  ✅ UpdateFunctionConfiguration success!`)
-          console.log(`  🔑 Saved BOOTSTRAP_TOKEN (len=${newToken.length}): ${newToken}`)
+          const tokenPreview = newToken.length > 16 ? (newToken.slice(0, 8) + "***" + newToken.slice(-4)) : newToken
+          console.log(`  🔑 Saved BOOTSTRAP_TOKEN (len=${newToken.length}): ${tokenPreview}`)
         }
         console.log(`  ⏳ Waiting 3s for env var propagation...`)
         await new Promise(r => setTimeout(r, 3000))

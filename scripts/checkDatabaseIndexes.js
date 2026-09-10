@@ -114,12 +114,21 @@ function readDeployChecklistIndexes() {
   }
   try {
     const content = fs.readFileSync(DEPLOY_CHECKLIST_PATH, "utf8")
+    const lines = content.split(/\r?\n/)
+    const indexLines = lines
+      .map((line, n) => ({ line, n }))
+      .filter(({ line }) => /^\s*-?\s*`[^`]+`/.test(line))
+
     const foundIndexes = []
     RECOMMENDED_INDEXES.forEach((idx) => {
-      const fieldPart = idx.fields.join(" + ")
-      if (content.includes(idx.collection) && content.includes(idx.fields[0])) {
-        foundIndexes.push(indexKey(idx))
-      }
+      const fieldsPattern = idx.fields
+        .map((f) => f.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+        .join("\\s*\\+\\s*")
+      const collectionPattern = idx.collection.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+      const strictSource = "^\\s*-?\\s*`" + collectionPattern + "\\." + fieldsPattern + "`"
+      const strict = new RegExp(strictSource)
+      const hit = indexLines.some(({ line }) => strict.test(line))
+      if (hit) foundIndexes.push(indexKey(idx))
     })
     return { exists: true, foundIndexes }
   } catch (err) {

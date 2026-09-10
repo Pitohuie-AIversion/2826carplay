@@ -100,8 +100,7 @@ async function main() {
     if (!opts.dryRun) {
       const q = await db.collection("content_guides").where({ slug: guide.slug }).field({ _id: true, slug: true, status: true }).limit(2).get()
       const list = Array.isArray(q.data) ? q.data : []
-      if (Array.isArray(q)) existing = q.length ? q[0] : null
-      else if (Array.isArray(list)) existing = list.length ? list[0] : null
+      if (list.length) existing = list[0]
     }
     if (existing) console.log(`  - existing found: _id=${existing._id} slug=${existing.slug} status=${existing.status}`)
     else console.log(`  - no existing, will create new`)

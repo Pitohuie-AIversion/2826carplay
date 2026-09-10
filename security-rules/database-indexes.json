@@ -21,5 +21,19 @@
         { "field": "status", "order": "asc" }
       ]
     }
+  ],
+  "roles": [
+    {
+      "name": "roles_openid_unique",
+      "unique": true,
+      "fields": [{ "field": "openid", "order": "asc" }]
+    }
+  ],
+  "vehicles": [
+    {
+      "name": "vehicles_plateNumber_unique",
+      "unique": true,
+      "fields": [{ "field": "plateNumber", "order": "asc" }]
+    }
   ]
 }

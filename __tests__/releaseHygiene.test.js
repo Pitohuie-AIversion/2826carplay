@@ -33,7 +33,7 @@ describe("release hygiene", () => {
     const packageConfig = readJson("package.json")
 
     expect(packageConfig.scripts["check:release"]).toBe(
-      "npm run check:structure && npm run check:secrets && npm run check:drafts && npm run check:package && npm test -- --runInBand"
+      "npm run check:structure && npm run check:secrets && npm run check:drafts && npm run check:indexes && npm run check:package && npm test -- --runInBand"
     )
     expect(packageConfig.scripts["check:drafts"]).toBe("node scripts/contentDraftsValidate.js")
     expect(packageConfig.scripts["bootstrap:seeds"]).toBe("node scripts/bootstrapContentDrafts.js")

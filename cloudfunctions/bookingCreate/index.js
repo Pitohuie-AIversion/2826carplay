@@ -88,7 +88,6 @@ function normalizeEvent(event) {
   const contentId = String(source.contentId || "").trim()
   const channel = String(source.channel || "").trim()
   const scene = String(source.scene || "").trim()
-  const sourceVehicleId = String(source.vehicleId || "").trim()
   return {
     vehicleId: normalizeText(payload.vehicleId, 64),
     userName: normalizeText(payload.userName, 20),
@@ -101,8 +100,7 @@ function normalizeEvent(event) {
     attribution: {
       contentId: ATTRIBUTION_ID_PATTERN.test(contentId) ? contentId : "",
       channel: ATTRIBUTION_CHANNELS.includes(channel) ? channel : "",
-      scene: ATTRIBUTION_SCENES.includes(scene) ? scene : "",
-      vehicleId: ATTRIBUTION_ID_PATTERN.test(sourceVehicleId) ? sourceVehicleId : ""
+      scene: ATTRIBUTION_SCENES.includes(scene) ? scene : ""
     }
   }
 }
@@ -422,8 +420,7 @@ exports.main = async (event) => {
         attribution: {
           contentId: input.attribution.contentId,
           channel: input.attribution.channel || "direct",
-          scene: input.attribution.scene,
-          vehicleId: input.vehicleId
+          scene: input.attribution.scene
         }
       } : {}),
       ...(input.requestId ? { requestId: input.requestId } : {}),

@@ -7,6 +7,18 @@ App({
     this.globalData.nativeActionAppVisible = false
   },
 
+  onError(err) {
+    try {
+      console.error("[App Error]", err)
+    } catch (e) {}
+  },
+
+  onUnhandledRejection(res) {
+    try {
+      console.warn("[App UnhandledRejection]", res)
+    } catch (e) {}
+  },
+
   onLaunch() {
     this._sharedUnsavedChanges = require("./shared/unsavedChanges")
     this._sharedVehicleFormProgress = require("./shared/vehicleFormProgress")

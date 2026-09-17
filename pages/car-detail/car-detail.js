@@ -196,7 +196,10 @@ Page({
       { key: "request", index: "01", title: "提交意向", desc: "填写日期与联系方式" },
       { key: "confirm", index: "02", title: "顾问确认", desc: "核对档期、价格和规则" },
       { key: "delivery", index: "03", title: "安排交付", desc: "确认取还车时间与方式" }
-    ]
+    ],
+    posterModalVisible: false,
+    posterGenerating: false,
+    posterImagePath: ""
   },
 
   onLoad(options) {
@@ -225,13 +228,26 @@ Page({
       attribution: sanitizeAttribution({ ...attribution, vehicleId: carId })
     })
 
+    try {
+      const previewCar = app && app.globalData ? app.globalData._tempCarDetailPreview : null
+      if (previewCar && String(previewCar.id || "") === String(carId)) {
+        app.globalData._tempCarDetailPreview = null
+        this.applyCar(previewCar)
+      }
+    } catch (e) {}
+
     this.loadOperationConfig()
     this.loadCarDetail(carId)
     this.loadFavoriteStatus(carId)
-    this.loadRelatedGuides(carId)
     trackEvent("vehicle_detail", carId)
     if (hasAttribution(attribution) && attribution.channel && attribution.channel !== "direct" && isShareLanding()) {
       trackEvent("share_open", carId, this.data.attribution)
+    }
+  },
+
+  onReady() {
+    if (this.data.carId) {
+      this.loadRelatedGuides(this.data.carId)
     }
   },
 
@@ -344,7 +360,7 @@ Page({
     }
 
     this.setData({
-      loading: true,
+      loading: !this.data.car,
       loadError: false
     })
 
@@ -413,6 +429,10 @@ Page({
 
   onUnload() {
     cancelPageNativeActions(this)
+    if (this._posterTimer) {
+      clearTimeout(this._posterTimer)
+      this._posterTimer = null
+    }
     this._carDetailRequestId = Number(this._carDetailRequestId || 0) + 1
     this._favoriteStatusRequestId = Number(this._favoriteStatusRequestId || 0) + 1
     this._favoriteUpdateSerial = Number(this._favoriteUpdateSerial || 0) + 1
@@ -447,9 +467,11 @@ Page({
       loadErrorText: String(message || "车辆详情加载失败，请返回车库后重试")
     })
 
-    wx.setNavigationBarTitle({
-      title: "车辆详情"
-    })
+    if (typeof wx !== "undefined" && typeof wx.setNavigationBarTitle === "function") {
+      wx.setNavigationBarTitle({
+        title: "车辆详情"
+      })
+    }
   },
 
   applyCar(targetCar) {
@@ -461,9 +483,11 @@ Page({
         loading: false,
         loadError: false
       })
-      wx.setNavigationBarTitle({
-        title: "车辆详情"
-      })
+      if (typeof wx !== "undefined" && typeof wx.setNavigationBarTitle === "function") {
+        wx.setNavigationBarTitle({
+          title: "车辆详情"
+        })
+      }
       return
     }
 
@@ -479,9 +503,11 @@ Page({
     this._trustProfileViewTracked = false
     this.scheduleImageResolves(viewModel.imageItems, 0)
 
-    wx.setNavigationBarTitle({
-      title: targetCar.name || "车辆详情"
-    })
+    if (typeof wx !== "undefined" && typeof wx.setNavigationBarTitle === "function") {
+      wx.setNavigationBarTitle({
+        title: targetCar.name || "车辆详情"
+      })
+    }
   },
 
   scheduleImageResolves(imageItems, currentIndex) {
@@ -859,6 +885,244 @@ Page({
     return {
       title: `${car.nickname} ${car.name}`,
       path: `/pages/car-detail/car-detail?${buildQuery({ ...this.data.attribution, channel: "wechat_share", vehicleId: car.id })}`
+    }
+  },
+
+  handleOpenPosterModal() {
+    this.setData({
+      posterModalVisible: true,
+      posterGenerating: true,
+      posterImagePath: ""
+    })
+    trackEvent("share", this.data.carId)
+    if (this._posterTimer) {
+      clearTimeout(this._posterTimer)
+    }
+    this._posterTimer = setTimeout(() => {
+      this._posterTimer = null
+      this.renderPoster()
+    }, 100)
+    if (this._posterTimer && typeof this._posterTimer.unref === "function") {
+      this._posterTimer.unref()
+    }
+  },
+
+  handleClosePosterModal() {
+    if (this._posterTimer) {
+      clearTimeout(this._posterTimer)
+      this._posterTimer = null
+    }
+    this.setData({
+      posterModalVisible: false,
+      posterGenerating: false
+    })
+  },
+
+  renderPoster() {
+    if (typeof wx === "undefined" || !wx || typeof wx.createSelectorQuery !== "function") {
+      this.fallbackRenderPoster()
+      return
+    }
+    const query = wx.createSelectorQuery().in(this)
+    query
+      .select("#posterCanvas")
+      .fields({ node: true, size: true })
+      .exec((res) => {
+        if (!res || !res[0] || !res[0].node) {
+          this.fallbackRenderPoster()
+          return
+        }
+        const canvas = res[0].node
+        const ctx = canvas.getContext("2d")
+        const dpr = (wx.getSystemInfoSync && wx.getSystemInfoSync().pixelRatio) || 2
+        const width = res[0].width || 300
+        const height = res[0].height || 480
+        canvas.width = width * dpr
+        canvas.height = height * dpr
+        ctx.scale(dpr, dpr)
+
+        // Draw background
+        ctx.fillStyle = "#0D1015"
+        ctx.fillRect(0, 0, width, height)
+
+        // Draw header accent
+        ctx.fillStyle = "#D09E5A"
+        ctx.fillRect(20, 20, 4, 18)
+
+        ctx.fillStyle = "#E8C88B"
+        ctx.font = "bold 13px sans-serif"
+        ctx.fillText("极境车库 · 尊享甄选", 30, 34)
+
+        // Car Title
+        const car = this.data.car || {}
+        ctx.fillStyle = "#FFFFFF"
+        ctx.font = "bold 18px sans-serif"
+        ctx.fillText((car.brand || "") + " " + (car.name || "极境座驾"), 20, 68)
+
+        ctx.fillStyle = "#8D98AA"
+        ctx.font = "12px sans-serif"
+        ctx.fillText(car.nickname || "车牌尾号保密 · 门店核验", 20, 88)
+
+        const drawFooterAndExport = () => {
+          // Price badge
+          ctx.fillStyle = "rgba(208, 158, 90, 0.12)"
+          ctx.fillRect(20, 290, width - 40, 52)
+          ctx.strokeStyle = "rgba(208, 158, 90, 0.35)"
+          ctx.lineWidth = 1
+          ctx.strokeRect(20, 290, width - 40, 52)
+
+          ctx.fillStyle = "#94A3B8"
+          ctx.font = "11px sans-serif"
+          ctx.fillText("今日参考日租", 32, 310)
+
+          ctx.fillStyle = "#E8C88B"
+          ctx.font = "bold 17px sans-serif"
+          ctx.fillText(car.priceText || "价格到店详询", 32, 332)
+
+          // Tags
+          ctx.fillStyle = "#9CA3AF"
+          ctx.font = "11px sans-serif"
+          const tagStr = (car.tags || []).slice(0, 3).join("  ·  ")
+          if (tagStr) {
+            ctx.fillText(tagStr, 20, 368)
+          }
+
+          // Bottom Slogan
+          ctx.fillStyle = "#6B7280"
+          ctx.font = "10px sans-serif"
+          ctx.fillText("甄选座驾 · 为每一次出发预留专属席位", 20, 410)
+          ctx.fillText("微信搜索【极境车库】小程序，查看完整档期与报价", 20, 428)
+
+          if (wx.canvasToTempFilePath) {
+            wx.canvasToTempFilePath({
+              canvas,
+              success: (tempRes) => {
+                this.setData({
+                  posterImagePath: tempRes.tempFilePath,
+                  posterGenerating: false
+                })
+              },
+              fail: () => {
+                this.setData({ posterGenerating: false })
+              }
+            })
+          } else {
+            this.fallbackRenderPoster()
+          }
+        }
+
+        const coverSrc = (car.imageItems && car.imageItems[0] && (car.imageItems[0].displaySrc || car.imageItems[0].src)) || car.cover
+        if (coverSrc && typeof canvas.createImage === "function") {
+          const img = canvas.createImage()
+          img.onload = () => {
+            try {
+              ctx.drawImage(img, 20, 106, width - 40, 168)
+            } catch (e) {}
+            drawFooterAndExport()
+          }
+          img.onerror = () => {
+            ctx.fillStyle = "#161B22"
+            ctx.fillRect(20, 106, width - 40, 168)
+            ctx.fillStyle = "#8D98AA"
+            ctx.font = "13px sans-serif"
+            ctx.fillText("极境座驾实拍", width / 2 - 36, 195)
+            drawFooterAndExport()
+          }
+          img.src = coverSrc
+        } else {
+          ctx.fillStyle = "#161B22"
+          ctx.fillRect(20, 106, width - 40, 168)
+          drawFooterAndExport()
+        }
+      })
+  },
+
+  fallbackRenderPoster() {
+    const car = this.data.car || {}
+    const fallbackImage = (car.imageItems && car.imageItems[0] && (car.imageItems[0].displaySrc || car.imageItems[0].src)) || car.cover || "/assets/icons/jijing-garage-emblem.png"
+    this.setData({
+      posterImagePath: fallbackImage,
+      posterGenerating: false
+    })
+  },
+
+  handleSavePoster() {
+    const filePath = this.data.posterImagePath
+    if (!filePath) {
+      wx.showToast({ title: "海报生成中", icon: "none" })
+      return
+    }
+    const action = beginPageNativeAction(this, { requireCurrent: true })
+    if (typeof wx.saveImageToPhotosAlbum === "function") {
+      wx.saveImageToPhotosAlbum({
+        filePath,
+        success: () => {
+          if (isPageNativeActionActive(this, action)) {
+            wx.showToast({ title: "海报已保存相册", icon: "success" })
+            this.handleClosePosterModal()
+          }
+        },
+        fail: (err) => {
+          if (!isPageNativeActionActive(this, action)) return
+          const msg = String((err && (err.errMsg || err.message)) || "")
+          if (msg.includes("cancel")) {
+            return
+          }
+          wx.showToast({ title: "保存未完成", icon: "none" })
+        }
+      })
+    } else {
+      wx.showToast({ title: "系统暂不支持", icon: "none" })
+    }
+  },
+
+  handleOpenLocation() {
+    const car = this.data.car || {}
+    const locationName = String(car.location || "极境车库").trim()
+    const isShanghai = locationName.includes("上海")
+    const latitude = isShanghai ? 31.2304 : 30.2741
+    const longitude = isShanghai ? 121.4737 : 120.1551
+    const name = `极境车库 · ${isShanghai ? "上海交付中心" : "杭州交付中心"}`
+
+    if (typeof wx.openLocation === "function") {
+      wx.openLocation({
+        latitude,
+        longitude,
+        name,
+        address: locationName,
+        scale: 15,
+        fail: () => {
+          wx.showToast({ title: "定位打开失败", icon: "none" })
+        }
+      })
+    } else {
+      wx.showToast({ title: "系统暂不支持", icon: "none" })
+    }
+  },
+
+  handleWechatConsult() {
+    const wechatId = "jijing_garage"
+    const action = beginPageNativeAction(this, { requireCurrent: true })
+    if (typeof wx.setClipboardData === "function") {
+      wx.setClipboardData({
+        data: wechatId,
+        success: () => {
+          if (isPageNativeActionActive(this, action)) {
+            wx.showToast({
+              title: "微信号已复制",
+              icon: "success"
+            })
+          }
+        },
+        fail: () => {
+          if (isPageNativeActionActive(this, action)) {
+            wx.showToast({
+              title: "复制失败",
+              icon: "none"
+            })
+          }
+        }
+      })
     }
   }
 })

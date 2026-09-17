@@ -87,6 +87,9 @@ function createPerformanceHelpers(context) {
         flushTimer = null
         flushPending()
       }, APPLY_STATE_FLUSH_MS)
+      if (flushTimer && typeof flushTimer.unref === "function") {
+        flushTimer.unref()
+      }
     }
   }
 
@@ -126,6 +129,9 @@ function createPerformanceHelpers(context) {
         timer = setTimeout(() => {
           timer = null
         }, ms)
+        if (timer && typeof timer.unref === "function") {
+          timer.unref()
+        }
         if (shouldCallNow) {
           lastResult = fn.apply(self, args)
         }
@@ -135,6 +141,9 @@ function createPerformanceHelpers(context) {
         timer = null
         lastResult = fn.apply(self, args)
       }, ms)
+      if (timer && typeof timer.unref === "function") {
+        timer.unref()
+      }
       return lastResult
     }
     wrapped.cancel = () => {

@@ -364,12 +364,12 @@ async function readVehicles() {
 
 async function queryNativePage(page, pageSize, ordered) {
   const skip = page * pageSize
-  let query = db
-    .collection("vehicles")
-    .field(PUBLIC_VEHICLE_FIELDS)
-    .where({ status: _.neq("retired") })
+  let query = db.collection("vehicles").field(PUBLIC_VEHICLE_FIELDS)
+  if (typeof query.where === "function") {
+    query = query.where({ status: _.neq("retired") })
+  }
 
-  if (ordered) {
+  if (ordered && typeof query.orderBy === "function") {
     query = query.orderBy("updatedAt", "desc")
   }
 
@@ -424,21 +424,60 @@ const STATS_PROJECTION_FIELDS = {
 }
 
 async function queryStatsProjection(ordered) {
-  let query = db
-    .collection("vehicles")
-    .field(STATS_PROJECTION_FIELDS)
-    .where({ status: _.neq("retired") })
+  const list = []
 
-  if (ordered) {
-    query = query.orderBy("updatedAt", "desc")
+  for (let offset = 0; offset <= STATS_PROJECTION_LIMIT; offset += VEHICLE_BATCH_SIZE) {
+    const remaining = STATS_PROJECTION_LIMIT + 1 - list.length
+    const batchSize = Math.min(VEHICLE_BATCH_SIZE, remaining)
+    let query = db.collection("vehicles").field(STATS_PROJECTION_FIELDS)
+
+    if (typeof query.where === "function") {
+      query = query.where({ status: _.neq("retired") })
+    }
+
+    if (ordered && typeof query.orderBy === "function") {
+      query = query.orderBy("updatedAt", "desc")
+    }
+
+    if (typeof query.skip === "function") {
+      query = query.skip(offset)
+    }
+
+    const res = await query.limit(batchSize).get()
+    const batch = res && Array.isArray(res.data) ? res.data : []
+
+    list.push(...batch)
+    if (batch.length < batchSize || list.length > STATS_PROJECTION_LIMIT) {
+      break
+    }
   }
 
-  const res = await query.limit(STATS_PROJECTION_LIMIT).get()
-  const data = res && Array.isArray(res.data) ? res.data : []
   return {
-    list: data.slice(0, STATS_PROJECTION_LIMIT),
-    truncated: data.length >= STATS_PROJECTION_LIMIT
+    list: list.slice(0, STATS_PROJECTION_LIMIT),
+    truncated: list.length > STATS_PROJECTION_LIMIT
   }
+}
+
+let cachedStatsProjection = null
+let cachedStatsProjectionExpiresAt = 0
+const STATS_CACHE_TTL_MS = 30 * 1000
+
+function clearStatsProjectionCache() {
+  cachedStatsProjection = null
+  cachedStatsProjectionExpiresAt = 0
+}
+
+async function queryStatsProjectionCached() {
+  const now = Date.now()
+  if (cachedStatsProjection && now < cachedStatsProjectionExpiresAt) {
+    return cachedStatsProjection
+  }
+  const result = await queryStatsProjectionWithFallback()
+  if (result && Array.isArray(result.list)) {
+    cachedStatsProjection = result
+    cachedStatsProjectionExpiresAt = now + STATS_CACHE_TTL_MS
+  }
+  return result
 }
 
 async function queryStatsProjectionWithFallback() {
@@ -504,12 +543,31 @@ async function runLegacyFallback(page, pageSize, keyword, category, availableOnl
   }
 }
 
-async function runNativeOptimized(page, pageSize, keyword, category, availableOnly) {
+async function runNativeOptimized(page, pageSize, keyword, category, availableOnly, skipStats) {
+  const hasFilter = Boolean(keyword || (category && category !== "all") || availableOnly)
+
+  if (skipStats && !hasFilter) {
+    const pageResult = await queryNativePageWithFallback(page, pageSize)
+    const pagePublicList = (pageResult && Array.isArray(pageResult.list) ? pageResult.list : [])
+      .filter((item) => item && item.status !== "retired")
+      .map(mapVehicle)
+      .sort((prev, next) => next.sort - prev.sort)
+
+    return {
+      ok: true,
+      page,
+      pageSize,
+      hasMore: pagePublicList.length >= pageSize,
+      list: pagePublicList
+    }
+  }
+
   const [totalCountResult, statsResult, pageResult] = await Promise.all([
     countTotalActive().catch(() => null),
-    queryStatsProjectionWithFallback(),
+    queryStatsProjectionCached(),
     queryNativePageWithFallback(page, pageSize)
   ])
+
 
   if (!statsResult || !pageResult) {
     throw new Error("NATIVE_QUERY_EMPTY_RESULT")
@@ -536,6 +594,8 @@ async function runNativeOptimized(page, pageSize, keyword, category, availableOn
   const totalForMeta = fullList.length
 
   const truncated = Boolean(statsResult.truncated) || (totalCountResult !== null && totalCountResult > STATS_PROJECTION_LIMIT)
+  const list = hasFilter ? fullList.slice(offset, offset + pageSize) : pageFiltered.fullList
+
 
   return {
     ok: true,
@@ -551,7 +611,7 @@ async function runNativeOptimized(page, pageSize, keyword, category, availableOn
     availableOnly,
     truncated,
     hasMore,
-    list: pageFiltered.fullList
+    list
   }
 }
 
@@ -565,9 +625,10 @@ exports.main = async (event) => {
     const keyword = normalizeSearchKeyword(payload.keyword)
     const category = String(payload.category || "all").trim().slice(0, 50) || "all"
     const availableOnly = payload.availableOnly === true
+    const skipStats = payload.skipStats === true
 
     try {
-      return await runNativeOptimized(page, pageSize, keyword, category, availableOnly)
+      return await runNativeOptimized(page, pageSize, keyword, category, availableOnly, skipStats)
     } catch (nativeError) {
       console.warn({
         function: "garageVehicleList",

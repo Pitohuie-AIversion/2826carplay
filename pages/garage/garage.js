@@ -296,8 +296,23 @@ Page({
 
   onShow() {
     this.loadOperationConfig()
-    this.loadCars()
-    this.loadContentGuides()
+    const now = Date.now()
+    const carsFresh =
+      Boolean(this._lastCarsLoadedAt) &&
+      now - this._lastCarsLoadedAt < 60 * 1000 &&
+      Array.isArray(this.data.cars) &&
+      this.data.cars.length > 0
+    if (!carsFresh) {
+      this.loadCars()
+    }
+    const guidesFresh =
+      Boolean(this._lastGuidesLoadedAt) &&
+      now - this._lastGuidesLoadedAt < 120 * 1000 &&
+      Array.isArray(this.data.contentGuides) &&
+      this.data.contentGuides.length > 0
+    if (!guidesFresh) {
+      this.loadContentGuides()
+    }
     try { clearExpiredCache() } catch (e) {}
   },
 
@@ -309,6 +324,7 @@ Page({
       success: (res) => {
         const result = res && res.result
         if (result && result.ok && Array.isArray(result.list)) {
+          this._lastGuidesLoadedAt = Date.now()
           this.setData({ contentGuides: result.list })
         }
       }
@@ -417,7 +433,8 @@ Page({
         pageSize: this.data.pageSize,
         keyword: this.data.searchKeyword,
         category: this.data.currentCategory,
-        availableOnly: this.data.availableOnly
+        availableOnly: this.data.availableOnly,
+        skipStats: append
       },
       success: (res) => {
         if (!finishRequest()) {
@@ -429,6 +446,7 @@ Page({
           return
         }
 
+        this._lastCarsLoadedAt = Date.now()
         const nextCars = append ? this.data.cars.concat(result.list) : result.list
         this.applyCars(nextCars, {
           page: Number.isInteger(result.page) ? result.page : nextPage,
@@ -709,6 +727,12 @@ Page({
           preloadImages(preloadUrls.slice(0, 4), { priority: 90 })
         } catch (e) {}
       }
+      try {
+        const app = typeof getApp === "function" ? getApp() : null
+        if (app && app.globalData) {
+          app.globalData._tempCarDetailPreview = targetCar
+        }
+      } catch (e) {}
     }
 
     const action = beginPageNativeAction(this)

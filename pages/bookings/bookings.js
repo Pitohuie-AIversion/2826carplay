@@ -231,7 +231,15 @@ Page({
     if (this.data.loading || this._bookingCancelTimer) {
       return
     }
-    this.loadList()
+    const now = Date.now()
+    const isFresh =
+      Boolean(this._lastBookingsLoadedAt) &&
+      now - this._lastBookingsLoadedAt < 30 * 1000 &&
+      Array.isArray(this.data.list) &&
+      this.data.list.length > 0
+    if (!isFresh) {
+      this.loadList()
+    }
   },
 
   onUnload() {
@@ -405,6 +413,7 @@ Page({
     if (typeof input.loadFailed !== undefined) {
       patch.loadFailed = input.loadFailed
     }
+    this._lastBookingsLoadedAt = Date.now()
     this.applyState(patch)
   },
 

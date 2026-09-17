@@ -287,6 +287,19 @@
         class="detail-action-btn ui-btn ui-btn-ghost"
         bindtap="handleViewVehicle"
       ><view class="vehicle-native-icon" aria-hidden="true"><view class="vehicle-native-window"></view><view class="vehicle-native-wheel vehicle-native-wheel-left"></view><view class="vehicle-native-wheel vehicle-native-wheel-right"></view></view><text>查看车辆</text></button>
+      <button
+        wx:if="{{booking.status !== 'cancelled'}}"
+        class="detail-action-btn ui-btn ui-btn-ghost action-with-icon"
+        bindtap="handleAddToCalendar"
+        hover-class="detail-action-btn-pressed"
+        aria-label="添加用车行程到系统日历"
+      ><view class="calendar-native-icon" aria-hidden="true"></view><text>添加日程</text></button>
+      <button
+        class="detail-action-btn ui-btn ui-btn-ghost action-with-icon"
+        bindtap="handleOpenLocation"
+        hover-class="detail-action-btn-pressed"
+        aria-label="查看取车门店位置并导航"
+      ><view class="location-native-icon" aria-hidden="true"><view class="location-native-pin"></view></view><text>门店导航</text></button>
       <button class="detail-action-btn detail-action-btn-last ui-btn ui-btn-primary action-with-icon" bindtap="handleBackBookings"><view class="booking-list-native-icon" aria-hidden="true"><view class="booking-list-native-line booking-list-native-line-top"></view><view class="booking-list-native-line"></view></view><text>全部预约</text></button>
     </view>
     <view class="detail-action-note tip-with-icon"><view class="tip-info-native-icon" aria-hidden="true"><view class="tip-info-mark"></view></view><view>预约信息仅供本次服务核对，最终安排以顾问确认为准。</view></view>

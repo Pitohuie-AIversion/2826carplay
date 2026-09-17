@@ -496,4 +496,83 @@ describe("pages/car-detail 客户侧车辆状态", () => {
     expect(wxss).toContain(".hero-placeholder-brand-row")
     expect(wxss).toContain(".hero-pagination-segment-active")
   })
+
+  test("支持生成车型海报、门店地图导航与微信咨询快捷复制", () => {
+    global.wx = {
+      setNavigationBarTitle: jest.fn(),
+      openLocation: jest.fn(),
+      setClipboardData: jest.fn(),
+      showModal: jest.fn(),
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition())
+    page.data.car = {
+      id: "car_911",
+      name: "保时捷 911",
+      location: "杭州市西湖区西溪路极境车库"
+    }
+    page.data.carId = "car_911"
+
+    page.handleOpenPosterModal()
+    expect(page.data.posterModalVisible).toBe(true)
+    page.handleClosePosterModal()
+    expect(page.data.posterModalVisible).toBe(false)
+
+    page.handleOpenLocation()
+    expect(global.wx.openLocation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        latitude: 30.2741,
+        longitude: 120.1551,
+        address: "杭州市西湖区西溪路极境车库"
+      })
+    )
+
+    page.handleWechatConsult()
+    expect(global.wx.setClipboardData).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: "jijing_garage"
+      })
+    )
+
+    const pageDir = path.resolve(__dirname, "../pages/car-detail")
+    const wxml = fs.readFileSync(path.join(pageDir, "car-detail.wxml"), "utf8")
+    const wxss = fs.readFileSync(path.join(pageDir, "car-detail.wxss"), "utf8")
+    expect(wxml).toContain('bindtap="handleOpenPosterModal"')
+    expect(wxml).toContain('bindtap="handleOpenLocation"')
+    expect(wxml).toContain('bindtap="handleWechatConsult"')
+    expect(wxml).toContain('id="posterCanvas"')
+    expect(wxss).toContain(".poster-button")
+    expect(wxss).toContain(".poster-modal-overlay")
+  })
+
+  test("若存在全局预填数据则首屏立即渲染车辆信息且无需骨架态", () => {
+    global.getApp = jest.fn(() => ({
+      globalData: {
+        _tempCarDetailPreview: {
+          id: "vehicle-preview-1",
+          name: "保时捷 911",
+          status: "available",
+          priceDay: 2800,
+          cover: "cloud://porsche.jpg",
+          images: ["cloud://porsche.jpg"]
+        }
+      }
+    }))
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn()
+      },
+      setNavigationBarTitle: jest.fn()
+    }
+    const page = createPage(loadPageDefinition())
+    page.onLoad({ carId: "vehicle-preview-1" })
+
+    expect(page.data.loading).toBe(false)
+    expect(page.data.car).toMatchObject({
+      id: "vehicle-preview-1",
+      name: "保时捷 911"
+    })
+    page.onUnload()
+  })
 })
+

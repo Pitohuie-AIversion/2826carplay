@@ -46,5 +46,11 @@
   },
   "style": "v2",
   "lazyCodeLoading": "requiredComponents",
+  "preloadRule": {
+    "pages/mine/mine": {
+      "network": "all",
+      "packages": ["pages-admin"]
+    }
+  },
   "sitemapLocation": "sitemap.json"
 }

@@ -377,4 +377,26 @@ describe("shared/pageAuth", () => {
     expect(wx.navigateBack).toHaveBeenCalledWith(expect.objectContaining({ delta: 1 }))
     expect(wx.redirectTo).not.toHaveBeenCalled()
   })
+
+  test("同环境下再次鉴权直接命中缓存，无需重复调用云函数", () => {
+    wx.cloud.callFunction.mockImplementation(({ success }) => {
+      success({ result: { ok: true, canManageVehicles: true } })
+    })
+    const page1 = createPage()
+    const page2 = createPage()
+    const onAuthorized1 = jest.fn()
+    const onAuthorized2 = jest.fn()
+    const { requirePagePermission } = require("../shared/pageAuth")
+
+    requirePagePermission(page1, { required: "canManageVehicles", onAuthorized: onAuthorized1 })
+    expect(wx.cloud.callFunction).toHaveBeenCalledTimes(1)
+    expect(onAuthorized1).toHaveBeenCalledTimes(1)
+    expect(page1.data.pageAuthorized).toBe(true)
+
+    // 第二个页面鉴权，命中缓存，不再发起云函数
+    requirePagePermission(page2, { required: "canManageVehicles", onAuthorized: onAuthorized2 })
+    expect(wx.cloud.callFunction).toHaveBeenCalledTimes(1)
+    expect(onAuthorized2).toHaveBeenCalledTimes(1)
+    expect(page2.data.pageAuthorized).toBe(true)
+  })
 })

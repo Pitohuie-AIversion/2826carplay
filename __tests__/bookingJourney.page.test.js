@@ -638,4 +638,52 @@ describe("我的预约旅程状态", () => {
     expect(wxss).toContain("calc(70rpx + env(safe-area-inset-bottom))")
     expect(wxss).toMatch(/\.code-row\s*\{[^}]*border-radius:\s*999rpx/s)
   })
+
+  test("预约详情支持添加系统日历日程与交付中心地图导航", () => {
+    global.wx = {
+      addPhoneCalendar: jest.fn(({ success }) => success && success()),
+      openLocation: jest.fn(),
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition("../pages/booking-detail/booking-detail"))
+    page.applyBooking({
+      id: "booking-cal-12345",
+      vehicleId: "car-911",
+      vehicleName: "保时捷 911 Carrera",
+      status: "confirmed",
+      startDate: "2026-10-01",
+      endDate: "2026-10-05",
+      city: "上海"
+    })
+
+    page.handleAddToCalendar()
+    expect(global.wx.addPhoneCalendar).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "极境车库用车 · 保时捷 911 Carrera",
+        location: "上海 极境车库交付中心",
+        alarm: true
+      })
+    )
+    expect(global.wx.showToast).toHaveBeenCalledWith({
+      title: "日程已添加",
+      icon: "success"
+    })
+
+    page.handleOpenLocation()
+    expect(global.wx.openLocation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        latitude: 31.2304,
+        longitude: 121.4737,
+        name: "极境车库 · 上海交付中心"
+      })
+    )
+
+    const wxml = fs.readFileSync(path.join(__dirname, "../pages/booking-detail/booking-detail.wxml"), "utf8")
+    const wxss = fs.readFileSync(path.join(__dirname, "../pages/booking-detail/booking-detail.wxss"), "utf8")
+    expect(wxml).toContain('bindtap="handleAddToCalendar"')
+    expect(wxml).toContain('bindtap="handleOpenLocation"')
+    expect(wxss).toContain(".calendar-native-icon")
+    expect(wxss).toContain(".location-native-icon")
+  })
 })
+

@@ -108,12 +108,41 @@ function calculatePackageFootprint(projectRoot) {
   files.sort((left, right) => right.bytes - left.bytes)
   const totalBytes = files.reduce((sum, item) => sum + item.bytes, 0)
 
+  const subPackageRoots = []
+  try {
+    const appJson = JSON.parse(fs.readFileSync(path.join(resolvedRoot, "app.json"), "utf8"))
+    if (Array.isArray(appJson.subPackages)) {
+      appJson.subPackages.forEach((sub) => {
+        const root = normalizeRelativePath(sub && sub.root)
+        if (root) subPackageRoots.push(root)
+      })
+    }
+  } catch (e) {}
+
+  const subPackages = subPackageRoots.map((subRoot) => {
+    const subFiles = files.filter((f) => f.path.startsWith(`${subRoot}/`))
+    const bytes = subFiles.reduce((sum, item) => sum + item.bytes, 0)
+    return {
+      root: subRoot,
+      bytes,
+      fileCount: subFiles.length
+    }
+  })
+
+  const mainPackageFiles = files.filter(
+    (f) => !subPackageRoots.some((subRoot) => f.path.startsWith(`${subRoot}/`))
+  )
+  const mainPackageBytes = mainPackageFiles.reduce((sum, item) => sum + item.bytes, 0)
+
   return {
     totalBytes,
     fileCount: files.length,
     remainingBytes: HARD_LIMIT_BYTES - totalBytes,
     hardLimitBytes: HARD_LIMIT_BYTES,
     warningLimitBytes: WARNING_LIMIT_BYTES,
+    mainPackageBytes,
+    mainPackageRemainingBytes: HARD_LIMIT_BYTES - mainPackageBytes,
+    subPackages,
     status:
       totalBytes >= HARD_LIMIT_BYTES
         ? "fail"
@@ -133,12 +162,19 @@ function runCli() {
   const projectRoot = path.resolve(__dirname, "..")
   const result = calculatePackageFootprint(projectRoot)
   const summary = [
-    `估算主包：${formatMiB(result.totalBytes)}`,
+    `估算总包：${formatMiB(result.totalBytes)}`,
+    result.mainPackageBytes ? `真实主包：${formatMiB(result.mainPackageBytes)}（2 MiB 主包余量：${formatMiB(Math.max(0, result.mainPackageRemainingBytes))}）` : null,
     `文件数量：${result.fileCount}`,
-    `2 MiB 余量：${formatMiB(Math.max(0, result.remainingBytes))}`,
+    `总包余量：${formatMiB(Math.max(0, result.remainingBytes))}`,
     `状态：${result.status}`
-  ]
+  ].filter(Boolean)
   process.stdout.write(`${summary.join("\n")}\n`)
+  if (result.subPackages && result.subPackages.length) {
+    process.stdout.write("分包明细：\n")
+    result.subPackages.forEach((sub) => {
+      process.stdout.write(`- ${formatMiB(sub.bytes)}  ${sub.root} (${sub.fileCount} 个文件)\n`)
+    })
+  }
   process.stdout.write("最大文件：\n")
   result.largestFiles.forEach((item) => {
     process.stdout.write(`- ${formatMiB(item.bytes)}  ${item.path}\n`)

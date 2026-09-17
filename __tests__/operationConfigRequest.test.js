@@ -86,4 +86,31 @@ describe("shared/operationConfigRequest", () => {
     expect(onFailure).toHaveBeenCalledTimes(1)
     expect(onFailure).toHaveBeenCalledWith(error)
   })
+
+  test("同环境二次调用直接命中缓存，无需再次调用云函数", () => {
+    jest.useFakeTimers()
+    const callFunctionMock = jest.fn(({ success }) => {
+      success({ result: { ok: true, config: { brandName: "2826 Carplay" } } })
+    })
+    global.wx = {
+      cloud: {
+        callFunction: callFunctionMock
+      }
+    }
+
+    const firstSuccess = jest.fn()
+    requestOperationConfig({ onSuccess: firstSuccess })
+    jest.advanceTimersByTime(100)
+    expect(firstSuccess).toHaveBeenCalledWith({ brandName: "2826 Carplay" })
+    expect(callFunctionMock).toHaveBeenCalledTimes(1)
+
+    // 第二次调用，应该直接走缓存
+    const secondSuccess = jest.fn()
+    requestOperationConfig({ onSuccess: secondSuccess })
+    jest.advanceTimersByTime(100)
+    expect(secondSuccess).toHaveBeenCalledWith({ brandName: "2826 Carplay" })
+    expect(callFunctionMock).toHaveBeenCalledTimes(1)
+  })
 })
+
+

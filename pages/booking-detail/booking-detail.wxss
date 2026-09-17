@@ -321,6 +321,8 @@
 
 .detail-action-buttons {
   display: flex;
+  flex-wrap: wrap;
+  gap: 14rpx;
   margin-top: 22rpx;
 }
 
@@ -328,16 +330,87 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  flex: 1;
+  flex: 1 1 calc(50% - 14rpx);
+  min-width: calc(50% - 14rpx);
   height: 78rpx;
-  margin: 0 12rpx 0 0;
+  margin: 0;
   border-radius: 18rpx;
   font-size: 21rpx;
   line-height: 1;
+  box-sizing: border-box;
 }
 
 .detail-action-btn-last {
   margin-right: 0;
+}
+
+.detail-action-btn-pressed {
+  opacity: 0.8;
+  transform: scale(0.98);
+}
+
+.calendar-native-icon {
+  position: relative;
+  width: 20rpx;
+  height: 18rpx;
+  margin-right: 8rpx;
+  border: 2rpx solid #7da5ea;
+  border-radius: 4rpx;
+  color: #7da5ea;
+  box-sizing: border-box;
+}
+
+.calendar-native-icon::before {
+  position: absolute;
+  top: 4rpx;
+  right: 0;
+  left: 0;
+  height: 2rpx;
+  background: currentColor;
+  content: "";
+}
+
+.calendar-native-icon::after {
+  position: absolute;
+  top: -4rpx;
+  left: 3rpx;
+  width: 2rpx;
+  height: 5rpx;
+  border-radius: 2rpx;
+  background: currentColor;
+  box-shadow: 8rpx 0 0 currentColor;
+  content: "";
+}
+
+.location-native-icon {
+  position: relative;
+  width: 18rpx;
+  height: 22rpx;
+  margin-right: 8rpx;
+  color: #7da5ea;
+}
+
+.location-native-pin {
+  position: absolute;
+  top: 0;
+  left: 1rpx;
+  width: 14rpx;
+  height: 14rpx;
+  border: 2rpx solid currentColor;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  box-sizing: border-box;
+}
+
+.location-native-pin::after {
+  position: absolute;
+  top: 3rpx;
+  left: 3rpx;
+  width: 4rpx;
+  height: 4rpx;
+  border-radius: 50%;
+  background: currentColor;
+  content: "";
 }
 
 .detail-action-note {

@@ -56,7 +56,25 @@ function resolveAllowed(result, required) {
   return false
 }
 
+const { getCached, setCache, invalidateCache } = require("./cloudDataCache")
+
 const PERMISSION_CHECK_TIMEOUT_MS = 12 * 1000
+const PAGE_PERMISSION_CACHE_KEY = "page_permissions_v1"
+const PAGE_PERMISSION_CACHE_TTL_MS = 3 * 60 * 1000
+
+let lastWxEnv = null
+
+function clearPagePermissionCache() {
+  invalidateCache(PAGE_PERMISSION_CACHE_KEY)
+}
+
+function checkWxEnvReset() {
+  const currentWx = typeof wx !== "undefined" ? wx : null
+  if (currentWx !== lastWxEnv) {
+    lastWxEnv = currentWx
+    clearPagePermissionCache()
+  }
+}
 
 function cancelPagePermissionCheck(page) {
   if (!page || typeof page._cancelPagePermissionCheck !== "function") {
@@ -75,6 +93,8 @@ function requirePagePermission(page, options) {
   if (!page || typeof page.setData !== "function") {
     return
   }
+
+  checkWxEnvReset()
 
   cancelPagePermissionCheck(page)
   let settled = false
@@ -139,6 +159,32 @@ function requirePagePermission(page, options) {
     })
   }
 
+  const cached = getCached(PAGE_PERMISSION_CACHE_KEY, PAGE_PERMISSION_CACHE_TTL_MS)
+  if (cached && !config.force) {
+    const allowed = resolveAllowed(cached, required)
+    if (!allowed) {
+      finish(() => {
+        wx.showToast({
+          title: noPermissionMessage,
+          icon: "none"
+        })
+        scheduleRedirect(700)
+      })
+      return cancel
+    }
+
+    finish(() => {
+      page.setData({
+        pageAuthorized: true
+      })
+
+      if (typeof config.onAuthorized === "function") {
+        config.onAuthorized(cached)
+      }
+    })
+    return cancel
+  }
+
   timeoutId = setTimeout(handleCheckFailure, PERMISSION_CHECK_TIMEOUT_MS)
 
   try {
@@ -151,6 +197,8 @@ function requirePagePermission(page, options) {
           handleCheckFailure()
           return
         }
+
+        setCache(PAGE_PERMISSION_CACHE_KEY, result)
 
         const allowed = resolveAllowed(result, required)
 
@@ -186,5 +234,6 @@ function requirePagePermission(page, options) {
 
 module.exports = {
   cancelPagePermissionCheck,
-  requirePagePermission
+  requirePagePermission,
+  clearPagePermissionCache
 }

@@ -235,4 +235,29 @@ describe("cloudfunctions/garageVehicleList integration", () => {
     expect(warnSpy).toHaveBeenCalled()
     warnSpy.mockRestore()
   })
+
+  test("skipStats 为 true 时跳过全量统计查询，直接返回分页列表", async () => {
+    const mocks = createMockDb({
+      vehiclesData: [
+        {
+          _id: "car_1",
+          plateNumber: "粤A11111",
+          vehicleType: "sedan",
+          brandModel: "Model 3",
+          status: "idle"
+        }
+      ]
+    })
+    const garageVehicleList = await loadGarageVehicleListWith({ mockDb: mocks.db })
+
+    const res = await garageVehicleList.main({ page: 1, pageSize: 10, skipStats: true })
+
+    expect(res.ok).toBe(true)
+    expect(res.page).toBe(1)
+    expect(res.pageSize).toBe(10)
+    expect(Array.isArray(res.list)).toBe(true)
+    // skipStats 模式下不消耗全量统计与计数查询
+    expect(res.categoryCounts).toBeUndefined()
+  })
 })
+

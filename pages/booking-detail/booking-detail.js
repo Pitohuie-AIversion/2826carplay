@@ -1222,6 +1222,111 @@ Page({
     })
   },
 
+  handleAddToCalendar() {
+    if (!this.isBookingDetailActive()) {
+      return
+    }
+    const booking = this.data.booking || {}
+    if (!booking.startDate || !booking.endDate) {
+      wx.showToast({
+        title: "缺少行程日期",
+        icon: "none"
+      })
+      return
+    }
+
+    if (typeof wx.addPhoneCalendar !== "function") {
+      wx.showToast({
+        title: "系统暂不支持",
+        icon: "none"
+      })
+      return
+    }
+
+    const parseDateToSeconds = (dateStr, hour) => {
+      const parts = String(dateStr).split("-").map(Number)
+      if (parts.length === 3) {
+        return Math.floor(new Date(parts[0], parts[1] - 1, parts[2], hour, 0, 0).getTime() / 1000)
+      }
+      return Math.floor(Date.now() / 1000)
+    }
+
+    const startTime = parseDateToSeconds(booking.startDate, 10)
+    const endTime = parseDateToSeconds(booking.endDate, 18)
+    const vehicleName = booking.vehicleName || "尊享座驾"
+    const city = String(booking.city || "").trim()
+    const bookingRef = this.data.bookingReference || booking.id || ""
+
+    wx.addPhoneCalendar({
+      title: `极境车库用车 · ${vehicleName}`,
+      startTime,
+      endTime,
+      location: `${city} 极境车库交付中心`,
+      description: `预约编号：${bookingRef}。取车城市：${city}，请提前备齐身份证与驾驶证。`,
+      alarm: true,
+      alarmOffset: 7200,
+      success: () => {
+        if (!this.isBookingDetailActive()) {
+          return
+        }
+        wx.showToast({
+          title: "日程已添加",
+          icon: "success"
+        })
+      },
+      fail: (err) => {
+        if (!this.isBookingDetailActive()) {
+          return
+        }
+        const errMsg = String((err && (err.errMsg || err.message)) || "")
+        if (errMsg.includes("cancel")) {
+          return
+        }
+        wx.showToast({
+          title: "添加未完成",
+          icon: "none"
+        })
+      }
+    })
+  },
+
+  handleOpenLocation() {
+    if (!this.isBookingDetailActive()) {
+      return
+    }
+    const booking = this.data.booking || {}
+    const city = String(booking.city || "").trim()
+    const isShanghai = city.includes("上海")
+    const latitude = isShanghai ? 31.2304 : 30.2741
+    const longitude = isShanghai ? 121.4737 : 120.1551
+    const name = `极境车库 · ${isShanghai ? "上海交付中心" : "杭州交付中心"}`
+    const address = isShanghai ? "上海市浦东新区世博大道极境交付中心" : "杭州市西湖区西溪路极境车库"
+
+    if (typeof wx.openLocation === "function") {
+      wx.openLocation({
+        latitude,
+        longitude,
+        name,
+        address,
+        scale: 15,
+        fail: () => {
+          if (!this.isBookingDetailActive()) {
+            return
+          }
+          wx.showToast({
+            title: "导航打开失败",
+            icon: "none"
+          })
+        }
+      })
+    } else {
+      wx.showToast({
+        title: "系统暂不支持",
+        icon: "none"
+      })
+    }
+  },
+
   handleBackBookings() {
     if (!this.isBookingDetailActive()) {
       return

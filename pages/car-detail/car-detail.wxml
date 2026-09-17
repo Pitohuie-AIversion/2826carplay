@@ -113,6 +113,17 @@
           </view>
           <text class="favorite-button-text">{{favoriteLoading ? '处理中…' : favorited ? '已收藏' : '收藏'}}</text>
         </button>
+        <button
+          class="poster-button"
+          bindtap="handleOpenPosterModal"
+          hover-class="poster-button-pressed"
+          aria-label="生成车型分享海报"
+        >
+          <view class="poster-button-icon" aria-hidden="true">
+            <view class="poster-button-native-mark"></view>
+          </view>
+          <text class="poster-button-text">海报</text>
+        </button>
       </view>
     </view>
 
@@ -195,9 +206,9 @@
         <view class="info-label">品牌</view>
         <view class="info-value">{{car.brand}}</view>
       </view>
-      <view class="info-item">
-        <view class="info-label">城市</view>
-        <view class="info-value">{{car.location}}</view>
+      <view class="info-item info-item-clickable" bindtap="handleOpenLocation" hover-class="info-item-pressed" aria-role="button" aria-label="查看{{car.location}}位置并导航">
+        <view class="info-label">城市 / 门店 <text class="location-nav-arrow">导航 →</text></view>
+        <view class="info-value location-clickable-value">{{car.location}}</view>
       </view>
       <view class="info-item">
         <view class="info-label">变速箱</view>
@@ -295,6 +306,33 @@
       <button class="action-button ui-btn ui-btn-ghost action-button-offset" bindtap="handlePhoneCall" aria-label="电话咨询极境车库顾问">
         <view class="detail-action-content"><view class="detail-action-native-icon phone-action-native-icon" aria-hidden="true"></view><text>电话咨询</text></view>
       </button>
+      <button class="action-button ui-btn ui-btn-ghost action-button-offset" bindtap="handleWechatConsult" aria-label="复制微信咨询极境车库顾问">
+        <view class="detail-action-content"><view class="detail-action-native-icon wechat-action-native-icon" aria-hidden="true"></view><text>微信咨询</text></view>
+      </button>
+    </view>
+  </view>
+
+  <view wx:if="{{posterModalVisible}}" class="poster-modal-overlay" bindtap="handleClosePosterModal" hover-class="none" aria-role="button" aria-modal="true">
+    <view class="poster-modal-dialog ui-card" catchtap="true">
+      <view class="poster-modal-header">
+        <view class="poster-modal-title">车型专属海报</view>
+        <view class="poster-modal-close" bindtap="handleClosePosterModal" hover-class="poster-modal-close-hover" aria-role="button" aria-label="关闭海报弹窗">✕</view>
+      </view>
+
+      <view class="poster-canvas-wrap">
+        <canvas type="2d" id="posterCanvas" class="poster-canvas"></canvas>
+        <view wx:if="{{posterGenerating}}" class="poster-loading-box">
+          <view class="poster-spinner"></view>
+          <text class="poster-loading-text">正在生成高清海报…</text>
+        </view>
+      </view>
+
+      <view class="poster-modal-footer">
+        <button class="ui-btn ui-btn-primary poster-save-action" bindtap="handleSavePoster" disabled="{{posterGenerating}}">
+          保存海报到相册
+        </button>
+        <view class="poster-modal-subtip">保存后可分享到微信朋友圈或车友群</view>
+      </view>
     </view>
   </view>
 </view>

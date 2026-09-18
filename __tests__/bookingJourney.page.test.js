@@ -237,6 +237,39 @@ describe("我的预约旅程状态", () => {
     expect(page.loadList).not.toHaveBeenCalled()
   })
 
+  test("预约列表下拉刷新成功与失败时均能关闭刷新动画，且忙碌时互斥", () => {
+    let pullDownSuccess
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(({ success }) => {
+          pullDownSuccess = success
+        })
+      },
+      showToast: jest.fn(),
+      stopPullDownRefresh: jest.fn()
+    }
+    const page = createPage(loadPageDefinition("../pages/bookings/bookings"))
+
+    page.onPullDownRefresh()
+    expect(page.data.loading).toBe(true)
+    expect(global.wx.stopPullDownRefresh).not.toHaveBeenCalled()
+
+    // 忙碌中再次触发下拉应立即中止刷新
+    page.onPullDownRefresh()
+    expect(global.wx.stopPullDownRefresh).toHaveBeenCalledTimes(1)
+
+    // 数据加载完毕后应关闭下拉刷新
+    pullDownSuccess({
+      result: {
+        ok: true,
+        list: [{ id: "booking-refreshed", status: "confirmed" }],
+        hasMore: false
+      }
+    })
+    expect(global.wx.stopPullDownRefresh).toHaveBeenCalledTimes(2)
+    expect(page.data.list.map((item) => item.id)).toEqual(["booking-refreshed"])
+  })
+
   test("取消预约同步异常时安全恢复可重试状态", () => {
     global.wx = {
       cloud: {
@@ -278,6 +311,41 @@ describe("我的预约旅程状态", () => {
 
     lateSuccess({ result: { ok: true, detail: { id: "detail-timeout", status: "pending" } } })
     expect(page.data.booking).toEqual({})
+  })
+
+  test("预约详情下拉刷新成功时关闭动画，编辑或忙碌态时互斥", () => {
+    let detailSuccess
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(({ success }) => {
+          detailSuccess = success
+        })
+      },
+      showToast: jest.fn(),
+      stopPullDownRefresh: jest.fn()
+    }
+    const page = createPage(loadPageDefinition("../pages/booking-detail/booking-detail"))
+    page.data.id = "detail-refresh-1"
+
+    page.onPullDownRefresh()
+    expect(page.data.loading).toBe(true)
+    expect(global.wx.stopPullDownRefresh).not.toHaveBeenCalled()
+
+    // 处于编辑态时触发下拉应立即中止刷新
+    page.data.editing = true
+    page.onPullDownRefresh()
+    expect(global.wx.stopPullDownRefresh).toHaveBeenCalledTimes(1)
+    page.data.editing = false
+
+    // 数据加载完毕后应关闭下拉刷新
+    detailSuccess({
+      result: {
+        ok: true,
+        detail: { id: "detail-refresh-1", status: "confirmed", vehicleName: "测试保时捷 911" }
+      }
+    })
+    expect(global.wx.stopPullDownRefresh).toHaveBeenCalledTimes(2)
+    expect(page.data.booking.id).toBe("detail-refresh-1")
   })
 
   test("预约详情调用同步异常时安全进入重试状态", () => {

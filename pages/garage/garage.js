@@ -317,6 +317,25 @@ Page({
     try { clearExpiredCache() } catch (e) {}
   },
 
+  onPullDownRefresh() {
+    if (this.data.loadingCars) {
+      if (typeof wx.stopPullDownRefresh === "function") {
+        wx.stopPullDownRefresh()
+      }
+      return
+    }
+    this.loadOperationConfig()
+    this.loadContentGuides()
+    this.loadCars({
+      force: true,
+      done: () => {
+        if (typeof wx.stopPullDownRefresh === "function") {
+          wx.stopPullDownRefresh()
+        }
+      }
+    })
+  },
+
   loadContentGuides() {
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") return
     wx.cloud.callFunction({
@@ -358,24 +377,44 @@ Page({
     })
   },
 
+  finishCarsLoadEffects() {
+    if (this._carsLoadTimer) {
+      clearTimeout(this._carsLoadTimer)
+      this._carsLoadTimer = null
+    }
+    if (typeof this._carsLoadDone === "function") {
+      const done = this._carsLoadDone
+      this._carsLoadDone = null
+      try {
+        done()
+      } catch (error) {}
+    }
+  },
+
   loadCars(input) {
     const append = Boolean(input && input.append)
     const force = Boolean(input && input.force)
     const nextPage = append ? this.data.page + 1 : 0
     if (this.data.loadingCars && !force) {
+      if (input && typeof input.done === "function") {
+        try { input.done() } catch (e) {}
+      }
       return
     }
 
-    if (force && this._carsLoadTimer) {
-      clearTimeout(this._carsLoadTimer)
-      this._carsLoadTimer = null
+    if (force) {
+      this.finishCarsLoadEffects()
     }
 
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       this.setCarsLoadError("云能力未初始化，请稍后重试")
+      if (input && typeof input.done === "function") {
+        try { input.done() } catch (e) {}
+      }
       return
     }
 
+    this._carsLoadDone = input && typeof input.done === "function" ? input.done : null
     this.applyState({
       loadingCars: true
     })
@@ -388,10 +427,7 @@ Page({
         return false
       }
       settled = true
-      if (this._carsLoadTimer) {
-        clearTimeout(this._carsLoadTimer)
-        this._carsLoadTimer = null
-      }
+      this.finishCarsLoadEffects()
       return true
     }
 
@@ -474,6 +510,7 @@ Page({
     cancelPageNativeActions(this)
     this._carsRequestId = Number(this._carsRequestId || 0) + 1
     this.cancelOperationConfigRequest()
+    this.finishCarsLoadEffects()
     if (this._carsLoadTimer) {
       clearTimeout(this._carsLoadTimer)
       this._carsLoadTimer = null

@@ -447,5 +447,47 @@ describe("pages/garage 首页车辆筛选", () => {
     expect(page.data.filteredCars).toHaveLength(1)
     expect(page.data.filteredCars[0].id).toBe("car-sh")
   })
+
+  test("车库首页下拉刷新重置数据并在完成时关闭刷新动画，忙碌时互斥", () => {
+    let carsSuccess
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(({ name, success }) => {
+          if (name === "garageVehicleList") {
+            carsSuccess = success
+          }
+        })
+      },
+      showToast: jest.fn(),
+      stopPullDownRefresh: jest.fn()
+    }
+    const page = createPage(loadPageDefinition())
+    page.loadOperationConfig = jest.fn()
+    page.loadContentGuides = jest.fn()
+
+    page.onPullDownRefresh()
+    expect(page.data.loadingCars).toBe(true)
+    expect(page.loadOperationConfig).toHaveBeenCalled()
+    expect(page.loadContentGuides).toHaveBeenCalled()
+    expect(global.wx.stopPullDownRefresh).not.toHaveBeenCalled()
+
+    // 忙碌中下拉应立即关闭
+    page.onPullDownRefresh()
+    expect(global.wx.stopPullDownRefresh).toHaveBeenCalledTimes(1)
+
+    // 数据返回后应关闭下拉刷新
+    carsSuccess({
+      result: {
+        ok: true,
+        page: 0,
+        total: 1,
+        hasMore: false,
+        list: [{ id: "car-refreshed", status: "idle", name: "全新到店 911" }]
+      }
+    })
+    expect(global.wx.stopPullDownRefresh).toHaveBeenCalledTimes(2)
+    expect(page.data.cars.map((item) => item.id)).toEqual(["car-refreshed"])
+  })
 })
+
 

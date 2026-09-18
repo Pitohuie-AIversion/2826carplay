@@ -330,6 +330,30 @@ Page({
     }
   },
 
+  onPullDownRefresh() {
+    if (
+      this.data.editing ||
+      this.data.saving ||
+      this.data.subscriptionRequesting ||
+      this.data.cancelling ||
+      this.data.quoteResponding ||
+      this.data.handoverResponding ||
+      this.data.loading
+    ) {
+      if (typeof wx.stopPullDownRefresh === "function") {
+        wx.stopPullDownRefresh()
+      }
+      return
+    }
+    this.loadDetail({
+      done: () => {
+        if (typeof wx.stopPullDownRefresh === "function") {
+          wx.stopPullDownRefresh()
+        }
+      }
+    })
+  },
+
   onUnload() {
     cancelPageNativeActions(this)
     this._bookingDetailUnloaded = true
@@ -353,12 +377,24 @@ Page({
     this._quoteResponseRequestId = Number(this._quoteResponseRequestId || 0) + 1
     this._handoverResponseRequestId = Number(this._handoverResponseRequestId || 0) + 1
     this.cancelOperationConfigRequest()
+    this.finishDetailLoadEffects()
     this.clearDetailLoadTimer()
     this.clearSaveRequestTimer()
     this.clearCancelRequestTimer()
     this.clearSubscriptionRequestTimer()
     this.clearQuoteResponseTimer()
     if (this._perf && typeof this._perf.dispose === 'function') try { this._perf.dispose(); } catch(e) {}
+  },
+
+  finishDetailLoadEffects() {
+    this.clearDetailLoadTimer()
+    if (typeof this._detailLoadDone === "function") {
+      const done = this._detailLoadDone
+      this._detailLoadDone = null
+      try {
+        done()
+      } catch (error) {}
+    }
   },
 
   applyBooking(booking, latestQuote, handovers) {
@@ -509,18 +545,21 @@ Page({
     }
   },
 
-  loadDetail() {
+  loadDetail(options) {
     if (
       this.data.editing ||
       this.data.saving ||
       this.data.subscriptionRequesting ||
       this.data.cancelling
     ) {
+      if (options && typeof options.done === "function") {
+        try { options.done() } catch (e) {}
+      }
       return
     }
     const requestId = Number(this._detailRequestId || 0) + 1
     this._detailRequestId = requestId
-    this.clearDetailLoadTimer()
+    this.finishDetailLoadEffects()
 
     if (!this.data.id) {
       this.applyState({
@@ -528,6 +567,9 @@ Page({
         loading: false,
         cancelling: false
       })
+      if (options && typeof options.done === "function") {
+        try { options.done() } catch (e) {}
+      }
       return
     }
 
@@ -539,9 +581,13 @@ Page({
         loadFailed: true,
         loadErrorText: "云能力未初始化，请稍后重试"
       })
+      if (options && typeof options.done === "function") {
+        try { options.done() } catch (e) {}
+      }
       return
     }
 
+    this._detailLoadDone = options && typeof options.done === "function" ? options.done : null
     this.applyState({
       loading: true,
       loadFailed: false
@@ -553,7 +599,7 @@ Page({
         return false
       }
       settled = true
-      this.clearDetailLoadTimer()
+      this.finishDetailLoadEffects()
       return true
     }
     const handleFailure = (message) => {

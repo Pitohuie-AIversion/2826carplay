@@ -1,5 +1,8 @@
 {
   "navigationBarTitleText": "极境车库",
+  "enablePullDownRefresh": true,
+  "backgroundColor": "#0B0D10",
+  "backgroundTextStyle": "light",
   "usingComponents": {
     "car-card": "/components/car-card/car-card",
     "core-nav": "/components/core-nav/core-nav"

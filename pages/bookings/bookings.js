@@ -242,13 +242,40 @@ Page({
     }
   },
 
+  onPullDownRefresh() {
+    if (this.data.loading || this._bookingCancelTimer) {
+      if (typeof wx.stopPullDownRefresh === "function") {
+        wx.stopPullDownRefresh()
+      }
+      return
+    }
+    this.loadList({
+      done: () => {
+        if (typeof wx.stopPullDownRefresh === "function") {
+          wx.stopPullDownRefresh()
+        }
+      }
+    })
+  },
+
   onUnload() {
     cancelPageNativeActions(this)
     this._bookingsRequestId = Number(this._bookingsRequestId || 0) + 1
     this._bookingCancelSerial = Number(this._bookingCancelSerial || 0) + 1
-    this.clearBookingsLoadTimer()
+    this.finishBookingsLoadEffects()
     this.clearBookingCancelTimer()
     if (this._perf && typeof this._perf.dispose === 'function') try { this._perf.dispose(); } catch(e) {}
+  },
+
+  finishBookingsLoadEffects() {
+    this.clearBookingsLoadTimer()
+    if (typeof this._bookingsLoadDone === "function") {
+      const done = this._bookingsLoadDone
+      this._bookingsLoadDone = null
+      try {
+        done()
+      } catch (error) {}
+    }
   },
 
   loadList(input) {
@@ -256,7 +283,7 @@ Page({
     const nextPage = append ? this.data.page + 1 : 0
     const requestId = Number(this._bookingsRequestId || 0) + 1
     this._bookingsRequestId = requestId
-    this.clearBookingsLoadTimer()
+    this.finishBookingsLoadEffects()
 
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       this.applyState({
@@ -270,9 +297,15 @@ Page({
         page: 0,
         hasMore: false
       })
+      if (input && typeof input.done === "function") {
+        try {
+          input.done()
+        } catch (error) {}
+      }
       return
     }
 
+    this._bookingsLoadDone = input && typeof input.done === "function" ? input.done : null
     this.applyState({
       loading: true,
       loadFailed: false
@@ -284,7 +317,7 @@ Page({
         return false
       }
       settled = true
-      this.clearBookingsLoadTimer()
+      this.finishBookingsLoadEffects()
       return true
     }
     const handleFailure = (message) => {

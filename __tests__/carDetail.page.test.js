@@ -545,6 +545,40 @@ describe("pages/car-detail 客户侧车辆状态", () => {
     expect(wxss).toContain(".poster-modal-overlay")
   })
 
+  test("保存海报支持授权失败友好提示与成功提示", () => {
+    let saveCallback = null
+    global.wx = {
+      saveImageToPhotosAlbum: jest.fn((options) => {
+        saveCallback = options
+      }),
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition())
+    page.setData({ posterImagePath: "wxfile://tmp/poster.png", posterModalVisible: true })
+
+    page.handleSavePoster()
+    expect(global.wx.saveImageToPhotosAlbum).toHaveBeenCalledWith(
+      expect.objectContaining({
+        filePath: "wxfile://tmp/poster.png"
+      })
+    )
+
+    // 1. 模拟相册权限拒绝时给出明确开启提示
+    saveCallback.fail({ errMsg: "saveImageToPhotosAlbum:fail auth deny" })
+    expect(global.wx.showToast).toHaveBeenCalledWith({
+      title: "请开启相册权限",
+      icon: "none"
+    })
+
+    // 2. 模拟保存成功时提示并关闭弹窗
+    saveCallback.success()
+    expect(global.wx.showToast).toHaveBeenCalledWith({
+      title: "海报已保存相册",
+      icon: "success"
+    })
+    expect(page.data.posterModalVisible).toBe(false)
+  })
+
   test("若存在全局预填数据则首屏立即渲染车辆信息且无需骨架态", () => {
     global.getApp = jest.fn(() => ({
       globalData: {

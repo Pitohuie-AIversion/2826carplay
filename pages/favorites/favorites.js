@@ -67,6 +67,28 @@ function buildFavoriteView(list, availableOnly) {
   }
 }
 
+const FAVORITE_FILTER_STORAGE_KEY = "favorite_available_only_preference"
+
+function getSavedFavoriteFilterPreference() {
+  if (typeof wx === "undefined" || typeof wx.getStorageSync !== "function") {
+    return false
+  }
+  try {
+    return Boolean(wx.getStorageSync(FAVORITE_FILTER_STORAGE_KEY))
+  } catch (error) {
+    return false
+  }
+}
+
+function saveFavoriteFilterPreference(availableOnly) {
+  if (typeof wx === "undefined" || typeof wx.setStorageSync !== "function") {
+    return
+  }
+  try {
+    wx.setStorageSync(FAVORITE_FILTER_STORAGE_KEY, Boolean(availableOnly))
+  } catch (error) {}
+}
+
 Page({
   data: {
     initialLoading: true,
@@ -88,8 +110,18 @@ Page({
     loadedOnce: false
   },
 
+  restoreFilterPreference() {
+    const saved = getSavedFavoriteFilterPreference()
+    if (saved) {
+      this.setData({
+        availableOnly: true
+      })
+    }
+  },
+
   onLoad() {
     activatePageNativeActions(this)
+    this.restoreFilterPreference()
     this.fetchList()
   },
 
@@ -155,6 +187,7 @@ Page({
       return
     }
 
+    saveFavoriteFilterPreference(availableOnly)
     this.applyFavoriteList(this.data.list, {
       availableOnly
     })
@@ -162,6 +195,7 @@ Page({
 
   handleShowAll() {
     if (this.data.availableOnly) {
+      saveFavoriteFilterPreference(false)
       this.applyFavoriteList(this.data.list, {
         availableOnly: false
       })

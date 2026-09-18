@@ -93,6 +93,45 @@ describe("pages/favorites 收藏车辆视图", () => {
     expect(page.data.visibleList).toHaveLength(3)
   })
 
+  test("收藏筛选偏好支持本地持久化与启动恢复", () => {
+    const storage = {}
+    global.wx = {
+      getStorageSync: jest.fn((key) => storage[key] || false),
+      setStorageSync: jest.fn((key, value) => {
+        storage[key] = value
+      })
+    }
+
+    const page = createPage(loadPageDefinition())
+    page.applyFavoriteList([
+      { id: "v1", status: "idle", statusText: "可预约" },
+      { id: "v2", status: "rented", statusText: "使用中" }
+    ])
+
+    // 1. 切换为只看可预约时写入存储
+    page.handleFilterTap({
+      currentTarget: {
+        dataset: {
+          mode: "available"
+        }
+      }
+    })
+    expect(global.wx.setStorageSync).toHaveBeenCalledWith("favorite_available_only_preference", true)
+    expect(storage.favorite_available_only_preference).toBe(true)
+    expect(page.data.availableOnly).toBe(true)
+
+    // 2. 模拟重新加载页面，恢复偏好为只看可预约
+    const freshPage = createPage(loadPageDefinition())
+    freshPage.restoreFilterPreference()
+    expect(freshPage.data.availableOnly).toBe(true)
+
+    // 3. 点击查看全部，重置存储为 false
+    freshPage.handleShowAll()
+    expect(global.wx.setStorageSync).toHaveBeenCalledWith("favorite_available_only_preference", false)
+    expect(storage.favorite_available_only_preference).toBe(false)
+    expect(freshPage.data.availableOnly).toBe(false)
+  })
+
   test("首次加载展示与车辆卡片一致的收藏骨架", () => {
     const pageDir = path.resolve(__dirname, "../pages/favorites")
     const wxmlSource = fs.readFileSync(path.join(pageDir, "favorites.wxml"), "utf8")

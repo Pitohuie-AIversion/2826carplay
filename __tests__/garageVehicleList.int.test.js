@@ -287,5 +287,34 @@ describe("cloudfunctions/garageVehicleList integration", () => {
     expect(res.list.some((car) => car.id === "car_hz")).toBe(true)
     expect(res.list.some((car) => car.id === "car_sh")).toBe(false)
   })
+
+  test("服务端支持按交付网点城市 city 参数精准筛选车辆与统计", async () => {
+    const mocks = createMockDb({
+      vehiclesData: [
+        {
+          _id: "car_hz",
+          plateNumber: "浙A88888",
+          vehicleType: "sports",
+          brandModel: "911",
+          status: "idle",
+          location: "杭州交付中心"
+        },
+        {
+          _id: "car_sh",
+          plateNumber: "沪A66666",
+          vehicleType: "supercar",
+          brandModel: "F8",
+          status: "idle",
+          location: "上海交付中心"
+        }
+      ]
+    })
+    const garageVehicleList = await loadGarageVehicleListWith({ mockDb: mocks.db })
+    const res = await garageVehicleList.main({ city: "杭州" })
+    expect(res.ok).toBe(true)
+    expect(res.total).toBe(1)
+    expect(res.list[0].id).toBe("car_hz")
+    expect(res.categoryCounts.all).toBe(1)
+  })
 })
 

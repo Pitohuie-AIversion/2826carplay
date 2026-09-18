@@ -488,6 +488,54 @@ describe("pages/garage 首页车辆筛选", () => {
     expect(global.wx.stopPullDownRefresh).toHaveBeenCalledTimes(2)
     expect(page.data.cars.map((item) => item.id)).toEqual(["car-refreshed"])
   })
+
+  test("支持点击城市交付中心标签切换并联动筛选车辆", () => {
+    const page = createPage(loadPageDefinition())
+    page.data.cars = [
+      { id: "car-hz", name: "保时捷 911", location: "杭州市西湖区西溪路极境车库", status: "idle", category: "sports" },
+      { id: "car-sh", name: "法拉利 F8", location: "上海市浦东新区世博大道极境交付中心", status: "idle", category: "supercar" }
+    ]
+
+    page.handleCityFilterTap({ currentTarget: { dataset: { city: "杭州" } } })
+    expect(page.data.selectedCity).toBe("杭州")
+    expect(page.data.filteredCars).toHaveLength(1)
+    expect(page.data.filteredCars[0].id).toBe("car-hz")
+
+    // 再次点击相同城市标签取消筛选
+    page.handleCityFilterTap({ currentTarget: { dataset: { city: "杭州" } } })
+    expect(page.data.selectedCity).toBe("")
+    expect(page.data.filteredCars).toHaveLength(2)
+
+    // 点击全部标签重置筛选
+    page.handleCityFilterTap({ currentTarget: { dataset: { city: "上海" } } })
+    expect(page.data.selectedCity).toBe("上海")
+    expect(page.data.filteredCars[0].id).toBe("car-sh")
+
+    page.handleCityFilterTap({ currentTarget: { dataset: { city: "" } } })
+    expect(page.data.selectedCity).toBe("")
+    expect(page.data.filteredCars).toHaveLength(2)
+  })
+
+  test("远程加载车辆列表时携带当前选择的城市网点参数", () => {
+    let callParams = null
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn((options) => {
+          callParams = options
+        })
+      }
+    }
+    const page = createPage(loadPageDefinition())
+    page.data.selectedCity = "杭州"
+    page.data.searchKeyword = "911"
+    page.loadCars()
+
+    expect(callParams).not.toBeNull()
+    expect(callParams.name).toBe("garageVehicleList")
+    expect(callParams.data.city).toBe("杭州")
+    expect(callParams.data.keyword).toBe("911")
+  })
 })
+
 
 

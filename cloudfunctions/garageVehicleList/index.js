@@ -498,8 +498,11 @@ async function queryStatsProjectionWithFallback() {
   }
 }
 
-function buildFilteredLists(publicList, keyword, category, availableOnly) {
-  const searchedList = publicList.filter((item) => matchesVehicleSearch(item, keyword))
+function buildFilteredLists(publicList, keyword, category, availableOnly, city) {
+  const cityFiltered = city
+    ? publicList.filter((item) => String((item && item.location) || "").toLowerCase().includes(city.toLowerCase()))
+    : publicList
+  const searchedList = cityFiltered.filter((item) => matchesVehicleSearch(item, keyword))
   const categoryCounts = buildCategoryCounts(searchedList)
   const categoryList = category === "all"
     ? searchedList
@@ -511,7 +514,7 @@ function buildFilteredLists(publicList, keyword, category, availableOnly) {
   return { searchedList, categoryCounts, categoryList, availableCount, fullList }
 }
 
-async function runLegacyFallback(page, pageSize, keyword, category, availableOnly) {
+async function runLegacyFallback(page, pageSize, keyword, category, availableOnly, city) {
   const vehicleRecords = await readVehicles()
   const publicList = vehicleRecords.list
     .filter((item) => item && item.status !== "retired")
@@ -521,7 +524,8 @@ async function runLegacyFallback(page, pageSize, keyword, category, availableOnl
     publicList,
     keyword,
     category,
-    availableOnly
+    availableOnly,
+    city
   )
   const offset = page * pageSize
   const list = fullList.slice(offset, offset + pageSize)
@@ -536,6 +540,7 @@ async function runLegacyFallback(page, pageSize, keyword, category, availableOnl
     availableCount,
     categoryCounts,
     keyword,
+    city,
     category,
     availableOnly,
     truncated: vehicleRecords.truncated,
@@ -544,8 +549,8 @@ async function runLegacyFallback(page, pageSize, keyword, category, availableOnl
   }
 }
 
-async function runNativeOptimized(page, pageSize, keyword, category, availableOnly, skipStats) {
-  const hasFilter = Boolean(keyword || (category && category !== "all") || availableOnly)
+async function runNativeOptimized(page, pageSize, keyword, category, availableOnly, skipStats, city) {
+  const hasFilter = Boolean(keyword || (category && category !== "all") || availableOnly || city)
 
   if (skipStats && !hasFilter) {
     const pageResult = await queryNativePageWithFallback(page, pageSize)
@@ -579,7 +584,7 @@ async function runNativeOptimized(page, pageSize, keyword, category, availableOn
     .map(mapVehicle)
     .sort((prev, next) => next.sort - prev.sort)
 
-  const statsFiltered = buildFilteredLists(statsPublicList, keyword, category, availableOnly)
+  const statsFiltered = buildFilteredLists(statsPublicList, keyword, category, availableOnly, city)
   const { searchedList, categoryCounts, categoryList, availableCount, fullList } = statsFiltered
 
   const pagePublicList = pageResult.list
@@ -587,7 +592,7 @@ async function runNativeOptimized(page, pageSize, keyword, category, availableOn
     .map(mapVehicle)
     .sort((prev, next) => next.sort - prev.sort)
 
-  const pageFiltered = buildFilteredLists(pagePublicList, keyword, category, availableOnly)
+  const pageFiltered = buildFilteredLists(pagePublicList, keyword, category, availableOnly, city)
   const offset = page * pageSize
   const hasMore = offset + pageSize < fullList.length
 
@@ -608,6 +613,7 @@ async function runNativeOptimized(page, pageSize, keyword, category, availableOn
     availableCount,
     categoryCounts,
     keyword,
+    city,
     category,
     availableOnly,
     truncated,
@@ -624,12 +630,13 @@ exports.main = async (event) => {
     const page = Number.isFinite(pageRaw) && pageRaw > 0 ? Math.floor(pageRaw) : 0
     const pageSize = Number.isFinite(pageSizeRaw) && pageSizeRaw > 0 ? Math.min(Math.max(Math.floor(pageSizeRaw), 1), 100) : 100
     const keyword = normalizeSearchKeyword(payload.keyword)
+    const city = String(payload.city || "").trim().slice(0, 50)
     const category = String(payload.category || "all").trim().slice(0, 50) || "all"
     const availableOnly = payload.availableOnly === true
     const skipStats = payload.skipStats === true
 
     try {
-      return await runNativeOptimized(page, pageSize, keyword, category, availableOnly, skipStats)
+      return await runNativeOptimized(page, pageSize, keyword, category, availableOnly, skipStats, city)
     } catch (nativeError) {
       console.warn({
         function: "garageVehicleList",
@@ -640,7 +647,7 @@ exports.main = async (event) => {
             : String(nativeError),
         createdAt: new Date().toISOString()
       })
-      return runLegacyFallback(page, pageSize, keyword, category, availableOnly)
+      return runLegacyFallback(page, pageSize, keyword, category, availableOnly, city)
     }
   } catch (error) {
     console.error({

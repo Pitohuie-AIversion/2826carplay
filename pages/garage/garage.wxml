@@ -37,6 +37,36 @@
     ><view class="search-clear-icon" aria-hidden="true"></view></button>
   </view>
 
+  <view wx:if="{{((!initialLoading && !loadingCars) || cars.length) && cityOptions.length}}" class="garage-city-bar">
+    <view class="city-chips-label">交付中心：</view>
+    <view class="city-chips-list">
+      <view
+        class="city-chip {{selectedCity === '' ? 'city-chip-active' : ''}}"
+        bindtap="handleCityFilterTap"
+        data-city=""
+        hover-class="city-chip-pressed"
+        aria-role="button"
+        aria-label="筛选全部城市车源"
+        aria-pressed="{{selectedCity === ''}}"
+      >
+        <text>全部</text>
+      </view>
+      <view
+        wx:for="{{cityOptions}}"
+        wx:key="*this"
+        class="city-chip {{selectedCity === item ? 'city-chip-active' : ''}}"
+        bindtap="handleCityFilterTap"
+        data-city="{{item}}"
+        hover-class="city-chip-pressed"
+        aria-role="button"
+        aria-label="按{{item}}交付中心筛选车源"
+        aria-pressed="{{selectedCity === item}}"
+      >
+        <text>{{item}}</text>
+      </view>
+    </view>
+  </view>
+
   <view wx:if="{{(!initialLoading && !loadingCars) || cars.length}}" class="category-scroll-shell">
     <scroll-view
       class="category-scroll"

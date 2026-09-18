@@ -87,6 +87,7 @@
 
 .garage-header,
 .garage-search,
+.garage-city-bar,
 .category-scroll-shell,
 .summary-panel,
 .availability-filter,
@@ -94,6 +95,56 @@
 .empty-state {
   position: relative;
   z-index: 1;
+}
+
+.garage-city-bar {
+  display: flex;
+  align-items: center;
+  margin-top: 14rpx;
+  padding: 0 4rpx;
+}
+
+.city-chips-label {
+  flex-shrink: 0;
+  margin-right: 8rpx;
+  color: #7d8b9d;
+  font-size: 20rpx;
+  letter-spacing: 0.5rpx;
+}
+
+.city-chips-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.city-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 48rpx;
+  padding: 0 20rpx;
+  border: 1rpx solid rgba(100, 149, 237, 0.16);
+  border-radius: 999rpx;
+  background: rgba(22, 28, 38, 0.85);
+  color: #94a3b8;
+  font-size: 20rpx;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.city-chip-active {
+  border-color: rgba(91, 145, 232, 0.6);
+  background: rgba(47, 128, 237, 0.18);
+  color: #7faaf0;
+  font-weight: 600;
+  box-shadow: 0 0 16rpx rgba(47, 128, 237, 0.2);
+}
+
+.city-chip-pressed {
+  opacity: 0.72;
+  transform: scale(0.96);
 }
 
 .garage-search {

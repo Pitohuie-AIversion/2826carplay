@@ -221,6 +221,8 @@ Page({
     servicePhone: "15715710090",
     currentCategory: "all",
     availableOnly: false,
+    cityOptions: ["杭州", "上海"],
+    selectedCity: "",
     searchKeyword: "",
     searchResultCount: 0,
     searchDebouncing: false,
@@ -368,11 +370,15 @@ Page({
     this.cancelOperationConfigRequest()
     this._cancelOperationConfigRequest = requestOperationConfig({
       onSuccess: (config) => {
-        this.applyState({
+        const nextState = {
           pageTitle: config.garagePageTitle || this.data.pageTitle,
           pageSubtitle: normalizeGarageSubtitle(config.garagePageSubtitle, this.data.pageSubtitle),
           servicePhone: config.servicePhone || this.data.servicePhone
-        })
+        }
+        if (Array.isArray(config.cityOptions) && config.cityOptions.length) {
+          nextState.cityOptions = config.cityOptions
+        }
+        this.applyState(nextState)
       }
     })
   },
@@ -469,6 +475,7 @@ Page({
         page: nextPage,
         pageSize: this.data.pageSize,
         keyword: this.data.searchKeyword,
+        city: this.data.selectedCity,
         category: this.data.currentCategory,
         availableOnly: this.data.availableOnly,
         skipStats: append
@@ -580,6 +587,7 @@ Page({
     const currentCategory = nextCategory
     const availableOnly = typeof this.data.availableOnly === "boolean" ? this.data.availableOnly : false
     const searchKeyword = typeof this.data.searchKeyword === "string" ? this.data.searchKeyword : ""
+    const selectedCity = typeof this.data.selectedCity === "string" ? this.data.selectedCity : ""
 
     const categoryCars =
       currentCategory === "all"
@@ -588,7 +596,10 @@ Page({
     const statusCars = availableOnly
       ? categoryCars.filter((car) => normalizeGarageStatus(car.status) === "idle")
       : categoryCars
-    const filteredCars = statusCars.filter((car) => matchesCarSearch(car, searchKeyword))
+    const cityCars = selectedCity
+      ? statusCars.filter((car) => String((car && car.location) || "").toLowerCase().includes(selectedCity.toLowerCase()))
+      : statusCars
+    const filteredCars = cityCars.filter((car) => matchesCarSearch(car, searchKeyword))
     const serverSummary = nextPagination
 
     const searchResultCount = serverSummary && Number.isFinite(serverSummary.total)
@@ -600,7 +611,7 @@ Page({
           total: serverSummary.categoryTotal,
           available: Number.isFinite(serverSummary.availableCount) ? serverSummary.availableCount : 0
         }
-      : buildCategorySummary(currentCategory, categories, categoryCars)
+      : buildCategorySummary(currentCategory, categories, selectedCity ? cityCars : categoryCars)
 
     this.applyState({
       loadError: false,
@@ -611,6 +622,7 @@ Page({
       filteredCars,
       currentCategory,
       availableOnly,
+      selectedCity,
       searchKeyword,
       searchResultCount,
       categorySummary,
@@ -622,12 +634,14 @@ Page({
     })
   },
 
-  filterCars(categoryId, availableOnlyInput, searchKeywordInput, serverSummary, keepSearchDebouncing) {
+  filterCars(categoryId, availableOnlyInput, searchKeywordInput, serverSummary, keepSearchDebouncing, selectedCityInput) {
     const nextCategory = categoryId || "all"
     const availableOnly =
       typeof availableOnlyInput === "boolean" ? availableOnlyInput : this.data.availableOnly
     const searchKeyword =
       typeof searchKeywordInput === "string" ? searchKeywordInput : this.data.searchKeyword
+    const selectedCity =
+      typeof selectedCityInput === "string" ? selectedCityInput : this.data.selectedCity
     const categoryCars =
       nextCategory === "all"
         ? this.data.cars.slice()
@@ -635,12 +649,16 @@ Page({
     const statusCars = availableOnly
       ? categoryCars.filter((car) => normalizeGarageStatus(car.status) === "idle")
       : categoryCars
-    const filteredCars = statusCars.filter((car) => matchesCarSearch(car, searchKeyword))
+    const cityCars = selectedCity
+      ? statusCars.filter((car) => String((car && car.location) || "").toLowerCase().includes(selectedCity.toLowerCase()))
+      : statusCars
+    const filteredCars = cityCars.filter((car) => matchesCarSearch(car, searchKeyword))
 
     this.applyState({
       currentCategory: nextCategory,
       availableOnly,
       searchKeyword,
+      selectedCity,
       searchResultCount: serverSummary && Number.isFinite(serverSummary.total)
         ? serverSummary.total
         : filteredCars.length,
@@ -651,14 +669,14 @@ Page({
             total: serverSummary.categoryTotal,
             available: Number.isFinite(serverSummary.availableCount) ? serverSummary.availableCount : 0
           }
-        : buildCategorySummary(nextCategory, this.data.categories, categoryCars),
+        : buildCategorySummary(nextCategory, this.data.categories, selectedCity ? cityCars : categoryCars),
       searchDebouncing: keepSearchDebouncing ? Boolean(this.data.searchDebouncing) : false
     })
   },
 
   _runFilteredCarsSearch(keyword) {
     const resolvedKeyword = typeof keyword === "string" ? keyword : this.data.searchKeyword
-    this.filterCars(this.data.currentCategory, this.data.availableOnly, resolvedKeyword)
+    this.filterCars(this.data.currentCategory, this.data.availableOnly, resolvedKeyword, null, false, this.data.selectedCity)
     if (canLoadGarageRemotely()) {
       this.setData({ searchDebouncing: false })
       this.loadCars({ force: true })
@@ -673,7 +691,7 @@ Page({
       searchKeyword: keyword,
       searchDebouncing: Boolean(keyword)
     })
-    this.filterCars(this.data.currentCategory, this.data.availableOnly, keyword, null, true)
+    this.filterCars(this.data.currentCategory, this.data.availableOnly, keyword, null, true, this.data.selectedCity)
     this._initStubSearchDebounce()
     if (this._debouncedFilterSearch) {
       this._debouncedFilterSearch(keyword)
@@ -683,10 +701,20 @@ Page({
   handleClearSearch() {
     if (this.data.searchKeyword) {
       this.clearSearchDebounce()
-      this.filterCars(this.data.currentCategory, this.data.availableOnly, "")
+      this.filterCars(this.data.currentCategory, this.data.availableOnly, "", null, false, this.data.selectedCity)
       if (canLoadGarageRemotely()) {
         this.loadCars({ force: true })
       }
+    }
+  },
+
+  handleCityFilterTap(event) {
+    const city = String((event && event.currentTarget && event.currentTarget.dataset && event.currentTarget.dataset.city) || "").trim()
+    const nextCity = city === this.data.selectedCity ? "" : city
+    this.clearSearchDebounce()
+    this.filterCars(this.data.currentCategory, this.data.availableOnly, this.data.searchKeyword, null, false, nextCity)
+    if (canLoadGarageRemotely()) {
+      this.loadCars({ force: true })
     }
   },
 
@@ -698,7 +726,7 @@ Page({
     }
 
     this.clearSearchDebounce()
-    this.filterCars(categoryId)
+    this.filterCars(categoryId, this.data.availableOnly, this.data.searchKeyword, null, false, this.data.selectedCity)
     if (canLoadGarageRemotely()) {
       this.loadCars({ force: true })
     }
@@ -711,7 +739,7 @@ Page({
       return
     }
     this.clearSearchDebounce()
-    this.filterCars(this.data.currentCategory, availableOnly)
+    this.filterCars(this.data.currentCategory, availableOnly, this.data.searchKeyword, null, false, this.data.selectedCity)
     if (canLoadGarageRemotely()) {
       this.loadCars({ force: true })
     }
@@ -720,7 +748,7 @@ Page({
   handleShowAllStatuses() {
     if (this.data.availableOnly) {
       this.clearSearchDebounce()
-      this.filterCars(this.data.currentCategory, false)
+      this.filterCars(this.data.currentCategory, false, this.data.searchKeyword, null, false, this.data.selectedCity)
       if (canLoadGarageRemotely()) {
         this.loadCars({ force: true })
       }

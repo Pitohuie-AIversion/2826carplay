@@ -23,6 +23,10 @@ App({
     this._sharedUnsavedChanges = require("./shared/unsavedChanges")
     this._sharedVehicleFormProgress = require("./shared/vehicleFormProgress")
 
+    const { setupUpdateManager, runVersionMigration } = require("./shared/versionMigration")
+    this._versionMigrationResult = runVersionMigration()
+    this._updateManager = setupUpdateManager()
+
     if (!wx.cloud || typeof wx.cloud.init !== "function") {
       return
     }

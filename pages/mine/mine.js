@@ -1,4 +1,4 @@
-﻿const { formatToastTitle } = require("../../shared/uiFeedback")
+const { formatToastTitle } = require("../../shared/uiFeedback")
 const { requestOperationConfig } = require("../../shared/operationConfigRequest")
 const {
   activatePageNativeActions,
@@ -374,12 +374,30 @@ Page({
     }
   },
 
+  onPullDownRefresh() {
+    if (this._mineToolActive || this.data.summaryLoading || this.data.permissionsLoading) {
+      if (typeof wx.stopPullDownRefresh === "function") {
+        wx.stopPullDownRefresh()
+      }
+      return
+    }
+    this.loadOperationConfig()
+    this.loadMyPermissions({
+      done: () => {
+        if (typeof wx.stopPullDownRefresh === "function") {
+          wx.stopPullDownRefresh()
+        }
+      }
+    })
+  },
+
   onUnload() {
     cancelPageNativeActions(this)
     this.cancelOperationConfigRequest()
     this._permissionRequestId = Number(this._permissionRequestId || 0) + 1
     this._summaryRequestId = Number(this._summaryRequestId || 0) + 1
     this._mineToolRequestId = Number(this._mineToolRequestId || 0) + 1
+    this.finishPermissionEffects()
     this.clearPermissionTimer()
     this.clearSummaryTimer()
     this.finishMineToolEffects()
@@ -405,10 +423,22 @@ Page({
     }
   },
 
-  loadMyPermissions() {
+  finishPermissionEffects() {
+    this.clearPermissionTimer()
+    if (typeof this._permissionLoadDone === "function") {
+      const done = this._permissionLoadDone
+      this._permissionLoadDone = null
+      try {
+        done()
+      } catch (error) {}
+    }
+  },
+
+  loadMyPermissions(options) {
+    const input = options && typeof options === "object" ? options : {}
     const requestId = Number(this._permissionRequestId || 0) + 1
     this._permissionRequestId = requestId
-    this.clearPermissionTimer()
+    this.finishPermissionEffects()
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       this.setData({
         permissionsLoading: false,
@@ -416,9 +446,13 @@ Page({
         permissionsError: "云能力未初始化，点击重试",
         ...buildPermissionFailureRole()
       })
+      if (typeof input.done === "function") {
+        try { input.done() } catch (e) {}
+      }
       return
     }
 
+    this._permissionLoadDone = typeof input.done === "function" ? input.done : null
     this.setData({
       permissionsLoading: true,
       permissionsError: ""
@@ -431,7 +465,7 @@ Page({
         return false
       }
       settled = true
-      this.clearPermissionTimer()
+      this.finishPermissionEffects()
       return true
     }
     const handleFailure = () => {

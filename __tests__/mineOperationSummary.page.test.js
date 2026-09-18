@@ -519,4 +519,45 @@ describe("pages/mine 运营待办角标", () => {
     expect(wx.setClipboardData).not.toHaveBeenCalled()
     expect(wx.showModal).not.toHaveBeenCalled()
   })
+
+  test("用户中心下拉刷新重载配置与权限并在完成时关闭刷新动画，忙碌时互斥", () => {
+    let permSuccess
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(({ name, success }) => {
+          if (name === "getMyPermissions") {
+            permSuccess = success
+          }
+        })
+      },
+      showToast: jest.fn(),
+      stopPullDownRefresh: jest.fn()
+    }
+    const page = createPage(loadPageDefinition())
+    page.loadOperationConfig = jest.fn()
+    page.data.permissionsLoading = false
+    page.data.summaryLoading = false
+
+    page.onPullDownRefresh()
+    expect(page.data.permissionsLoading).toBe(true)
+    expect(page.loadOperationConfig).toHaveBeenCalled()
+    expect(global.wx.stopPullDownRefresh).not.toHaveBeenCalled()
+
+    // 正在拉取时再次下拉应立即关闭
+    page.onPullDownRefresh()
+    expect(global.wx.stopPullDownRefresh).toHaveBeenCalledTimes(1)
+
+    // 权限数据返回后关闭刷新
+    permSuccess({
+      result: {
+        ok: true,
+        canManageBookings: false,
+        canManageRoles: false
+      }
+    })
+    expect(global.wx.stopPullDownRefresh).toHaveBeenCalledTimes(2)
+    expect(page.data.permissionsLoading).toBe(false)
+    page.onUnload()
+  })
 })
+

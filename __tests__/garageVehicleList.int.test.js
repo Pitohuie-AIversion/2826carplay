@@ -259,5 +259,33 @@ describe("cloudfunctions/garageVehicleList integration", () => {
     // skipStats 模式下不消耗全量统计与计数查询
     expect(res.categoryCounts).toBeUndefined()
   })
+
+  test("服务端搜索支持根据车辆门店地址与城市检索", async () => {
+    const mocks = createMockDb({
+      vehiclesData: [
+        {
+          _id: "car_hz",
+          plateNumber: "浙A88888",
+          vehicleType: "sports",
+          brandModel: "911",
+          status: "idle",
+          location: "杭州交付中心"
+        },
+        {
+          _id: "car_sh",
+          plateNumber: "沪A66666",
+          vehicleType: "supercar",
+          brandModel: "F8",
+          status: "idle",
+          location: "上海交付中心"
+        }
+      ]
+    })
+    const garageVehicleList = await loadGarageVehicleListWith({ mockDb: mocks.db })
+    const res = await garageVehicleList.main({ keyword: "杭州" })
+    expect(res.ok).toBe(true)
+    expect(res.list.some((car) => car.id === "car_hz")).toBe(true)
+    expect(res.list.some((car) => car.id === "car_sh")).toBe(false)
+  })
 })
 

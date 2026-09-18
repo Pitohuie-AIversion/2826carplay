@@ -171,6 +171,7 @@ function matchesCarSearch(car, keyword) {
     source.brand,
     source.category,
     CATEGORY_LABEL_MAP[source.category],
+    source.location,
     ...tags
   ]
     .map((value) => String(value || "").toLowerCase())

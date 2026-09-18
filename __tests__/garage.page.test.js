@@ -431,4 +431,21 @@ describe("pages/garage 首页车辆筛选", () => {
     expect(page.data.loadError).toBe(true)
     expect(page.data.loadErrorText).toBe("cloud init failed")
   })
+
+  test("搜索关键词支持根据车辆所属交付中心城市或门店地址筛选", () => {
+    const page = createPage(loadPageDefinition())
+    page.data.cars = [
+      { id: "car-hz", name: "保时捷 911", location: "杭州市西湖区西溪路极境车库", status: "idle", category: "sports" },
+      { id: "car-sh", name: "法拉利 F8", location: "上海市浦东新区世博大道极境交付中心", status: "idle", category: "supercar" }
+    ]
+
+    page.filterCars("all", false, "杭州")
+    expect(page.data.filteredCars).toHaveLength(1)
+    expect(page.data.filteredCars[0].id).toBe("car-hz")
+
+    page.filterCars("all", false, "世博大道")
+    expect(page.data.filteredCars).toHaveLength(1)
+    expect(page.data.filteredCars[0].id).toBe("car-sh")
+  })
 })
+

@@ -1687,3 +1687,32 @@
     background-position: -70% 0;
   }
 }
+
+.mine-version-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  padding: 36rpx 24rpx 16rpx;
+  font-size: 22rpx;
+  letter-spacing: 0.5rpx;
+}
+
+.mine-version-footer-pressed {
+  opacity: 0.62;
+  transform: scale(0.985);
+}
+
+.mine-version-label {
+  color: #64748b;
+}
+
+.mine-version-dot {
+  color: #334155;
+}
+
+.mine-version-action {
+  color: #528fff;
+  text-decoration: underline;
+  text-decoration-color: rgba(82, 143, 255, 0.35);
+}

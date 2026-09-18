@@ -6,6 +6,7 @@ const {
   cancelPageNativeActions,
   isPageNativeActionActive
 } = require("../../shared/pageNativeAction")
+const { CURRENT_VERSION, showReleaseNotesModal } = require("../../shared/versionMigration")
 
 const MENU_ITEMS = [
   { key: "bookings", title: "我的预约", desc: "查看已提交的预约咨询", section: "会员服务", sectionKicker: "MEMBER", icon: "calendar" },
@@ -324,6 +325,7 @@ Page({
     roleKicker: "VERIFYING",
     roleLabel: "正在确认身份",
     roleClass: "profile-role-loading",
+    appVersion: CURRENT_VERSION,
     memberQuickActions: MEMBER_QUICK_ACTIONS,
     menuItems: buildVisibleMenuItems({
       envVersion: "release",
@@ -1006,5 +1008,9 @@ Page({
         })
       }
     })
+  },
+
+  handleShowReleaseNotes() {
+    showReleaseNotesModal()
   }
 })

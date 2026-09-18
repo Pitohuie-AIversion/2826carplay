@@ -190,5 +190,17 @@
     </view>
   </view>
 
+  <view
+    class="mine-version-footer"
+    bindtap="handleShowReleaseNotes"
+    hover-class="mine-version-footer-pressed"
+    aria-role="button"
+    aria-label="极境车库版本 {{appVersion}}，点击查看更新说明"
+  >
+    <text class="mine-version-label">极境车库 v{{appVersion}}</text>
+    <text class="mine-version-dot">·</text>
+    <text class="mine-version-action">更新日志</text>
+  </view>
+
   <core-nav active-key="mine" />
 </view>

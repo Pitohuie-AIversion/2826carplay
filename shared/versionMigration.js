@@ -99,6 +99,31 @@ function setupUpdateManager(options) {
   }
 }
 
+function showReleaseNotesModal(options) {
+  if (typeof wx === "undefined" || typeof wx.showModal !== "function") {
+    return
+  }
+  const highlights = Array.isArray(RELEASE_NOTES.highlights)
+    ? RELEASE_NOTES.highlights.join("\r\n\r\n")
+    : ""
+  try {
+    wx.showModal({
+      title: "版本更新说明",
+      content: `${RELEASE_NOTES.title}\r\n\r\n${highlights}`,
+      showCancel: false,
+      confirmText: "知道了",
+      confirmColor: "#528fff",
+      success: (res) => {
+        if (options && typeof options.onConfirm === "function") {
+          try {
+            options.onConfirm(res)
+          } catch (e) {}
+        }
+      }
+    })
+  } catch (error) {}
+}
+
 module.exports = {
   CURRENT_VERSION,
   STORAGE_KEY_VERSION,
@@ -108,5 +133,6 @@ module.exports = {
   getStoredVersion,
   setStoredVersion,
   runVersionMigration,
-  setupUpdateManager
+  setupUpdateManager,
+  showReleaseNotesModal
 }

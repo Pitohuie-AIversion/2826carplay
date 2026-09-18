@@ -6,7 +6,8 @@ const {
   getStoredVersion,
   setStoredVersion,
   runVersionMigration,
-  setupUpdateManager
+  setupUpdateManager,
+  showReleaseNotesModal
 } = require("../shared/versionMigration")
 
 describe("shared/versionMigration 版本迁移与热更新管理器", () => {
@@ -149,5 +150,64 @@ describe("shared/versionMigration 版本迁移与热更新管理器", () => {
     expect(appConfig._versionMigrationResult).toBeDefined()
     expect(appConfig._versionMigrationResult.currentVersion).toBe(CURRENT_VERSION)
     expect(appConfig._updateManager).toBe(mockUpdateManager)
+  })
+
+  test("showReleaseNotesModal 弹出统一品牌规范的版本更新说明弹窗", () => {
+    let modalOptions = null
+    global.wx = {
+      showModal: jest.fn((options) => {
+        modalOptions = options
+        if (typeof options.success === "function") {
+          options.success({ confirm: true })
+        }
+      })
+    }
+
+    const onConfirm = jest.fn()
+    showReleaseNotesModal({ onConfirm })
+
+    expect(global.wx.showModal).toHaveBeenCalledTimes(1)
+    expect(modalOptions).toMatchObject({
+      title: "版本更新说明",
+      showCancel: false,
+      confirmText: "知道了",
+      confirmColor: "#528fff"
+    })
+    expect(modalOptions.content).toContain(RELEASE_NOTES.title)
+    expect(modalOptions.content).toContain("交付中心")
+    expect(onConfirm).toHaveBeenCalledTimes(1)
+  })
+
+  test("showReleaseNotesModal 在缺少 wx 环境时优雅静默降级", () => {
+    delete global.wx
+    expect(() => showReleaseNotesModal()).not.toThrow()
+  })
+
+  test("pages/mine 正确挂载版本号并通过 handleShowReleaseNotes 唤起更新弹窗", () => {
+    jest.resetModules()
+    let pageDefinition = null
+    global.Page = jest.fn((def) => {
+      pageDefinition = def
+    })
+
+    global.wx = {
+      showModal: jest.fn()
+    }
+
+    require("../pages/mine/mine")
+
+    expect(pageDefinition).toBeDefined()
+    expect(pageDefinition.data.appVersion).toBe(CURRENT_VERSION)
+    expect(typeof pageDefinition.handleShowReleaseNotes).toBe("function")
+
+    pageDefinition.handleShowReleaseNotes()
+    expect(global.wx.showModal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "版本更新说明",
+        showCancel: false,
+        confirmText: "知道了",
+        confirmColor: "#528fff"
+      })
+    )
   })
 })

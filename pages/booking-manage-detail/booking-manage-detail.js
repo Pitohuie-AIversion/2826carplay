@@ -400,6 +400,26 @@ Page({
     )
   },
 
+  onPullDownRefresh() {
+    if (
+      this.isBookingDetailInteractionBusy() ||
+      this.data.remarkDirty ||
+      this.data.quoteDirty
+    ) {
+      if (typeof wx.stopPullDownRefresh === "function") {
+        wx.stopPullDownRefresh()
+      }
+      return
+    }
+    this.loadDetail({
+      done: () => {
+        if (typeof wx.stopPullDownRefresh === "function") {
+          wx.stopPullDownRefresh()
+        }
+      }
+    })
+  },
+
   onUnload() {
     cancelPagePermissionCheck(this)
     cancelPageNativeActions(this)
@@ -418,6 +438,7 @@ Page({
     this._bookingDetailRequestId = Number(this._bookingDetailRequestId || 0) + 1
     this._bookingDetailMutationRequestId =
       Number(this._bookingDetailMutationRequestId || 0) + 1
+    this.finishBookingDetailLoadEffects()
     this.clearBookingDetailTimer()
     this.clearBookingDetailMutationTimer()
     this._bookingDetailMutationActive = false
@@ -474,13 +495,28 @@ Page({
     })
   },
 
-  loadDetail() {
+  finishBookingDetailLoadEffects() {
+    this.clearBookingDetailTimer()
+    if (typeof this._bookingDetailLoadDone === "function") {
+      const done = this._bookingDetailLoadDone
+      this._bookingDetailLoadDone = null
+      try {
+        done()
+      } catch (error) {}
+    }
+  },
+
+  loadDetail(options) {
+    const input = options && typeof options === "object" ? options : {}
     const id = String(this.data.id || "").trim()
     if (!id) {
       this.applyState({
         initialLoading: false,
         loading: false
       })
+      if (typeof input.done === "function") {
+        try { input.done() } catch (e) {}
+      }
       return
     }
 
@@ -490,12 +526,15 @@ Page({
       this._bookingDetailMutationActive ||
       this._bookingDetailStatusFeedbackPending
     ) {
+      if (typeof input.done === "function") {
+        try { input.done() } catch (e) {}
+      }
       return
     }
 
     const requestId = Number(this._bookingDetailRequestId || 0) + 1
     this._bookingDetailRequestId = requestId
-    this.clearBookingDetailTimer()
+    this.finishBookingDetailLoadEffects()
 
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       this.applyState({
@@ -504,9 +543,13 @@ Page({
         loadFailed: true,
         loadErrorText: "云能力未初始化，请稍后重试"
       })
+      if (typeof input.done === "function") {
+        try { input.done() } catch (e) {}
+      }
       return
     }
 
+    this._bookingDetailLoadDone = typeof input.done === "function" ? input.done : null
     this.applyState({
       loading: true,
       loadFailed: false
@@ -518,7 +561,7 @@ Page({
         return false
       }
       settled = true
-      this.clearBookingDetailTimer()
+      this.finishBookingDetailLoadEffects()
       return true
     }
     const handleFailure = (message) => {

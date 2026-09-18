@@ -423,4 +423,47 @@ describe("pages/booking-manage-detail conflict handling", () => {
     expect(wxss).toContain(".coordination-option-pressed")
     expect(wxss).toContain(".manage-detail-button-pressed")
   })
+
+  test("管理详情下拉刷新同步最新状态并关闭刷新动画，忙碌或脏表单时互斥", () => {
+    let detailSuccess
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(({ name, success }) => {
+          if (name === "bookingDetail") {
+            detailSuccess = success
+          }
+        })
+      },
+      showToast: jest.fn(),
+      stopPullDownRefresh: jest.fn()
+    }
+    const page = createPage(loadPageDefinition(), { id: "booking_pull_down_test", initialLoading: false, loading: false })
+
+    page.onPullDownRefresh()
+    expect(page.data.loading).toBe(true)
+    expect(global.wx.stopPullDownRefresh).not.toHaveBeenCalled()
+
+    // 正在编辑备注时再次下拉应立即关闭
+    page.data.remarkDirty = true
+    page.onPullDownRefresh()
+    expect(global.wx.stopPullDownRefresh).toHaveBeenCalledTimes(1)
+    page.data.remarkDirty = false
+
+    // 数据加载完毕后应关闭下拉刷新
+    detailSuccess({
+      result: {
+        ok: true,
+        detail: {
+          id: "booking_pull_down_test",
+          status: "confirmed",
+          userName: "李先生",
+          vehicleName: "法拉利 F8"
+        }
+      }
+    })
+    expect(global.wx.stopPullDownRefresh).toHaveBeenCalledTimes(2)
+    expect(page.data.booking.id).toBe("booking_pull_down_test")
+    page.onUnload()
+  })
 })
+

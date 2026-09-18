@@ -175,6 +175,7 @@ function normalizeFilters(event) {
   const status = normalizeText(payload.status, 50)
   const schedulePriority = normalizeText(payload.schedulePriority, 50)
   const coordinationStatus = normalizeText(payload.coordinationStatus, 50)
+  const city = normalizeText(payload.city, 50)
   const keyword = normalizeText(payload.keyword, 100).toUpperCase()
   const limitRaw = Number(payload.limit)
   const limit = Number.isFinite(limitRaw) ? Math.floor(limitRaw) : 500
@@ -183,6 +184,7 @@ function normalizeFilters(event) {
     status,
     schedulePriority,
     coordinationStatus,
+    city,
     keyword,
     limit: Math.min(Math.max(limit, 1), 500)
   }
@@ -490,6 +492,9 @@ exports.main = async (event) => {
           filters.coordinationStatus !== "all" &&
           item.coordinationStatus !== filters.coordinationStatus
         ) {
+          return false
+        }
+        if (filters.city && filters.city !== "all" && item.city !== filters.city) {
           return false
         }
         return matchesKeyword(item, filters.keyword)

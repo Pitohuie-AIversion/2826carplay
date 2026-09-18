@@ -365,4 +365,44 @@ describe("pages/booking-manage workflow filters", () => {
     expect(wxssSource).toContain(".recent-empty-native-icon")
     expect(wxssSource).toContain(".recent-item-pressed")
   })
+
+  test("取车城市筛选联动列表查询与 CSV 导出，重置时恢复全部城市", () => {
+    let listCall = null
+    let exportCall = null
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn((options) => {
+          if (options.name === "bookingList") {
+            listCall = options
+            if (typeof options.success === "function") {
+              options.success({ result: { ok: true, list: [], total: 0 } })
+            }
+          }
+          if (options.name === "bookingExportCsv") {
+            exportCall = options
+          }
+        })
+      },
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition(), {
+      currentStatus: "pending",
+      currentCity: "all"
+    })
+
+    page.handleCityTap({ currentTarget: { dataset: { value: "杭州" } } })
+    expect(page.data.currentCity).toBe("杭州")
+    expect(listCall).not.toBeNull()
+    expect(listCall.data.city).toBe("杭州")
+
+    page.handleExport()
+    expect(exportCall).not.toBeNull()
+    expect(exportCall.data.city).toBe("杭州")
+
+    page.data.loading = false
+    page.handleReset()
+    expect(page.data.currentCity).toBe("all")
+    page.onUnload()
+  })
 })
+

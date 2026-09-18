@@ -122,6 +122,7 @@ function normalizeFilters(event) {
   const status = String(payload.status || "").trim()
   const schedulePriority = String(payload.schedulePriority || "").trim()
   const coordinationStatus = String(payload.coordinationStatus || "").trim()
+  const city = String(payload.city || "").trim()
   const keyword = String(payload.keyword || "").trim().toUpperCase()
   const limitRaw = Number(payload.limit)
   const pageRaw = Number(payload.page)
@@ -135,6 +136,7 @@ function normalizeFilters(event) {
     status,
     schedulePriority,
     coordinationStatus,
+    city,
     keyword,
     limit: Math.min(Math.max(limit, 1), MAX_BOOKING_RECORDS),
     page,
@@ -425,6 +427,9 @@ exports.main = async (event) => {
           filters.coordinationStatus !== "all" &&
           item.coordinationStatus !== filters.coordinationStatus
         ) {
+          return false
+        }
+        if (filters.city && filters.city !== "all" && item.city !== filters.city) {
           return false
         }
 

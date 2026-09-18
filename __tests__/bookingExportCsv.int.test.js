@@ -523,4 +523,21 @@ describe("cloudfunctions/bookingExportCsv integration", () => {
       expect(cells[cidIdx].startsWith("'")).toBe(false)
     })
   })
+
+  test("CSV 导出支持按取车城市精准筛选", async () => {
+    const mocks = createMockDb({
+      rolesData: [{ role: "admin" }],
+      bookingData: [
+        { _id: "b_hz", city: "杭州", vehicleName: "911", status: "pending", createdAt: new Date().toISOString() },
+        { _id: "b_sh", city: "上海", vehicleName: "F8", status: "pending", createdAt: new Date().toISOString() }
+      ]
+    })
+    const mod = await loadBookingExportCsvWith({ openid: "admin_openid", mockDb: mocks.db })
+    const res = await mod.main({ status: "all", city: "杭州" })
+    expect(res.ok).toBe(true)
+    expect(res.total).toBe(1)
+    expect(res.csvText).toContain("911")
+    expect(res.csvText).not.toContain("F8")
+  })
 })
+

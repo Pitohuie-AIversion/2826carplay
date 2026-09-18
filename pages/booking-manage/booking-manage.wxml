@@ -71,7 +71,7 @@
       </view>
     </view>
 
-    <view class="workflow-filter workflow-filter-last">
+    <view class="workflow-filter">
       <view class="workflow-filter-label">协调进度</view>
       <view class="workflow-filter-row">
         <view
@@ -83,6 +83,22 @@
           hover-class="workflow-chip-pressed"
           aria-role="button"
           aria-pressed="{{currentCoordination === item.value}}"
+        >{{item.label}}</view>
+      </view>
+    </view>
+
+    <view class="workflow-filter workflow-filter-last">
+      <view class="workflow-filter-label">取车城市</view>
+      <view class="workflow-filter-row">
+        <view
+          wx:for="{{cityOptions}}"
+          wx:key="value"
+          class="workflow-chip {{currentCity === item.value ? 'workflow-chip-active workflow-chip-city' : ''}}"
+          data-value="{{item.value}}"
+          bindtap="handleCityTap"
+          hover-class="workflow-chip-pressed"
+          aria-role="button"
+          aria-pressed="{{currentCity === item.value}}"
         >{{item.label}}</view>
       </view>
     </view>

@@ -1,6 +1,7 @@
 const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
 const { isUserCancelError, removeCsvFile } = require("../../shared/csvFile")
 const { formatToastTitle } = require("../../shared/uiFeedback")
+const { requestOperationConfig } = require("../../shared/operationConfigRequest")
 const {
   activatePageCsvFileActions,
   beginPageCsvFileAction,
@@ -69,6 +70,12 @@ const COORDINATION_OPTIONS = [
   { value: "pending", label: "待协调" },
   { value: "coordinating", label: "协调中" },
   { value: "resolved", label: "已协调" }
+]
+
+const CITY_OPTIONS = [
+  { value: "all", label: "全部城市" },
+  { value: "杭州", label: "杭州" },
+  { value: "上海", label: "上海" }
 ]
 
 const DEFAULT_PAGE_SIZE = 20
@@ -347,6 +354,8 @@ Page({
     priorityOptions: PRIORITY_OPTIONS,
     currentCoordination: "all",
     coordinationOptions: COORDINATION_OPTIONS,
+    currentCity: "all",
+    cityOptions: CITY_OPTIONS,
     total: 0,
     truncated: false,
     summaryItems: buildStatusSummary({}),
@@ -383,6 +392,18 @@ Page({
       } catch (error) {}
     }
 
+    this.cancelOperationConfigRequest()
+    this._cancelOperationConfigRequest = requestOperationConfig({
+      onSuccess: (config) => {
+        if (Array.isArray(config.cityOptions) && config.cityOptions.length) {
+          const dynamicCityOptions = [
+            { value: "all", label: "全部城市" }
+          ].concat(config.cityOptions.map((c) => ({ value: c, label: c })))
+          this.setData({ cityOptions: dynamicCityOptions })
+        }
+      }
+    })
+
     this.setData({
       canShareExport: !isDevtoolsEnv() && typeof wx.shareFileMessage === "function"
     })
@@ -406,10 +427,18 @@ Page({
     })
   },
 
+  cancelOperationConfigRequest() {
+    if (typeof this._cancelOperationConfigRequest === "function") {
+      this._cancelOperationConfigRequest()
+      this._cancelOperationConfigRequest = null
+    }
+  },
+
   onUnload() {
     cancelPagePermissionCheck(this)
     cancelPageCsvFileActions(this)
     cancelPageNativeActions(this)
+    this.cancelOperationConfigRequest()
     this._bookingListRequestId = Number(this._bookingListRequestId || 0) + 1
     this._bookingMutationRequestId = Number(this._bookingMutationRequestId || 0) + 1
     this._bookingExportRequestId = Number(this._bookingExportRequestId || 0) + 1
@@ -481,6 +510,15 @@ Page({
     this.fetchList()
   },
 
+  handleCityTap(event) {
+    const value = String(event.currentTarget.dataset.value || "")
+    if (!value || value === this.data.currentCity || this.data.loading) {
+      return
+    }
+    this.setData({ currentCity: value })
+    this.fetchList()
+  },
+
   handleReset() {
     if (this.data.loading) {
       return
@@ -489,7 +527,8 @@ Page({
       keyword: "",
       currentStatus: "all",
       currentPriority: "all",
-      currentCoordination: "all"
+      currentCoordination: "all",
+      currentCity: "all"
     })
 
     this.fetchList()
@@ -522,6 +561,9 @@ Page({
       coordinationStatus: this.data.currentCoordination,
       keyword: String(this.data.keyword || ""),
       limit: 500
+    }
+    if (this.data.currentCity && this.data.currentCity !== "all") {
+      filters.city = this.data.currentCity
     }
     const requestId = Number(this._bookingExportRequestId || 0) + 1
     this._bookingExportRequestId = requestId
@@ -1104,6 +1146,9 @@ Page({
       limit: 2000,
       page: nextPage,
       pageSize
+    }
+    if (this.data.currentCity && this.data.currentCity !== "all") {
+      filters.city = this.data.currentCity
     }
     this._bookingListRequestDone = typeof done === "function" ? done : null
     this.setData({

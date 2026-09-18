@@ -337,4 +337,18 @@ describe("cloudfunctions/bookingList integration", () => {
     expect((await mod.main({ schedulePriority: "top" })).code).toBe("VALIDATION_ERROR")
     expect((await mod.main({ coordinationStatus: "unknown" })).code).toBe("VALIDATION_ERROR")
   })
+
+  test("支持按取车城市精准筛选预约列表", async () => {
+    const mocks = createMockDb({
+      rolesData: [{ role: "admin" }],
+      bookingData: [
+        { _id: "b_hz", city: "杭州", status: "pending", createdAt: new Date().toISOString() },
+        { _id: "b_sh", city: "上海", status: "pending", createdAt: new Date().toISOString() }
+      ]
+    })
+    const mod = await loadBookingListWith({ openid: "admin_openid", mockDb: mocks.db })
+    const res = await mod.main({ city: "杭州" })
+    expect(res.ok).toBe(true)
+    expect(res.list.map((item) => item.id)).toEqual(["b_hz"])
+  })
 })

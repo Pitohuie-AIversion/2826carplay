@@ -574,5 +574,51 @@ describe("pages/car-detail 客户侧车辆状态", () => {
     })
     page.onUnload()
   })
+
+  test("车辆详情下拉刷新同步重载详情、收藏与场景指南并在完成时关闭刷新", () => {
+    let detailSuccess
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(({ name, success }) => {
+          if (name === "vehiclePublicDetail") {
+            detailSuccess = success
+          }
+        })
+      },
+      showToast: jest.fn(),
+      stopPullDownRefresh: jest.fn(),
+      setNavigationBarTitle: jest.fn()
+    }
+    const page = createPage(loadPageDefinition())
+    page.data.carId = "vehicle-porsche-gt3"
+    page.data.loading = false
+    page.loadOperationConfig = jest.fn()
+    page.loadFavoriteStatus = jest.fn()
+    page.loadRelatedGuides = jest.fn()
+
+    page.onPullDownRefresh()
+    expect(page.loadOperationConfig).toHaveBeenCalled()
+    expect(page.loadFavoriteStatus).toHaveBeenCalledWith("vehicle-porsche-gt3")
+    expect(page.loadRelatedGuides).toHaveBeenCalledWith("vehicle-porsche-gt3")
+    expect(global.wx.stopPullDownRefresh).not.toHaveBeenCalled()
+
+    // 正在加载时再次下拉应直接关闭刷新
+    page.data.loading = true
+    page.onPullDownRefresh()
+    expect(global.wx.stopPullDownRefresh).toHaveBeenCalledTimes(1)
+    page.data.loading = false
+
+    // 详情数据返回后关闭刷新
+    detailSuccess({
+      result: {
+        ok: true,
+        car: { id: "vehicle-porsche-gt3", name: "Porsche 911 GT3", status: "idle", images: [] }
+      }
+    })
+    expect(global.wx.stopPullDownRefresh).toHaveBeenCalledTimes(2)
+    expect(page.data.car.name).toBe("Porsche 911 GT3")
+    page.onUnload()
+  })
 })
+
 

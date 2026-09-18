@@ -251,6 +251,27 @@ Page({
     }
   },
 
+  onPullDownRefresh() {
+    if (this.data.loading || this.data.favoriteLoading || this.data.posterGenerating) {
+      if (typeof wx.stopPullDownRefresh === "function") {
+        wx.stopPullDownRefresh()
+      }
+      return
+    }
+    this.loadOperationConfig()
+    if (this.data.carId) {
+      this.loadFavoriteStatus(this.data.carId)
+      this.loadRelatedGuides(this.data.carId)
+    }
+    this.loadCarDetail(this.data.carId, {
+      done: () => {
+        if (typeof wx.stopPullDownRefresh === "function") {
+          wx.stopPullDownRefresh()
+        }
+      }
+    })
+  },
+
   loadRelatedGuides(vehicleId) {
     if (!vehicleId || !wx.cloud || typeof wx.cloud.callFunction !== "function") return
     wx.cloud.callFunction({
@@ -344,21 +365,40 @@ Page({
     }
   },
 
-  loadCarDetail(carId) {
+  finishCarDetailLoadEffects() {
+    this.clearCarDetailLoadTimer()
+    if (typeof this._carDetailLoadDone === "function") {
+      const done = this._carDetailLoadDone
+      this._carDetailLoadDone = null
+      try {
+        done()
+      } catch (error) {}
+    }
+  },
+
+  loadCarDetail(carId, options) {
+    const input = options && typeof options === "object" ? options : {}
     const requestId = Number(this._carDetailRequestId || 0) + 1
     this._carDetailRequestId = requestId
-    this.clearCarDetailLoadTimer()
+    this.finishCarDetailLoadEffects()
 
     if (!carId) {
       this.applyCar(null)
+      if (typeof input.done === "function") {
+        try { input.done() } catch (e) {}
+      }
       return
     }
 
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       this.setLoadError("云能力未初始化，请稍后重试")
+      if (typeof input.done === "function") {
+        try { input.done() } catch (e) {}
+      }
       return
     }
 
+    this._carDetailLoadDone = typeof input.done === "function" ? input.done : null
     this.setData({
       loading: !this.data.car,
       loadError: false
@@ -370,7 +410,7 @@ Page({
         return false
       }
       settled = true
-      this.clearCarDetailLoadTimer()
+      this.finishCarDetailLoadEffects()
       return true
     }
     const handleFailure = (message) => {
@@ -438,6 +478,7 @@ Page({
     this._favoriteUpdateSerial = Number(this._favoriteUpdateSerial || 0) + 1
     this.cancelOperationConfigRequest()
     this.cancelImageResolves()
+    this.finishCarDetailLoadEffects()
     this.clearCarDetailLoadTimer()
     this.clearFavoriteStatusTimer()
     this.clearFavoriteUpdateTimer()

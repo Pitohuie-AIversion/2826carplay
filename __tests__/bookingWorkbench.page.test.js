@@ -443,6 +443,60 @@ describe("pages/booking-workbench", () => {
     expect(page.data.queue).toHaveLength(1)
   })
 
+  test("工作台排序偏好支持本地持久化与启动恢复", () => {
+    const storage = {}
+    global.wx = {
+      getStorageSync: jest.fn((key) => storage[key] || ""),
+      setStorageSync: jest.fn((key, value) => {
+        storage[key] = value
+      })
+    }
+
+    const page = createPage(loadPageDefinition(), {
+      allBookings: [
+        {
+          id: "booking_1",
+          startDate: "2026-10-01",
+          createdTimestamp: 1000,
+          status: "pending",
+          coordinationStatus: "pending"
+        },
+        {
+          id: "booking_2",
+          startDate: "2026-09-20",
+          createdTimestamp: 2000,
+          status: "pending",
+          coordinationStatus: "pending"
+        }
+      ]
+    })
+
+    // 1. 切换排序为 pickup 时写入存储
+    page.handleSortTap({
+      currentTarget: {
+        dataset: {
+          sort: "pickup"
+        }
+      }
+    })
+    expect(global.wx.setStorageSync).toHaveBeenCalledWith("workbench_sort_preference", "pickup")
+    expect(storage.workbench_sort_preference).toBe("pickup")
+
+    // 2. 模拟下次打开页面，restoreSortPreference 从本地存储恢复偏好
+    const freshPage = createPage(loadPageDefinition())
+    freshPage.restoreSortPreference()
+    expect(freshPage.data.selectedSort).toBe("pickup")
+    expect(freshPage.data.sortHint).toBe("按预计用车日期从近到远排列")
+    expect(freshPage.data.viewCustomized).toBe(true)
+
+    // 3. 一键重置视图后将存储恢复为 smart
+    freshPage.handleResetView()
+    expect(global.wx.setStorageSync).toHaveBeenCalledWith("workbench_sort_preference", "smart")
+    expect(storage.workbench_sort_preference).toBe("smart")
+    expect(freshPage.data.selectedSort).toBe("smart")
+    expect(freshPage.data.viewCustomized).toBe(false)
+  })
+
   test("待协调预约可一键开始协调并刷新队列", () => {
     global.wx = {
       cloud: {

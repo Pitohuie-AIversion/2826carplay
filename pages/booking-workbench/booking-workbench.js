@@ -147,6 +147,28 @@ function sortQueue(queue, mode) {
     .map((entry) => entry.item)
 }
 
+const WORKBENCH_SORT_STORAGE_KEY = "workbench_sort_preference"
+
+function getSavedSortPreference() {
+  if (typeof wx === "undefined" || typeof wx.getStorageSync !== "function") {
+    return ""
+  }
+  try {
+    return wx.getStorageSync(WORKBENCH_SORT_STORAGE_KEY) || ""
+  } catch (error) {
+    return ""
+  }
+}
+
+function saveSortPreference(sort) {
+  if (typeof wx === "undefined" || typeof wx.setStorageSync !== "function") {
+    return
+  }
+  try {
+    wx.setStorageSync(WORKBENCH_SORT_STORAGE_KEY, sort)
+  } catch (error) {}
+}
+
 Page({
   data: {
     pageAuthorized: false,
@@ -184,12 +206,29 @@ Page({
 
   applyState(patch) { this.setData(patch) },
 
+  restoreSortPreference() {
+    const saved = getSavedSortPreference()
+    const option = SORT_OPTIONS.find((item) => item.key === saved)
+    if (option && option.key !== this.data.selectedSort) {
+      this.setData({
+        selectedSort: option.key,
+        sortHint: option.hint,
+        viewCustomized: Boolean(
+          this.data.selectedMode !== "todo" ||
+          String(this.data.keyword || "").trim() ||
+          option.key !== "smart"
+        )
+      })
+    }
+  },
+
   onLoad() {
     const perf = createPerformanceHelpers(this)
     this._perf = perf
     this.applyState = perf.applyState
     this.flushStateNow = perf.flushStateNow
     activatePageNativeActions(this)
+    this.restoreSortPreference()
     requirePagePermission(this, {
       required: "canManageBookings",
       noPermissionMessage: "无权访问待协调工作台",
@@ -317,6 +356,7 @@ Page({
       selectedSort: "smart",
       sortHint: SORT_OPTIONS[0].hint
     })
+    saveSortPreference("smart")
     this.applyWorkbench("todo")
   },
 
@@ -330,6 +370,7 @@ Page({
       selectedSort,
       sortHint: option.hint
     })
+    saveSortPreference(selectedSort)
     this.applyWorkbench()
   },
 

@@ -139,6 +139,31 @@ function shouldCache(url) {
   return isCloudUrl(url) || isRemoteUrl(url)
 }
 
+function isLocalPath(path) {
+  if (typeof path !== "string" || !path) return false
+  return (
+    path.startsWith("wxfile://") ||
+    path.startsWith("http://usr/") ||
+    path.startsWith("http://tmp/") ||
+    path.startsWith("/")
+  )
+}
+
+function isLocalFileAccessible(path) {
+  if (!isLocalPath(path)) return true
+  if (typeof wx === "undefined" || typeof wx.getFileSystemManager !== "function") return true
+  try {
+    const fs = wx.getFileSystemManager()
+    if (fs && typeof fs.accessSync === "function") {
+      fs.accessSync(path)
+      return true
+    }
+    return true
+  } catch (e) {
+    return false
+  }
+}
+
 function processDownloadQueue() {
   if (activeDownloads >= MAX_CONCURRENT_DOWNLOADS || downloadQueue.length === 0) {
     return
@@ -266,16 +291,22 @@ function resolveImage(url, options) {
 
   if (memoryCache.has(url)) {
     const localPath = memoryCache.get(url)
-    touchMeta(url)
-    return Promise.resolve({ localPath, cached: true, local: true })
+    if (isLocalFileAccessible(localPath)) {
+      touchMeta(url)
+      return Promise.resolve({ localPath, cached: true, local: true })
+    }
+    memoryCache.delete(url)
   }
 
   loadUrlMap()
   const savedPath = urlMap[url]
   if (savedPath) {
-    memoryCache.set(url, savedPath)
-    touchMeta(url)
-    return Promise.resolve({ localPath: savedPath, cached: true, local: true })
+    if (isLocalFileAccessible(savedPath)) {
+      memoryCache.set(url, savedPath)
+      touchMeta(url)
+      return Promise.resolve({ localPath: savedPath, cached: true, local: true })
+    }
+    removeCacheEntry(url)
   }
 
   if (pendingDownloads.has(url)) {
@@ -296,14 +327,22 @@ function preloadImages(urls, options) {
     .filter((url) => shouldCache(url))
     .map((url) => {
       if (memoryCache.has(url)) {
-        touchMeta(url)
-        return Promise.resolve({ localPath: memoryCache.get(url), cached: true })
+        const localPath = memoryCache.get(url)
+        if (isLocalFileAccessible(localPath)) {
+          touchMeta(url)
+          return Promise.resolve({ localPath, cached: true })
+        }
+        memoryCache.delete(url)
       }
       loadUrlMap()
       if (urlMap[url]) {
-        memoryCache.set(url, urlMap[url])
-        touchMeta(url)
-        return Promise.resolve({ localPath: urlMap[url], cached: true })
+        const saved = urlMap[url]
+        if (isLocalFileAccessible(saved)) {
+          memoryCache.set(url, saved)
+          touchMeta(url)
+          return Promise.resolve({ localPath: saved, cached: true })
+        }
+        removeCacheEntry(url)
       }
       return resolveImage(url, { priority }).catch(() => null)
     })
@@ -312,13 +351,22 @@ function preloadImages(urls, options) {
 
 function getCachedPath(url) {
   if (!url) return url
-  if (memoryCache.has(url)) return memoryCache.get(url)
+  if (memoryCache.has(url)) {
+    const localPath = memoryCache.get(url)
+    if (isLocalFileAccessible(localPath)) {
+      return localPath
+    }
+    memoryCache.delete(url)
+  }
   loadUrlMap()
   const saved = urlMap[url]
   if (saved) {
-    memoryCache.set(url, saved)
-    touchMeta(url)
-    return saved
+    if (isLocalFileAccessible(saved)) {
+      memoryCache.set(url, saved)
+      touchMeta(url)
+      return saved
+    }
+    removeCacheEntry(url)
   }
   return url
 }

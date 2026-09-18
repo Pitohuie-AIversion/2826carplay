@@ -9,6 +9,8 @@ const {
   isPageNativeActionActive
 } = require("../../shared/pageNativeAction")
 const { resolveImage, getCachedPath, preloadImages } = require("../../shared/imageCache")
+const detailLoadedImagesCache = new Set()
+const carDetailMemoryCache = new Map()
 const CAR_DETAIL_LOAD_TIMEOUT_MS = 15 * 1000
 const FAVORITE_STATUS_TIMEOUT_MS = 10 * 1000
 const FAVORITE_UPDATE_TIMEOUT_MS = 12 * 1000
@@ -145,13 +147,17 @@ function formatCarViewModel(car) {
 
   const statusCar = attachStatusClass(car)
   const images = Array.isArray(car.images) && car.images.length ? car.images : car.cover ? [car.cover] : []
-  const imageItems = images.map((src, index) => ({
-    key: `vehicle-image-${index}`,
-    src,
-    displaySrc: getCachedPath(src),
-    loaded: false,
-    failed: false
-  }))
+  const imageItems = images.map((src, index) => {
+    const displaySrc = getCachedPath(src)
+    const isAlreadyLoaded = detailLoadedImagesCache.has(src) || detailLoadedImagesCache.has(displaySrc)
+    return {
+      key: `vehicle-image-${index}`,
+      src,
+      displaySrc,
+      loaded: Boolean(isAlreadyLoaded),
+      failed: false
+    }
+  })
 
   return {
     ...statusCar,
@@ -390,8 +396,15 @@ Page({
       return
     }
 
+    const cachedCar = carDetailMemoryCache.get(carId)
+    if (cachedCar && !this.data.car) {
+      this.applyCar(cachedCar)
+    }
+
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
-      this.setLoadError("云能力未初始化，请稍后重试")
+      if (!cachedCar) {
+        this.setLoadError("云能力未初始化，请稍后重试")
+      }
       if (typeof input.done === "function") {
         try { input.done() } catch (e) {}
       }
@@ -436,11 +449,17 @@ Page({
         const result = res && res.result ? res.result : null
         const car = result && result.ok ? result.car : null
         if (car) {
+          carDetailMemoryCache.set(carId, car)
+          if (carDetailMemoryCache.size > 30) {
+            const oldestKey = carDetailMemoryCache.keys().next().value
+            carDetailMemoryCache.delete(oldestKey)
+          }
           this.applyCar(car)
           return
         }
 
         if (result && result.code === "NOT_FOUND") {
+          carDetailMemoryCache.delete(carId)
           this.applyCar(null)
           return
         }
@@ -602,6 +621,13 @@ Page({
       return
     }
 
+    const car = this.data.car
+    const item = car && car.imageItems && car.imageItems[index]
+    if (item) {
+      if (item.src) detailLoadedImagesCache.add(item.src)
+      if (item.displaySrc) detailLoadedImagesCache.add(item.displaySrc)
+    }
+
     this.setData({
       [`car.imageItems[${index}].loaded`]: true,
       [`car.imageItems[${index}].failed`]: false
@@ -616,6 +642,11 @@ Page({
 
     const car = this.data.car
     const item = car && car.imageItems && car.imageItems[index]
+    if (item) {
+      if (item.src) detailLoadedImagesCache.delete(item.src)
+      if (item.displaySrc) detailLoadedImagesCache.delete(item.displaySrc)
+    }
+
     if (item && item.displaySrc && item.src && item.displaySrc !== item.src) {
       this.setData({
         [`car.imageItems[${index}].displaySrc`]: item.src

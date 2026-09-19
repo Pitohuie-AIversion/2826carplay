@@ -22,6 +22,8 @@ const DEFAULT_RENTAL_TERMS = {
 const DEFAULT_CONFIG = {
   brandName: "极境车库",
   servicePhone: "15715710090",
+  wxKfCorpId: "",
+  wxKfExtInfo: "",
   mineUserDesc: "查看预约、个人信息申请与车库服务",
   garagePageTitle: "极境车库",
   garagePageSubtitle: "甄选座驾，为每一次出发预留专属席位",
@@ -68,6 +70,8 @@ function normalizeConfig(raw) {
   return {
     brandName: normalizeText(input.brandName, 20) || DEFAULT_CONFIG.brandName,
     servicePhone: normalizeText(input.servicePhone, 20) || DEFAULT_CONFIG.servicePhone,
+    wxKfCorpId: normalizeText(input.wxKfCorpId, 64),
+    wxKfExtInfo: normalizeText(input.wxKfExtInfo, 512),
     mineUserDesc:
       !mineUserDesc || mineUserDesc === "静态展示页，更多个人功能将在后续版本完善"
         ? DEFAULT_CONFIG.mineUserDesc

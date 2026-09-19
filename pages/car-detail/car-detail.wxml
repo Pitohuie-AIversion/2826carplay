@@ -303,6 +303,9 @@
       <button class="action-button ui-btn ui-btn-primary" bindtap="handleBookingTap" aria-label="{{car.primaryActionText}}，{{car.actionHintText}}">
         <view class="detail-action-content"><view class="detail-action-native-icon booking-action-native-icon" aria-hidden="true"></view><text>{{car.primaryActionText}}</text></view>
       </button>
+      <button class="action-button ui-btn ui-btn-ghost action-button-offset" bindtap="handleOpenCustomerService" hover-class="detail-button-pressed" aria-label="在线咨询极境车库顾问">
+        <view class="detail-action-content"><view class="detail-action-native-icon contact-chat-native-icon" aria-hidden="true"></view><text>在线咨询</text></view>
+      </button>
       <button class="action-button ui-btn ui-btn-ghost action-button-offset" bindtap="handlePhoneCall" aria-label="电话咨询极境车库顾问">
         <view class="detail-action-content"><view class="detail-action-native-icon phone-action-native-icon" aria-hidden="true"></view><text>电话咨询</text></view>
       </button>

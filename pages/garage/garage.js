@@ -632,6 +632,13 @@ Page({
       truncated: Boolean(nextPagination && nextPagination.truncated),
       hasMore: Boolean(nextPagination && nextPagination.hasMore)
     })
+
+    const topCovers = sortedCars.slice(0, 6).map((c) => c.cover).filter(Boolean)
+    if (topCovers.length) {
+      try {
+        preloadImages(topCovers, { priority: 30 })
+      } catch (e) {}
+    }
   },
 
   filterCars(categoryId, availableOnlyInput, searchKeywordInput, serverSummary, keepSearchDebouncing, selectedCityInput) {

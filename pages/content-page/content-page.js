@@ -7,6 +7,7 @@ const {
   cancelPageNativeActions,
   isPageNativeActionActive
 } = require("../../shared/pageNativeAction")
+const { openCustomerService, hasWxKfConfig } = require("../../shared/customerService")
 
 const CONTENT_MAP = {
   faq: {
@@ -93,6 +94,7 @@ Page({
     contentTabs: CONTENT_TABS,
     activeSectionKey: "",
     servicePhone: "15715710090",
+    wxKfReady: false,
     guideMode: false,
     guide: null,
     relatedVehicles: [],
@@ -191,6 +193,15 @@ Page({
   handleGuideVehicleTap(event) {
     const vehicleId = String(event.currentTarget.dataset.id || "").trim()
     if (!vehicleId) return
+    const targetVehicle = (this.data.relatedVehicles || []).find((item) => String(item.id || "") === vehicleId)
+    if (targetVehicle) {
+      try {
+        const app = typeof getApp === "function" ? getApp() : null
+        if (app && app.globalData) {
+          app.globalData._tempCarDetailPreview = targetVehicle
+        }
+      } catch (e) {}
+    }
     const attribution = sanitizeAttribution({ ...this.data.attribution, vehicleId })
     trackEvent("content_vehicle_click", vehicleId, attribution)
     const query = buildQuery(attribution)
@@ -285,7 +296,8 @@ Page({
     this._cancelContentConfigRequest = requestOperationConfig({
       onSuccess: (config) => {
         this.setData({
-          servicePhone: config.servicePhone || this.data.servicePhone
+          servicePhone: config.servicePhone || this.data.servicePhone,
+          wxKfReady: hasWxKfConfig(config)
         })
 
         const field =
@@ -312,6 +324,38 @@ Page({
       this._cancelContentConfigRequest()
       this._cancelContentConfigRequest = null
     }
+  },
+
+  handleOpenCustomerService() {
+    const contentKey = this.data.contentKey || ""
+    const pageAction = beginPageNativeAction(this, { requireCurrent: true })
+    openCustomerService({
+      page: this,
+      source: "content:" + (contentKey || "unknown"),
+      onLegacyFallback: () => {
+        if (this.data.wxKfReady) {
+          return
+        }
+        if (!isPageNativeActionActive(this, pageAction)) {
+          return
+        }
+        wx.showModal({
+          title: "在线客服未启用",
+          content: "管理员尚未配置微信客服，您可以先通过电话联系我们。",
+          confirmText: "拨打客服电话",
+          cancelText: "知道了",
+          confirmColor: "#528fff",
+          success: (res) => {
+            if (!isPageNativeActionActive(this, pageAction)) {
+              return
+            }
+            if (res && res.confirm) {
+              this.handlePhoneCall()
+            }
+          }
+        })
+      }
+    })
   },
 
   handlePhoneCall() {

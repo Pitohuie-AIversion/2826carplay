@@ -7,6 +7,7 @@ const {
   isPageNativeActionActive
 } = require("../../shared/pageNativeAction")
 const { CURRENT_VERSION, showReleaseNotesModal } = require("../../shared/versionMigration")
+const { openCustomerService, hasWxKfConfig } = require("../../shared/customerService")
 
 const MENU_ITEMS = [
   { key: "bookings", title: "我的预约", desc: "查看已提交的预约咨询", section: "会员服务", sectionKicker: "MEMBER", icon: "calendar" },
@@ -306,6 +307,7 @@ Page({
   data: {
     brandName: "极境车库",
     servicePhone: "15715710090",
+    wxKfReady: false,
     userName: "车库来访者",
     userDesc: "查看预约、个人信息申请与车库服务",
     envVersion: "release",
@@ -412,7 +414,8 @@ Page({
         this.setData({
           brandName: config.brandName || this.data.brandName,
           servicePhone: config.servicePhone || this.data.servicePhone,
-          userDesc: config.mineUserDesc || this.data.userDesc
+          userDesc: config.mineUserDesc || this.data.userDesc,
+          wxKfReady: hasWxKfConfig(config)
         })
       }
     })
@@ -975,6 +978,37 @@ Page({
     wx.showToast({
       title: formatToastTitle(`${title} 即将开放`, "功能即将开放"),
       icon: "none"
+    })
+  },
+
+  handleOpenCustomerService() {
+    const pageAction = beginPageNativeAction(this, { requireCurrent: true })
+    openCustomerService({
+      page: this,
+      source: "mine",
+      onLegacyFallback: () => {
+        if (this.data.wxKfReady) {
+          return
+        }
+        if (!isPageNativeActionActive(this, pageAction)) {
+          return
+        }
+        wx.showModal({
+          title: "在线客服未启用",
+          content: "管理员尚未配置微信客服，您可以先通过电话联系我们。",
+          confirmText: "拨打客服电话",
+          cancelText: "知道了",
+          confirmColor: "#528fff",
+          success: (res) => {
+            if (!isPageNativeActionActive(this, pageAction)) {
+              return
+            }
+            if (res && res.confirm) {
+              this.handlePhoneCall()
+            }
+          }
+        })
+      }
     })
   },
 

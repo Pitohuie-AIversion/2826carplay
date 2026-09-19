@@ -138,7 +138,10 @@
       </view>
     </view>
     <view class="support-actions">
-      <button class="support-button ui-btn ui-btn-primary" open-type="contact" hover-class="content-control-pressed" aria-label="联系极境车库在线客服">
+      <button wx:if="{{wxKfReady}}" class="support-button ui-btn ui-btn-primary" bindtap="handleOpenCustomerService" hover-class="content-control-pressed" aria-label="联系极境车库在线客服">
+        <view class="content-action-content"><view class="content-action-native-icon support-chat-native-icon" aria-hidden="true"></view><text>在线客服</text></view>
+      </button>
+      <button wx:else class="support-button ui-btn ui-btn-primary" open-type="contact" hover-class="content-control-pressed" aria-label="联系极境车库在线客服">
         <view class="content-action-content"><view class="content-action-native-icon support-chat-native-icon" aria-hidden="true"></view><text>在线客服</text></view>
       </button>
       <button class="support-button support-button-last ui-btn ui-btn-ghost" bindtap="handlePhoneCall" hover-class="content-control-pressed" aria-label="拨打极境车库咨询电话">

@@ -1,7 +1,9 @@
 const STORAGE_KEY_MAP = "image_cache_url_map_v1"
 const STORAGE_KEY_META = "image_cache_meta_v1"
+const STORAGE_KEY_CONFIRMED = "image_cache_confirmed_v1"
 const MAX_MEMORY_CACHE = 80
 const MAX_LOCAL_CACHE = 120
+const MAX_CONFIRMED_URLS = 120
 const MAX_CONCURRENT_DOWNLOADS = 3
 const DOWNLOAD_TIMEOUT_MS = 20 * 1000
 
@@ -45,6 +47,7 @@ const memoryCache = createLRU(MAX_MEMORY_CACHE)
 
 let urlMap = null
 let cacheMeta = null
+let confirmedUrls = null
 let pendingDownloads = new Map()
 let downloadQueue = []
 let activeDownloads = 0
@@ -83,6 +86,26 @@ function saveCacheMeta() {
   } catch (e) {}
 }
 
+function loadConfirmedUrls() {
+  if (confirmedUrls !== null) return confirmedUrls
+  try {
+    const raw = wx.getStorageSync(STORAGE_KEY_CONFIRMED)
+    confirmedUrls = Array.isArray(raw) ? new Set(raw) : new Set()
+  } catch (e) {
+    confirmedUrls = new Set()
+  }
+  return confirmedUrls
+}
+
+function saveConfirmedUrls() {
+  if (!confirmedUrls) return
+  try {
+    const list = Array.from(confirmedUrls)
+    const trimmed = list.length > MAX_CONFIRMED_URLS ? list.slice(list.length - MAX_CONFIRMED_URLS) : list
+    wx.setStorageSync(STORAGE_KEY_CONFIRMED, trimmed)
+  } catch (e) {}
+}
+
 function touchMeta(url) {
   loadCacheMeta()
   const entry = cacheMeta[url] || { createdAt: Date.now(), hits: 0 }
@@ -101,13 +124,29 @@ function removeCacheEntry(url) {
   saveUrlMap()
   saveCacheMeta()
   memoryCache.delete(url)
+  if (confirmedUrls) {
+    confirmedUrls.delete(url)
+    if (localPath) confirmedUrls.delete(localPath)
+    saveConfirmedUrls()
+  }
   if (localPath) {
     try {
-      const fs = wx.getFileSystemManager()
-      fs.removeSavedFile({
-        filePath: localPath,
-        fail: () => {}
-      })
+      if (typeof wx !== "undefined") {
+        if (typeof wx.removeSavedFile === "function") {
+          wx.removeSavedFile({
+            filePath: localPath,
+            fail: () => {}
+          })
+        } else if (typeof wx.getFileSystemManager === "function") {
+          const fs = wx.getFileSystemManager()
+          if (fs && typeof fs.unlink === "function") {
+            fs.unlink({
+              filePath: localPath,
+              fail: () => {}
+            })
+          }
+        }
+      }
     } catch (e) {}
   }
 }
@@ -151,6 +190,9 @@ function isLocalPath(path) {
 
 function isLocalFileAccessible(path) {
   if (!isLocalPath(path)) return true
+  if (typeof path === "string" && (path.startsWith("/assets/") || path.startsWith("/images/") || path.startsWith("/static/"))) {
+    return true
+  }
   if (typeof wx === "undefined" || typeof wx.getFileSystemManager !== "function") return true
   try {
     const fs = wx.getFileSystemManager()
@@ -391,6 +433,10 @@ function clearAllCache() {
   const urls = Object.keys(urlMap || {})
   urls.forEach((url) => removeCacheEntry(url))
   memoryCache.keys().forEach((key) => memoryCache.delete(key))
+  if (confirmedUrls) {
+    confirmedUrls.clear()
+    saveConfirmedUrls()
+  }
 }
 
 function getCacheStats() {
@@ -404,10 +450,52 @@ function getCacheStats() {
   }
 }
 
+function isImageLocallyCached(url) {
+  if (!url || typeof url !== "string") return false
+  const cached = getCachedPath(url)
+  return Boolean(cached && cached !== url)
+}
+
+function isImageLoaded(url) {
+  if (!url || typeof url !== "string") return false
+  if (isImageLocallyCached(url)) return true
+  const set = loadConfirmedUrls()
+  if (set.has(url)) return true
+  const cached = getCachedPath(url)
+  if (cached && set.has(cached)) return true
+  return false
+}
+
+function markImageLoaded(url) {
+  if (!url || typeof url !== "string") return
+  const set = loadConfirmedUrls()
+  set.add(url)
+  const cached = getCachedPath(url)
+  if (cached && cached !== url) {
+    set.add(cached)
+  }
+  saveConfirmedUrls()
+}
+
+function unmarkImageLoaded(url) {
+  if (!url || typeof url !== "string") return
+  const set = loadConfirmedUrls()
+  set.delete(url)
+  const cached = getCachedPath(url)
+  if (cached && cached !== url) {
+    set.delete(cached)
+  }
+  saveConfirmedUrls()
+}
+
 module.exports = {
   resolveImage,
   preloadImages,
   getCachedPath,
+  isImageLoaded,
+  isImageLocallyCached,
+  markImageLoaded,
+  unmarkImageLoaded,
   clearExpiredCache,
   clearAllCache,
   getCacheStats

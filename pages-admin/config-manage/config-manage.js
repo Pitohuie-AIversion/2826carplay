@@ -21,6 +21,8 @@ const DEFAULT_RENTAL_TERMS = {
 const DEFAULT_CONFIG = {
   brandName: "极境车库",
   servicePhone: "15715710090",
+  wxKfCorpId: "",
+  wxKfExtInfo: "",
   mineUserDesc: "查看预约、个人信息申请与车库服务",
   garagePageTitle: "极境车库",
   garagePageSubtitle: "甄选座驾，为每一次出发预留专属席位",
@@ -54,6 +56,8 @@ function buildForm(config) {
   return {
     brandName: source.brandName || DEFAULT_CONFIG.brandName,
     servicePhone: source.servicePhone || DEFAULT_CONFIG.servicePhone,
+    wxKfCorpId: source.wxKfCorpId || DEFAULT_CONFIG.wxKfCorpId,
+    wxKfExtInfo: source.wxKfExtInfo || DEFAULT_CONFIG.wxKfExtInfo,
     mineUserDesc: source.mineUserDesc || DEFAULT_CONFIG.mineUserDesc,
     garagePageTitle: source.garagePageTitle || DEFAULT_CONFIG.garagePageTitle,
     garagePageSubtitle: normalizeGarageSubtitle(source.garagePageSubtitle),
@@ -86,6 +90,8 @@ function buildSubmitConfig(form) {
   return {
     brandName: source.brandName || "",
     servicePhone: source.servicePhone || "",
+    wxKfCorpId: String(source.wxKfCorpId || "").trim(),
+    wxKfExtInfo: String(source.wxKfExtInfo || "").trim(),
     mineUserDesc: source.mineUserDesc || "",
     garagePageTitle: source.garagePageTitle || "",
     garagePageSubtitle: source.garagePageSubtitle || "",
@@ -331,6 +337,33 @@ Page({
     ) {
       wx.showToast({
         title: "模板编号有误",
+        icon: "none"
+      })
+      return
+    }
+
+    if (submitConfig.wxKfCorpId && !/^[A-Za-z0-9_-]{6,64}$/.test(submitConfig.wxKfCorpId)) {
+      wx.showToast({
+        title: "企业ID格式错误",
+        icon: "none"
+      })
+      return
+    }
+
+    if (submitConfig.wxKfExtInfo && submitConfig.wxKfExtInfo.length > 512) {
+      wx.showToast({
+        title: "客服链接参数过长",
+        icon: "none"
+      })
+      return
+    }
+
+    if (
+      (submitConfig.wxKfCorpId && !submitConfig.wxKfExtInfo) ||
+      (!submitConfig.wxKfCorpId && submitConfig.wxKfExtInfo)
+    ) {
+      wx.showToast({
+        title: "企业ID与链接需同填",
         icon: "none"
       })
       return

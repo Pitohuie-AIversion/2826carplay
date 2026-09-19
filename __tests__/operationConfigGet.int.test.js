@@ -62,6 +62,8 @@ describe("cloudfunctions/operationConfigGet integration", () => {
     expect(res.config).toEqual({
       brandName: "超跑车库",
       servicePhone: "18800000000",
+      wxKfCorpId: "",
+      wxKfExtInfo: "",
       mineUserDesc: "欢迎来到车库",
       garagePageTitle: "超跑车库",
       garagePageSubtitle: "欢迎预约热门车型",

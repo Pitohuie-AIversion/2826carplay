@@ -88,6 +88,19 @@
       <view class="form-tip">支持手机号、带区号座机或以 + 开头的国际号码。</view>
     </view>
 
+    <view class="form-divider"></view>
+    <view class="form-item">
+      <view class="form-label">企业ID（CorpID）</view>
+      <input class="form-input ui-input" value="{{form.wxKfCorpId}}" data-field="wxKfCorpId" disabled="{{loading || saving}}" bindinput="handleInput" maxlength="64" confirm-type="done" placeholder="例如 ww1234567890abcdef" aria-label="企业微信 CorpId" />
+      <view class="form-tip">企业微信后台「我的企业」→企业信息」中可查看，以 ww 开头。</view>
+    </view>
+
+    <view class="form-item">
+      <view class="form-label">微信客服链接参数（extInfo）</view>
+      <textarea class="form-textarea ui-input" value="{{form.wxKfExtInfo}}" data-field="wxKfExtInfo" disabled="{{loading || saving}}" bindinput="handleInput" maxlength="512" placeholder="企业微信客服接入页打开小程序场景值参数（Base64 字符串）" aria-label="微信客服 extInfo 参数" />
+      <view class="field-meta"><view class="form-tip">企业微信「微信客服 → 客服账号 → 获取链接 → 小程序」场景值参数（Base64 字符串）。留空则降级使用原生轻量客服按钮。</view><view class="field-counter">{{form.wxKfExtInfo.length}} / 512</view></view>
+    </view>
+
     <view class="form-item">
       <view class="form-label">我的页简介</view>
       <textarea class="form-textarea ui-input" value="{{form.mineUserDesc}}" data-field="mineUserDesc" disabled="{{loading || saving}}" bindinput="handleInput" maxlength="80" placeholder="填写个人中心品牌简介" aria-label="我的页简介" />

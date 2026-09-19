@@ -179,6 +179,7 @@ describe("用户主流程原生图标", () => {
         "form.faqContent.length",
         "form.rulesContent.length",
         "form.bookingPrivacyTip.length",
+        "form.wxKfExtInfo.length",
         "form.rentalIncludedText.length",
         "form.rentalProtectionText.length",
         "form.rentalServiceFeeText.length",
@@ -236,9 +237,9 @@ describe("用户主流程原生图标", () => {
       })
     })
 
-    expect(inputControlCount).toBe(81)
-    expect(singleLineInputCount).toBe(41)
-    expect(textareaCount).toBe(40)
+    expect(inputControlCount).toBe(83)
+    expect(singleLineInputCount).toBe(42)
+    expect(textareaCount).toBe(41)
     expect(Object.values(textareaCounterExpressions).flat()).toHaveLength(textareaCount)
     Object.entries(textareaCounterExpressions).forEach(([relativePath, expressions]) => {
       const source = read(relativePath)
@@ -538,7 +539,7 @@ describe("用户主流程原生图标", () => {
       })
     })
 
-    expect(confirmationCount).toBe(33)
+    expect(confirmationCount).toBe(35)
   })
 
   test("原生操作菜单统一使用品牌色与顶部说明", () => {
@@ -690,7 +691,7 @@ describe("用户主流程原生图标", () => {
     )
     const bookingDetailSource = read("pages/booking-detail/booking-detail.js")
 
-    expect(currentOnlyActionCount).toBe(17)
+    expect(currentOnlyActionCount).toBe(19)
     expect(bookingDetailSource).toContain("isPageCurrent(this)")
     expect(read("app.js")).toContain("nativeActionAppVisible = false")
     expect(read("app.js")).toContain("nativeActionAppVisible = true")

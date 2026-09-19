@@ -1,6 +1,10 @@
-const { resolveImage, getCachedPath } = require("../../shared/imageCache")
-
-const loadedCoversCache = new Set()
+const {
+  resolveImage,
+  getCachedPath,
+  isImageLoaded,
+  markImageLoaded,
+  unmarkImageLoaded
+} = require("../../shared/imageCache")
 
 Component({
   properties: {
@@ -24,8 +28,8 @@ Component({
       const isSameCover = cover && cover === this._lastCover
       const isAlreadyLoaded =
         (isSameCover && Boolean(this._imageLoaded)) ||
-        loadedCoversCache.has(cover) ||
-        loadedCoversCache.has(nextDisplay)
+        isImageLoaded(cover) ||
+        (nextDisplay && isImageLoaded(nextDisplay))
 
       this._lastCover = cover
       this.setData({
@@ -64,10 +68,10 @@ Component({
       this._imageLoaded = true
       const car = this.data.car || {}
       if (car.cover) {
-        loadedCoversCache.add(car.cover)
+        markImageLoaded(car.cover)
       }
       if (this.data.displayCover) {
-        loadedCoversCache.add(this.data.displayCover)
+        markImageLoaded(this.data.displayCover)
       }
       this.setData({
         imageLoading: false,
@@ -80,11 +84,11 @@ Component({
       const car = this.data.car || {}
       const originalCover = car.cover || ""
       if (originalCover) {
-        loadedCoversCache.delete(originalCover)
+        unmarkImageLoaded(originalCover)
       }
       const current = this.data.displayCover
       if (current) {
-        loadedCoversCache.delete(current)
+        unmarkImageLoaded(current)
       }
       if (originalCover && current && current !== originalCover) {
         this.setData({ displayCover: originalCover })

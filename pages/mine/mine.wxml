@@ -181,7 +181,10 @@
     </view>
     <view class="section-desc">如需确认车辆档期、价格或取还车规则，可选择在线客服或电话咨询。</view>
     <view class="contact-actions">
-      <button class="action-button ui-btn ui-btn-ghost" open-type="contact" hover-class="mine-button-pressed" aria-label="联系极境车库在线客服">
+      <button wx:if="{{wxKfReady}}" class="action-button ui-btn ui-btn-ghost" bindtap="handleOpenCustomerService" hover-class="mine-button-pressed" aria-label="联系极境车库在线客服">
+        <view class="contact-action-content"><view class="contact-action-native-icon contact-chat-native-icon" aria-hidden="true"></view><text>在线客服</text></view>
+      </button>
+      <button wx:else class="action-button ui-btn ui-btn-ghost" open-type="contact" hover-class="mine-button-pressed" aria-label="联系极境车库在线客服">
         <view class="contact-action-content"><view class="contact-action-native-icon contact-chat-native-icon" aria-hidden="true"></view><text>在线客服</text></view>
       </button>
       <button class="action-button ui-btn ui-btn-ghost action-button-offset" bindtap="handlePhoneCall" hover-class="mine-button-pressed" aria-label="拨打极境车库咨询电话">

@@ -10,6 +10,7 @@ const ALLOWED_EVENTS = [
   "rental_rules_view",
   "trusted_profile_view",
   "phone_call",
+  "kf_chat",
   "share",
   "availability_available",
   "availability_conflict",

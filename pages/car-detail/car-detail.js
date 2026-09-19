@@ -8,7 +8,15 @@ const {
   cancelPageNativeActions,
   isPageNativeActionActive
 } = require("../../shared/pageNativeAction")
-const { resolveImage, getCachedPath, preloadImages } = require("../../shared/imageCache")
+const {
+  resolveImage,
+  getCachedPath,
+  preloadImages,
+  isImageLoaded,
+  markImageLoaded,
+  unmarkImageLoaded
+} = require("../../shared/imageCache")
+const { openCustomerService, hasWxKfConfig } = require("../../shared/customerService")
 const detailLoadedImagesCache = new Set()
 const carDetailMemoryCache = new Map()
 const CAR_DETAIL_LOAD_TIMEOUT_MS = 15 * 1000
@@ -149,7 +157,11 @@ function formatCarViewModel(car) {
   const images = Array.isArray(car.images) && car.images.length ? car.images : car.cover ? [car.cover] : []
   const imageItems = images.map((src, index) => {
     const displaySrc = getCachedPath(src)
-    const isAlreadyLoaded = detailLoadedImagesCache.has(src) || detailLoadedImagesCache.has(displaySrc)
+    const isAlreadyLoaded =
+      isImageLoaded(src) ||
+      (displaySrc && isImageLoaded(displaySrc)) ||
+      detailLoadedImagesCache.has(src) ||
+      detailLoadedImagesCache.has(displaySrc)
     return {
       key: `vehicle-image-${index}`,
       src,
@@ -182,6 +194,7 @@ Page({
   data: {
     brandName: "极境车库",
     servicePhone: "15715710090",
+    wxKfReady: false,
     rentalTerms: normalizeRentalTerms(),
     pricingOverview: buildPricingOverview(null, DEFAULT_RENTAL_TERMS),
     pricingExpanded: false,
@@ -315,6 +328,7 @@ Page({
         this.setData({
           brandName: String(config.brandName || "").trim() || this.data.brandName,
           servicePhone: servicePhone || this.data.servicePhone,
+          wxKfReady: hasWxKfConfig(config),
           rentalTerms,
           pricingOverview: buildPricingOverview(this.data.car, rentalTerms)
         })
@@ -552,10 +566,14 @@ Page({
     }
 
     const viewModel = formatCarViewModel(targetCar)
+    const isSameCar = Boolean(this.data.car && targetCar && String(this.data.car.id || "") === String(targetCar.id || ""))
+    const nextImageIndex = isSameCar
+      ? Math.min(Math.max(Number(this.data.currentImageIndex) || 0, 0), Math.max((viewModel.imageItems.length || 1) - 1, 0))
+      : 0
     this.setData({
       car: viewModel,
       pricingOverview: buildPricingOverview(targetCar, this.data.rentalTerms),
-      currentImageIndex: 0,
+      currentImageIndex: nextImageIndex,
       trustExpanded: false,
       loading: false,
       loadError: false
@@ -604,7 +622,8 @@ Page({
           if (!current || current.src !== item.src) return
           if (result.localPath === current.displaySrc) return
           this.setData({
-            [`car.imageItems[${entry.index}].displaySrc`]: result.localPath
+            [`car.imageItems[${entry.index}].displaySrc`]: result.localPath,
+            [`car.imageItems[${entry.index}].loaded`]: true
           })
         })
         .catch(() => {})
@@ -624,8 +643,14 @@ Page({
     const car = this.data.car
     const item = car && car.imageItems && car.imageItems[index]
     if (item) {
-      if (item.src) detailLoadedImagesCache.add(item.src)
-      if (item.displaySrc) detailLoadedImagesCache.add(item.displaySrc)
+      if (item.src) {
+        detailLoadedImagesCache.add(item.src)
+        markImageLoaded(item.src)
+      }
+      if (item.displaySrc) {
+        detailLoadedImagesCache.add(item.displaySrc)
+        markImageLoaded(item.displaySrc)
+      }
     }
 
     this.setData({
@@ -643,8 +668,14 @@ Page({
     const car = this.data.car
     const item = car && car.imageItems && car.imageItems[index]
     if (item) {
-      if (item.src) detailLoadedImagesCache.delete(item.src)
-      if (item.displaySrc) detailLoadedImagesCache.delete(item.displaySrc)
+      if (item.src) {
+        detailLoadedImagesCache.delete(item.src)
+        unmarkImageLoaded(item.src)
+      }
+      if (item.displaySrc) {
+        detailLoadedImagesCache.delete(item.displaySrc)
+        unmarkImageLoaded(item.displaySrc)
+      }
     }
 
     if (item && item.displaySrc && item.src && item.displaySrc !== item.src) {
@@ -841,6 +872,31 @@ Page({
       this._trustProfileViewTracked = true
       trackEvent("trusted_profile_view", this.data.carId)
     }
+  },
+
+  handleOpenCustomerService() {
+    openCustomerService({
+      page: this,
+      vehicleId: this.data.carId,
+      source: "car_detail",
+      onLegacyFallback: () => {
+        if (this.data.wxKfReady) {
+          return
+        }
+        wx.showActionSheet({
+          itemList: ["拨打客服电话", "复制官方微信号"],
+          itemColor: "#2a2a33",
+          success: (res) => {
+            if (!res) return
+            if (res.tapIndex === 0) {
+              this.handlePhoneCall()
+            } else if (res.tapIndex === 1) {
+              this.handleWechatConsult()
+            }
+          }
+        })
+      }
+    })
   },
 
   handlePhoneCall() {

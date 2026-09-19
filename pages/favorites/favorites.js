@@ -5,6 +5,7 @@ const {
   cancelPageNativeActions,
   isPageNativeActionActive
 } = require("../../shared/pageNativeAction")
+const { preloadImages } = require("../../shared/imageCache")
 const FAVORITES_LOAD_TIMEOUT_MS = 15 * 1000
 const FAVORITE_MUTATION_TIMEOUT_MS = 12 * 1000
 
@@ -223,6 +224,29 @@ Page({
     const carId = String(detail.carId || "").trim()
     if (!carId) {
       return
+    }
+    const targetCar =
+      (this.data.visibleList || []).find((item) => String(item.id || "") === carId) ||
+      (this.data.list || []).find((item) => String(item.id || "") === carId)
+    if (targetCar) {
+      const preloadUrls = []
+      if (targetCar.cover) preloadUrls.push(targetCar.cover)
+      if (Array.isArray(targetCar.images)) {
+        targetCar.images.forEach((img) => {
+          if (img && preloadUrls.indexOf(img) === -1) preloadUrls.push(img)
+        })
+      }
+      if (preloadUrls.length) {
+        try {
+          preloadImages(preloadUrls.slice(0, 4), { priority: 90 })
+        } catch (e) {}
+      }
+      try {
+        const app = typeof getApp === "function" ? getApp() : null
+        if (app && app.globalData) {
+          app.globalData._tempCarDetailPreview = targetCar
+        }
+      } catch (e) {}
     }
     const action = beginPageNativeAction(this)
     wx.navigateTo({

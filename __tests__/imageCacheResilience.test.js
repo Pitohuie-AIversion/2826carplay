@@ -182,4 +182,103 @@ describe("shared/imageCache 图片缓存健壮性与防失效机制", () => {
     // 第二次进入应直接识别为已加载，不显示加载中遮罩
     expect(page.data.car.imageItems[0].loaded).toBe(true)
   })
+
+  test("isImageLoaded 与 markImageLoaded / unmarkImageLoaded 全局状态共享且本地缓存直接判定为已加载", () => {
+    const STORAGE_KEY_MAP = "image_cache_url_map_v1"
+    const storage = {
+      [STORAGE_KEY_MAP]: {
+        "https://example.com/cached-local.jpg": "wxfile://disk_car.jpg"
+      }
+    }
+    const mockFs = {
+      accessSync: jest.fn(() => true)
+    }
+
+    global.wx = {
+      getStorageSync: jest.fn((key) => storage[key]),
+      setStorageSync: jest.fn((key, val) => {
+        storage[key] = val
+      }),
+      getFileSystemManager: jest.fn(() => mockFs)
+    }
+
+    const {
+      isImageLoaded,
+      isImageLocallyCached,
+      markImageLoaded,
+      unmarkImageLoaded
+    } = require("../shared/imageCache")
+
+    // 本地磁盘已缓存的文件应立即识别为已加载，无须等待网络
+    expect(isImageLocallyCached("https://example.com/cached-local.jpg")).toBe(true)
+    expect(isImageLoaded("https://example.com/cached-local.jpg")).toBe(true)
+
+    // 新未加载的网络 URL
+    expect(isImageLoaded("https://example.com/fresh-url.jpg")).toBe(false)
+    markImageLoaded("https://example.com/fresh-url.jpg")
+    expect(isImageLoaded("https://example.com/fresh-url.jpg")).toBe(true)
+
+    // 取消标记后返回 false
+    unmarkImageLoaded("https://example.com/fresh-url.jpg")
+    expect(isImageLoaded("https://example.com/fresh-url.jpg")).toBe(false)
+  })
+
+  test("isLocalFileAccessible 对小程序内置资源包图片（/assets/等）不调用 accessSync 直接返回 true", () => {
+    const mockFs = {
+      accessSync: jest.fn()
+    }
+    global.wx = {
+      getStorageSync: jest.fn(() => ({})),
+      setStorageSync: jest.fn(),
+      getFileSystemManager: jest.fn(() => mockFs)
+    }
+
+    const { getCachedPath } = require("../shared/imageCache")
+    // /assets/ 下的内置资源应安全被认为是可访问的
+    const result = getCachedPath("/assets/icons/jijing-garage-emblem.png")
+    expect(result).toBe("/assets/icons/jijing-garage-emblem.png")
+    expect(mockFs.accessSync).not.toHaveBeenCalled()
+  })
+
+  test("favorites 页面点击车辆卡片时能够预设 _tempCarDetailPreview 并执行图片预加载", () => {
+    let favoritesPageDefinition = null
+    global.Page = jest.fn((options) => {
+      favoritesPageDefinition = options
+    })
+    const globalData = {}
+    global.getApp = jest.fn(() => ({ globalData }))
+    global.wx = {
+      getStorageSync: jest.fn(() => ({})),
+      setStorageSync: jest.fn(),
+      navigateTo: jest.fn(),
+      showToast: jest.fn()
+    }
+
+    require("../pages/favorites/favorites")
+    expect(favoritesPageDefinition).toBeDefined()
+
+    const instance = {
+      ...favoritesPageDefinition,
+      data: {
+        ...favoritesPageDefinition.data,
+        visibleList: [
+          {
+            id: "car-fav-1",
+            name: "保时捷 911",
+            cover: "https://example.com/porsche-cover.jpg",
+            images: ["https://example.com/porsche-hero.jpg"]
+          }
+        ]
+      }
+    }
+
+    instance.handleCarTap({ detail: { carId: "car-fav-1" } })
+    expect(globalData._tempCarDetailPreview).toBeDefined()
+    expect(globalData._tempCarDetailPreview.name).toBe("保时捷 911")
+    expect(wx.navigateTo).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: expect.stringContaining("/pages/car-detail/car-detail?carId=car-fav-1")
+      })
+    )
+  })
 })

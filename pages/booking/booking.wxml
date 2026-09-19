@@ -373,7 +373,7 @@
       <view class="confirmation-item confirmation-item-wide">
         <view class="confirmation-label">用车日期</view>
         <view class="confirmation-value">{{bookingSummary.dateText}}</view>
-        <view class="confirmation-subvalue">{{bookingSummary.durationText}}</view>
+        <view class="confirmation-subvalue">{{bookingSummary.durationText}}<text wx:if="{{rentalEstimate.estimateText}}"> · {{rentalEstimate.estimateText}}</text></view>
       </view>
       <view class="confirmation-item">
         <view class="confirmation-label">联系人</view>

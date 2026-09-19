@@ -8,6 +8,7 @@ const {
   isPageNativeActionActive
 } = require("../../shared/pageNativeAction")
 const { preloadImages, clearExpiredCache } = require("../../shared/imageCache")
+const { onNetworkReconnect } = require("../../shared/networkStatus")
 const { createPerformanceHelpers } = require("../../shared/performance")
 const mockCategories = require("../../data/categories")
 
@@ -295,6 +296,11 @@ Page({
       } catch (error) {}
     }
 
+    this._unsubscribeNetwork = onNetworkReconnect(() => {
+      if (this.data.loadError) {
+        this.loadCars()
+      }
+    })
   },
 
   onShow() {
@@ -336,6 +342,13 @@ Page({
         }
       }
     })
+  },
+
+  onUnload() {
+    if (typeof this._unsubscribeNetwork === "function") {
+      this._unsubscribeNetwork()
+      this._unsubscribeNetwork = null
+    }
   },
 
   loadContentGuides() {
@@ -523,6 +536,10 @@ Page({
       this._carsLoadTimer = null
     }
     this.clearSearchDebounce()
+    if (typeof this._unsubscribeNetwork === "function") {
+      this._unsubscribeNetwork()
+      this._unsubscribeNetwork = null
+    }
     if (this._perf && typeof this._perf.dispose === "function") {
       try { this._perf.dispose() } catch (e) {}
       this._perf = null
@@ -809,8 +826,9 @@ Page({
     }
 
     const action = beginPageNativeAction(this)
+    const cityParam = this.data.selectedCity ? `&city=${encodeURIComponent(this.data.selectedCity)}` : ""
     wx.navigateTo({
-      url: `/pages/car-detail/car-detail?carId=${carId}`,
+      url: `/pages/car-detail/car-detail?carId=${carId}${cityParam}`,
       fail: () => {
         if (!isPageNativeActionActive(this, action)) {
           return

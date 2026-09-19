@@ -2,6 +2,8 @@ const { trackEvent } = require("../../shared/analytics")
 const { sanitizeAttribution, buildQuery, hasAttribution, isShareLanding } = require("../../shared/contentAttribution")
 const { formatToastTitle } = require("../../shared/uiFeedback")
 const { requestOperationConfig } = require("../../shared/operationConfigRequest")
+const { onNetworkReconnect } = require("../../shared/networkStatus")
+const { triggerHapticFeedback } = require("../../shared/hapticFeedback")
 const {
   activatePageNativeActions,
   beginPageNativeAction,
@@ -242,6 +244,7 @@ Page({
 
     const attribution = sanitizeAttribution(options)
     const carId = attribution.vehicleId || String((options && options.carId) || "").trim()
+    this._initialCity = String((options && options.city) || "").trim()
     this.setData({
       carId,
       attribution: sanitizeAttribution({ ...attribution, vehicleId: carId })
@@ -262,6 +265,13 @@ Page({
     if (hasAttribution(attribution) && attribution.channel && attribution.channel !== "direct" && isShareLanding()) {
       trackEvent("share_open", carId, this.data.attribution)
     }
+
+    this._unsubscribeNetwork = onNetworkReconnect(() => {
+      if (this.data.loadError && this.data.carId) {
+        this.loadCarDetail(this.data.carId)
+        this.loadFavoriteStatus(this.data.carId)
+      }
+    })
   },
 
   onReady() {
@@ -502,6 +512,10 @@ Page({
 
   onUnload() {
     cancelPageNativeActions(this)
+    if (typeof this._unsubscribeNetwork === "function") {
+      this._unsubscribeNetwork()
+      this._unsubscribeNetwork = null
+    }
     if (this._posterTimer) {
       clearTimeout(this._posterTimer)
       this._posterTimer = null
@@ -801,6 +815,7 @@ Page({
         if (result.favorited) {
           trackEvent("favorite_add", vehicleId)
         }
+        triggerHapticFeedback("light")
         wx.showToast({
           title: result.favorited ? "已加入收藏" : "已取消收藏",
           icon: "success"
@@ -833,8 +848,12 @@ Page({
 
     const action = beginPageNativeAction(this)
     const attribution = sanitizeAttribution({ ...this.data.attribution, vehicleId: this.data.carId })
+    const city = this._initialCity || (this.data.car && this.data.car.location) || ""
+    const query = buildQuery(attribution)
+    const cityParam = city ? `${query ? "&" : ""}city=${encodeURIComponent(city)}` : ""
+    const fullQuery = [query, cityParam].filter(Boolean).join("")
     wx.navigateTo({
-      url: `/pages/booking/booking?${buildQuery(attribution)}`,
+      url: `/pages/booking/booking?${fullQuery}`,
       fail: () => {
         if (!isPageNativeActionActive(this, action)) {
           return
@@ -1185,6 +1204,7 @@ Page({
       wx.saveImageToPhotosAlbum({
         filePath,
         success: () => {
+          triggerHapticFeedback("medium")
           if (isPageNativeActionActive(this, action)) {
             wx.showToast({ title: "海报已保存相册", icon: "success" })
             this.handleClosePosterModal()
@@ -1239,6 +1259,7 @@ Page({
       wx.setClipboardData({
         data: wechatId,
         success: () => {
+          triggerHapticFeedback("medium")
           if (isPageNativeActionActive(this, action)) {
             wx.showToast({
               title: "微信号已复制",

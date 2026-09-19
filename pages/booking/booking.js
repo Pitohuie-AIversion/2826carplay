@@ -9,6 +9,7 @@ const {
   cancelPageNativeActions,
   isPageNativeActionActive
 } = require("../../shared/pageNativeAction")
+const { onNetworkReconnect } = require("../../shared/networkStatus")
 const LAST_BOOKING_CONTACT_KEY = "lastBookingContact"
 const BOOKING_CAR_LOAD_TIMEOUT_MS = 15 * 1000
 const AVAILABILITY_CHECK_TIMEOUT_MS = 12 * 1000
@@ -132,6 +133,24 @@ function buildBookingSummary(form, carName) {
   }
 }
 
+function calculateRentalEstimate(startDate, endDate, priceDay) {
+  const hasDates = Boolean(startDate && endDate && endDate >= startDate)
+  if (!hasDates) {
+    return { rentalDays: 0, estimateTotal: 0, estimateText: "" }
+  }
+  const start = new Date(`${startDate}T00:00:00`)
+  const end = new Date(`${endDate}T00:00:00`)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) {
+    return { rentalDays: 0, estimateTotal: 0, estimateText: "" }
+  }
+  const diffDays = Math.round((end.getTime() - start.getTime()) / 86400000)
+  const rentalDays = Math.max(diffDays, 1)
+  const dailyRate = Number(priceDay) || 0
+  const estimateTotal = dailyRate > 0 ? rentalDays * dailyRate : 0
+  const estimateText = estimateTotal > 0 ? `预估参考 ￥${estimateTotal}` : ""
+  return { rentalDays, estimateTotal, estimateText }
+}
+
 Page({
   data: {
     carId: "",
@@ -153,6 +172,8 @@ Page({
     privacyAgreed: false,
     formProgress: buildFormProgress(null, false),
     bookingSummary: buildBookingSummary(null, ""),
+    rentalEstimate: calculateRentalEstimate("", "", 0),
+    priceDay: 0,
     cityOptions: [],
     cityIndex: -1,
     pickerCityIndex: 0,
@@ -200,6 +221,7 @@ Page({
 
     const attribution = sanitizeAttribution(options)
     const carId = attribution.vehicleId || String((options && options.carId) || "").trim()
+    this._initialCity = String((options && options.city) || "").trim()
     this.setData({
       carId,
       attribution: sanitizeAttribution({ ...attribution, vehicleId: carId })
@@ -210,6 +232,12 @@ Page({
     this.loadBookingCar(carId)
     trackEvent("booking_start", carId)
     if (attribution.contentId) trackEvent("content_booking_start", carId, this.data.attribution)
+
+    this._unsubscribeNetwork = onNetworkReconnect(() => {
+      if (this.data.loadError && this.data.carId) {
+        this.loadBookingCar(this.data.carId)
+      }
+    })
   },
 
   loadSavedContact() {
@@ -351,6 +379,10 @@ Page({
 
   onUnload() {
     cancelPageNativeActions(this)
+    if (typeof this._unsubscribeNetwork === "function") {
+      this._unsubscribeNetwork()
+      this._unsubscribeNetwork = null
+    }
     this._bookingCarRequestId = Number(this._bookingCarRequestId || 0) + 1
     this.availabilityRequestSerial = Number(this.availabilityRequestSerial || 0) + 1
     this._bookingSubmitSerial = Number(this._bookingSubmitSerial || 0) + 1
@@ -386,16 +418,21 @@ Page({
 
   applyCar(car) {
     const carName = car ? car.name || "" : ""
+    const priceDay = car ? Number(car.priceDay) || 0 : 0
+    this._carPriceDay = priceDay
+    const city = this._initialCity || (car ? car.location || "" : "")
     const nextForm = {
       ...this.data.form,
-      city: car ? car.location || "" : ""
+      city
     }
     this.applyState({
       loadingCar: false,
       loadError: false,
       carName,
+      priceDay,
       "form.city": nextForm.city,
-      bookingSummary: buildBookingSummary(nextForm, carName)
+      bookingSummary: buildBookingSummary(nextForm, carName),
+      rentalEstimate: calculateRentalEstimate(nextForm.startDate, nextForm.endDate, priceDay)
     })
 
     this.syncCitySelection()
@@ -408,7 +445,10 @@ Page({
   syncCitySelection() {
     const cityOptions = Array.isArray(this.data.cityOptions) ? this.data.cityOptions : []
     const currentCity = String((this.data.form && this.data.form.city) || "").trim()
-    const cityIndex = cityOptions.indexOf(currentCity)
+    let cityIndex = cityOptions.indexOf(currentCity)
+    if (cityIndex < 0 && currentCity) {
+      cityIndex = cityOptions.findIndex((opt) => currentCity.includes(opt) || opt.includes(currentCity))
+    }
 
     this.setData({
       cityIndex,
@@ -450,7 +490,7 @@ Page({
     const { field } = event.currentTarget.dataset
     const value = event.detail.value
 
-    if (!field) {
+    if (!field || !value) {
       return
     }
 
@@ -472,6 +512,7 @@ Page({
 
       nextData.formProgress = buildFormProgress(nextForm, this.data.privacyAgreed)
       nextData.bookingSummary = buildBookingSummary(nextForm, this.data.carName)
+      nextData.rentalEstimate = calculateRentalEstimate(nextForm.startDate, nextForm.endDate, this.data.priceDay || this._carPriceDay)
       this.setData(nextData)
       this.checkVehicleAvailability()
       return
@@ -485,7 +526,8 @@ Page({
       [`form.${field}`]: value,
       submitRequestId: "",
       formProgress: buildFormProgress(nextForm, this.data.privacyAgreed),
-      bookingSummary: buildBookingSummary(nextForm, this.data.carName)
+      bookingSummary: buildBookingSummary(nextForm, this.data.carName),
+      rentalEstimate: calculateRentalEstimate(nextForm.startDate, nextForm.endDate, this.data.priceDay || this._carPriceDay)
     })
     this.checkVehicleAvailability()
   },
@@ -515,7 +557,8 @@ Page({
       endMinDate: nextForm.startDate || today,
       submitRequestId: "",
       formProgress: buildFormProgress(nextForm, this.data.privacyAgreed),
-      bookingSummary: buildBookingSummary(nextForm, this.data.carName)
+      bookingSummary: buildBookingSummary(nextForm, this.data.carName),
+      rentalEstimate: calculateRentalEstimate(nextForm.startDate, nextForm.endDate, this.data.priceDay || this._carPriceDay)
     }, () => this.checkVehicleAvailability())
   },
 

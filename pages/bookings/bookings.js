@@ -7,6 +7,7 @@ const {
   cancelPageNativeActions,
   isPageNativeActionActive
 } = require("../../shared/pageNativeAction")
+const { onNetworkReconnect } = require("../../shared/networkStatus")
 const BOOKINGS_LOAD_TIMEOUT_MS = 15 * 1000
 const BOOKING_CANCEL_TIMEOUT_MS = 12 * 1000
 
@@ -225,6 +226,12 @@ Page({
         })
       } catch (error) {}
     }
+
+    this._unsubscribeNetwork = onNetworkReconnect(() => {
+      if (this.data.loadError) {
+        this.loadList()
+      }
+    })
   },
 
   onShow() {
@@ -260,6 +267,10 @@ Page({
 
   onUnload() {
     cancelPageNativeActions(this)
+    if (typeof this._unsubscribeNetwork === "function") {
+      this._unsubscribeNetwork()
+      this._unsubscribeNetwork = null
+    }
     this._bookingsRequestId = Number(this._bookingsRequestId || 0) + 1
     this._bookingCancelSerial = Number(this._bookingCancelSerial || 0) + 1
     this.finishBookingsLoadEffects()

@@ -8,6 +8,7 @@ const {
   isPageNativeActionActive,
   isPageCurrent
 } = require("../../shared/pageNativeAction")
+const { triggerHapticFeedback } = require("../../shared/hapticFeedback")
 const BOOKING_DETAIL_LOAD_TIMEOUT_MS = 15 * 1000
 const BOOKING_DETAIL_MUTATION_TIMEOUT_MS = 12 * 1000
 const SUBSCRIPTION_REQUEST_TIMEOUT_MS = 15 * 1000
@@ -1191,6 +1192,7 @@ Page({
       wx.showToast({ title: "救援电话暂不可用", icon: "none" })
       return
     }
+    triggerHapticFeedback("medium")
     const action = beginPageNativeAction(this)
     wx.makePhoneCall({
       phoneNumber,
@@ -1225,6 +1227,7 @@ Page({
     wx.setClipboardData({
       data: id,
       success: () => {
+        triggerHapticFeedback("light")
         if (!this.isBookingDetailActive() || !isPageCurrent(this)) {
           return
         }

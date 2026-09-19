@@ -5,6 +5,7 @@ const {
   markImageLoaded,
   unmarkImageLoaded
 } = require("../../shared/imageCache")
+const { triggerHapticFeedback } = require("../../shared/hapticFeedback")
 
 Component({
   properties: {
@@ -107,6 +108,7 @@ Component({
         return
       }
 
+      triggerHapticFeedback("light")
       this.triggerEvent("cardtap", {
         carId: car.id
       })

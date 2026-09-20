@@ -535,6 +535,57 @@ describe("pages/garage 首页车辆筛选", () => {
     expect(callParams.data.city).toBe("杭州")
     expect(callParams.data.keyword).toBe("911")
   })
+
+  test("onShareAppMessage 保留筛选条件 category、city 和 sortBy", () => {
+    const page = createPage(loadPageDefinition())
+    page.data.currentCategory = "supercar"
+    page.data.selectedCity = "杭州"
+    page.data.sortBy = "price_asc"
+
+    const share = page.onShareAppMessage()
+    expect(share.path).toContain("category=supercar")
+    expect(share.path).toContain("city=%E6%9D%AD%E5%B7%9E")
+    expect(share.path).toContain("sortBy=price_asc")
+    expect(share.path).toContain("channel=wechat_share")
+  })
+
+  test("onLoad(options) 支持还原传入的 category、city 和 sortBy", () => {
+    global.wx = {
+      getStorageSync: jest.fn(() => null)
+    }
+    const page = createPage(loadPageDefinition())
+    page.onLoad({
+      category: "suv",
+      city: "上海",
+      sortBy: "price_desc"
+    })
+    expect(page.data.currentCategory).toBe("suv")
+    expect(page.data.selectedCity).toBe("上海")
+    expect(page.data.sortBy).toBe("price_desc")
+  })
+
+  test("onReachBottom 触发 handleLoadMore 加载更多车辆", () => {
+    const page = createPage(loadPageDefinition())
+    page.handleLoadMore = jest.fn()
+    page.onReachBottom()
+    expect(page.handleLoadMore).toHaveBeenCalledTimes(1)
+  })
+
+  test("冷启动时优先从 storage 恢复 garage_last_snapshot 实现秒开", () => {
+    const mockCars = [{ id: "c1", name: "Porsche 911", brand: "保时捷", priceDay: 3000, status: "available" }]
+    global.wx = {
+      getStorageSync: jest.fn((key) => {
+        if (key === "garage_last_snapshot") {
+          return { cars: mockCars, pagination: { total: 1 } }
+        }
+        return null
+      })
+    }
+    const page = createPage(loadPageDefinition())
+    page.applyCars = jest.fn()
+    page.onLoad()
+    expect(page.applyCars).toHaveBeenCalledWith(mockCars, { total: 1 })
+  })
 })
 
 

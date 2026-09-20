@@ -19,7 +19,6 @@
     <view class="booking-loading-field booking-loading-field-short skeleton-pulse"></view>
   </view>
 </view>
-
 <view class="booking-page booking-success-page" wx:elif="{{submitSuccess && carName}}">
   <view class="booking-glow"></view>
   <view class="success-card ui-card ui-card-gradient">
@@ -37,7 +36,6 @@
       <text>当前状态 · 等待顾问联系</text>
     </view>
   </view>
-
   <view class="success-summary ui-card">
     <view class="card-heading">
       <view>
@@ -68,7 +66,6 @@
       </view>
     </view>
   </view>
-
   <view class="success-next ui-card">
     <view class="section-kicker">WHAT'S NEXT</view>
     <view class="section-title">下一步</view>
@@ -94,7 +91,6 @@
       </view>
     </view>
   </view>
-
   <button class="success-primary ui-btn ui-btn-primary action-with-icon" bindtap="handleViewSubmittedBooking">
     <view class="success-action-icon success-action-document" aria-hidden="true"><view class="success-action-document-line"></view></view>
     <text>查看我的预约</text>
@@ -104,10 +100,8 @@
     <text>继续浏览车库</text>
   </button>
 </view>
-
 <view class="booking-page" wx:elif="{{carName}}">
   <view class="booking-glow"></view>
-
   <view class="page-header">
     <view class="header-copy">
       <view class="header-kicker">PRIVATE RESERVATION</view>
@@ -116,7 +110,6 @@
     </view>
     <image class="header-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
   </view>
-
   <view class="booking-card vehicle-card">
     <view class="card-heading">
       <view>
@@ -133,7 +126,6 @@
       <view class="section-desc">提交后由顾问为您确认车辆档期、价格与取还车细节</view>
     </view>
   </view>
-
   <view class="booking-card form-card">
     <view class="card-heading form-heading">
       <view>
@@ -142,7 +134,6 @@
       </view>
       <view class="step-label">01 / 04</view>
     </view>
-
     <view class="form-progress" aria-role="group" aria-label="预约信息完成度 {{formProgress.completed}} / {{formProgress.total}}，{{formProgress.nextLabel}}">
       <view class="form-progress-top">
         <view class="form-progress-title">信息完成度 {{formProgress.completed}}/{{formProgress.total}}</view>
@@ -169,11 +160,9 @@
         </view>
       </view>
     </view>
-
     <button wx:if="{{savedContactAvailable}}" class="saved-contact-button" bindtap="handleUseSavedContact" hover-class="booking-link-pressed">
       使用上次联系人
     </button>
-
     <view class="form-item">
       <view class="form-label-row">
         <view class="form-label">姓名</view>
@@ -193,7 +182,6 @@
         aria-required="{{true}}"
       />
     </view>
-
     <view class="form-item">
       <view class="form-label-row">
         <view class="form-label">手机号</view>
@@ -215,13 +203,11 @@
       />
       <view wx:if="{{form.phone && !formProgress.phoneComplete}}" class="field-inline-error">请输入正确的 11 位手机号</view>
     </view>
-
     <view class="form-section-divider">
       <view class="divider-line"></view>
       <view class="divider-text">出行安排</view>
       <view class="divider-line"></view>
     </view>
-
     <view class="form-row">
       <view class="form-item form-item-half">
         <view class="form-label-row"><view class="form-label">取车日期</view><view class="required-mark">必填</view></view>
@@ -232,7 +218,6 @@
           </view>
         </picker>
       </view>
-
       <view class="form-item form-item-half">
         <view class="form-label-row"><view class="form-label">还车日期</view><view class="required-mark">必填</view></view>
         <picker mode="date" value="{{form.endDate}}" start="{{endMinDate}}" data-field="endDate" disabled="{{isSubmitting}}" bindchange="handleDateChange" aria-label="选择还车日期" aria-required="{{true}}">
@@ -243,13 +228,11 @@
         </picker>
       </view>
     </view>
-
     <view class="date-shortcuts" aria-role="group" aria-label="常用日期快捷选择">
       <button class="date-shortcut" data-action="today" disabled="{{isSubmitting}}" bindtap="handleDateShortcut">今天取车</button>
       <button class="date-shortcut" data-action="tomorrow" disabled="{{isSubmitting}}" bindtap="handleDateShortcut">明天取车</button>
       <button class="date-shortcut" data-action="three-days" disabled="{{isSubmitting}}" bindtap="handleDateShortcut">安排 3 天</button>
     </view>
-
     <view class="availability-card availability-{{availabilityState}}">
       <view class="availability-icon">
         <view wx:if="{{availabilityState === 'checking'}}" class="availability-spinner"></view>
@@ -273,7 +256,6 @@
         aria-label="重新检查车辆档期"
       >重试</view>
     </view>
-
     <view wx:if="{{priceCalendarSummary}}" class="price-calendar-card">
       <view class="price-calendar-heading">
         <view>
@@ -291,7 +273,6 @@
       </view>
       <view class="price-calendar-note">这是按日期汇总的参考价，不含 Phase 12 报价中的押金、服务项和调整；最终金额以顾问发送并由您确认的报价版本为准。</view>
     </view>
-
     <view class="form-item">
       <view class="form-label-row"><view class="form-label">取车城市</view><view class="optional-mark">选填</view></view>
       <picker wx:if="{{cityOptions.length}}" mode="selector" range="{{cityOptions}}" value="{{pickerCityIndex}}" disabled="{{isSubmitting}}" bindchange="handleCityChange" aria-label="选择取车城市">
@@ -314,7 +295,6 @@
         aria-label="填写取车城市，选填"
       />
     </view>
-
     <view class="form-item">
       <view class="form-label-row">
         <view class="form-label">备注</view>
@@ -333,7 +313,6 @@
       />
     </view>
   </view>
-
   <view class="booking-card privacy-card">
     <view class="card-heading">
       <view>
@@ -356,7 +335,6 @@
       <view>提交时可选择接收预约状态变化提醒，拒绝授权不影响预约。</view>
     </view>
   </view>
-
   <view wx:if="{{formProgress.ready}}" class="booking-card confirmation-card">
     <view class="card-heading">
       <view>
@@ -389,7 +367,6 @@
       <view>请确认以上信息。提交后可在“我的预约”查看进度，进行中可修改联系方式。</view>
     </view>
   </view>
-
   <view class="submit-section">
     <view class="submit-kicker">04 / 04 · SUBMIT</view>
     <view class="submit-readiness {{formProgress.ready ? 'submit-readiness-ready' : ''}}">
@@ -415,7 +392,6 @@
     <view class="submit-note">提交预约不产生费用，最终安排以顾问确认为准</view>
   </view>
 </view>
-
 <view class="empty-page" wx:else>
   <image class="empty-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
   <view class="empty-title">预约咨询</view>

@@ -360,4 +360,50 @@ describe("pages/privacy-request 用户申请流程", () => {
     expect(wx.stopPullDownRefresh).toHaveBeenCalledTimes(1)
     expect(wx.cloud.callFunction).not.toHaveBeenCalled()
   })
+
+  test("申请说明输入触发防误触离开保护并在清空或卸载时解除", () => {
+    global.wx = {
+      enableAlertBeforeUnload: jest.fn(),
+      disableAlertBeforeUnload: jest.fn()
+    }
+    const page = createPage(loadPageDefinition())
+
+    page.handleDescriptionInput({ detail: { value: "需要更正联系电话" } })
+    expect(wx.enableAlertBeforeUnload).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "当前有未保存的修改，确定离开吗？" })
+    )
+
+    page.handleDescriptionInput({ detail: { value: "" } })
+    expect(wx.disableAlertBeforeUnload).toHaveBeenCalled()
+
+    page.handleDescriptionInput({ detail: { value: "再次输入" } })
+    page.onUnload()
+    expect(wx.disableAlertBeforeUnload).toHaveBeenCalledTimes(2)
+  })
+
+  test("支持 onReachBottom 触底翻页并从 storage 恢复快照秒开", () => {
+    const json = JSON.parse(fs.readFileSync(path.resolve(__dirname, "../pages/privacy-request/privacy-request.json"), "utf8"))
+    expect(json.onReachBottomDistance).toBe(200)
+
+    const page = createPage(loadPageDefinition())
+    page.handleLoadMore = jest.fn()
+    page.onReachBottom()
+    expect(page.handleLoadMore).toHaveBeenCalledTimes(1)
+
+    const mockSnapshot = [
+      { id: "req-1", type: "access", status: "completed", createdAt: "2026-09-01" }
+    ]
+    global.wx = {
+      getStorageSync: jest.fn((key) => {
+        if (key === "privacy_requests_snapshot") return mockSnapshot
+        return null
+      }),
+      cloud: { callFunction: jest.fn() }
+    }
+    const page2 = createPage(loadPageDefinition())
+    page2.applyRequestList = jest.fn()
+    page2.onLoad()
+    expect(page2.applyRequestList).toHaveBeenCalledWith(mockSnapshot, expect.objectContaining({ page: 0, hasMore: true }))
+    expect(page2.data.initialLoading).toBe(false)
+  })
 })

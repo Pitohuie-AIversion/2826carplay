@@ -10,10 +10,8 @@ const {
   isPageCurrent,
   isPageNativeActionActive
 } = require("../../shared/pageNativeAction")
-
 const VEHICLE_EDIT_LOAD_TIMEOUT_MS = 15 * 1000
 const VEHICLE_EDIT_SUBMIT_TIMEOUT_MS = 20 * 1000
-
 const VEHICLE_TYPE_LABEL_MAP = {
   sedan: "轿车",
   suv: "SUV",
@@ -22,30 +20,25 @@ const VEHICLE_TYPE_LABEL_MAP = {
   truck: "卡车",
   other: "其他"
 }
-
 const STATUS_LABEL_MAP = {
   active: "在用",
   idle: "闲置",
   maintenance: "维修",
   retired: "停用"
 }
-
 const TRANSMISSION_LABEL_MAP = {
   manual: "手动挡",
   automatic: "自动挡"
 }
-
 const FUEL_TYPE_LABEL_MAP = {
   gasoline: "燃油",
   electric: "纯电",
   hybrid: "混动"
 }
-
 const ARCHIVE_REVIEW_LABEL_MAP = {
   pending: "待复核",
   reviewed: "已复核"
 }
-
 const FIELD_LABEL_MAP = {
   id: "车辆ID",
   plateNumber: "车牌号",
@@ -74,18 +67,15 @@ const FIELD_LABEL_MAP = {
   internalInsuranceRecord: "内部保险记录",
   internalArchiveNote: "内部档案说明"
 }
-
 function formatDate(date) {
   const year = date.getFullYear()
   const month = `${date.getMonth() + 1}`.padStart(2, "0")
   const day = `${date.getDate()}`.padStart(2, "0")
   return `${year}-${month}-${day}`
 }
-
 function buildLabels(values, map) {
   return values.map((value) => map[value] || value)
 }
-
 Page({
   data: {
     id: "",
@@ -141,7 +131,6 @@ Page({
       internalArchiveNote: ""
     }
   },
-
   onLoad(options) {
     activatePageNativeActions(this)
     const app = getApp()
@@ -151,7 +140,6 @@ Page({
       app.globalData.cloudEnvId
         ? app.globalData.cloudEnvId
         : undefined
-
     if (wx.cloud && typeof wx.cloud.init === "function") {
       try {
         wx.cloud.init({
@@ -160,7 +148,6 @@ Page({
         })
       } catch (error) {}
     }
-
     const id = String((options && options.id) || "").trim()
     if (!id) {
       wx.showToast({
@@ -174,7 +161,6 @@ Page({
       })
       return
     }
-
     this.setData({ id })
     requirePagePermission(this, {
       required: "canManageVehicles",
@@ -184,7 +170,6 @@ Page({
       }
     })
   },
-
   onShow() {
     const requestId = Number(this._vehicleEditPendingNavigationRequestId || 0)
     if (
@@ -195,7 +180,6 @@ Page({
       this.continueVehicleEditNavigation(requestId)
     }
   },
-
   onUnload() {
     cancelPagePermissionCheck(this)
     cancelPageNativeActions(this)
@@ -208,7 +192,6 @@ Page({
     this.clearVehicleEditSubmitTimer()
     this.clearVehicleEditNavigationTimer()
   },
-
   fetchDetail(id) {
     const vehicleId = String(id || "").trim()
     const requestId = Number(this._vehicleEditLoadRequestId || 0) + 1
@@ -226,7 +209,6 @@ Page({
       })
       return
     }
-
     this.setData({
       loading: true,
       loadFailed: false
@@ -254,11 +236,9 @@ Page({
         loadErrorText: message || "车辆档案加载失败，请稍后重试"
       })
     }
-
     this._vehicleEditLoadTimer = setTimeout(() => {
       handleFailure("档案加载超时，请重试")
     }, VEHICLE_EDIT_LOAD_TIMEOUT_MS)
-
     const requestOptions = {
       name: "vehicleDetail",
       data: {
@@ -281,9 +261,7 @@ Page({
           })
           return
         }
-
         const current = result.detail
-
         const vehicleTypeIndex = Math.max(vehicleUtils.VEHICLE_TYPES.indexOf(current.vehicleType), 0)
         const statusIndex = Math.max(vehicleUtils.VEHICLE_STATUSES.indexOf(current.status), 0)
         const transmissionIndex = Math.max(vehicleUtils.TRANSMISSION_TYPES.indexOf(current.transmission), 0)
@@ -296,7 +274,6 @@ Page({
           ? current.publicArchiveReviewStatus
           : "pending"
         const archiveReviewIndex = Math.max(vehicleUtils.ARCHIVE_REVIEW_STATUSES.indexOf(archiveReviewStatus), 0)
-
         this.setData({
           loading: false,
           loadFailed: false,
@@ -353,14 +330,12 @@ Page({
         handleFailure(error && (error.errMsg || error.message))
       }
     }
-
     try {
       wx.cloud.callFunction(requestOptions)
     } catch (error) {
       handleFailure(error && (error.errMsg || error.message))
     }
   },
-
   handlePlateInput(event) {
     if (this.data.isSubmitting) {
       return
@@ -368,14 +343,12 @@ Page({
     let value = vehicleUtils.normalizePlateNumber(event.detail.value)
     value = value.replace(/\s/g, "")
     value = value.replace(/[^0-9A-Z\u4e00-\u9fa5]/g, "").slice(0, 8)
-
     this.setData({
       "form.plateNumber": value,
       formProgress: buildVehicleFormProgress({ ...this.data.form, plateNumber: value })
     })
     markUnsaved(this, "车辆资料尚未保存，确定离开吗？")
   },
-
   handleTextInput(event) {
     if (this.data.isSubmitting) {
       return
@@ -384,41 +357,31 @@ Page({
     if (!field) {
       return
     }
-
     let value = event.detail.value
-
     if (field === "brandModel") {
       value = String(value || "").slice(0, 50)
     }
-
     if (field === "location") {
       value = String(value || "").slice(0, 20)
     }
-
     if (field === "vin" || field === "engineNumber") {
       value = String(value || "").slice(0, 32)
     }
-
     if (field === "publicDescription" || field === "note") {
       value = String(value || "").slice(0, 200)
     }
-
     if (vehicleUtils.PUBLIC_ARCHIVE_TEXT_FIELDS.includes(field)) {
       value = String(value || "").slice(0, 200)
     }
-
     if (vehicleUtils.INTERNAL_ARCHIVE_TEXT_FIELDS.includes(field)) {
       value = String(value || "").slice(0, 500)
     }
-
     if (field === "seats") {
       value = String(value || "").replace(/\D/g, "").slice(0, 1)
     }
-
     if (field === "priceDay") {
       value = String(value || "").replace(/\D/g, "").slice(0, 5)
     }
-
     const nextData = {
       [`form.${field}`]: value,
       formProgress: buildVehicleFormProgress({ ...this.data.form, [field]: value })
@@ -429,11 +392,9 @@ Page({
     if (field === "note") {
       nextData.noteLength = String(value || "").length
     }
-
     this.setData(nextData)
     markUnsaved(this, "车辆资料尚未保存，确定离开吗？")
   },
-
   handleVehicleTypeChange(event) {
     if (this.data.isSubmitting) {
       return
@@ -441,7 +402,6 @@ Page({
     const index = Number(event.detail.value) || 0
     const value = vehicleUtils.VEHICLE_TYPES[index] || ""
     const label = VEHICLE_TYPE_LABEL_MAP[value] || ""
-
     this.setData({
       vehicleTypeIndex: index,
       vehicleTypeLabel: label,
@@ -450,7 +410,6 @@ Page({
     })
     markUnsaved(this, "车辆资料尚未保存，确定离开吗？")
   },
-
   handleStatusChange(event) {
     if (this.data.isSubmitting) {
       return
@@ -458,7 +417,6 @@ Page({
     const index = Number(event.detail.value) || 0
     const value = vehicleUtils.VEHICLE_STATUSES[index] || ""
     const label = STATUS_LABEL_MAP[value] || ""
-
     this.setData({
       statusIndex: index,
       statusLabel: label,
@@ -467,7 +425,6 @@ Page({
     })
     markUnsaved(this, "车辆资料尚未保存，确定离开吗？")
   },
-
   handleDateChange(event) {
     if (this.data.isSubmitting) {
       return
@@ -478,7 +435,6 @@ Page({
     })
     markUnsaved(this, "车辆资料尚未保存，确定离开吗？")
   },
-
   handleArchiveDateChange(event) {
     if (this.data.isSubmitting) {
       return
@@ -490,7 +446,6 @@ Page({
     this.setData({ [`form.${field}`]: event.detail.value })
     markUnsaved(this, "车辆资料尚未保存，确定离开吗？")
   },
-
   handleArchiveReviewChange(event) {
     if (this.data.isSubmitting) {
       return
@@ -504,7 +459,6 @@ Page({
     })
     markUnsaved(this, "车辆资料尚未保存，确定离开吗？")
   },
-
   handleTransmissionChange(event) {
     if (this.data.isSubmitting) {
       return
@@ -512,7 +466,6 @@ Page({
     const index = Number(event.detail.value) || 0
     const value = vehicleUtils.TRANSMISSION_TYPES[index] || ""
     const label = TRANSMISSION_LABEL_MAP[value] || ""
-
     this.setData({
       transmissionIndex: index,
       transmissionLabel: label,
@@ -520,7 +473,6 @@ Page({
     })
     markUnsaved(this, "车辆资料尚未保存，确定离开吗？")
   },
-
   handleFuelTypeChange(event) {
     if (this.data.isSubmitting) {
       return
@@ -528,7 +480,6 @@ Page({
     const index = Number(event.detail.value) || 0
     const value = vehicleUtils.FUEL_TYPES[index] || ""
     const label = FUEL_TYPE_LABEL_MAP[value] || ""
-
     this.setData({
       fuelTypeIndex: index,
       fuelTypeLabel: label,
@@ -536,12 +487,10 @@ Page({
     })
     markUnsaved(this, "车辆资料尚未保存，确定离开吗？")
   },
-
   handleManageImages() {
     if (!this.data.id || this.data.loading) {
       return
     }
-
     const action = beginPageNativeAction(this)
     wx.navigateTo({
       url: `/pages-admin/vehicle-detail-manage/vehicle-detail-manage?id=${this.data.id}`,
@@ -556,19 +505,16 @@ Page({
       }
     })
   },
-
   handleRetryLoad() {
     if (!this.data.id || this.data.loading || this.data.isSubmitting) {
       return
     }
-
     this.setData({
       loading: true,
       loadFailed: false
     })
     this.fetchDetail(this.data.id)
   },
-
   handleBackList() {
     const action = beginPageNativeAction(this)
     const pages = getCurrentPages()
@@ -603,7 +549,6 @@ Page({
       })
       return
     }
-
     wx.redirectTo({
       url: "/pages-admin/vehicle-manage/vehicle-manage",
       fail: () => {
@@ -625,26 +570,21 @@ Page({
       }
     })
   },
-
   getValidationMessage(result) {
     const details = result && result.details
     const errors = details && details.errors
     const first = Array.isArray(errors) ? errors[0] : null
-
     if (!first) {
       return (result && result.message) || "参数校验失败"
     }
-
     const fieldLabel = FIELD_LABEL_MAP[first.field] || first.field
     const message = first.message ? `${fieldLabel}：${first.message}` : fieldLabel
     return message.length > 30 ? message.slice(0, 30) : message
   },
-
   handleSubmit() {
     if (this.data.loading || this.data.isSubmitting) {
       return
     }
-
     const check = vehicleUtils.validateVehicle(this.data.form)
     if (!check.ok) {
       wx.showToast({
@@ -653,7 +593,6 @@ Page({
       })
       return
     }
-
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       wx.showToast({
         title: "云能力未初始化",
@@ -661,7 +600,6 @@ Page({
       })
       return
     }
-
     const payload = {
       id: String(this.data.id || "").trim(),
       ...check.value
@@ -695,11 +633,9 @@ Page({
         isSubmitting: false
       })
     }
-
     this._vehicleEditSubmitTimer = setTimeout(() => {
       handleFailure("保存超时，请重试")
     }, VEHICLE_EDIT_SUBMIT_TIMEOUT_MS)
-
     const requestOptions = {
       name: "vehicleUpdate",
       data: payload,
@@ -708,7 +644,6 @@ Page({
           return
         }
         const result = res && res.result ? res.result : null
-
         if (result && result.ok) {
           clearUnsaved(this)
           wx.showToast({
@@ -716,11 +651,9 @@ Page({
             icon: "success",
             duration: 1200
           })
-
           this.scheduleVehicleEditNavigation(requestId)
           return
         }
-
         const title =
           result &&
           result.code === "VALIDATION_ERROR" &&
@@ -728,12 +661,10 @@ Page({
           result.details.errors
             ? this.getValidationMessage(result)
             : (result && result.message) || "保存失败"
-
         wx.showToast({
           title,
           icon: "none"
         })
-
         this.setData({
           isSubmitting: false
         })
@@ -742,28 +673,24 @@ Page({
         handleFailure(error && (error.errMsg || error.message))
       }
     }
-
     try {
       wx.cloud.callFunction(requestOptions)
     } catch (error) {
       handleFailure(error && (error.errMsg || error.message))
     }
   },
-
   clearVehicleEditLoadTimer() {
     if (this._vehicleEditLoadTimer) {
       clearTimeout(this._vehicleEditLoadTimer)
       this._vehicleEditLoadTimer = null
     }
   },
-
   clearVehicleEditSubmitTimer() {
     if (this._vehicleEditSubmitTimer) {
       clearTimeout(this._vehicleEditSubmitTimer)
       this._vehicleEditSubmitTimer = null
     }
   },
-
   scheduleVehicleEditNavigation(requestId) {
     this.clearVehicleEditNavigationTimer()
     this._vehicleEditPendingNavigationRequestId = requestId
@@ -772,7 +699,6 @@ Page({
       this.continueVehicleEditNavigation(requestId)
     }, 900)
   },
-
   continueVehicleEditNavigation(requestId) {
     const isCurrent = () => this._vehicleEditSubmitRequestId === requestId
     const canNavigate = () => isCurrent() && isPageCurrent(this)
@@ -781,12 +707,10 @@ Page({
         this._vehicleEditPendingNavigationRequestId = requestId
       }
     }
-
     if (!canNavigate()) {
       deferNavigation()
       return
     }
-
     this._vehicleEditPendingNavigationRequestId = 0
     wx.navigateBack({
       delta: 1,
@@ -826,7 +750,6 @@ Page({
       }
     })
   },
-
   clearVehicleEditNavigationTimer() {
     if (this._vehicleEditNavigationTimer) {
       clearTimeout(this._vehicleEditNavigationTimer)

@@ -1,4 +1,4 @@
-﻿function loadPageDefinition() {
+function loadPageDefinition() {
   jest.resetModules()
   let definition = null
   global.Page = jest.fn((input) => {
@@ -174,5 +174,32 @@ describe("pages/mine 常用服务快捷入口", () => {
     navigateOptions.fail(new Error("navigate failed"))
 
     expect(global.wx.showToast).not.toHaveBeenCalled()
+  })
+
+  test("onLoad 优先从 storage 恢复 mine_permissions_snapshot 消除身份闪烁与布局跳动", () => {
+    const mockPermissions = {
+      ok: true,
+      isAdmin: true,
+      canManageBookings: true,
+      canManageRoles: true,
+      canManageConfig: true,
+      canViewAuditLogs: true,
+      canViewErrorLogs: true,
+      canManageVehicles: true
+    }
+    global.wx = {
+      getStorageSync: jest.fn((key) => {
+        if (key === "mine_permissions_snapshot") return mockPermissions
+        return null
+      }),
+      cloud: { callFunction: jest.fn() }
+    }
+    const page = createPage(loadPageDefinition())
+    page.loadMyPermissions = jest.fn()
+    page.loadOperationConfig = jest.fn()
+    page.onLoad()
+    expect(page.data.permissionsReady).toBe(true)
+    expect(page.data.roleLabel).toBe("车库管理员")
+    expect(page.data.menuItems.some((item) => item.key === "roleManage")).toBe(true)
   })
 })

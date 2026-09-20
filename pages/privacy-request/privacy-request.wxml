@@ -13,7 +13,6 @@
       <text>申请与处理进度仅对当前微信账号展示</text>
     </view>
   </view>
-
   <view class="form-card ui-card">
     <view class="privacy-field-heading">
       <view><view class="section-kicker">REQUEST TYPE</view><view class="section-title">选择申请类型</view></view>
@@ -43,7 +42,6 @@
         </view>
       </view>
     </view>
-
     <view class="field-label-row"><view class="field-label">申请说明</view><view class="privacy-required-mark">必填</view></view>
     <textarea
       class="description-input {{formReady ? 'description-input-ready' : ''}}"
@@ -74,11 +72,9 @@
     </button>
     <view class="form-tip"><view class="form-tip-native-icon" aria-hidden="true"></view><text>申请不会自动删除业务记录；工作人员核验身份与保留义务后处理，并在下方反馈结果。</text></view>
   </view>
-
   <view class="record-section">
     <view class="section-kicker">REQUEST HISTORY</view>
     <view class="section-title">我的申请记录</view>
-
     <view wx:if="{{list.length}}" class="request-overview ui-card">
       <view class="request-summary">
         <view>
@@ -123,7 +119,6 @@
         >已结束</button>
       </view>
     </view>
-
     <view
       wx:if="{{initialLoading && !list.length}}"
       class="request-skeleton"
@@ -147,7 +142,6 @@
         <view class="request-skeleton-line request-skeleton-line-short privacy-skeleton-pulse"></view>
       </view>
     </view>
-
     <view wx:elif="{{loadError && !list.length}}" class="empty-card ui-card">
       <view class="empty-visual empty-visual-error" aria-hidden="true">
         <view class="empty-alert-icon"><view class="empty-alert-dot"></view></view>
@@ -157,7 +151,6 @@
       <view class="empty-desc">{{loadError}}</view>
       <button class="retry-btn ui-btn ui-btn-ghost" bindtap="handleRetry"><view class="privacy-action-content"><view class="privacy-action-native-icon privacy-retry-native-icon" aria-hidden="true"></view><text>重新加载</text></view></button>
     </view>
-
     <view wx:elif="{{list.length}}" class="record-list">
       <view wx:if="{{visibleList.length}}">
       <view class="record-card ui-card" wx:for="{{visibleList}}" wx:key="id">
@@ -214,7 +207,6 @@
       </button>
       <view wx:else class="list-end"><view class="privacy-complete-native-icon" aria-hidden="true"></view><text>已加载全部申请</text></view>
     </view>
-
     <view wx:else class="empty-card ui-card">
       <view class="empty-visual empty-visual-record" aria-hidden="true">
         <view class="empty-record-icon">

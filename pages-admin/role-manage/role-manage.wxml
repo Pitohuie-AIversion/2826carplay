@@ -10,7 +10,6 @@
       <image class="hero-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
     </view>
   </view>
-
   <view class="form-card ui-card">
     <view class="section-heading">
       <view>
@@ -29,7 +28,6 @@
       disabled="{{initialLoading || loading || saving || !!editingOpenid}}"
       bindinput="handleOpenidInput"
     />
-
     <view class="permission-row" aria-role="group" aria-label="选择成员管理权限">
       <view
         wx:for="{{permissionOptions}}"
@@ -55,15 +53,12 @@
         </view>
       </view>
     </view>
-
     <view class="form-tip"><view class="role-tip-native-icon" aria-hidden="true"></view><text>{{editingOpenid ? "编辑时不可更换 OpenID；如需新增成员，请先清空表单。" : "不选任何权限时，将保存为普通成员记录。"}}</text></view>
-
     <view class="action-row">
       <button class="save-btn ui-btn ui-btn-primary" loading="{{saving}}" disabled="{{initialLoading || loading || saving}}" bindtap="handleSubmit" aria-label="保存当前成员权限"><view class="role-action-content"><view wx:if="{{!saving}}" class="role-action-native-icon role-save-native-icon" aria-hidden="true"></view><text>{{saving ? '正在保存' : '保存权限'}}</text></view></button>
       <button class="reset-btn ui-btn ui-btn-ghost" disabled="{{initialLoading || loading || saving}}" bindtap="handleResetForm" aria-label="清空权限表单"><view class="role-action-content"><view class="role-action-native-icon role-reset-native-icon" aria-hidden="true"></view><text>清空表单</text></view></button>
     </view>
   </view>
-
   <view class="list-card ui-card">
     <view class="section-heading">
       <view>
@@ -73,7 +68,6 @@
       <view class="section-index">02</view>
     </view>
     <view class="section-desc">优先显示管理员，其余按 OpenID 排序。</view>
-
   <view wx:if="{{(initialLoading || loading) && !list.length}}" class="role-skeleton" aria-hidden="true">
       <view class="role-skeleton-item">
         <view class="role-skeleton-avatar manage-skeleton-pulse"></view>
@@ -92,7 +86,6 @@
         <view class="role-skeleton-action manage-skeleton-pulse"></view>
       </view>
     </view>
-
     <view wx:elif="{{list.length}}" class="role-list">
       <view wx:for="{{list}}" wx:key="id" class="role-item">
         <view class="role-avatar {{item.isAdmin ? 'role-avatar-admin' : ''}}" aria-hidden="true">
@@ -129,7 +122,6 @@
       </button>
       <view wx:else class="role-list-end"><view class="role-complete-native-icon" aria-hidden="true"></view><text>已加载全部成员</text></view>
     </view>
-
     <view wx:else class="empty-wrap">
       <image class="role-empty-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
       <view class="role-empty-kicker">NO ACCESS RECORDS</view>

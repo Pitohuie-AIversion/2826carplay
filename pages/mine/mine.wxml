@@ -5,7 +5,6 @@
     <view class="intro-title">我的极境</view>
     <view class="intro-desc">管理预约与专属服务</view>
   </view>
-
   <view class="profile-card ui-card ui-card-gradient" aria-role="group" aria-label="{{userName}}，{{roleLabel}}，{{userDesc}}">
     <view class="avatar-ring">
       <image class="avatar-image" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
@@ -24,7 +23,6 @@
     </view>
     <image class="profile-watermark" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
   </view>
-
   <view
     wx:if="{{operationPulse.visible}}"
     class="operation-pulse operation-pulse-priority ui-card"
@@ -65,7 +63,6 @@
       {{operationPulse.attentionAreas ? operationPulse.attentionAreas + ' 个模块需要关注，点击查看处理建议' : '各模块状态平稳，点击查看运营详情'}}
     </view>
   </view>
-
   <view class="member-services ui-card">
     <view class="section-heading member-services-heading">
       <view>
@@ -102,7 +99,6 @@
       </view>
     </view>
   </view>
-
   <view class="section-card ui-card">
     <view class="section-heading">
       <view>
@@ -170,7 +166,6 @@
       </block>
     </block>
   </view>
-
   <view class="section-card contact-card ui-card">
     <view class="contact-heading">
       <view>
@@ -192,7 +187,6 @@
       </button>
     </view>
   </view>
-
   <view
     class="mine-version-footer"
     bindtap="handleShowReleaseNotes"
@@ -204,6 +198,5 @@
     <text class="mine-version-dot">·</text>
     <text class="mine-version-action">更新日志</text>
   </view>
-
   <core-nav active-key="mine" />
 </view>

@@ -10,6 +10,7 @@ const {
   isPageNativeActionActive
 } = require("../../shared/pageNativeAction")
 const { onNetworkReconnect } = require("../../shared/networkStatus")
+const { clearUnsaved, markUnsaved } = require("../../shared/unsavedChanges")
 const LAST_BOOKING_CONTACT_KEY = "lastBookingContact"
 const BOOKING_CAR_LOAD_TIMEOUT_MS = 15 * 1000
 const AVAILABILITY_CHECK_TIMEOUT_MS = 12 * 1000
@@ -277,6 +278,7 @@ Page({
       bookingSummary: buildBookingSummary(nextForm, this.data.carName),
       submitRequestId: ""
     })
+    markUnsaved(this)
     wx.showToast({ title: "已填入上次联系人", icon: "none" })
   },
 
@@ -378,6 +380,7 @@ Page({
   },
 
   onUnload() {
+    clearUnsaved(this)
     cancelPageNativeActions(this)
     if (typeof this._unsubscribeNetwork === "function") {
       this._unsubscribeNetwork()
@@ -529,6 +532,7 @@ Page({
       bookingSummary: buildBookingSummary(nextForm, this.data.carName),
       rentalEstimate: calculateRentalEstimate(nextForm.startDate, nextForm.endDate, this.data.priceDay || this._carPriceDay)
     })
+    markUnsaved(this)
     this.checkVehicleAvailability()
   },
 
@@ -560,6 +564,7 @@ Page({
       bookingSummary: buildBookingSummary(nextForm, this.data.carName),
       rentalEstimate: calculateRentalEstimate(nextForm.startDate, nextForm.endDate, this.data.priceDay || this._carPriceDay)
     }, () => this.checkVehicleAvailability())
+    markUnsaved(this)
   },
 
   resetAvailability() {
@@ -748,6 +753,7 @@ Page({
       submitRequestId: "",
       bookingSummary: buildBookingSummary(nextForm, this.data.carName)
     })
+    markUnsaved(this)
   },
 
   validateForm() {
@@ -969,6 +975,7 @@ Page({
             submittedBookingId: String(result.id || "").trim(),
             submittedSummary
           })
+          clearUnsaved(this)
           wx.setNavigationBarTitle({
             title: "预约已提交"
           })

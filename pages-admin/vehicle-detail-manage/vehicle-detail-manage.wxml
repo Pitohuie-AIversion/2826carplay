@@ -10,7 +10,6 @@
       <image class="hero-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
     </view>
   </view>
-
   <view class="loading-card ui-card" wx:if="{{loading}}" aria-hidden="true">
     <view class="vehicle-detail-skeleton-head">
       <view>
@@ -31,7 +30,6 @@
       <view class="vehicle-detail-skeleton-button manage-skeleton-pulse"></view>
     </view>
   </view>
-
   <view wx:elif="{{detail}}" class="detail-wrap">
     <view class="summary-card ui-card">
       <view class="summary-copy">
@@ -45,7 +43,6 @@
       </view>
       <view class="vehicle-status ui-status {{detail.statusClass}}">{{detail.statusText}}</view>
     </view>
-
     <view class="section-card ui-card">
       <view class="detail-section-heading">
         <view class="detail-section-heading-main">
@@ -80,7 +77,6 @@
         <button class="restore-inline-btn ui-btn ui-btn-primary" bindtap="handleRestore" disabled="{{loading || updatingStatus || uploading}}"><view class="danger-button-content"><view class="restore-native-icon" aria-hidden="true"></view><text>恢复启用</text></view></button>
       </view>
     </view>
-
     <view class="section-card ui-card">
       <view class="detail-section-heading">
         <view class="detail-section-heading-main">
@@ -146,7 +142,6 @@
         </view>
       </view>
     </view>
-
     <view class="section-card ui-card">
       <view class="detail-section-heading">
         <view class="detail-section-heading-main">
@@ -182,12 +177,10 @@
         </view>
       </view>
     </view>
-
     <view class="section-card ui-card">
       <view class="note-heading"><view><view class="detail-section-kicker">PUBLIC CONTENT</view><view class="section-title">公开说明</view></view><view class="visibility-chip visibility-chip-public"><view class="visibility-eye-icon" aria-hidden="true"></view><text>前台可见</text></view></view>
       <view class="note-box">{{detail.publicDescriptionText}}</view>
     </view>
-
     <view class="section-card ui-card">
       <view class="note-heading">
         <view><view class="detail-section-kicker">TRUST PROFILE</view><view class="section-title">公开可信档案</view></view>
@@ -204,7 +197,6 @@
       <view class="note-box"><view class="info-label">商业保险摘要</view>{{detail.publicInsuranceSummaryText}}</view>
       <view class="note-box"><view class="info-label">救援能力摘要</view>{{detail.publicAssistanceSummaryText}}</view>
     </view>
-
     <view class="section-card ui-card">
       <view class="note-heading"><view><view class="detail-section-kicker">PRIVATE NOTE</view><view class="section-title">内部备注</view></view><view class="visibility-chip visibility-chip-private"><view class="visibility-lock-icon" aria-hidden="true"><view class="visibility-lock-shackle"></view></view><text>仅后台可见</text></view></view>
       <view class="note-box">{{detail.noteText}}</view>
@@ -213,7 +205,6 @@
       <view class="note-box"><view class="info-label">内部保险记录</view>{{detail.internalInsuranceRecordText}}</view>
       <view class="note-box"><view class="info-label">内部档案说明</view>{{detail.internalArchiveNoteText}}</view>
     </view>
-
     <view class="section-card ui-card">
       <view class="image-header">
         <view class="detail-section-heading-main">
@@ -228,7 +219,6 @@
           <view class="upload-button-content"><view wx:if="{{!uploading}}" class="upload-native-icon" aria-hidden="true"></view><text>{{uploading ? "处理中…" : "上传图片"}}</text></view>
         </button>
       </view>
-
       <view wx:if="{{uploading || failedUploadPaths.length}}" class="upload-progress-panel" aria-live="polite">
         <view class="upload-progress-header">
           <view>
@@ -246,7 +236,6 @@
           </view>
         </view>
       </view>
-
       <view wx:if="{{detail.imageItems.length}}" class="image-list">
         <view wx:for="{{detail.imageItems}}" wx:key="fileId" class="image-card">
           <image wx:if="{{!item.imageFailed}}" class="vehicle-image" src="{{item.fileId}}" mode="aspectFill" lazy-load="{{true}}" fade-in="{{true}}" binderror="handleManagedImageError" bindtap="handlePreviewImage" data-file-id="{{item.fileId}}" hover-class="vehicle-image-pressed" aria-role="button" aria-label="预览第 {{index + 1}} 张车辆图片" />
@@ -277,14 +266,12 @@
           </view>
         </view>
       </view>
-
       <view wx:else class="empty-image-box">
         <view class="empty-image-icon" aria-hidden="true"><view class="empty-image-sun"></view><view class="empty-image-mountain"></view></view>
         <view class="empty-image-title">还没有车辆图片</view>
         <view class="empty-image-desc">上传第一张图片后，可将其中一张设置为首页封面。</view>
       </view>
     </view>
-
     <view class="detail-action-dock ui-card">
       <view class="action-row">
         <button class="secondary-button ui-btn ui-btn-ghost" bindtap="handleBackList"><view class="detail-action-content"><view class="back-native-icon" aria-hidden="true"></view><text>返回列表</text></view></button>
@@ -292,7 +279,6 @@
       </view>
     </view>
   </view>
-
   <view class="loading-card vehicle-detail-empty-card ui-card" wx:else>
     <image class="vehicle-detail-empty-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
     <view class="vehicle-detail-empty-kicker">FLEET PROFILE</view>

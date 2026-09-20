@@ -1,7 +1,1 @@
-{
-  "navigationBarTitleText": "审计日志",
-  "enablePullDownRefresh": true,
-  "backgroundColor": "#101010",
-  "backgroundTextStyle": "light",
-  "usingComponents": {}
-}
+{"navigationBarTitleText":"审计日志","enablePullDownRefresh":true,"backgroundColor":"#101010","backgroundTextStyle":"light","usingComponents":{}}

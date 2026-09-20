@@ -1,6 +1,5 @@
 <view class="content-page">
   <view class="page-glow"></view>
-
   <view class="hero-card ui-card ui-card-gradient">
     <view class="hero-top">
       <view>
@@ -11,7 +10,6 @@
     </view>
     <view class="hero-desc">{{heroDesc}}</view>
   </view>
-
   <view wx:if="{{!guideMode}}" class="content-switcher ui-card">
     <view class="switcher-heading">
       <view>
@@ -37,7 +35,6 @@
       </button>
     </view>
   </view>
-
   <view wx:if="{{guideLoading}}" class="content-card ui-card guide-state">内容加载中…</view>
   <view wx:elif="{{guideError}}" class="content-card ui-card guide-state">
     <view>{{guideError}}</view>
@@ -95,7 +92,6 @@
     </view>
     <view wx:else class="content-text">{{content}}</view>
   </view>
-
   <view wx:if="{{guideMode && relatedVehicles.length}}" class="content-card ui-card guide-vehicles">
     <view class="document-label">RELATED VEHICLES</view>
     <view class="guide-vehicle" wx:for="{{relatedVehicles}}" wx:key="id">
@@ -107,7 +103,6 @@
       </view>
     </view>
   </view>
-
   <view wx:if="{{type === 'privacy'}}" class="rights-card ui-card">
     <view class="rights-icon" aria-hidden="true">
       <view class="rights-document-icon">
@@ -123,7 +118,6 @@
       <view class="content-action-content"><view class="content-action-native-icon rights-action-native-icon" aria-hidden="true"></view><text>提交个人信息申请</text></view>
     </button>
   </view>
-
   <view wx:if="{{!guideMode}}" class="support-card ui-card">
     <view class="support-heading">
       <view>
@@ -149,7 +143,6 @@
       </button>
     </view>
   </view>
-
   <view class="document-footer">
     <view class="footer-line"></view>
     <view class="footer-text">EXTREME GARAGE · OFFICIAL</view>

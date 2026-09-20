@@ -123,7 +123,24 @@ Page({
   onLoad() {
     activatePageNativeActions(this)
     this.restoreFilterPreference()
+    try {
+      if (typeof wx !== "undefined" && typeof wx.getStorageSync === "function") {
+        const snapshot = wx.getStorageSync("favorites_last_snapshot")
+        if (Array.isArray(snapshot) && snapshot.length > 0) {
+          this.applyFavoriteList(snapshot, {
+            availableOnly: this.data.availableOnly,
+            page: 0,
+            hasMore: true
+          })
+          this.setData({ initialLoading: false, loadedOnce: true })
+        }
+      }
+    } catch (e) {}
     this.fetchList()
+  },
+
+  onReachBottom() {
+    this.handleLoadMore()
   },
 
   onShow() {
@@ -592,6 +609,9 @@ Page({
         }
         const list = Array.isArray(result.list) ? result.list : []
         const nextList = append ? this.data.list.concat(list) : list
+        if (!append && typeof wx !== "undefined" && typeof wx.setStorageSync === "function") {
+          try { wx.setStorageSync("favorites_last_snapshot", nextList) } catch (e) {}
+        }
         this.applyFavoriteList(nextList, {
           availableOnly: this.data.availableOnly,
           page: Number.isInteger(result.page) ? result.page : nextPage,

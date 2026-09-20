@@ -6,7 +6,6 @@ page {
   font-feature-settings: "tnum" 1;
   line-height: 1.6;
 }
-
 view,
 text,
 button,
@@ -18,59 +17,49 @@ image,
 scroll-view {
   box-sizing: border-box;
 }
-
 button {
   border-radius: 18rpx;
   font-weight: 600;
   transition: opacity 140ms ease, transform 140ms ease, box-shadow 160ms ease;
 }
-
 button::after {
   border: 0;
 }
-
 button:active {
   opacity: 0.86;
   transform: scale(0.992);
 }
-
 button[disabled] {
   opacity: 0.55;
   box-shadow: none;
   transform: none;
 }
-
 input,
 textarea {
   caret-color: #6e9fea;
 }
-
 .page-placeholder {
   min-height: 100vh;
   padding: 40rpx 32rpx;
   box-sizing: border-box;
 }
-
 .page-title {
   font-size: 40rpx;
   font-weight: 700;
   line-height: 1.25;
   letter-spacing: 1rpx;
 }
-
 .page-desc {
   margin-top: 14rpx;
   font-size: 24rpx;
   line-height: 1.7;
   color: #929aa7;
 }
-
 .ui-page {
   min-height: 100vh;
   background: #0b0d10;
   color: #f7f8fa;
 }
-
 .ui-card {
   border: 1rpx solid rgba(255, 255, 255, 0.08);
   border-radius: 24rpx;
@@ -78,53 +67,43 @@ textarea {
   box-sizing: border-box;
   box-shadow: 0 20rpx 48rpx rgba(0, 0, 0, 0.2);
 }
-
 .ui-card-soft {
   border-color: rgba(255, 255, 255, 0.07);
   background: #12151a;
 }
-
 .ui-card-gradient {
   border-color: rgba(103, 153, 255, 0.18);
   background: linear-gradient(145deg, #1b2230 0%, #15191f 54%, #111419 100%);
 }
-
 .ui-shadow-sm {
   box-shadow: 0 12rpx 24rpx rgba(0, 0, 0, 0.18);
 }
-
 .ui-title {
   color: #ffffff;
   font-weight: 700;
   line-height: 1.35;
 }
-
 .ui-title-lg {
   font-size: 36rpx;
 }
-
 .ui-title-md {
   font-size: 30rpx;
 }
-
 .ui-title-sm {
   font-size: 28rpx;
   font-weight: 600;
   line-height: 1.45;
 }
-
 .ui-desc {
   color: #a2a9b4;
   font-size: 24rpx;
   line-height: 1.7;
 }
-
 .ui-desc-weak {
   color: #7f8793;
   font-size: 22rpx;
   line-height: 1.6;
 }
-
 .ui-pill {
   display: flex;
   align-items: center;
@@ -137,24 +116,20 @@ textarea {
   transition: color 150ms ease, background 150ms ease, border-color 150ms ease,
     opacity 120ms ease, transform 120ms ease;
 }
-
 .ui-pill-active {
   border-color: rgba(88, 145, 255, 0.7);
   background: linear-gradient(135deg, rgba(47, 128, 237, 0.3), rgba(77, 126, 236, 0.14));
   color: #ffffff;
   box-shadow: 0 10rpx 26rpx rgba(24, 94, 210, 0.16);
 }
-
 .ui-pill-pressed,
 .ui-pill:active {
   opacity: 0.8;
   transform: scale(0.98);
 }
-
 .ui-scroll-shell {
   position: relative;
 }
-
 .ui-scroll-cue {
   position: absolute;
   z-index: 2;
@@ -165,7 +140,6 @@ textarea {
   pointer-events: none;
   background: linear-gradient(90deg, rgba(21, 24, 29, 0), rgba(21, 24, 29, 0.96) 74%);
 }
-
 .ui-scroll-cue::after {
   position: absolute;
   top: 50%;
@@ -177,7 +151,6 @@ textarea {
   content: "";
   transform: translateY(-50%) rotate(45deg);
 }
-
 .ui-badge {
   display: inline-flex;
   align-items: center;
@@ -187,7 +160,6 @@ textarea {
   color: inherit;
   box-sizing: border-box;
 }
-
 .ui-status {
   display: inline-flex;
   align-items: center;
@@ -204,69 +176,45 @@ textarea {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
 .ui-status-lg {
   min-height: 48rpx;
   padding: 10rpx 18rpx;
   font-size: 22rpx;
 }
-
 .status-available,
 .status-active,
 .status-contacted {
   background: #2f80ed;
 }
-
 .status-quoted {
   background: #765cc9;
 }
-
 .status-adjustment-requested {
   background: #c38a38;
 }
-
 .status-confirmed {
   background: #27865d;
 }
-
-.status-quoted {
-  background: #765cc9;
-}
-
-.status-adjustment-requested {
-  background: #c38a38;
-}
-
-.status-confirmed {
-  background: #27865d;
-}
-
 .status-idle,
 .status-completed {
   background: #27ae60;
 }
-
 .status-maintenance {
   background: #f2994a;
 }
-
 .status-retired,
 .status-rented {
   background: #6f7580;
 }
-
 .status-reserved {
   background: #9b51e0;
 }
-
 .status-pending {
   background: #5c6370;
 }
-
 .status-cancelled {
   background: #d64b4b;
 }
-
 .ui-btn {
   height: 80rpx;
   margin: 0;
@@ -279,39 +227,32 @@ textarea {
   text-overflow: ellipsis;
   box-sizing: border-box;
 }
-
 .ui-btn::after {
   border: 0;
 }
-
 .ui-btn-primary {
   background: linear-gradient(135deg, #4c91ff, #2f6ee5);
   color: #ffffff;
   box-shadow: 0 12rpx 26rpx rgba(47, 110, 229, 0.2);
 }
-
 .ui-btn-ghost {
   border: 1rpx solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.045);
   color: #f1f3f6;
 }
-
 .ui-btn-danger {
   background: #d64b4b;
   color: #ffffff;
 }
-
 .ui-btn-success {
   background: #27ae60;
   color: #ffffff;
 }
-
 .ui-btn-danger-ghost {
   border: 1rpx solid rgba(214, 75, 75, 0.6);
   background: rgba(214, 75, 75, 0.12);
   color: #ffffff;
 }
-
 .ui-input {
   height: 80rpx;
   padding: 0 24rpx;
@@ -323,7 +264,6 @@ textarea {
   box-sizing: border-box;
   transition: border-color 150ms ease, background 150ms ease, box-shadow 150ms ease;
 }
-
 .ui-input:focus {
   border-color: rgba(84, 143, 255, 0.55);
   box-shadow: 0 0 0 5rpx rgba(84, 143, 255, 0.08);

@@ -1,12 +1,10 @@
 @import "../../shared/management-shell.wxss";
-
 .role-page {
   min-height: 100vh;
   padding: 24rpx calc(24rpx + env(safe-area-inset-right)) calc(24rpx + env(safe-area-inset-bottom)) calc(24rpx + env(safe-area-inset-left));
   background: #101010;
   box-sizing: border-box;
 }
-
 .hero-card,
 .form-card,
 .list-card {
@@ -14,26 +12,22 @@
   padding: 28rpx;
   box-sizing: border-box;
 }
-
 .hero-title,
 .section-title,
 .role-openid,
 .empty-title {
   color: #ffffff;
 }
-
 .hero-title {
   font-size: 32rpx;
   font-weight: 700;
   line-height: 1.4;
 }
-
 .section-title {
   font-size: 28rpx;
   font-weight: 600;
   line-height: 1.5;
 }
-
 .hero-desc,
 .section-desc,
 .form-tip,
@@ -45,21 +39,17 @@
   font-size: 24rpx;
   line-height: 1.7;
 }
-
 .openid-input {
   margin-top: 20rpx;
 }
-
 .openid-input[disabled] {
   opacity: 0.58;
 }
-
 .permission-row {
   display: flex;
   gap: 14rpx;
   margin-top: 20rpx;
 }
-
 .permission-option {
   display: flex;
   align-items: center;
@@ -71,22 +61,18 @@
   background: rgba(255, 255, 255, 0.022);
   transition: opacity 120ms ease, transform 120ms ease, border-color 150ms ease, background 150ms ease;
 }
-
 .permission-option-active {
   border-color: rgba(82, 143, 255, 0.42);
   background: linear-gradient(145deg, rgba(55, 112, 204, 0.15), rgba(55, 112, 204, 0.055));
   box-shadow: 0 12rpx 28rpx rgba(20, 69, 145, 0.12);
 }
-
 .permission-option-pressed {
   opacity: 0.76;
   transform: scale(0.98);
 }
-
 .permission-option-disabled {
   opacity: 0.52;
 }
-
 .permission-option-icon {
   display: flex;
   align-items: center;
@@ -99,20 +85,17 @@
   background: rgba(70, 121, 199, 0.08);
   color: #789bce;
 }
-
 .permission-option-active .permission-option-icon {
   border-color: rgba(101, 157, 243, 0.32);
   background: rgba(64, 126, 223, 0.14);
   color: #8cb7fb;
 }
-
 .permission-icon {
   position: relative;
   width: 25rpx;
   height: 25rpx;
   box-sizing: border-box;
 }
-
 .permission-icon-car {
   width: 27rpx;
   height: 13rpx;
@@ -120,7 +103,6 @@
   border: 2rpx solid currentColor;
   border-radius: 5rpx;
 }
-
 .permission-icon-car::before {
   position: absolute;
   top: -9rpx;
@@ -133,7 +115,6 @@
   box-sizing: border-box;
   content: "";
 }
-
 .permission-icon-car::after {
   position: absolute;
   bottom: -6rpx;
@@ -145,7 +126,6 @@
   box-shadow: 13rpx 0 0 currentColor;
   content: "";
 }
-
 .permission-icon-calendar {
   width: 25rpx;
   height: 23rpx;
@@ -153,7 +133,6 @@
   border: 2rpx solid currentColor;
   border-radius: 5rpx;
 }
-
 .permission-icon-calendar::before {
   position: absolute;
   top: 5rpx;
@@ -163,7 +142,6 @@
   background: currentColor;
   content: "";
 }
-
 .permission-icon-calendar::after {
   position: absolute;
   top: -5rpx;
@@ -175,27 +153,23 @@
   box-shadow: 11rpx 0 0 currentColor;
   content: "";
 }
-
 .permission-option-copy {
   flex: 1;
   min-width: 0;
   margin-left: 13rpx;
 }
-
 .permission-option-title {
   color: #e9edf3;
   font-size: 21rpx;
   font-weight: 650;
   line-height: 1.35;
 }
-
 .permission-option-desc {
   margin-top: 5rpx;
   color: #687587;
   font-size: 15rpx;
   line-height: 1.35;
 }
-
 .permission-option-check {
   position: relative;
   flex-shrink: 0;
@@ -206,13 +180,11 @@
   border-radius: 50%;
   box-sizing: border-box;
 }
-
 .permission-option-active .permission-option-check {
   border-color: #639af0;
   background: #3978d8;
   box-shadow: 0 0 13rpx rgba(73, 132, 224, 0.34);
 }
-
 .permission-option-check-mark {
   position: absolute;
   top: 4rpx;
@@ -224,26 +196,21 @@
   opacity: 0;
   transform: rotate(45deg);
 }
-
 .permission-option-active .permission-option-check-mark {
   opacity: 1;
 }
-
 .action-row {
   display: flex;
   margin-top: 20rpx;
 }
-
 .form-tip {
   display: flex;
   align-items: flex-start;
 }
-
 .form-tip text {
   flex: 1;
   min-width: 0;
 }
-
 .role-tip-native-icon {
   position: relative;
   flex-shrink: 0;
@@ -255,7 +222,6 @@
   border-radius: 50%;
   box-sizing: border-box;
 }
-
 .role-tip-native-icon::before {
   position: absolute;
   top: 4rpx;
@@ -266,7 +232,6 @@
   background: #64758d;
   content: "";
 }
-
 .role-tip-native-icon::after {
   position: absolute;
   top: 9rpx;
@@ -277,7 +242,6 @@
   background: #64758d;
   content: "";
 }
-
 .role-action-content {
   display: flex;
   align-items: center;
@@ -286,7 +250,6 @@
   height: 100%;
   line-height: 1;
 }
-
 .role-action-native-icon {
   position: relative;
   flex-shrink: 0;
@@ -294,14 +257,12 @@
   color: currentColor;
   box-sizing: border-box;
 }
-
 .role-save-native-icon {
   width: 22rpx;
   height: 25rpx;
   border: 2rpx solid currentColor;
   border-radius: 6rpx 6rpx 10rpx 10rpx;
 }
-
 .role-save-native-icon::after {
   position: absolute;
   top: 4rpx;
@@ -313,14 +274,12 @@
   content: "";
   transform: rotate(45deg);
 }
-
 .role-reset-native-icon {
   width: 22rpx;
   height: 22rpx;
   border: 2rpx solid currentColor;
   border-radius: 50%;
 }
-
 .role-reset-native-icon::before,
 .role-reset-native-icon::after {
   position: absolute;
@@ -332,15 +291,12 @@
   background: currentColor;
   content: "";
 }
-
 .role-reset-native-icon::before {
   transform: rotate(45deg);
 }
-
 .role-reset-native-icon::after {
   transform: rotate(-45deg);
 }
-
 .role-edit-native-icon {
   width: 7rpx;
   height: 20rpx;
@@ -349,7 +305,6 @@
   background: currentColor;
   transform: rotate(42deg);
 }
-
 .role-edit-native-icon::after {
   position: absolute;
   right: 0;
@@ -363,7 +318,6 @@
   border-top: 6rpx solid currentColor;
   content: "";
 }
-
 .role-more-native-icon {
   width: 13rpx;
   height: 13rpx;
@@ -372,20 +326,16 @@
   border-bottom: 2rpx solid currentColor;
   transform: rotate(45deg);
 }
-
 .save-btn,
 .reset-btn {
   flex: 1;
 }
-
 .reset-btn {
   margin-left: 16rpx;
 }
-
 .role-list {
   margin-top: 16rpx;
 }
-
 .role-item {
   display: flex;
   align-items: center;
@@ -393,13 +343,11 @@
   padding: 20rpx 0;
   border-bottom: 1rpx solid #262626;
 }
-
 .role-main {
   flex: 1;
   min-width: 0;
   padding-right: 16rpx;
 }
-
 .role-avatar {
   display: flex;
   align-items: center;
@@ -413,19 +361,16 @@
   background: rgba(64, 110, 181, 0.07);
   color: #7294c7;
 }
-
 .role-avatar-admin {
   border-color: rgba(195, 154, 76, 0.22);
   background: rgba(170, 126, 49, 0.08);
   color: #c3a05c;
 }
-
 .role-member-icon {
   position: relative;
   width: 25rpx;
   height: 25rpx;
 }
-
 .role-member-icon::before {
   position: absolute;
   top: 0;
@@ -437,7 +382,6 @@
   box-sizing: border-box;
   content: "";
 }
-
 .role-member-icon::after {
   position: absolute;
   right: 3rpx;
@@ -450,7 +394,6 @@
   box-sizing: border-box;
   content: "";
 }
-
 .role-shield-icon {
   position: relative;
   width: 23rpx;
@@ -459,7 +402,6 @@
   border-radius: 7rpx 7rpx 11rpx 11rpx;
   box-sizing: border-box;
 }
-
 .role-shield-icon::after {
   position: absolute;
   top: 5rpx;
@@ -471,23 +413,19 @@
   content: "";
   transform: rotate(45deg);
 }
-
 .role-openid {
   font-size: 24rpx;
   line-height: 1.6;
   word-break: break-all;
 }
-
 .role-permission-row {
   display: flex;
   align-items: center;
   margin-top: 8rpx;
 }
-
 .role-permission-row .role-permission {
   margin-top: 0;
 }
-
 .role-permission-dot {
   flex-shrink: 0;
   width: 7rpx;
@@ -497,16 +435,13 @@
   background: #6088bd;
   box-shadow: 0 0 10rpx rgba(96, 136, 189, 0.34);
 }
-
 .role-permission-dot-admin {
   background: #c19a50;
   box-shadow: 0 0 10rpx rgba(193, 154, 80, 0.34);
 }
-
 .edit-btn {
   min-width: 132rpx;
 }
-
 .admin-tag {
   min-width: 132rpx;
   padding: 10rpx 16rpx;
@@ -518,16 +453,13 @@
   text-align: center;
   box-sizing: border-box;
 }
-
 .empty-wrap {
   padding: 40rpx 0 12rpx;
   text-align: center;
 }
-
 .load-more-btn {
   margin-top: 24rpx;
 }
-
 .role-list-end {
   display: flex;
   align-items: center;
@@ -538,7 +470,6 @@
   line-height: 1.5;
   letter-spacing: 1rpx;
 }
-
 .role-complete-native-icon {
   position: relative;
   width: 20rpx;
@@ -548,7 +479,6 @@
   border-radius: 50%;
   box-sizing: border-box;
 }
-
 .role-complete-native-icon::after {
   position: absolute;
   top: 3rpx;
@@ -560,7 +490,6 @@
   content: "";
   transform: rotate(45deg);
 }
-
 .role-page.management-page .hero-card,
 .role-page.management-page .form-card,
 .role-page.management-page .list-card {
@@ -569,17 +498,14 @@
   border-color: rgba(255, 255, 255, 0.075);
   border-radius: 26rpx;
 }
-
 .role-page.management-page .form-card,
 .role-page.management-page .list-card {
   background: #15181d;
 }
-
 .role-page.management-page .openid-input {
   height: 82rpx;
   margin-top: 4rpx;
 }
-
 .role-page.management-page .form-tip,
 .role-page.management-page .section-desc,
 .role-page.management-page .role-permission,
@@ -588,7 +514,6 @@
   color: #737e8c;
   font-size: 21rpx;
 }
-
 .role-page.management-page .save-btn,
 .role-page.management-page .reset-btn,
 .role-page.management-page .load-more-btn {
@@ -597,7 +522,6 @@
   font-size: 23rpx;
   line-height: 82rpx;
 }
-
 .role-page.management-page .role-item {
   margin-bottom: 12rpx;
   padding: 20rpx;
@@ -605,23 +529,19 @@
   border-radius: 18rpx;
   background: rgba(255, 255, 255, 0.025);
 }
-
 .role-page.management-page .role-openid {
   color: #e5e9ef;
   font-family: monospace;
   font-size: 21rpx;
 }
-
 .role-page.management-page .admin-tag {
   border: 1rpx solid rgba(84, 143, 255, 0.24);
   background: rgba(47, 128, 237, 0.1);
   color: #83b0fb;
 }
-
 .role-skeleton {
   margin-top: 20rpx;
 }
-
 .role-skeleton-item {
   display: flex;
   align-items: center;
@@ -632,43 +552,36 @@
   border-radius: 18rpx;
   background: rgba(255, 255, 255, 0.02);
 }
-
 .role-skeleton-item-muted {
   opacity: 0.7;
 }
-
 .role-skeleton-copy {
   flex: 1;
   min-width: 0;
   padding-right: 22rpx;
 }
-
 .role-skeleton-avatar {
   flex: 0 0 56rpx;
   height: 56rpx;
   margin-right: 16rpx;
   border-radius: 17rpx;
 }
-
 .role-skeleton-openid {
   width: 78%;
   height: 23rpx;
   border-radius: 8rpx;
 }
-
 .role-skeleton-permission {
   width: 58%;
   height: 19rpx;
   margin-top: 16rpx;
   border-radius: 8rpx;
 }
-
 .role-skeleton-action {
   flex: 0 0 132rpx;
   height: 68rpx;
   border-radius: 18rpx;
 }
-
 .role-empty-emblem {
   width: 88rpx;
   height: 88rpx;
@@ -676,7 +589,6 @@
   border-radius: 50%;
   opacity: 0.76;
 }
-
 .role-empty-kicker {
   margin-top: 17rpx;
   color: #60738f;
@@ -685,7 +597,6 @@
   line-height: 1.4;
   letter-spacing: 2rpx;
 }
-
 .role-page.management-page .empty-title {
   margin-top: 8rpx;
 }

@@ -8,17 +8,14 @@
     linear-gradient(180deg, rgba(18, 24, 34, 0.98) 0%, #0b0d10 540rpx),
     #0b0d10;
 }
-
 .garage-guides {
   margin: 22rpx 24rpx;
   padding: 26rpx;
 }
-
 .garage-guide-track {
   display: inline-flex;
   padding-top: 18rpx;
 }
-
 .garage-guide-card {
   width: 360rpx;
   margin-right: 16rpx;
@@ -28,26 +25,22 @@
   background: rgba(76, 126, 210, 0.07);
   box-sizing: border-box;
 }
-
 .garage-guide-card-pressed {
   opacity: 0.72;
   transform: scale(0.985);
 }
-
 .garage-guide-type,
 .garage-guide-open {
   color: #7faaf0;
   font-size: 17rpx;
   letter-spacing: 1rpx;
 }
-
 .garage-guide-title {
   margin-top: 10rpx;
   color: #eef2f7;
   font-size: 25rpx;
   font-weight: 650;
 }
-
 .garage-guide-summary {
   height: 72rpx;
   margin-top: 10rpx;
@@ -56,17 +49,14 @@
   font-size: 19rpx;
   line-height: 1.5;
 }
-
 .garage-guide-open {
   margin-top: 14rpx;
 }
-
 .ambient {
   position: absolute;
   border-radius: 50%;
   pointer-events: none;
 }
-
 .ambient-blue {
   top: -160rpx;
   right: -220rpx;
@@ -75,7 +65,6 @@
   background: rgba(47, 128, 237, 0.12);
   filter: blur(90rpx);
 }
-
 .ambient-silver {
   top: 280rpx;
   left: -240rpx;
@@ -84,7 +73,6 @@
   background: rgba(185, 202, 226, 0.06);
   filter: blur(80rpx);
 }
-
 .garage-header,
 .garage-search,
 .garage-city-bar,
@@ -96,14 +84,12 @@
   position: relative;
   z-index: 1;
 }
-
 .garage-city-bar {
   display: flex;
   align-items: center;
   margin-top: 14rpx;
   padding: 0 4rpx;
 }
-
 .city-chips-label {
   flex-shrink: 0;
   margin-right: 8rpx;
@@ -111,14 +97,12 @@
   font-size: 20rpx;
   letter-spacing: 0.5rpx;
 }
-
 .city-chips-list {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 12rpx;
 }
-
 .city-chip {
   display: inline-flex;
   align-items: center;
@@ -133,7 +117,6 @@
   transition: all 0.2s ease;
   box-sizing: border-box;
 }
-
 .city-chip-active {
   border-color: rgba(91, 145, 232, 0.6);
   background: rgba(47, 128, 237, 0.18);
@@ -141,12 +124,10 @@
   font-weight: 600;
   box-shadow: 0 0 16rpx rgba(47, 128, 237, 0.2);
 }
-
 .city-chip-pressed {
   opacity: 0.72;
   transform: scale(0.96);
 }
-
 .garage-search {
   display: flex;
   align-items: center;
@@ -157,7 +138,6 @@
   background: rgba(17, 22, 29, 0.92);
   box-sizing: border-box;
 }
-
 .search-symbol {
   position: relative;
   flex-shrink: 0;
@@ -167,7 +147,6 @@
   color: #6f94cb;
   box-sizing: border-box;
 }
-
 .search-symbol::before {
   position: absolute;
   top: 2rpx;
@@ -179,7 +158,6 @@
   box-sizing: border-box;
   content: "";
 }
-
 .search-symbol::after {
   position: absolute;
   top: 17rpx;
@@ -192,7 +170,6 @@
   transform: rotate(45deg);
   transform-origin: left center;
 }
-
 .search-input {
   flex: 1;
   min-width: 0;
@@ -201,11 +178,9 @@
   font-size: 22rpx;
   line-height: 80rpx;
 }
-
 .search-placeholder {
   color: #556171;
 }
-
 .search-clear {
   position: relative;
   flex-shrink: 0;
@@ -220,11 +195,9 @@
   color: #788596;
   line-height: 56rpx;
 }
-
 .search-clear::after {
   border: 0;
 }
-
 .search-clear-icon::before,
 .search-clear-icon::after {
   position: absolute;
@@ -236,20 +209,16 @@
   background: currentColor;
   content: "";
 }
-
 .search-clear-icon::before {
   transform: rotate(45deg);
 }
-
 .search-clear-icon::after {
   transform: rotate(-45deg);
 }
-
 .search-clear-pressed {
   opacity: 0.68;
   transform: scale(0.9);
 }
-
 .garage-action-content {
   display: flex;
   align-items: center;
@@ -258,7 +227,6 @@
   height: 100%;
   line-height: 1;
 }
-
 .garage-action-native-icon {
   position: relative;
   flex-shrink: 0;
@@ -266,7 +234,6 @@
   color: currentColor;
   box-sizing: border-box;
 }
-
 .garage-retry-native-icon {
   width: 24rpx;
   height: 24rpx;
@@ -274,7 +241,6 @@
   border-right-color: transparent;
   border-radius: 50%;
 }
-
 .garage-retry-native-icon::after {
   position: absolute;
   top: -4rpx;
@@ -286,7 +252,6 @@
   content: "";
   transform: rotate(20deg);
 }
-
 .garage-more-native-icon {
   width: 13rpx;
   height: 13rpx;
@@ -295,7 +260,6 @@
   border-bottom: 2rpx solid currentColor;
   transform: rotate(45deg);
 }
-
 .garage-search-more-native-icon {
   width: 21rpx;
   height: 21rpx;
@@ -303,7 +267,6 @@
   border: 2rpx solid currentColor;
   border-radius: 50%;
 }
-
 .garage-search-more-native-icon::after {
   position: absolute;
   right: -7rpx;
@@ -315,14 +278,12 @@
   content: "";
   transform: rotate(45deg);
 }
-
 .garage-clear-native-icon {
   width: 22rpx;
   height: 22rpx;
   border: 2rpx solid currentColor;
   border-radius: 50%;
 }
-
 .garage-clear-native-icon::before,
 .garage-clear-native-icon::after {
   position: absolute;
@@ -334,22 +295,18 @@
   background: currentColor;
   content: "";
 }
-
 .garage-clear-native-icon::before {
   transform: rotate(45deg);
 }
-
 .garage-clear-native-icon::after {
   transform: rotate(-45deg);
 }
-
 .garage-status-native-icon {
   width: 22rpx;
   height: 25rpx;
   border: 2rpx solid currentColor;
   border-radius: 4rpx;
 }
-
 .garage-status-native-icon::before {
   position: absolute;
   top: 6rpx;
@@ -361,7 +318,6 @@
   box-shadow: 0 6rpx 0 currentColor, 0 12rpx 0 currentColor;
   content: "";
 }
-
 .garage-list-end {
   display: flex;
   align-items: center;
@@ -372,7 +328,6 @@
   line-height: 1.5;
   letter-spacing: 1rpx;
 }
-
 .garage-complete-native-icon {
   position: relative;
   width: 20rpx;
@@ -382,7 +337,6 @@
   border-radius: 50%;
   box-sizing: border-box;
 }
-
 .garage-complete-native-icon::after {
   position: absolute;
   top: 3rpx;
@@ -394,7 +348,6 @@
   content: "";
   transform: rotate(45deg);
 }
-
 .garage-state-icon {
   position: relative;
   width: 54rpx;
@@ -403,7 +356,6 @@
   color: #648ac1;
   box-sizing: border-box;
 }
-
 .garage-error-native-icon {
   display: flex;
   align-items: center;
@@ -416,7 +368,6 @@
   color: #d89762;
   transform: rotate(45deg);
 }
-
 .garage-error-native-mark {
   position: relative;
   width: 3rpx;
@@ -425,7 +376,6 @@
   background: currentColor;
   transform: rotate(-45deg);
 }
-
 .garage-error-native-mark::after {
   position: absolute;
   right: 0;
@@ -436,7 +386,6 @@
   background: currentColor;
   content: "";
 }
-
 .garage-search-empty-native-icon {
   width: 37rpx;
   height: 37rpx;
@@ -444,7 +393,6 @@
   border: 3rpx solid currentColor;
   border-radius: 50%;
 }
-
 .garage-search-empty-native-icon::after {
   position: absolute;
   right: -13rpx;
@@ -456,12 +404,10 @@
   content: "";
   transform: rotate(45deg);
 }
-
 .garage-filter-empty-native-icon {
   width: 46rpx;
   height: 46rpx;
 }
-
 .garage-filter-empty-line {
   position: absolute;
   left: 5rpx;
@@ -470,7 +416,6 @@
   border-radius: 999rpx;
   background: currentColor;
 }
-
 .garage-filter-empty-line::after {
   position: absolute;
   top: -5rpx;
@@ -482,23 +427,18 @@
   box-sizing: border-box;
   content: "";
 }
-
 .garage-filter-empty-line-top {
   top: 13rpx;
 }
-
 .garage-filter-empty-line-top::after {
   left: 7rpx;
 }
-
 .garage-filter-empty-line-bottom {
   top: 31rpx;
 }
-
 .garage-filter-empty-line-bottom::after {
   right: 7rpx;
 }
-
 .garage-empty-native-icon::before {
   position: absolute;
   top: 4rpx;
@@ -510,7 +450,6 @@
   content: "";
   transform: rotate(45deg);
 }
-
 .garage-empty-native-icon::after {
   position: absolute;
   right: 5rpx;
@@ -522,7 +461,6 @@
   border-radius: 0 0 5rpx 5rpx;
   content: "";
 }
-
 .garage-empty-native-door {
   position: absolute;
   bottom: 3rpx;
@@ -534,11 +472,9 @@
   border-bottom: 0;
   box-sizing: border-box;
 }
-
 .garage-load-more {
   margin-top: 24rpx;
 }
-
 .garage-capacity-tip {
   margin-top: 18rpx;
   color: #89919d;
@@ -546,11 +482,9 @@
   line-height: 1.6;
   text-align: center;
 }
-
 .garage-header {
   padding: 12rpx 10rpx 18rpx;
 }
-
 .header-kicker {
   display: flex;
   align-items: center;
@@ -560,21 +494,18 @@
   line-height: 1.2;
   letter-spacing: 4rpx;
 }
-
 .kicker-line {
   width: 36rpx;
   height: 2rpx;
   margin-right: 14rpx;
   background: #4d8dff;
 }
-
 .header-main {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-top: 20rpx;
 }
-
 .page-title {
   flex: 1;
   min-width: 0;
@@ -584,7 +515,6 @@
   line-height: 1.2;
   letter-spacing: 2rpx;
 }
-
 .brand-mark {
   display: flex;
   align-items: center;
@@ -599,13 +529,11 @@
   box-shadow: 0 10rpx 30rpx rgba(0, 0, 0, 0.28);
   overflow: hidden;
 }
-
 .brand-mark-image {
   width: 100%;
   height: 100%;
   border-radius: 50%;
 }
-
 .page-desc {
   max-width: 620rpx;
   margin-top: 16rpx;
@@ -613,24 +541,20 @@
   font-size: 24rpx;
   line-height: 1.7;
 }
-
 .category-scroll-shell {
   position: relative;
   width: calc(100% + 48rpx);
   margin-top: 24rpx;
   margin-left: -24rpx;
 }
-
 .category-scroll {
   width: 100%;
   white-space: nowrap;
 }
-
 .category-list {
   display: flex;
   padding: 0 72rpx 10rpx 34rpx;
 }
-
 .horizontal-scroll-cue {
   position: absolute;
   z-index: 2;
@@ -646,7 +570,6 @@
   background: linear-gradient(90deg, rgba(11, 13, 16, 0), rgba(11, 13, 16, 0.94) 72%);
   box-sizing: border-box;
 }
-
 .horizontal-scroll-cue-arrow {
   width: 12rpx;
   height: 12rpx;
@@ -654,7 +577,6 @@
   border-right: 2rpx solid rgba(142, 178, 232, 0.72);
   transform: rotate(45deg);
 }
-
 .category-item {
   flex-shrink: 0;
   min-height: 70rpx;
@@ -666,7 +588,6 @@
   line-height: 1.3;
   overflow: hidden;
 }
-
 .category-count {
   min-width: 34rpx;
   margin-left: 12rpx;
@@ -675,11 +596,9 @@
   line-height: 1.2;
   text-align: center;
 }
-
 .ui-pill-active .category-count {
   background: rgba(255, 255, 255, 0.16);
 }
-
 .summary-panel {
   display: flex;
   align-items: stretch;
@@ -691,7 +610,6 @@
   background:
     linear-gradient(135deg, rgba(29, 37, 49, 0.96), rgba(16, 20, 26, 0.98));
 }
-
 .summary-panel::after {
   position: absolute;
   top: -80rpx;
@@ -702,12 +620,10 @@
   border-radius: 50%;
   content: "";
 }
-
 .summary-copy {
   flex: 1;
   min-width: 0;
 }
-
 .summary-label,
 .list-kicker {
   color: #63738b;
@@ -716,7 +632,6 @@
   line-height: 1.4;
   letter-spacing: 3rpx;
 }
-
 .summary-title {
   margin-top: 6rpx;
   color: #f4f6f9;
@@ -724,43 +639,36 @@
   font-weight: 650;
   line-height: 1.45;
 }
-
 .summary-stats {
   display: flex;
   align-items: center;
   margin-top: 18rpx;
 }
-
 .summary-stat {
   display: flex;
   align-items: baseline;
 }
-
 .summary-number {
   color: #f5f7fa;
   font-size: 34rpx;
   font-weight: 700;
   line-height: 1;
 }
-
 .summary-number-active {
   color: #6aa1ff;
 }
-
 .summary-unit {
   margin-left: 8rpx;
   color: #7f8997;
   font-size: 19rpx;
   line-height: 1.4;
 }
-
 .summary-divider {
   width: 1rpx;
   height: 28rpx;
   margin: 0 18rpx;
   background: rgba(255, 255, 255, 0.1);
 }
-
 .summary-service {
   position: relative;
   z-index: 1;
@@ -772,12 +680,10 @@
   border-left: 1rpx solid rgba(255, 255, 255, 0.08);
   transition: opacity 120ms ease, transform 120ms ease;
 }
-
 .summary-service-pressed {
   opacity: 0.72;
   transform: scale(0.95);
 }
-
 .availability-filter {
   display: flex;
   align-items: center;
@@ -788,7 +694,6 @@
   border-color: rgba(255, 255, 255, 0.07);
   background: rgba(18, 23, 30, 0.9);
 }
-
 .availability-copy {
   display: flex;
   align-items: center;
@@ -796,7 +701,6 @@
   min-width: 0;
   padding-right: 16rpx;
 }
-
 .availability-filter-native-icon {
   position: relative;
   flex-shrink: 0;
@@ -806,7 +710,6 @@
   color: #6f94cb;
   box-sizing: border-box;
 }
-
 .availability-filter-line {
   position: absolute;
   left: 2rpx;
@@ -815,7 +718,6 @@
   border-radius: 999rpx;
   background: currentColor;
 }
-
 .availability-filter-line::after {
   position: absolute;
   top: -4rpx;
@@ -827,30 +729,24 @@
   box-sizing: border-box;
   content: "";
 }
-
 .availability-filter-line-top {
   top: 8rpx;
 }
-
 .availability-filter-line-top::after {
   left: 5rpx;
 }
-
 .availability-filter-line-bottom {
   bottom: 7rpx;
 }
-
 .availability-filter-line-bottom::after {
   right: 5rpx;
 }
-
 .availability-title {
   color: #b8c0cb;
   font-size: 19rpx;
   font-weight: 600;
   line-height: 1.3;
 }
-
 .availability-options {
   display: flex;
   flex-shrink: 0;
@@ -859,7 +755,6 @@
   border-radius: 16rpx;
   background: rgba(255, 255, 255, 0.025);
 }
-
 .availability-option {
   min-width: 92rpx;
   padding: 11rpx 14rpx;
@@ -871,25 +766,21 @@
   box-sizing: border-box;
   transition: opacity 120ms ease, transform 120ms ease;
 }
-
 .availability-option-pressed {
   opacity: 0.72;
   transform: scale(0.975);
 }
-
 .availability-option-active {
   background: rgba(73, 133, 232, 0.14);
   color: #8cb8ff;
   box-shadow: inset 0 0 0 1rpx rgba(91, 148, 240, 0.16);
 }
-
 .garage-sort-bar {
   display: flex;
   align-items: center;
   margin-top: 14rpx;
   padding: 0 4rpx;
 }
-
 .sort-bar-label {
   flex-shrink: 0;
   margin-right: 8rpx;
@@ -897,14 +788,12 @@
   font-size: 20rpx;
   letter-spacing: 0.5rpx;
 }
-
 .sort-chips {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 12rpx;
 }
-
 .sort-chip {
   display: inline-flex;
   align-items: center;
@@ -919,7 +808,6 @@
   transition: all 0.2s ease;
   box-sizing: border-box;
 }
-
 .sort-chip-active {
   border-color: rgba(208, 158, 90, 0.6);
   background: rgba(208, 158, 90, 0.16);
@@ -927,12 +815,10 @@
   font-weight: 600;
   box-shadow: 0 0 16rpx rgba(208, 158, 90, 0.2);
 }
-
 .sort-chip-pressed {
   opacity: 0.72;
   transform: scale(0.96);
 }
-
 .service-icon {
   display: flex;
   align-items: center;
@@ -944,7 +830,6 @@
   background: rgba(47, 128, 237, 0.11);
   color: #75a8ff;
 }
-
 .service-phone-icon {
   position: relative;
   width: 20rpx;
@@ -955,7 +840,6 @@
   box-sizing: border-box;
   transform: rotate(-45deg);
 }
-
 .service-phone-icon::before,
 .service-phone-icon::after {
   position: absolute;
@@ -963,32 +847,27 @@
   background: currentColor;
   content: "";
 }
-
 .service-phone-icon::before {
   top: -3rpx;
   left: -5rpx;
   width: 7rpx;
   height: 11rpx;
 }
-
 .service-phone-icon::after {
   right: -3rpx;
   bottom: -5rpx;
   width: 11rpx;
   height: 7rpx;
 }
-
 .service-copy {
   display: none;
 }
-
 .list-heading {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
   margin: 28rpx 8rpx 22rpx;
 }
-
 .list-title {
   margin-top: 4rpx;
   color: #f4f6f9;
@@ -996,7 +875,6 @@
   font-weight: 650;
   line-height: 1.35;
 }
-
 .list-count {
   padding-bottom: 4rpx;
   color: #5f6875;
@@ -1004,7 +882,6 @@
   line-height: 1.4;
   letter-spacing: 2rpx;
 }
-
 .empty-state {
   margin-top: 34rpx;
   padding: 70rpx 36rpx;
@@ -1013,47 +890,39 @@
   background: #14171c;
   text-align: center;
 }
-
 .empty-title {
   color: #f5f7fa;
   font-size: 30rpx;
   font-weight: 600;
   line-height: 1.45;
 }
-
 .empty-desc {
   margin: 14rpx 0 28rpx;
   color: #89919d;
   font-size: 24rpx;
   line-height: 1.65;
 }
-
 .empty-secondary-action {
   margin-top: 14rpx;
 }
-
 .garage-skeleton {
   position: relative;
   z-index: 1;
 }
-
 .garage-skeleton-pills {
   display: flex;
   margin: 18rpx 0 24rpx;
   overflow: hidden;
 }
-
 .garage-skeleton-pill {
   flex: 0 0 124rpx;
   height: 64rpx;
   margin-right: 14rpx;
   border-radius: 999rpx;
 }
-
 .garage-skeleton-pill-wide {
   flex-basis: 166rpx;
 }
-
 .garage-skeleton-summary {
   display: flex;
   align-items: center;
@@ -1062,58 +931,49 @@
   padding: 30rpx;
   box-sizing: border-box;
 }
-
 .garage-skeleton-copy {
   flex: 1;
 }
-
 .garage-skeleton-kicker {
   width: 190rpx;
   height: 18rpx;
   border-radius: 9rpx;
 }
-
 .garage-skeleton-title {
   width: 236rpx;
   height: 38rpx;
   margin-top: 18rpx;
   border-radius: 10rpx;
 }
-
 .garage-skeleton-numbers {
   width: 176rpx;
   height: 28rpx;
   margin-top: 25rpx;
   border-radius: 10rpx;
 }
-
 .garage-skeleton-service {
   width: 190rpx;
   height: 88rpx;
   margin-left: 24rpx;
   border-radius: 20rpx;
 }
-
 .garage-skeleton-heading {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
   margin: 38rpx 8rpx 20rpx;
 }
-
 .garage-skeleton-list-title {
   width: 150rpx;
   height: 34rpx;
   margin-top: 13rpx;
   border-radius: 9rpx;
 }
-
 .garage-skeleton-count {
   width: 116rpx;
   height: 20rpx;
   border-radius: 9rpx;
 }
-
 .garage-skeleton-card {
   display: flex;
   min-height: 226rpx;
@@ -1121,49 +981,41 @@
   padding: 18rpx;
   box-sizing: border-box;
 }
-
 .garage-skeleton-cover {
   flex: 0 0 238rpx;
   height: 190rpx;
   border-radius: 20rpx;
 }
-
 .garage-skeleton-card-body {
   flex: 1;
   padding: 20rpx 8rpx 12rpx 24rpx;
 }
-
 .garage-skeleton-card-title {
   width: 74%;
   height: 34rpx;
   border-radius: 9rpx;
 }
-
 .garage-skeleton-card-line {
   width: 92%;
   height: 20rpx;
   margin-top: 24rpx;
   border-radius: 8rpx;
 }
-
 .garage-skeleton-card-meta {
   width: 56%;
   height: 24rpx;
   margin-top: 38rpx;
   border-radius: 8rpx;
 }
-
 .skeleton-pulse {
   background: linear-gradient(105deg, #181c22 12%, #252b34 34%, #181c22 56%);
   background-size: 220% 100%;
   animation: garageSkeletonPulse 1.6s ease-in-out infinite;
 }
-
 @keyframes garageSkeletonPulse {
   0% {
     background-position: 160% 0;
   }
-
   100% {
     background-position: -70% 0;
   }

@@ -22,13 +22,11 @@ const {
 } = require("../../shared/csvFile")
 const INVENTORY_LOAD_TIMEOUT_MS = 15 * 1000
 const INVENTORY_EXPORT_TIMEOUT_MS = 20 * 1000
-
 const REQUEST_TYPE_LABELS = {
   access: "查询信息",
   correction: "更正信息",
   deletion: "删除信息"
 }
-
 const REQUEST_STATUS_LABELS = {
   pending: "待处理",
   processing: "处理中",
@@ -36,7 +34,6 @@ const REQUEST_STATUS_LABELS = {
   rejected: "未通过",
   cancelled: "已撤回"
 }
-
 const REQUEST_TYPE_META = {
   access: {
     className: "request-type-access",
@@ -51,7 +48,6 @@ const REQUEST_TYPE_META = {
     iconClass: "request-type-icon-deletion"
   }
 }
-
 const REQUEST_STATUS_CLASS = {
   pending: "request-status-pending",
   processing: "request-status-processing",
@@ -59,7 +55,6 @@ const REQUEST_STATUS_CLASS = {
   rejected: "request-status-rejected",
   cancelled: "request-status-cancelled"
 }
-
 const BOOKING_STATUS_LABELS = {
   pending: "待联系",
   contacted: "已联系",
@@ -69,7 +64,6 @@ const BOOKING_STATUS_LABELS = {
   completed: "已完成",
   cancelled: "已取消"
 }
-
 function formatDisplayTime(value) {
   if (!value) {
     return "—"
@@ -83,7 +77,6 @@ function formatDisplayTime(value) {
     date.getHours()
   )}:${pad(date.getMinutes())}`
 }
-
 function normalizeCategory(category, mapper) {
   const source = category && typeof category === "object" ? category : {}
   const list = Array.isArray(source.list) ? source.list.map(mapper) : []
@@ -93,7 +86,6 @@ function normalizeCategory(category, mapper) {
     list
   }
 }
-
 function decorateCategory(key, category, unavailable, truncated, iconClass) {
   const isUnavailable = unavailable.includes(key)
   const isTruncated = truncated.includes(key) || Boolean(category.truncated)
@@ -111,7 +103,6 @@ function decorateCategory(key, category, unavailable, truncated, iconClass) {
         : "metric-state-complete"
   }
 }
-
 function buildViewData(result) {
   const request = result && result.request ? result.request : {}
   const categories = result && result.categories ? result.categories : {}
@@ -191,7 +182,6 @@ function buildViewData(result) {
     className: "request-type-default",
     iconClass: "request-type-icon-default"
   }
-
   return {
     partial: Boolean(result && result.partial),
     verifiedCategoryCount,
@@ -231,7 +221,6 @@ function buildViewData(result) {
     privacyRequests
   }
 }
-
 Page({
   data: {
     pageAuthorized: false,
@@ -260,7 +249,6 @@ Page({
     favorites: { count: 0, truncated: false, list: [] },
     privacyRequests: { count: 0, truncated: false, list: [] }
   },
-
   onLoad(options) {
     activatePageCsvFileActions(this)
     activatePageNativeActions(this)
@@ -284,7 +272,6 @@ Page({
       }
     })
   },
-
   onUnload() {
     cancelPagePermissionCheck(this)
     cancelPageCsvFileActions(this)
@@ -294,7 +281,6 @@ Page({
     this.finishInventoryRequestEffects()
     this.clearExportRequestTimer()
   },
-
   onPullDownRefresh() {
     if (!this.data.pageAuthorized || !this.data.requestId) {
       wx.stopPullDownRefresh()
@@ -305,13 +291,11 @@ Page({
       done: () => wx.stopPullDownRefresh()
     })
   },
-
   handleRefresh() {
     if (!this.data.loading && !this.data.refreshing && this.data.requestId) {
       this.loadInventory({ refreshing: true })
     }
   },
-
   handleCopyOpenid() {
     if (this.data.loading || this.data.refreshing || this.data.exporting) {
       return
@@ -347,7 +331,6 @@ Page({
       }
     })
   },
-
   handleBookingTap(event) {
     const id = String(event.currentTarget.dataset.id || "")
     if (this.data.loading || this.data.refreshing || this.data.exporting || !id) {
@@ -367,7 +350,6 @@ Page({
       }
     })
   },
-
   handleExport() {
     if (this.data.loading || this.data.refreshing || this.data.exporting) {
       return
@@ -393,7 +375,6 @@ Page({
       })
       return
     }
-
     const action = beginPageNativeAction(this, {
       exclusiveKey: "privacy-inventory-export-confirmation"
     })
@@ -418,7 +399,6 @@ Page({
         this._exportRequestSerial = exportSerial
         this.clearExportRequestTimer()
         this.setData({ exporting: true })
-
         let settled = false
         const isActive = () => !settled && exportSerial === this._exportRequestSerial
         const finishRequest = () => {
@@ -439,11 +419,9 @@ Page({
             icon: "none"
           })
         }
-
         this._exportRequestTimer = setTimeout(() => {
           handleFailure("导出超时，请重试")
         }, INVENTORY_EXPORT_TIMEOUT_MS)
-
         const requestOptions = {
           name: "privacyRequestDataInventory",
           data: {
@@ -493,7 +471,6 @@ Page({
             handleFailure(error && (error.errMsg || error.message))
           }
         }
-
         try {
           wx.cloud.callFunction(requestOptions)
         } catch (error) {
@@ -502,7 +479,6 @@ Page({
       }
     })
   },
-
   handleShareExportedFile() {
     if (this.data.exporting || !this.data.exportFilePath || !this.data.exportFileName) {
       return
@@ -519,7 +495,6 @@ Page({
       this.handleOpenExportedFile()
     })
   },
-
   handleOpenExportedFile() {
     if (this.data.exporting || !this.data.exportFilePath) {
       return
@@ -536,7 +511,6 @@ Page({
       })
     })
   },
-
   handleDeleteExportedFile() {
     const filePath = String(this.data.exportFilePath || "")
     if (this.data.exporting || !filePath) {
@@ -582,7 +556,6 @@ Page({
       }
     })
   },
-
   loadInventory(options) {
     const input = options && typeof options === "object" ? options : {}
     const requestId = Number(this._inventoryRequestId || 0) + 1
@@ -599,14 +572,12 @@ Page({
       }
       return
     }
-
     this._inventoryRequestDone = typeof input.done === "function" ? input.done : null
     this.setData({
       loading: !input.refreshing,
       refreshing: Boolean(input.refreshing),
       loadError: ""
     })
-
     let settled = false
     const finishRequest = () => {
       if (settled || requestId !== this._inventoryRequestId) {
@@ -626,11 +597,9 @@ Page({
         loadError: String(message || "相关数据核验失败，请稍后重试")
       })
     }
-
     this._inventoryRequestTimer = setTimeout(() => {
       handleFailure("相关数据核验超时，请检查网络后重试")
     }, INVENTORY_LOAD_TIMEOUT_MS)
-
     const inventoryRequestId = String(this.data.requestId || "").trim()
     const requestOptions = {
       name: "privacyRequestDataInventory",
@@ -661,14 +630,12 @@ Page({
         handleFailure((error && (error.errMsg || error.message)) || "相关数据核验失败，请稍后重试")
       }
     }
-
     try {
       wx.cloud.callFunction(requestOptions)
     } catch (error) {
       handleFailure((error && (error.errMsg || error.message)) || "相关数据核验失败，请稍后重试")
     }
   },
-
   finishInventoryRequestEffects() {
     if (this._inventoryRequestTimer) {
       clearTimeout(this._inventoryRequestTimer)
@@ -680,7 +647,6 @@ Page({
       done()
     }
   },
-
   clearExportRequestTimer() {
     if (!this._exportRequestTimer) {
       return

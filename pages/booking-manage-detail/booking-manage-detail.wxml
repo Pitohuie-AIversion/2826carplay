@@ -11,7 +11,6 @@
       <view class="booking-status ui-status ui-status-lg {{statusClass}}"><view class="booking-status-dot"></view><text>{{statusText}}</text></view>
     </view>
   </view>
-
   <view class="info-card ui-card">
     <view class="info-grid">
       <view class="info-item">
@@ -57,7 +56,6 @@
       <button class="quick-contact-btn quick-contact-btn-last ui-btn ui-btn-ghost action-with-icon" disabled="{{loading || coordinationLoading}}" data-field="openid" bindtap="handleCopyContact"><view class="identity-native-icon" aria-hidden="true"><view class="identity-native-dot"></view></view><text>复制 OpenID</text></button>
     </view>
   </view>
-
   <view class="coordination-card ui-card">
     <view class="coordination-heading">
       <view>
@@ -66,7 +64,6 @@
       </view>
       <view wx:if="{{coordinationUpdatedAtText}}" class="coordination-time">{{coordinationUpdatedAtText}}</view>
     </view>
-
     <view class="coordination-group">
       <view class="coordination-label">预约优先级</view>
       <view class="coordination-options">
@@ -99,7 +96,6 @@
         >候补</button>
       </view>
     </view>
-
     <view class="coordination-group coordination-group-last">
       <view class="coordination-label">协调进度</view>
       <view class="coordination-options">
@@ -132,7 +128,6 @@
         >已协调</button>
       </view>
     </view>
-
     <view wx:if="{{coordinationEditable}}" class="coordination-help">
       <view class="help-native-icon" aria-hidden="true"><view class="help-info-mark"></view></view><view>点选后立即保存；具体联系结果可继续记录在管理员备注中。</view>
     </view>
@@ -140,7 +135,6 @@
       <view class="help-native-icon" aria-hidden="true"><view class="help-info-mark"></view></view><view>当前预约已结束，协调安排仅供历史查看。</view>
     </view>
   </view>
-
   <view class="conflict-card ui-card {{conflictTotal ? 'conflict-card-warning' : ''}}">
     <view class="conflict-heading">
       <view>
@@ -151,7 +145,6 @@
         {{conflictsUnavailable ? '?' : conflictTotal}}
       </view>
     </view>
-
     <view wx:if="{{conflictsUnavailable}}" class="conflict-state conflict-message">
       <view class="conflict-message-icon conflict-message-icon-warning" aria-hidden="true"><view class="conflict-alert-mark"></view></view><view>冲突信息暂时无法加载，主预约仍可继续处理。</view>
     </view>
@@ -207,7 +200,6 @@
       </view>
     </view>
   </view>
-
   <view class="quote-card ui-card">
     <view class="quote-heading">
       <view>
@@ -216,12 +208,10 @@
       </view>
       <view class="quote-version">下一版本 v{{(booking.latestQuoteVersion || 0) + 1}}</view>
     </view>
-
     <view wx:if="{{booking.status === 'pending'}}" class="quote-guidance">请先完成联系并标记“已联系”，报价草稿可提前保存，发送前不会展示给用户。</view>
     <view wx:elif="{{booking.status === 'quoted'}}" class="quote-guidance quote-guidance-highlight">报价已发送，等待用户确认或申请调整；已发送版本不可修改。</view>
     <view wx:elif="{{booking.status === 'adjustment_requested'}}" class="quote-guidance quote-guidance-warning">用户已申请调整，请参考历史版本中的调整说明创建新报价。</view>
     <view wx:elif="{{booking.status === 'confirmed'}}" class="quote-guidance quote-guidance-success">用户已确认报价。确认不代表付款，可在实际行程结束后标记完成。</view>
-
     <view wx:if="{{booking.status === 'pending' || booking.status === 'contacted' || booking.status === 'adjustment_requested'}}" class="quote-form">
       <view class="quote-form-grid">
         <view class="quote-field"><view class="quote-label">基础租金（元）</view><input class="quote-input" type="digit" maxlength="12" value="{{quoteForm.baseRentalAmount}}" data-field="baseRentalAmount" disabled="{{quoteLoading || loading}}" bindinput="handleQuoteInput" aria-label="基础租金" placeholder="0.00" confirm-type="done" /></view>
@@ -239,7 +229,6 @@
       </view>
       <view class="quote-help">合计由服务端根据五项费用重新计算；租期和计费天数来自预约日期，客户端不能篡改。</view>
     </view>
-
     <view wx:if="{{quotesUnavailable}}" class="quote-empty">报价记录暂时无法加载，请稍后重试。</view>
     <view wx:elif="{{quoteHistory.length}}" class="quote-history">
       <view class="quote-history-title">版本记录</view>
@@ -253,12 +242,10 @@
     </view>
     <view wx:else class="quote-empty">尚无已发送报价版本。</view>
   </view>
-
   <view wx:if="{{booking.note}}" class="note-card ui-card">
     <view class="note-title note-title-with-icon"><view class="note-native-icon note-native-icon-user" aria-hidden="true"><view class="note-native-line"></view></view><text>用户备注</text></view>
     <view class="note-content">{{booking.note}}</view>
   </view>
-
   <view class="note-card ui-card ui-card-soft">
     <view class="note-head">
       <view class="note-title note-title-with-icon"><view class="note-native-icon" aria-hidden="true"><view class="note-native-line"></view></view><text>管理员备注</text></view>
@@ -278,7 +265,6 @@
     />
     <button class="save-btn ui-btn ui-btn-primary action-with-icon" loading="{{loading}}" disabled="{{loading || coordinationLoading}}" bindtap="handleSaveRemark"><view wx:if="{{!loading}}" class="save-native-icon" aria-hidden="true"><view class="save-native-line"></view></view><text>{{loading ? '正在保存' : '保存备注'}}</text></button>
   </view>
-
   <view wx:if="{{booking.status === 'confirmed' || booking.status === 'completed'}}" class="handover-card ui-card">
     <view class="quote-heading">
       <view><view class="quote-kicker">VEHICLE HANDOVER</view><view class="quote-title">取还车交接记录</view></view>
@@ -322,7 +308,6 @@
     </view>
     <view wx:else class="quote-empty">尚无交接记录。</view>
   </view>
-
   <view class="action-card ui-card" wx:if="{{booking.status !== 'completed' && booking.status !== 'cancelled'}}">
     <view class="action-title note-title-with-icon"><view class="status-operation-native-icon" aria-hidden="true"><view class="status-operation-dot"></view></view><text>状态操作</text></view>
     <view class="action-tip"><view class="help-native-icon" aria-hidden="true"><view class="help-info-mark"></view></view><view>拨号不会自动改变状态，请在实际沟通完成后再标记“已联系”。</view></view>
@@ -333,7 +318,6 @@
     </view>
   </view>
   </block>
-
   <view wx:elif="{{initialLoading || loading}}" class="manage-detail-skeleton" aria-hidden="true">
     <view class="manage-detail-skeleton-hero ui-card">
       <view>
@@ -357,7 +341,6 @@
       <view class="manage-detail-skeleton-button manage-skeleton-pulse"></view>
     </view>
   </view>
-
   <view wx:else class="manage-detail-state ui-card">
     <image class="manage-detail-state-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
     <view class="manage-detail-state-kicker">RESERVATION PROFILE</view>

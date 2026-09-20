@@ -1,6 +1,1 @@
-{
-  "navigationBarTitleText": "个人信息申请",
-  "enablePullDownRefresh": true,
-  "backgroundColor": "#101010",
-  "backgroundTextStyle": "light"
-}
+{"navigationBarTitleText":"个人信息申请","enablePullDownRefresh":true,"onReachBottomDistance":200,"backgroundColor":"#101010","backgroundTextStyle":"light"}

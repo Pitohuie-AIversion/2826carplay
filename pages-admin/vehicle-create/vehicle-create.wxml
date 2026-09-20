@@ -1,6 +1,5 @@
 <view wx:if="{{pageAuthorized}}" class="vehicle-create-page vehicle-form-page">
   <view class="page-glow"></view>
-
   <view class="hero-card">
     <view class="hero-top">
       <view>
@@ -22,7 +21,6 @@
       </view>
     </view>
   </view>
-
   <view class="tip-card">
     <view class="tip-mark" aria-hidden="true">
       <view class="tip-info-icon"></view>
@@ -32,7 +30,6 @@
       <view class="tip-desc">提交车辆后可立即进入图片管理，设置首页封面与车辆相册。</view>
     </view>
   </view>
-
   <view class="form-card">
     <view class="section-heading">
       <view class="section-heading-main">
@@ -45,7 +42,6 @@
       <view class="section-index">01</view>
     </view>
     <view class="form-divider"></view>
-
     <view class="form-row">
       <view class="form-item form-item-half">
         <view class="form-label field-label-row"><text>车牌号</text><text class="field-required">必填</text></view>
@@ -62,7 +58,6 @@
           aria-required="{{true}}"
         />
       </view>
-
       <view class="form-item form-item-half">
         <view class="form-label field-label-row"><text>车辆类型</text><text class="field-required">必填</text></view>
         <picker mode="selector" range="{{vehicleTypeLabels}}" value="{{vehicleTypeIndex}}" disabled="{{isSubmitting}}" bindchange="handleVehicleTypeChange" aria-label="选择车辆类型" aria-required="{{true}}">
@@ -73,7 +68,6 @@
         </picker>
       </view>
     </view>
-
     <view class="form-item">
       <view class="form-label field-label-row"><text>品牌型号</text><text class="field-required">必填</text></view>
       <input
@@ -90,7 +84,6 @@
         aria-required="{{true}}"
       />
     </view>
-
     <view class="form-row">
       <view class="form-item form-item-half">
         <view class="form-label field-label-row"><text>注册日期</text><text class="field-required">必填</text></view>
@@ -101,7 +94,6 @@
           </view>
         </picker>
       </view>
-
       <view class="form-item form-item-half">
         <view class="form-label field-label-row"><text>使用状态</text><text class="field-required">必填</text></view>
         <picker mode="selector" range="{{statusLabels}}" value="{{statusIndex}}" disabled="{{isSubmitting}}" bindchange="handleStatusChange" aria-label="选择使用状态" aria-required="{{true}}">
@@ -113,7 +105,6 @@
       </view>
     </view>
   </view>
-
   <view class="form-card">
     <view class="section-heading">
       <view class="section-heading-main">
@@ -127,7 +118,6 @@
     </view>
     <view class="form-divider"></view>
     <view class="section-helper">选填信息 · 完善后将用于车库前台展示</view>
-
     <view class="form-row">
       <view class="form-item form-item-half">
         <view class="form-label">取车城市</view>
@@ -138,7 +128,6 @@
         <input class="form-input" type="number" placeholder="例如 699" placeholder-class="input-placeholder" value="{{form.priceDay}}" maxlength="5" data-field="priceDay" disabled="{{isSubmitting}}" bindinput="handleTextInput" confirm-type="done" aria-label="日租价格" />
       </view>
     </view>
-
     <view class="form-row">
       <view class="form-item form-item-half">
         <view class="form-label">变速箱</view>
@@ -159,12 +148,10 @@
         </picker>
       </view>
     </view>
-
     <view class="form-item">
       <view class="form-label">座位数</view>
       <input class="form-input" type="number" placeholder="例如 5" placeholder-class="input-placeholder" value="{{form.seats}}" maxlength="1" data-field="seats" disabled="{{isSubmitting}}" bindinput="handleTextInput" confirm-type="done" aria-label="座位数" />
     </view>
-
     <view class="form-item">
       <view class="form-label field-label-row"><text>公开说明</text><text class="field-counter">{{publicDescriptionLength}} / 200</text></view>
       <textarea
@@ -181,7 +168,6 @@
       <view class="section-helper">此内容会显示在首页和车辆详情，请勿填写内部档案信息。</view>
     </view>
   </view>
-
   <view class="form-card">
     <view class="section-heading">
       <view class="section-heading-main">
@@ -195,17 +181,14 @@
     </view>
     <view class="form-divider"></view>
     <view class="section-helper">选填信息 · 仅用于内部档案，不会在前台展示</view>
-
     <view class="form-item">
       <view class="form-label">VIN</view>
       <input class="form-input" placeholder="选填，最多 32 位" placeholder-class="input-placeholder" value="{{form.vin}}" maxlength="32" data-field="vin" disabled="{{isSubmitting}}" bindinput="handleTextInput" confirm-type="done" aria-label="车辆识别码 VIN" />
     </view>
-
     <view class="form-item">
       <view class="form-label">发动机号</view>
       <input class="form-input" placeholder="选填，最多 32 位" placeholder-class="input-placeholder" value="{{form.engineNumber}}" maxlength="32" data-field="engineNumber" disabled="{{isSubmitting}}" bindinput="handleTextInput" confirm-type="done" aria-label="发动机号" />
     </view>
-
     <view class="form-item">
       <view class="form-label field-label-row"><text>内部备注</text><text class="field-counter">{{noteLength}} / 200</text></view>
       <textarea
@@ -221,7 +204,6 @@
       />
     </view>
   </view>
-
   <view class="vehicle-submit-dock">
     <view class="vehicle-submit-state {{formProgress.ready ? 'vehicle-submit-state-ready' : ''}}">
       <view class="vehicle-submit-state-icon" aria-hidden="true"><view class="vehicle-submit-state-check"></view></view>

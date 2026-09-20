@@ -1,5 +1,6 @@
 const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
 const { buildMonthView, normalizeMonthKey, shiftMonth } = require("../../shared/bookingCalendar")
+const { clearUnsaved, markUnsaved } = require("../../shared/unsavedChanges")
 const {
   activatePageNativeActions,
   beginPageNativeAction,
@@ -8,6 +9,9 @@ const {
 } = require("../../shared/pageNativeAction")
 
 const CURRENT_MONTH_KEY = normalizeMonthKey("")
+function getCalendarSnapshotKey(monthKey) {
+  return `booking_calendar_${monthKey || "current"}`
+}
 const BOOKING_CALENDAR_LOAD_TIMEOUT_MS = 15 * 1000
 const CALENDAR_SAVE_TIMEOUT_MS = 15 * 1000
 const BLOCK_KIND_OPTIONS = [
@@ -91,12 +95,45 @@ Page({
 
   onLoad() {
     activatePageNativeActions(this)
-    this.setData({ monthKey: this.data.currentMonthKey, isCurrentMonth: true })
+    const monthKey = this.data.currentMonthKey
+    this.setData({ monthKey, isCurrentMonth: true })
+    this.restoreCalendarSnapshot(monthKey)
     requirePagePermission(this, {
       required: "canManageBookings",
       noPermissionMessage: "无权查看预约日历",
       onAuthorized: () => this.fetchBookings()
     })
+  },
+
+  restoreCalendarSnapshot(monthKey) {
+    if (typeof wx === "undefined" || typeof wx.getStorageSync !== "function") {
+      return false
+    }
+    try {
+      const cached = wx.getStorageSync(getCalendarSnapshotKey(monthKey))
+      if (!cached || typeof cached !== "object") {
+        return false
+      }
+      const allBookings = Array.isArray(cached.list) ? cached.list : []
+      const allBlocks = Array.isArray(cached.blocks) ? cached.blocks : []
+      const allPriceRules = Array.isArray(cached.priceRules) ? cached.priceRules : []
+      const vehicles = Array.isArray(cached.vehicles) ? cached.vehicles : []
+      const vehicleOptions = vehicles.map((item) => `${item.name} · 日租${item.priceDay ? `￥${item.priceDay}` : "待定"}`)
+      this.setData({
+        allBookings,
+        allBlocks,
+        allPriceRules,
+        vehicles,
+        vehicleOptions,
+        truncated: Boolean(cached.truncated),
+        loading: false
+      })
+      this.applyCalendar()
+      this._hasCalendarSnapshot = true
+      return true
+    } catch (error) {
+      return false
+    }
   },
 
   onPullDownRefresh() {
@@ -110,6 +147,7 @@ Page({
   onUnload() {
     cancelPagePermissionCheck(this)
     cancelPageNativeActions(this)
+    clearUnsaved(this)
     this._bookingCalendarRequestId =
       Number(this._bookingCalendarRequestId || 0) + 1
     this.finishBookingCalendarRequestEffects()
@@ -131,11 +169,13 @@ Page({
     if (this.data.monthKey === this.data.currentMonthKey) {
       return
     }
+    const monthKey = this.data.currentMonthKey
     this.setData({
-      monthKey: this.data.currentMonthKey,
+      monthKey,
       selectedDate: "",
       isCurrentMonth: true
     })
+    this.restoreCalendarSnapshot(monthKey)
     this.fetchBookings()
   },
 
@@ -146,6 +186,7 @@ Page({
       selectedDate: "",
       isCurrentMonth: monthKey === this.data.currentMonthKey
     })
+    this.restoreCalendarSnapshot(monthKey)
     this.fetchBookings()
   },
 
@@ -240,8 +281,10 @@ Page({
     }
 
     const monthKey = String(this.data.monthKey || "")
+    const showSkeleton = !this._hasCalendarSnapshot
+    this._hasCalendarSnapshot = false
     this.setData({
-      loading: true,
+      loading: showSkeleton,
       loadError: ""
     })
     let settled = false
@@ -283,6 +326,17 @@ Page({
             loadError: (result && result.message) || "预约日历加载失败"
           })
           return
+        }
+        if (typeof wx !== "undefined" && typeof wx.setStorageSync === "function") {
+          try {
+            wx.setStorageSync(getCalendarSnapshotKey(monthKey), {
+              list: result.list || [],
+              blocks: result.blocks || [],
+              priceRules: result.priceRules || [],
+              vehicles: result.vehicles || [],
+              truncated: Boolean(result.truncated)
+            })
+          } catch (e) {}
         }
         this.setData({
           loading: false,
@@ -353,6 +407,7 @@ Page({
     if (!["blockForm", "priceForm"].includes(form) || !field) return
     const value = event.detail && event.detail.value !== undefined ? String(event.detail.value) : ""
     this.setData({ [form]: { ...this.data[form], [field]: value } })
+    markUnsaved(this)
   },
 
   handleEditBlock(event) {
@@ -382,11 +437,13 @@ Page({
   },
 
   handleResetBlockForm() {
+    clearUnsaved(this)
     const vehicle = this.data.vehicles[this.data.blockVehicleIndex]
     this.setData({ editingBlockId: "", blockKindIndex: 0, blockForm: { vehicleId: vehicle ? vehicle.id : "", kind: "maintenance", startDate: this.data.selectedDate, endDate: this.data.selectedDate, reason: "" } })
   },
 
   handleResetPriceForm() {
+    clearUnsaved(this)
     const vehicle = this.data.vehicles[this.data.priceVehicleIndex]
     this.setData({ editingRuleId: "", priceForm: { vehicleId: vehicle ? vehicle.id : "", label: "", startDate: this.data.selectedDate, endDate: this.data.selectedDate, dailyPrice: "", reason: "" } })
   },

@@ -1,9 +1,1 @@
-{
-  "navigationBarTitleText": "我的预约",
-  "enablePullDownRefresh": true,
-  "backgroundColor": "#101010",
-  "backgroundTextStyle": "light",
-  "usingComponents": {
-    "core-nav": "/components/core-nav/core-nav"
-  }
-}
+{"navigationBarTitleText":"我的预约","enablePullDownRefresh":true,"onReachBottomDistance":200,"backgroundColor":"#101010","backgroundTextStyle":"light","usingComponents":{"core-nav":"/components/core-nav/core-nav"}}

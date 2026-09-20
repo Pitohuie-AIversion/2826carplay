@@ -1,10 +1,8 @@
 const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
 const { formatToastTitle } = require("../../shared/uiFeedback")
 const { clearUnsaved, markUnsaved } = require("../../shared/unsavedChanges")
-
 const CONFIG_LOAD_TIMEOUT_MS = 15 * 1000
 const CONFIG_SAVE_TIMEOUT_MS = 20 * 1000
-
 const LEGACY_GARAGE_SUBTITLE = "后台车辆资料已接入首页展示，上传封面后会同步展示到车库首页"
 const DEFAULT_RENTAL_TERMS = {
   includedText: "基础日租仅包含车辆使用费，其他项目会在正式报价前单独列明。",
@@ -17,7 +15,6 @@ const DEFAULT_RENTAL_TERMS = {
   energyText: "取还车油量或电量标准会在交付前确认，并以交接记录为准。",
   estimateDisclaimer: "页面价格为基础日租参考，不是正式报价，提交预约也不会自动锁定车辆。"
 }
-
 const DEFAULT_CONFIG = {
   brandName: "极境车库",
   servicePhone: "15715710090",
@@ -36,18 +33,15 @@ const DEFAULT_CONFIG = {
   bookingPrivacyTip:
     "提交预约即表示您同意我们仅将所填信息用于本次车辆预约沟通与联系确认。您可在【我的预约】查看、修改联系信息与取消；如需查询、更正或删除其他个人信息，请前往【个人信息申请】。车辆档期、价格、押金及取还车规则以客服最终确认为准。"
 }
-
 function isValidServicePhone(value) {
   const phone = String(value || "").trim()
   const digitCount = phone.replace(/\D/g, "").length
   return /^\+?[0-9-]{6,20}$/.test(phone) && digitCount >= 6 && digitCount <= 15
 }
-
 function normalizeGarageSubtitle(value) {
   const subtitle = String(value || "").trim()
   return !subtitle || subtitle === LEGACY_GARAGE_SUBTITLE ? DEFAULT_CONFIG.garagePageSubtitle : subtitle
 }
-
 function buildForm(config) {
   const source = config && typeof config === "object" ? config : DEFAULT_CONFIG
   const rentalTerms = source.rentalTerms && typeof source.rentalTerms === "object"
@@ -78,7 +72,6 @@ function buildForm(config) {
       rentalTerms.estimateDisclaimer || DEFAULT_RENTAL_TERMS.estimateDisclaimer
   }
 }
-
 function buildSubmitConfig(form) {
   const source = form && typeof form === "object" ? form : {}
   const cityOptions = String(source.cityOptionsText || "")
@@ -86,7 +79,6 @@ function buildSubmitConfig(form) {
     .map((item) => String(item || "").trim())
     .filter(Boolean)
     .filter((item, index, list) => list.indexOf(item) === index)
-
   return {
     brandName: source.brandName || "",
     servicePhone: source.servicePhone || "",
@@ -113,7 +105,6 @@ function buildSubmitConfig(form) {
     }
   }
 }
-
 Page({
   data: {
     loading: true,
@@ -125,7 +116,6 @@ Page({
     isDirty: false,
     form: buildForm(DEFAULT_CONFIG)
   },
-
   onLoad() {
     requirePagePermission(this, {
       required: "canManageConfig",
@@ -135,7 +125,6 @@ Page({
       }
     })
   },
-
   onPullDownRefresh() {
     if (!this.data.pageAuthorized) {
       wx.stopPullDownRefresh()
@@ -157,7 +146,6 @@ Page({
       wx.stopPullDownRefresh()
     })
   },
-
   onUnload() {
     cancelPagePermissionCheck(this)
     this._configLoadRequestId = Number(this._configLoadRequestId || 0) + 1
@@ -165,7 +153,6 @@ Page({
     this.finishConfigLoadRequestEffects()
     this.finishConfigSaveRequestEffects()
   },
-
   fetchConfig(done) {
     if (this.data.saving || this.data.isDirty) {
       if (typeof done === "function") {
@@ -188,14 +175,12 @@ Page({
       }
       return
     }
-
     this._configLoadRequestDone = typeof done === "function" ? done : null
     this.setData({
       loading: true,
       loadFailed: false,
       loadErrorText: ""
     })
-
     let settled = false
     const finishRequest = () => {
       if (settled || this._configLoadRequestId !== requestId) {
@@ -215,11 +200,9 @@ Page({
         loadErrorText: String(message || "配置加载失败，请刷新后重试")
       })
     }
-
     this._configLoadRequestTimer = setTimeout(() => {
       handleFailure("配置加载超时，请检查网络后重试")
     }, CONFIG_LOAD_TIMEOUT_MS)
-
     const requestOptions = {
       name: "operationConfigGet",
       success: (res) => {
@@ -235,7 +218,6 @@ Page({
           })
           return
         }
-
         this.setData({
           loading: false,
           hasLoadedConfig: true,
@@ -251,14 +233,12 @@ Page({
       },
       complete: () => {}
     }
-
     try {
       wx.cloud.callFunction(requestOptions)
     } catch (error) {
       handleFailure(error && (error.errMsg || error.message))
     }
   },
-
   handleInput(event) {
     if (this.data.loading || this.data.saving) {
       return
@@ -267,14 +247,12 @@ Page({
     if (!field) {
       return
     }
-
     this.setData({
       [`form.${field}`]: String((event.detail && event.detail.value) || ""),
       isDirty: true
     })
     markUnsaved(this, "运营配置尚未保存，确定离开吗？")
   },
-
   handleReset() {
     if (this.data.loading || this.data.saving) {
       return
@@ -286,26 +264,22 @@ Page({
       })
       return
     }
-
     this.setData({
       form: buildForm(DEFAULT_CONFIG),
       isDirty: true
     })
     markUnsaved(this, "运营配置尚未保存，确定离开吗？")
   },
-
   handleRetryLoad() {
     if (this.data.loading || this.data.saving || this.data.isDirty) {
       return
     }
     this.fetchConfig()
   },
-
   handleSubmit() {
     if (this.data.loading || this.data.saving) {
       return
     }
-
     if (!this.data.hasLoadedConfig || this.data.loadFailed) {
       wx.showToast({
         title: "配置未就绪",
@@ -313,7 +287,6 @@ Page({
       })
       return
     }
-
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       wx.showToast({
         title: "云能力未初始化",
@@ -321,7 +294,6 @@ Page({
       })
       return
     }
-
     const submitConfig = buildSubmitConfig(this.data.form)
     if (!isValidServicePhone(submitConfig.servicePhone)) {
       wx.showToast({
@@ -330,7 +302,6 @@ Page({
       })
       return
     }
-
     if (
       submitConfig.bookingStatusTemplateId &&
       !/^[A-Za-z0-9_-]{10,128}$/.test(submitConfig.bookingStatusTemplateId)
@@ -341,7 +312,6 @@ Page({
       })
       return
     }
-
     if (submitConfig.wxKfCorpId && !/^[A-Za-z0-9_-]{6,64}$/.test(submitConfig.wxKfCorpId)) {
       wx.showToast({
         title: "企业ID格式错误",
@@ -349,7 +319,6 @@ Page({
       })
       return
     }
-
     if (submitConfig.wxKfExtInfo && submitConfig.wxKfExtInfo.length > 512) {
       wx.showToast({
         title: "客服链接参数过长",
@@ -357,7 +326,6 @@ Page({
       })
       return
     }
-
     if (
       (submitConfig.wxKfCorpId && !submitConfig.wxKfExtInfo) ||
       (!submitConfig.wxKfCorpId && submitConfig.wxKfExtInfo)
@@ -368,7 +336,6 @@ Page({
       })
       return
     }
-
     this.setData({ saving: true })
     const requestId = Number(this._configSaveRequestId || 0) + 1
     this._configSaveRequestId = requestId
@@ -378,7 +345,6 @@ Page({
       mask: true
     })
     this._configSaveLoadingVisible = true
-
     let settled = false
     const finishRequest = () => {
       if (settled || this._configSaveRequestId !== requestId) {
@@ -398,11 +364,9 @@ Page({
       })
       this.setData({ saving: false })
     }
-
     this._configSaveRequestTimer = setTimeout(() => {
       handleFailure("保存超时，请重试")
     }, CONFIG_SAVE_TIMEOUT_MS)
-
     const requestOptions = {
       name: "operationConfigUpdate",
       data: {
@@ -421,7 +385,6 @@ Page({
           this.setData({ saving: false })
           return
         }
-
         wx.showToast({
         title: formatToastTitle(result.message, "保存成功"),
           icon: "success"
@@ -438,14 +401,12 @@ Page({
       },
       complete: () => {}
     }
-
     try {
       wx.cloud.callFunction(requestOptions)
     } catch (error) {
       handleFailure(error && (error.errMsg || error.message))
     }
   },
-
   finishConfigLoadRequestEffects() {
     if (this._configLoadRequestTimer) {
       clearTimeout(this._configLoadRequestTimer)
@@ -457,7 +418,6 @@ Page({
       done()
     }
   },
-
   finishConfigSaveRequestEffects() {
     if (this._configSaveRequestTimer) {
       clearTimeout(this._configSaveRequestTimer)

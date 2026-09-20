@@ -1,87 +1,71 @@
 @import "../../shared/management-shell.wxss";
-
 .config-page {
   min-height: 100vh;
   padding: 24rpx calc(24rpx + env(safe-area-inset-right)) calc(24rpx + env(safe-area-inset-bottom)) calc(24rpx + env(safe-area-inset-left));
   background: #101010;
   box-sizing: border-box;
 }
-
 .hero-card,
 .form-card {
   margin-bottom: 24rpx;
   padding: 28rpx;
   box-sizing: border-box;
 }
-
 .hero-title,
 .section-title,
 .form-label {
   color: #ffffff;
 }
-
 .hero-title {
   font-size: 32rpx;
   font-weight: 700;
   line-height: 1.4;
 }
-
 .hero-desc {
   margin-top: 10rpx;
   color: #b7b7b7;
   font-size: 24rpx;
   line-height: 1.7;
 }
-
 .form-tip {
   margin-top: 10rpx;
   color: #8f8f8f;
   font-size: 22rpx;
   line-height: 1.6;
 }
-
 .section-title {
   font-size: 28rpx;
   font-weight: 600;
   line-height: 1.5;
 }
-
 .form-item {
   margin-top: 20rpx;
 }
-
 .form-label {
   font-size: 24rpx;
   line-height: 1.6;
 }
-
 .form-input,
 .form-textarea {
   width: 100%;
   margin-top: 12rpx;
   box-sizing: border-box;
 }
-
 .form-textarea {
   min-height: 140rpx;
 }
-
 .form-textarea-lg {
   min-height: 220rpx;
 }
-
 .action-row {
   display: flex;
 }
-
 .action-btn {
   flex: 1;
 }
-
 .action-btn-offset {
   margin-left: 16rpx;
 }
-
 .config-page.management-page .hero-card,
 .config-page.management-page .form-card {
   margin-bottom: 22rpx;
@@ -89,22 +73,18 @@
   border-color: rgba(255, 255, 255, 0.075);
   border-radius: 26rpx;
 }
-
 .config-page.management-page .form-card {
   background: #15181d;
 }
-
 .config-page.management-page .form-item {
   margin-top: 24rpx;
 }
-
 .config-page.management-page .form-label {
   margin-bottom: 10rpx;
   color: #c8cdd5;
   font-size: 22rpx;
   font-weight: 500;
 }
-
 .config-page.management-page .form-input,
 .config-page.management-page .form-textarea {
   margin-top: 0;
@@ -114,44 +94,36 @@
   color: #edf0f4;
   font-size: 23rpx;
 }
-
 .config-page.management-page .form-input {
   height: 82rpx;
 }
-
 .config-page.management-page .form-textarea {
   min-height: 156rpx;
   padding: 20rpx;
 }
-
 .config-page.management-page .form-textarea-lg {
   min-height: 230rpx;
 }
-
 .config-page.management-page .form-tip {
   color: #6f7a88;
   font-size: 20rpx;
 }
-
 .config-page.management-page .action-row {
   position: relative;
   z-index: 1;
   margin-top: 8rpx;
 }
-
 .config-page.management-page .action-btn {
   height: 88rpx;
   border-radius: 20rpx;
   font-size: 24rpx;
   line-height: 88rpx;
 }
-
 .config-skeleton,
 .config-state {
   position: relative;
   z-index: 1;
 }
-
 .config-skeleton-card {
   margin-bottom: 22rpx;
   padding: 28rpx;
@@ -160,63 +132,52 @@
   background: #15181d;
   box-sizing: border-box;
 }
-
 .config-skeleton-card-muted {
   opacity: 0.72;
 }
-
 .config-skeleton-heading {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
 }
-
 .config-skeleton-kicker {
   width: 178rpx;
   height: 16rpx;
   border-radius: 8rpx;
 }
-
 .config-skeleton-title {
   width: 140rpx;
   height: 31rpx;
   margin-top: 13rpx;
   border-radius: 9rpx;
 }
-
 .config-skeleton-index {
   width: 32rpx;
   height: 20rpx;
   margin-bottom: 4rpx;
   border-radius: 8rpx;
 }
-
 .config-skeleton-field {
   margin-top: 26rpx;
 }
-
 .config-skeleton-label {
   width: 112rpx;
   height: 20rpx;
   margin-bottom: 12rpx;
   border-radius: 8rpx;
 }
-
 .config-skeleton-label-short {
   width: 88rpx;
 }
-
 .config-skeleton-input,
 .config-skeleton-textarea {
   width: 100%;
   height: 82rpx;
   border-radius: 18rpx;
 }
-
 .config-skeleton-textarea {
   height: 156rpx;
 }
-
 .config-state {
   display: flex;
   align-items: center;
@@ -228,7 +189,6 @@
   background: linear-gradient(145deg, #1a2029, #14171c 72%);
   text-align: center;
 }
-
 .config-state-emblem {
   width: 98rpx;
   height: 98rpx;
@@ -236,7 +196,6 @@
   border-radius: 50%;
   opacity: 0.8;
 }
-
 .config-state-kicker {
   margin-top: 20rpx;
   color: #60738f;
@@ -245,7 +204,6 @@
   line-height: 1.4;
   letter-spacing: 2rpx;
 }
-
 .config-state-title {
   margin-top: 9rpx;
   color: #f3f5f8;
@@ -253,14 +211,12 @@
   font-weight: 650;
   line-height: 1.4;
 }
-
 .config-state-desc {
   margin-top: 12rpx;
   color: #a2abb7;
   font-size: 22rpx;
   line-height: 1.65;
 }
-
 .config-state-note {
   margin-top: 12rpx;
   padding: 16rpx 18rpx;
@@ -272,7 +228,6 @@
   line-height: 1.65;
   text-align: left;
 }
-
 .config-state-button {
   width: 100%;
   height: 84rpx;
@@ -280,11 +235,9 @@
   font-size: 23rpx;
   line-height: 84rpx;
 }
-
 .config-state-button .action-btn-content {
   height: 100%;
 }
-
 .hero-status {
   position: relative;
   z-index: 1;
@@ -297,7 +250,6 @@
   font-size: 18rpx;
   line-height: 1.5;
 }
-
 .hero-status-dot {
   flex-shrink: 0;
   width: 8rpx;
@@ -307,7 +259,6 @@
   background: #68a0f3;
   box-shadow: 0 0 14rpx rgba(82, 143, 255, 0.55);
 }
-
 .hero-status-count {
   flex-shrink: 0;
   margin-left: auto;
@@ -316,13 +267,11 @@
   font-weight: 650;
   letter-spacing: 1.5rpx;
 }
-
 .section-heading-main {
   display: flex;
   align-items: center;
   min-width: 0;
 }
-
 .section-glyph {
   position: relative;
   display: flex;
@@ -337,19 +286,16 @@
   background: rgba(70, 119, 194, 0.1);
   color: #7caaf0;
 }
-
 .section-glyph-icon {
   position: relative;
   box-sizing: border-box;
 }
-
 .section-glyph-brand .section-glyph-icon {
   width: 27rpx;
   height: 28rpx;
   border: 3rpx solid currentColor;
   border-radius: 4rpx;
 }
-
 .section-glyph-brand .section-glyph-icon::before {
   position: absolute;
   top: 6rpx;
@@ -361,7 +307,6 @@
   box-shadow: 9rpx 0 currentColor, 0 8rpx currentColor, 9rpx 8rpx currentColor;
   content: "";
 }
-
 .section-glyph-home .section-glyph-icon {
   width: 26rpx;
   height: 23rpx;
@@ -370,7 +315,6 @@
   border-top: 0;
   border-radius: 2rpx 2rpx 5rpx 5rpx;
 }
-
 .section-glyph-home .section-glyph-icon::before {
   position: absolute;
   top: -9rpx;
@@ -383,7 +327,6 @@
   content: "";
   transform: rotate(45deg);
 }
-
 .section-glyph-home .section-glyph-icon::after {
   position: absolute;
   right: 5rpx;
@@ -394,14 +337,12 @@
   border-bottom: 0;
   content: "";
 }
-
 .section-glyph-content .section-glyph-icon {
   width: 25rpx;
   height: 31rpx;
   border: 3rpx solid currentColor;
   border-radius: 4rpx;
 }
-
 .section-glyph-content .section-glyph-icon::before,
 .section-glyph-content .section-glyph-icon::after {
   position: absolute;
@@ -412,15 +353,12 @@
   background: currentColor;
   content: "";
 }
-
 .section-glyph-content .section-glyph-icon::before {
   top: 8rpx;
 }
-
 .section-glyph-content .section-glyph-icon::after {
   top: 16rpx;
 }
-
 .section-glyph-reservation .section-glyph-icon {
   width: 29rpx;
   height: 27rpx;
@@ -428,7 +366,6 @@
   border: 3rpx solid currentColor;
   border-radius: 5rpx;
 }
-
 .section-glyph-reservation .section-glyph-icon::before {
   position: absolute;
   top: 5rpx;
@@ -438,7 +375,6 @@
   background: currentColor;
   content: "";
 }
-
 .section-glyph-reservation .section-glyph-icon::after {
   position: absolute;
   top: -7rpx;
@@ -450,14 +386,12 @@
   box-shadow: 11rpx 0 currentColor;
   content: "";
 }
-
 .section-glyph-pricing .section-glyph-icon {
   width: 29rpx;
   height: 29rpx;
   border: 3rpx solid currentColor;
   border-radius: 50%;
 }
-
 .section-glyph-pricing .section-glyph-icon::before {
   position: absolute;
   top: 4rpx;
@@ -468,7 +402,6 @@
   line-height: 1;
   content: "¥";
 }
-
 .pricing-config-tip {
   margin-top: 0;
   margin-bottom: 25rpx;
@@ -477,33 +410,28 @@
   border-radius: 0 14rpx 14rpx 0;
   background: rgba(84, 143, 255, 0.05);
 }
-
 .field-counter-standalone {
   margin-top: 10rpx;
   text-align: right;
 }
-
 .field-meta {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   margin-top: 10rpx;
 }
-
 .field-meta .form-tip {
   flex: 1;
   min-width: 0;
   margin-top: 0;
   padding-right: 18rpx;
 }
-
 .field-counter {
   flex-shrink: 0;
   color: #596679;
   font-size: 18rpx;
   line-height: 1.6;
 }
-
 .template-state {
   display: flex;
   align-items: center;
@@ -512,7 +440,6 @@
   font-size: 19rpx;
   line-height: 1.5;
 }
-
 .template-state-icon {
   position: relative;
   flex-shrink: 0;
@@ -523,16 +450,13 @@
   border-radius: 50%;
   box-sizing: border-box;
 }
-
 .template-state-active {
   color: #73bd96;
 }
-
 .template-state-active .template-state-icon {
   border-color: #62c28f;
   background: #62c28f;
 }
-
 .template-state-check {
   position: absolute;
   top: 2rpx;
@@ -543,11 +467,9 @@
   border-bottom: 2rpx solid transparent;
   transform: rotate(45deg);
 }
-
 .template-state-active .template-state-check {
   border-color: #ffffff;
 }
-
 .action-dock {
   position: sticky;
   z-index: 8;
@@ -560,12 +482,10 @@
   box-shadow: 0 22rpx 54rpx rgba(0, 0, 0, 0.35);
   box-sizing: border-box;
 }
-
 .save-state {
   display: flex;
   align-items: center;
 }
-
 .save-state-mark {
   position: relative;
   display: flex;
@@ -580,13 +500,11 @@
   background: rgba(71, 173, 120, 0.1);
   color: #6dca99;
 }
-
 .save-state-mark-dirty {
   border-color: rgba(224, 170, 79, 0.3);
   background: rgba(194, 134, 44, 0.12);
   color: #e3b35f;
 }
-
 .save-state-check {
   width: 8rpx;
   height: 15rpx;
@@ -596,7 +514,6 @@
   box-sizing: border-box;
   transform: rotate(45deg);
 }
-
 .save-state-mark-dirty .save-state-check {
   width: 3rpx;
   height: 18rpx;
@@ -607,36 +524,30 @@
   box-shadow: 0 11rpx 0 -1rpx currentColor;
   transform: none;
 }
-
 .save-state-copy {
   flex: 1;
   min-width: 0;
 }
-
 .save-state-title {
   color: #e7ebf1;
   font-size: 22rpx;
   font-weight: 650;
   line-height: 1.4;
 }
-
 .save-state-desc {
   margin-top: 3rpx;
   color: #697688;
   font-size: 17rpx;
   line-height: 1.45;
 }
-
 .config-page.management-page .action-dock .action-row {
   margin-top: 20rpx;
 }
-
 .action-btn-content {
   display: flex;
   align-items: center;
   justify-content: center;
 }
-
 .config-action-native-icon {
   position: relative;
   flex-shrink: 0;
@@ -647,11 +558,9 @@
   border-radius: 50%;
   box-sizing: border-box;
 }
-
 .config-retry-native-icon {
   border-left-color: transparent;
 }
-
 .config-retry-native-icon::after {
   position: absolute;
   top: -5rpx;
@@ -664,11 +573,9 @@
   content: "";
   transform: rotate(-18deg);
 }
-
 .config-reset-native-icon {
   border-right-color: transparent;
 }
-
 .config-reset-native-icon::after {
   position: absolute;
   top: -5rpx;
@@ -681,7 +588,6 @@
   content: "";
   transform: rotate(18deg);
 }
-
 .save-native-icon {
   position: relative;
   width: 22rpx;
@@ -691,7 +597,6 @@
   border-radius: 4rpx;
   box-sizing: border-box;
 }
-
 .save-native-icon::before {
   position: absolute;
   top: -2rpx;
@@ -703,7 +608,6 @@
   box-sizing: border-box;
   content: "";
 }
-
 .save-native-icon::after {
   position: absolute;
   right: 4rpx;

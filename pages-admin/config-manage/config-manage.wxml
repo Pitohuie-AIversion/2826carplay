@@ -15,7 +15,6 @@
       <view class="hero-status-count">5 GROUPS</view>
     </view>
   </view>
-
   <view wx:if="{{loading && !hasLoadedConfig}}" class="config-skeleton" aria-hidden="true">
     <view class="config-skeleton-card ui-card">
       <view class="config-skeleton-heading">
@@ -52,7 +51,6 @@
       </view>
     </view>
   </view>
-
   <view wx:elif="{{loadFailed}}" class="config-state ui-card">
     <image class="config-state-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
     <view class="config-state-kicker">CONFIGURATION UNAVAILABLE</view>
@@ -63,7 +61,6 @@
       <view class="action-btn-content"><view class="config-action-native-icon config-retry-native-icon" aria-hidden="true"></view><text>重新加载配置</text></view>
     </button>
   </view>
-
   <block wx:else>
   <view class="form-card ui-card">
     <view class="section-heading">
@@ -76,38 +73,32 @@
       </view>
       <view class="section-index">01</view>
     </view>
-
     <view class="form-item">
       <view class="form-label">品牌名称</view>
       <input class="form-input ui-input" value="{{form.brandName}}" data-field="brandName" disabled="{{loading || saving}}" bindinput="handleInput" maxlength="20" confirm-type="done" placeholder="例如 极境车库" aria-label="品牌名称" />
     </view>
-
     <view class="form-item">
       <view class="form-label">客服电话</view>
       <input class="form-input ui-input" maxlength="20" value="{{form.servicePhone}}" data-field="servicePhone" disabled="{{loading || saving}}" bindinput="handleInput" confirm-type="done" placeholder="请输入客服电话" aria-label="客服电话" />
       <view class="form-tip">支持手机号、带区号座机或以 + 开头的国际号码。</view>
     </view>
-
     <view class="form-divider"></view>
     <view class="form-item">
       <view class="form-label">企业ID（CorpID）</view>
       <input class="form-input ui-input" value="{{form.wxKfCorpId}}" data-field="wxKfCorpId" disabled="{{loading || saving}}" bindinput="handleInput" maxlength="64" confirm-type="done" placeholder="例如 ww1234567890abcdef" aria-label="企业微信 CorpId" />
       <view class="form-tip">企业微信后台「我的企业」→企业信息」中可查看，以 ww 开头。</view>
     </view>
-
     <view class="form-item">
       <view class="form-label">微信客服链接参数（extInfo）</view>
       <textarea class="form-textarea ui-input" value="{{form.wxKfExtInfo}}" data-field="wxKfExtInfo" disabled="{{loading || saving}}" bindinput="handleInput" maxlength="512" placeholder="企业微信客服接入页打开小程序场景值参数（Base64 字符串）" aria-label="微信客服 extInfo 参数" />
       <view class="field-meta"><view class="form-tip">企业微信「微信客服 → 客服账号 → 获取链接 → 小程序」场景值参数（Base64 字符串）。留空则降级使用原生轻量客服按钮。</view><view class="field-counter">{{form.wxKfExtInfo.length}} / 512</view></view>
     </view>
-
     <view class="form-item">
       <view class="form-label">我的页简介</view>
       <textarea class="form-textarea ui-input" value="{{form.mineUserDesc}}" data-field="mineUserDesc" disabled="{{loading || saving}}" bindinput="handleInput" maxlength="80" placeholder="填写个人中心品牌简介" aria-label="我的页简介" />
       <view class="field-meta"><view class="form-tip">显示在个人中心品牌信息区域。</view><view class="field-counter">{{form.mineUserDesc.length}} / 80</view></view>
     </view>
   </view>
-
   <view class="form-card ui-card">
     <view class="section-heading">
       <view class="section-heading-main">
@@ -119,25 +110,21 @@
       </view>
       <view class="section-index">02</view>
     </view>
-
     <view class="form-item">
       <view class="form-label">首页标题</view>
       <input class="form-input ui-input" value="{{form.garagePageTitle}}" data-field="garagePageTitle" disabled="{{loading || saving}}" bindinput="handleInput" maxlength="20" confirm-type="done" placeholder="例如 探索极境座驾" aria-label="首页标题" />
     </view>
-
     <view class="form-item">
       <view class="form-label">首页副标题</view>
       <textarea class="form-textarea ui-input" value="{{form.garagePageSubtitle}}" data-field="garagePageSubtitle" disabled="{{loading || saving}}" bindinput="handleInput" maxlength="80" placeholder="填写首页品牌说明" aria-label="首页副标题" />
       <view class="field-meta"><view class="form-tip">建议用一句话说明车库定位或当前服务状态。</view><view class="field-counter">{{form.garagePageSubtitle.length}} / 80</view></view>
     </view>
-
     <view class="form-item">
       <view class="form-label">城市列表</view>
       <textarea class="form-textarea ui-input" value="{{form.cityOptionsText}}" data-field="cityOptionsText" disabled="{{loading || saving}}" bindinput="handleInput" maxlength="300" placeholder="每行填写一个城市" aria-label="城市列表" />
       <view class="field-meta"><view class="form-tip">每行一个城市，预约页会展示为可选列表。</view><view class="field-counter">{{form.cityOptionsText.length}} / 300</view></view>
     </view>
   </view>
-
   <view class="form-card ui-card">
     <view class="section-heading">
       <view class="section-heading-main">
@@ -154,14 +141,12 @@
       <textarea class="form-textarea form-textarea-lg ui-input" value="{{form.faqContent}}" data-field="faqContent" disabled="{{loading || saving}}" bindinput="handleInput" maxlength="1000" placeholder="填写常见问题内容" aria-label="常见问题内容" />
       <view class="field-meta"><view class="form-tip">按主题分段，便于用户快速定位答案。</view><view class="field-counter">{{form.faqContent.length}} / 1000</view></view>
     </view>
-
     <view class="form-item">
       <view class="form-label">平台规则</view>
       <textarea class="form-textarea form-textarea-lg ui-input" value="{{form.rulesContent}}" data-field="rulesContent" disabled="{{loading || saving}}" bindinput="handleInput" maxlength="1000" placeholder="填写平台规则内容" aria-label="平台规则内容" />
       <view class="field-meta"><view class="form-tip">修改后会同步服务指南中的平台规则。</view><view class="field-counter">{{form.rulesContent.length}} / 1000</view></view>
     </view>
   </view>
-
   <view class="form-card ui-card">
     <view class="section-heading">
       <view class="section-heading-main">
@@ -198,7 +183,6 @@
       <view class="form-tip">模板需包含：车辆名称 thing1、预约状态 phrase2、服务说明 thing3、更新时间 time4。未配置时预约仍可提交，但用户收不到状态变更提醒。</view>
     </view>
   </view>
-
   <view class="form-card ui-card">
     <view class="section-heading">
       <view class="section-heading-main">
@@ -257,7 +241,6 @@
       <view class="field-counter field-counter-standalone">{{form.rentalEstimateDisclaimer.length}} / 200</view>
     </view>
   </view>
-
   <view class="action-dock ui-card">
     <view class="save-state">
       <view class="save-state-mark {{isDirty ? 'save-state-mark-dirty' : ''}}" aria-hidden="true"><view class="save-state-check"></view></view>

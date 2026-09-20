@@ -11,10 +11,8 @@ const {
   normalizeUsablePhone
 } = require("../../shared/bookingWorkbench")
 const { createPerformanceHelpers } = require('../../shared/performance')
-
 const WORKBENCH_LOAD_TIMEOUT_MS = 15 * 1000
 const WORKBENCH_WRITE_TIMEOUT_MS = 20 * 1000
-
 const STATUS_LABELS = {
   pending: "待联系",
   contacted: "已联系",
@@ -22,7 +20,6 @@ const STATUS_LABELS = {
   adjustment_requested: "待调整",
   confirmed: "已确认"
 }
-
 const FILTER_OPTIONS = [
   { key: "todo", label: "全部待办" },
   { key: "pending", label: "待启动" },
@@ -33,19 +30,16 @@ const FILTER_OPTIONS = [
   { key: "contactIssue", label: "号码异常" },
   { key: "standby", label: "候补" }
 ]
-
 const SORT_OPTIONS = [
   { key: "smart", label: "智能排序", hint: "优先处理超时、临近用车、号码异常与高优先级预约" },
   { key: "waiting", label: "等待最久", hint: "按提交时间从早到晚排列" },
   { key: "pickup", label: "用车日期", hint: "按预计用车日期从近到远排列" }
 ]
-
 const PRIORITY_OPTIONS = [
   { key: "priority", label: "优先" },
   { key: "normal", label: "常规" },
   { key: "standby", label: "候补" }
 ]
-
 function formatSyncTime(value) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) {
@@ -58,7 +52,6 @@ function formatSyncTime(value) {
   const second = `${date.getSeconds()}`.padStart(2, "0")
   return `${month}-${day} ${hour}:${minute}:${second}`
 }
-
 function formatQueueItem(item) {
   const priority =
     PRIORITY_OPTIONS.find((option) => option.key === item.schedulePriority) ||
@@ -80,18 +73,15 @@ function formatQueueItem(item) {
     statusClass: `status-${item.status || "pending"}`
   }
 }
-
 function filterQueueByKeyword(queue, keyword) {
   const tokens = String(keyword || "")
     .trim()
     .toLowerCase()
     .split(/\s+/)
     .filter(Boolean)
-
   if (!tokens.length) {
     return queue
   }
-
   return queue.filter((item) => {
     const searchableFields = [
       item.id,
@@ -101,13 +91,11 @@ function filterQueueByKeyword(queue, keyword) {
       item.city,
       item.adminRemark
     ].map((value) => String(value || "").toLowerCase())
-
     return tokens.every((token) =>
       searchableFields.some((field) => field.includes(token))
     )
   })
 }
-
 function getPickupTimestamp(value) {
   const date = String(value || "").trim()
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
@@ -116,12 +104,10 @@ function getPickupTimestamp(value) {
   const timestamp = new Date(`${date}T00:00:00.000Z`).getTime()
   return Number.isFinite(timestamp) ? timestamp : Number.MAX_SAFE_INTEGER
 }
-
 function sortQueue(queue, mode) {
   if (mode === "smart") {
     return queue
   }
-
   return queue
     .map((item, index) => ({
       item,
@@ -133,7 +119,6 @@ function sortQueue(queue, mode) {
         const rightTime = right.item.createdTimestamp || Number.MAX_SAFE_INTEGER
         return leftTime - rightTime || left.index - right.index
       }
-
       const pickupDifference =
         getPickupTimestamp(left.item.startDate) -
         getPickupTimestamp(right.item.startDate)
@@ -146,9 +131,7 @@ function sortQueue(queue, mode) {
     })
     .map((entry) => entry.item)
 }
-
 const WORKBENCH_SORT_STORAGE_KEY = "workbench_sort_preference"
-
 function getSavedSortPreference() {
   if (typeof wx === "undefined" || typeof wx.getStorageSync !== "function") {
     return ""
@@ -159,7 +142,6 @@ function getSavedSortPreference() {
     return ""
   }
 }
-
 function saveSortPreference(sort) {
   if (typeof wx === "undefined" || typeof wx.setStorageSync !== "function") {
     return
@@ -168,7 +150,6 @@ function saveSortPreference(sort) {
     wx.setStorageSync(WORKBENCH_SORT_STORAGE_KEY, sort)
   } catch (error) {}
 }
-
 Page({
   data: {
     pageAuthorized: false,
@@ -203,9 +184,7 @@ Page({
     lastSyncedText: "",
     viewCustomized: false
   },
-
   applyState(patch) { this.setData(patch) },
-
   restoreSortPreference() {
     const saved = getSavedSortPreference()
     const option = SORT_OPTIONS.find((item) => item.key === saved)
@@ -221,7 +200,6 @@ Page({
       })
     }
   },
-
   onLoad() {
     const perf = createPerformanceHelpers(this)
     this._perf = perf
@@ -235,7 +213,6 @@ Page({
       onAuthorized: () => this.fetchBookings()
     })
   },
-
   onPullDownRefresh() {
     if (!this.data.pageAuthorized || this.isWorkbenchWriteBusy()) {
       wx.stopPullDownRefresh()
@@ -243,7 +220,6 @@ Page({
     }
     this.fetchBookings(() => wx.stopPullDownRefresh())
   },
-
   onShow() {
     if (
       this.data.pageAuthorized &&
@@ -255,7 +231,6 @@ Page({
       this.fetchBookings()
     }
   },
-
   isWorkbenchWriteBusy() {
     return Boolean(
       this._workbenchWriteActive ||
@@ -265,7 +240,6 @@ Page({
       this.data.statusUpdatingId
     )
   },
-
   isWorkbenchInteractionBusy() {
     return Boolean(
       this.data.loading ||
@@ -273,7 +247,6 @@ Page({
       this.isWorkbenchWriteBusy()
     )
   },
-
   onUnload() {
     if (this._perf && this._perf.dispose) try { this._perf.dispose() } catch(e) {}
     cancelPagePermissionCheck(this)
@@ -287,7 +260,6 @@ Page({
     this._workbenchWriteActive = false
     this._workbenchStatusFeedbackPending = false
   },
-
   applyWorkbench(mode) {
     const view = buildBookingWorkbench(
       this.data.allBookings,
@@ -315,14 +287,12 @@ Page({
       )
     })
   },
-
   handleKeywordInput(event) {
     this.setData({
       keyword: String(event.detail.value || "").slice(0, 40)
     })
     this.applyWorkbench()
   },
-
   handleClearKeyword() {
     if (!this.data.keyword) {
       return
@@ -332,7 +302,6 @@ Page({
     })
     this.applyWorkbench()
   },
-
   handleManualRefresh() {
     if (
       !this.data.pageAuthorized ||
@@ -346,7 +315,6 @@ Page({
     }
     this.fetchBookings()
   },
-
   handleResetView() {
     if (!this.data.viewCustomized) {
       return
@@ -359,7 +327,6 @@ Page({
     saveSortPreference("smart")
     this.applyWorkbench("todo")
   },
-
   handleSortTap(event) {
     const selectedSort = String(event.currentTarget.dataset.sort || "")
     const option = SORT_OPTIONS.find((item) => item.key === selectedSort)
@@ -373,7 +340,6 @@ Page({
     saveSortPreference(selectedSort)
     this.applyWorkbench()
   },
-
   handleFilterTap(event) {
     const mode = String(event.currentTarget.dataset.mode || "")
     if (!mode || mode === this.data.selectedMode) {
@@ -381,7 +347,6 @@ Page({
     }
     this.applyWorkbench(mode)
   },
-
   handleSummaryTap(event) {
     const mode = String(event.currentTarget.dataset.mode || "")
     if (!mode) {
@@ -389,7 +354,6 @@ Page({
     }
     this.applyWorkbench(mode)
   },
-
   handleViewDetail(event) {
     const id = String(event.currentTarget.dataset.id || "").trim()
     if (this.isWorkbenchInteractionBusy() || !id) {
@@ -409,7 +373,6 @@ Page({
       }
     })
   },
-
   handleCallPhone(event) {
     if (this.isWorkbenchInteractionBusy()) {
       return
@@ -439,7 +402,6 @@ Page({
       }
     })
   },
-
   handleCopyPhone(event) {
     if (this.isWorkbenchInteractionBusy()) {
       return
@@ -482,7 +444,6 @@ Page({
       }
     })
   },
-
   handlePriorityTap(event) {
     const dataset = event.currentTarget.dataset || {}
     const id = String(dataset.id || "").trim()
@@ -494,7 +455,6 @@ Page({
     ) {
       return
     }
-
     const action = beginPageNativeAction(this)
     wx.showActionSheet({
       alertText: "调整预约优先级",
@@ -526,7 +486,6 @@ Page({
       }
     })
   },
-
   handleOpenRemark(event) {
     const dataset = event.currentTarget.dataset || {}
     const id = String(dataset.id || "").trim()
@@ -541,13 +500,11 @@ Page({
       remarkDraft: String(dataset.remark || "").slice(0, 200)
     })
   },
-
   handleRemarkInput(event) {
     this.setData({
       remarkDraft: String(event.detail.value || "").slice(0, 200)
     })
   },
-
   handleCancelRemark() {
     if (this.data.savingRemark) {
       return
@@ -557,7 +514,6 @@ Page({
       remarkDraft: ""
     })
   },
-
   handleSaveRemark() {
     const id = String(this.data.editingRemarkId || "").trim()
     const adminRemark = String(this.data.remarkDraft || "").trim()
@@ -619,7 +575,6 @@ Page({
       }
     })
   },
-
   handleMarkContacted(event) {
     const dataset = event.currentTarget.dataset || {}
     const id = String(dataset.id || "").trim()
@@ -631,7 +586,6 @@ Page({
     ) {
       return
     }
-
     this.applyState({
       statusUpdatingId: id
     })
@@ -663,7 +617,6 @@ Page({
       }
     })
   },
-
   updateContactedStatus(id) {
     const bookingId = String(id || "").trim()
     if (
@@ -701,7 +654,6 @@ Page({
           })
           return
         }
-
         if (result.notificationStatus === "failed") {
           this._workbenchStatusFeedbackPending = true
           let feedbackSettled = false
@@ -735,7 +687,6 @@ Page({
           }
           return
         }
-
         this.applyState({
           statusUpdatingId: ""
         })
@@ -755,7 +706,6 @@ Page({
       }
     })
   },
-
   handleQuickCoordination(event) {
     const dataset = event.currentTarget.dataset || {}
     const id = String(dataset.id || "").trim()
@@ -767,7 +717,6 @@ Page({
         : currentStatus === "coordinating"
           ? "resolved"
           : ""
-
     if (
       !id ||
       !nextStatus ||
@@ -775,7 +724,6 @@ Page({
     ) {
       return
     }
-
     const update = () => {
       this.updateCoordination({
         id,
@@ -783,7 +731,6 @@ Page({
         coordinationStatus: nextStatus
       })
     }
-
     if (nextStatus === "resolved") {
       this.applyState({
         updatingId: id
@@ -817,10 +764,8 @@ Page({
       })
       return
     }
-
     update()
   },
-
   updateCoordination(payload, successTitle) {
     const coordinationPayload = {
       id: String((payload && payload.id) || "").trim(),
@@ -831,11 +776,9 @@ Page({
         (payload && payload.coordinationStatus) || "pending"
       )
     }
-
     if (!coordinationPayload.id) {
       return
     }
-
     if (
       this.data.loading ||
       this.data.refreshing ||
@@ -847,7 +790,6 @@ Page({
     ) {
       return
     }
-
     this.applyState({
       updatingId: coordinationPayload.id
     })
@@ -887,14 +829,12 @@ Page({
       }
     })
   },
-
   clearWorkbenchWriteTimer() {
     if (this._workbenchWriteTimer) {
       clearTimeout(this._workbenchWriteTimer)
       this._workbenchWriteTimer = null
     }
   },
-
   runWorkbenchWrite(options) {
     const input = options || {}
     const clearState =
@@ -916,7 +856,6 @@ Page({
       })
       return
     }
-
     const requestId = Number(this._workbenchWriteRequestId || 0) + 1
     this._workbenchWriteRequestId = requestId
     this._workbenchWriteActive = true
@@ -942,11 +881,9 @@ Page({
         icon: "none"
       })
     }
-
     this._workbenchWriteTimer = setTimeout(() => {
       handleFailure(input.timeoutTitle || "操作超时，请重试")
     }, WORKBENCH_WRITE_TIMEOUT_MS)
-
     const requestOptions = {
       name: input.name,
       data: input.data,
@@ -963,14 +900,12 @@ Page({
         handleFailure(error && (error.errMsg || error.message))
       }
     }
-
     try {
       wx.cloud.callFunction(requestOptions)
     } catch (error) {
       handleFailure(error && (error.errMsg || error.message))
     }
   },
-
   handleOpenBookingManage() {
     if (this.isWorkbenchInteractionBusy()) {
       return
@@ -989,14 +924,12 @@ Page({
       }
     })
   },
-
   handleRetry() {
     if (this.data.loading || this.data.refreshing || this.isWorkbenchWriteBusy()) {
       return
     }
     this.fetchBookings()
   },
-
   finishWorkbenchLoadRequestEffects() {
     if (this._workbenchLoadTimer) {
       clearTimeout(this._workbenchLoadTimer)
@@ -1008,13 +941,11 @@ Page({
       done()
     }
   },
-
   fetchBookings(done) {
     this.finishWorkbenchLoadRequestEffects()
     const requestId = Number(this._workbenchLoadRequestId || 0) + 1
     this._workbenchLoadRequestId = requestId
     this._workbenchLoadDone = typeof done === "function" ? done : null
-
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       this.applyState({
         loading: false,
@@ -1024,7 +955,6 @@ Page({
       this.finishWorkbenchLoadRequestEffects()
       return
     }
-
     this.applyState({
       loading: !this.data.allBookings.length,
       refreshing: Boolean(this.data.allBookings.length),
@@ -1049,11 +979,9 @@ Page({
         loadError: message || "待协调预约加载失败"
       })
     }
-
     this._workbenchLoadTimer = setTimeout(() => {
       handleFailure("待协调预约加载超时，请检查网络后重试")
     }, WORKBENCH_LOAD_TIMEOUT_MS)
-
     const requestOptions = {
       name: "bookingList",
       data: {
@@ -1087,7 +1015,6 @@ Page({
       },
       complete: () => {}
     }
-
     try {
       wx.cloud.callFunction(requestOptions)
     } catch (error) {

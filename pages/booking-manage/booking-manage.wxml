@@ -10,7 +10,6 @@
       <image class="hero-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
     </view>
   </view>
-
   <view class="filter-card ui-card ui-card-soft">
     <view class="section-heading">
       <view>
@@ -39,7 +38,6 @@
         aria-label="清空搜索关键词"
       ><view class="management-search-clear-icon" aria-hidden="true"></view></button>
     </view>
-
     <view class="status-row">
       <view
         wx:for="{{statusOptions}}"
@@ -54,7 +52,6 @@
         {{item.label}}
       </view>
     </view>
-
     <view class="workflow-filter">
       <view class="workflow-filter-label">预约级别</view>
       <view class="workflow-filter-row">
@@ -70,7 +67,6 @@
         >{{item.label}}</view>
       </view>
     </view>
-
     <view class="workflow-filter">
       <view class="workflow-filter-label">协调进度</view>
       <view class="workflow-filter-row">
@@ -86,7 +82,6 @@
         >{{item.label}}</view>
       </view>
     </view>
-
     <view class="workflow-filter workflow-filter-last">
       <view class="workflow-filter-label">取车城市</view>
       <view class="workflow-filter-row">
@@ -102,15 +97,12 @@
         >{{item.label}}</view>
       </view>
     </view>
-
     <view class="actions">
       <button class="action-btn ui-btn ui-btn-primary" bindtap="handleSearch"><view class="booking-action-content"><view class="query-native-icon" aria-hidden="true"></view><text>查询</text></view></button>
       <button class="action-btn ui-btn ui-btn-ghost action-btn-last" bindtap="handleReset"><view class="booking-action-content"><view class="reset-native-icon" aria-hidden="true"></view><text>重置</text></view></button>
     </view>
-
     <view class="result-count">当前筛选结果 {{total}}{{truncated ? '+' : ''}} 条</view>
     <view wx:if="{{truncated}}" class="result-count">当前最多展示已读取的 2000 条预约，请缩小筛选范围。</view>
-
     <button class="export-btn ui-btn ui-btn-ghost" bindtap="handleExport"><view class="booking-action-content"><view class="export-native-icon" aria-hidden="true"></view><text>导出 CSV</text></view></button>
     <view wx:if="{{exportFilePath}}" class="export-actions">
       <view class="export-tip"><view class="export-file-native-icon" aria-hidden="true"><view class="export-file-line"></view></view><view><view class="export-tip-title">导出文件已就绪</view><view class="export-tip-name">{{exportFileName}}</view></view></view>
@@ -121,7 +113,6 @@
       </view>
     </view>
   </view>
-
   <view class="dashboard-card ui-card ui-card-gradient">
     <view class="dashboard-head">
       <view>
@@ -130,14 +121,12 @@
       </view>
       <view class="dashboard-desc">全量预约统计</view>
     </view>
-
     <view class="summary-grid">
       <view wx:for="{{summaryItems}}" wx:key="key" class="summary-item">
         <view class="summary-value">{{item.value}}</view>
         <view class="summary-label">{{item.label}}</view>
       </view>
     </view>
-
     <view class="ratio-card">
       <view class="ratio-head">
         <view class="dashboard-title">跟进进度占比</view>
@@ -159,13 +148,11 @@
         </view>
       </view>
     </view>
-
     <view class="recent-block">
       <view class="recent-head">
         <view class="dashboard-title">近 7 天新增预约</view>
         <view class="dashboard-desc">展示最近提交的 5 条预约，可直接进入详情</view>
       </view>
-
       <view wx:if="{{recentCreatedList.length}}" class="recent-list">
         <view wx:for="{{recentCreatedList}}" wx:key="id" class="recent-item" data-id="{{item.id}}" bindtap="handleViewDetail" hover-class="recent-item-pressed" aria-role="button" aria-label="查看 {{item.vehicleName}}，{{item.userName}} 的预约详情">
           <view class="recent-main">
@@ -177,14 +164,12 @@
           <view class="recent-entry-side"><view class="booking-status ui-status ui-status-lg {{item.statusClass}}">{{item.statusText}}</view><view class="recent-entry-chevron" aria-hidden="true"></view></view>
         </view>
       </view>
-
       <view wx:else class="recent-empty">
         <view class="recent-empty-native-icon booking-recent-empty-native-icon" aria-hidden="true"></view>
         <view class="recent-empty-copy"><view class="recent-empty-title">近 7 天暂无新增预约</view><view class="recent-empty-desc">新预约提交后会显示在这里</view></view>
       </view>
     </view>
   </view>
-
   <view wx:if="{{loading}}" class="loading manage-list-skeleton" aria-hidden="true">
     <view class="manage-loading-head">
       <view>
@@ -203,7 +188,6 @@
       <view class="manage-loading-action manage-skeleton-pulse"></view>
     </view>
   </view>
-
   <view wx:elif="{{list.length}}" class="booking-list">
     <view class="list-heading">
       <view>
@@ -223,7 +207,6 @@
         </view>
         <view class="booking-status ui-status ui-status-lg {{item.statusClass}}">{{item.statusText}}</view>
       </view>
-
       <view class="booking-journey {{item.journeyClass}}">
         <view class="booking-journey-head"><view><view class="booking-journey-kicker">FOLLOW-UP JOURNEY</view><view class="booking-journey-title">预约跟进</view></view><view class="booking-journey-stage">{{item.journeyStage}} / 3</view></view>
         <view class="booking-journey-track"><view class="booking-journey-fill" style="width: {{item.journeyProgress}}%;"></view></view>
@@ -234,7 +217,6 @@
         </view>
         <view class="booking-journey-hint">{{item.journeyHint}}</view>
       </view>
-
       <view class="booking-meta-grid">
         <view class="booking-meta-item"><view class="booking-meta-icon booking-meta-icon-user" aria-hidden="true"></view><view><view class="booking-meta-label">客户</view><view class="booking-meta-value">{{item.userName || '—'}}</view></view></view>
         <view class="booking-meta-item"><view class="booking-meta-icon booking-meta-icon-phone" aria-hidden="true"></view><view><view class="booking-meta-label">联系电话</view><view class="booking-meta-value">{{item.phone || '—'}}</view></view></view>
@@ -242,13 +224,11 @@
         <view class="booking-meta-item"><view class="booking-meta-icon booking-meta-icon-location" aria-hidden="true"></view><view><view class="booking-meta-label">取车城市</view><view class="booking-meta-value">{{item.city || '—'}}</view></view></view>
         <view class="booking-meta-item"><view class="booking-meta-icon booking-meta-icon-time" aria-hidden="true"></view><view><view class="booking-meta-label">提交时间</view><view class="booking-meta-value">{{item.createdAtText || '—'}}</view></view></view>
       </view>
-
       <view class="quick-action-row">
         <button class="quick-action-btn ui-btn ui-btn-primary" data-phone="{{item.phone}}" disabled="{{loading}}" bindtap="handleCallPhone"><view class="booking-action-content"><view class="call-native-icon" aria-hidden="true"></view><text>拨打电话</text></view></button>
         <button class="quick-action-btn quick-action-btn-last ui-btn ui-btn-ghost" data-id="{{item.id}}" disabled="{{loading}}" bindtap="handleViewDetail"><view class="booking-action-content"><view class="detail-native-icon" aria-hidden="true"></view><text>查看详情</text></view></button>
       </view>
       <view wx:if="{{item.note}}" class="booking-note"><view class="booking-note-icon" aria-hidden="true"></view><view><view class="booking-note-label">用户备注</view><view class="booking-note-text">{{item.note}}</view></view></view>
-
       <view class="remark-card ui-card ui-card-soft">
         <view class="remark-head">
           <view class="remark-heading"><view class="remark-native-icon" aria-hidden="true"></view><view><view class="remark-title">管理员备注</view><view class="remark-subtitle">记录联系结果与后续计划</view></view></view>
@@ -257,7 +237,6 @@
         <textarea class="remark-input" maxlength="200" placeholder="记录联系结果、到店时间、后续跟进计划" aria-label="第 {{index + 1}} 条预约内部备注" value="{{item.adminRemarkDraft}}" data-index="{{index}}" bindinput="handleRemarkInput" />
         <button class="remark-save-btn ui-btn ui-btn-primary" data-id="{{item.id}}" data-index="{{index}}" bindtap="handleSaveRemark"><view class="booking-action-content"><view class="save-native-icon" aria-hidden="true"></view><text>保存备注</text></view></button>
       </view>
-
       <view class="op-panel" wx:if="{{item.status !== 'completed' && item.status !== 'cancelled'}}">
         <view class="op-panel-head"><view><view class="op-panel-title">推进预约状态</view><view class="op-panel-desc">状态更新后将尝试发送订阅提醒</view></view><view class="op-panel-current">{{item.statusText}}</view></view>
         <button wx:if="{{item.status === 'pending'}}" class="op-main-btn ui-btn ui-btn-primary" data-id="{{item.id}}" data-status="contacted" bindtap="handleUpdateStatus"><view class="booking-action-content"><view class="advance-native-icon" aria-hidden="true"></view><text>标记已联系</text></view></button>
@@ -265,13 +244,11 @@
         <view class="op-danger-row"><view><view class="op-danger-title">取消预约</view><view class="op-danger-desc">取消后将结束本次跟进。</view></view><button class="op-cancel-btn ui-btn ui-btn-danger-ghost" data-id="{{item.id}}" data-status="cancelled" bindtap="handleUpdateStatus"><view class="booking-action-content"><view class="cancel-native-icon" aria-hidden="true"></view><text>取消</text></view></button></view>
       </view>
     </view>
-
     <view class="load-more">
       <button wx:if="{{hasMore && !loading}}" class="load-more-btn ui-btn ui-btn-ghost" bindtap="handleLoadMore"><view class="booking-action-content"><view class="load-more-native-icon" aria-hidden="true"></view><text>加载更多</text></view></button>
       <view wx:elif="{{!hasMore}}" class="load-more-end">已加载全部</view>
     </view>
   </view>
-
   <view wx:else class="empty">
     <image class="manage-empty-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
     <view class="manage-empty-kicker">NO MATCHING RESERVATIONS</view>

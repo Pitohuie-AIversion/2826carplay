@@ -14,7 +14,6 @@ const {
   cancelPageNativeActions,
   isPageNativeActionActive
 } = require("../../shared/pageNativeAction")
-
 const STATUS_OPTIONS = [
   { value: "all", label: "全部" },
   { value: "pending", label: "待联系" },
@@ -25,7 +24,6 @@ const STATUS_OPTIONS = [
   { value: "completed", label: "已完成" },
   { value: "cancelled", label: "已取消" }
 ]
-
 const STATUS_TEXT_MAP = {
   pending: "待联系",
   contacted: "已联系",
@@ -35,7 +33,6 @@ const STATUS_TEXT_MAP = {
   completed: "已完成",
   cancelled: "已取消"
 }
-
 const STATUS_CLASS_MAP = {
   pending: "status-pending",
   contacted: "status-contacted",
@@ -45,44 +42,37 @@ const STATUS_CLASS_MAP = {
   completed: "status-completed",
   cancelled: "status-cancelled"
 }
-
 const PRIORITY_TEXT_MAP = {
   priority: "优先",
   normal: "常规",
   standby: "候补"
 }
-
 const COORDINATION_TEXT_MAP = {
   pending: "待协调",
   coordinating: "协调中",
   resolved: "已协调"
 }
-
 const PRIORITY_OPTIONS = [
   { value: "all", label: "全部级别" },
   { value: "priority", label: "优先" },
   { value: "normal", label: "常规" },
   { value: "standby", label: "候补" }
 ]
-
 const COORDINATION_OPTIONS = [
   { value: "all", label: "全部进度" },
   { value: "pending", label: "待协调" },
   { value: "coordinating", label: "协调中" },
   { value: "resolved", label: "已协调" }
 ]
-
 const CITY_OPTIONS = [
   { value: "all", label: "全部城市" },
   { value: "杭州", label: "杭州" },
   { value: "上海", label: "上海" }
 ]
-
 const DEFAULT_PAGE_SIZE = 20
 const BOOKING_MANAGE_LIST_TIMEOUT_MS = 15 * 1000
 const BOOKING_MANAGE_MUTATION_TIMEOUT_MS = 20 * 1000
 const BOOKING_MANAGE_EXPORT_TIMEOUT_MS = 20 * 1000
-
 function showStatusUpdateFeedback(result, done) {
   const next = typeof done === "function" ? done : () => {}
   let settled = false
@@ -113,7 +103,6 @@ function showStatusUpdateFeedback(result, done) {
     }
     return
   }
-
   const title =
     notificationStatus === "sent"
       ? "提醒已发送"
@@ -129,7 +118,6 @@ function showStatusUpdateFeedback(result, done) {
     finish()
   }
 }
-
 function buildStatusSummary(stats) {
   return [
     { key: "pending", label: "待联系", value: stats.pending || 0 },
@@ -140,7 +128,6 @@ function buildStatusSummary(stats) {
     { key: "recentCreated7d", label: "近 7 天新增", value: stats.recentCreated7d || 0 }
   ]
 }
-
 function buildStatusRatioSegments(stats) {
   const pending = Number(stats && stats.pending) || 0
   const contacted = Number(stats && stats.contacted) || 0
@@ -148,7 +135,6 @@ function buildStatusRatioSegments(stats) {
   const confirmed = Number(stats && stats.confirmed) || 0
   const completed = Number(stats && stats.completed) || 0
   const total = pending + contacted + quoted + confirmed + completed
-
   const base = [
     { key: "pending", label: "待联系", value: pending, className: "ratio-pending" },
     { key: "contacted", label: "已联系", value: contacted, className: "ratio-contacted" },
@@ -156,7 +142,6 @@ function buildStatusRatioSegments(stats) {
     { key: "confirmed", label: "已确认", value: confirmed, className: "ratio-completed" },
     { key: "completed", label: "已完成", value: completed, className: "ratio-completed" }
   ]
-
   if (!total) {
     return base.map((item) => ({
       ...item,
@@ -164,19 +149,16 @@ function buildStatusRatioSegments(stats) {
       percentText: "0%"
     }))
   }
-
   const rawPercents = base.map((item) => (item.value / total) * 100)
   const floors = rawPercents.map((value) => Math.floor(value))
   let used = floors.reduce((sum, n) => sum + n, 0)
   let remain = 100 - used
-
   const order = rawPercents
     .map((value, index) => ({
       index,
       frac: value - floors[index]
     }))
     .sort((a, b) => b.frac - a.frac)
-
   const percents = floors.slice()
   let i = 0
   while (remain > 0 && i < order.length) {
@@ -187,19 +169,16 @@ function buildStatusRatioSegments(stats) {
       i = 0
     }
   }
-
   return base.map((item, index) => ({
     ...item,
     percent: percents[index],
     percentText: `${percents[index]}%`
   }))
 }
-
 function buildRecentCreatedViewModel(list) {
   if (!Array.isArray(list)) {
     return []
   }
-
   return list.map((item) => {
     const status = item.status || "pending"
     return {
@@ -216,17 +195,14 @@ function buildRecentCreatedViewModel(list) {
     }
   })
 }
-
 function formatDisplayTime(value) {
   if (!value) {
     return ""
   }
-
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) {
     return ""
   }
-
   const year = date.getFullYear()
   const month = `${date.getMonth() + 1}`.padStart(2, "0")
   const day = `${date.getDate()}`.padStart(2, "0")
@@ -234,11 +210,9 @@ function formatDisplayTime(value) {
   const minute = `${date.getMinutes()}`.padStart(2, "0")
   return `${year}-${month}-${day} ${hour}:${minute}`
 }
-
 function normalizeRemark(value) {
   return String(value || "").slice(0, 200)
 }
-
 function normalizePhone(value) {
   const phone = String(value || "").trim()
   const digitCount = phone.replace(/\D/g, "").length
@@ -247,7 +221,6 @@ function normalizePhone(value) {
   }
   return phone
 }
-
 function buildJourneyView(status) {
   const current = String(status || "pending")
   if (current === "contacted") {
@@ -297,7 +270,6 @@ function buildJourneyView(status) {
     journeyClass: "booking-journey-pending"
   }
 }
-
 function ensureCsvFileName(name) {
   const raw = String(name || "").trim()
   if (!raw) {
@@ -308,20 +280,16 @@ function ensureCsvFileName(name) {
   }
   return `${raw}.csv`
 }
-
 function getErrorMessage(error) {
   if (!error) {
     return ""
   }
-
   return String(error.errMsg || error.message || error)
 }
-
 function isTapGestureShareError(error) {
   const message = getErrorMessage(error).toLowerCase()
   return message.includes("tap gesture")
 }
-
 function isDevtoolsEnv() {
   try {
     if (!wx || typeof wx.getSystemInfoSync !== "function") {
@@ -333,16 +301,13 @@ function isDevtoolsEnv() {
     return false
   }
 }
-
 function isDevtoolsNotSupportedShareError(error) {
   const message = getErrorMessage(error)
   if (!message) {
     return false
   }
-
   return message.includes("开发者工具") || message.includes("不支持")
 }
-
 Page({
   data: {
     loading: false,
@@ -371,7 +336,6 @@ Page({
     emptyTitle: "暂无预约数据",
     emptyDesc: "当前筛选条件下没有匹配的预约记录"
   },
-
   onLoad() {
     activatePageCsvFileActions(this)
     activatePageNativeActions(this)
@@ -382,7 +346,6 @@ Page({
       app.globalData.cloudEnvId
         ? app.globalData.cloudEnvId
         : undefined
-
     if (wx.cloud && typeof wx.cloud.init === "function") {
       try {
         wx.cloud.init({
@@ -391,7 +354,6 @@ Page({
         })
       } catch (error) {}
     }
-
     this.cancelOperationConfigRequest()
     this._cancelOperationConfigRequest = requestOperationConfig({
       onSuccess: (config) => {
@@ -403,11 +365,9 @@ Page({
         }
       }
     })
-
     this.setData({
       canShareExport: !isDevtoolsEnv() && typeof wx.shareFileMessage === "function"
     })
-
     requirePagePermission(this, {
       required: "canManageBookings",
       noPermissionMessage: "无权访问预约管理",
@@ -416,7 +376,6 @@ Page({
       }
     })
   },
-
   onPullDownRefresh() {
     if (!this.data.pageAuthorized || this.data.loading) {
       wx.stopPullDownRefresh()
@@ -426,14 +385,18 @@ Page({
       wx.stopPullDownRefresh()
     })
   },
-
+  onReachBottom() {
+    if (!this.data.pageAuthorized || this.data.loading || !this.data.hasMore) {
+      return
+    }
+    this.fetchList({ append: true })
+  },
   cancelOperationConfigRequest() {
     if (typeof this._cancelOperationConfigRequest === "function") {
       this._cancelOperationConfigRequest()
       this._cancelOperationConfigRequest = null
     }
   },
-
   onUnload() {
     cancelPagePermissionCheck(this)
     cancelPageCsvFileActions(this)
@@ -446,12 +409,10 @@ Page({
     this.clearBookingMutationTimer()
     this.clearBookingExportTimer()
   },
-
   handleKeywordInput(event) {
     const value = String((event.detail && event.detail.value) || "")
     this.setData({ keyword: value })
   },
-
   handleClearKeyword() {
     if (!this.data.keyword || this.data.loading) {
       return
@@ -464,34 +425,28 @@ Page({
       this.fetchList()
     })
   },
-
   handleKeywordConfirm() {
     if (this.data.loading) {
       return
     }
     this.fetchList()
   },
-
   handleSearch() {
     if (this.data.loading) {
       return
     }
     this.fetchList()
   },
-
   handleStatusTap(event) {
     const status = event.currentTarget.dataset.status
     if (!status || status === this.data.currentStatus || this.data.loading) {
       return
     }
-
     this.setData({
       currentStatus: status
     })
-
     this.fetchList()
   },
-
   handlePriorityTap(event) {
     const value = String(event.currentTarget.dataset.value || "")
     if (!value || value === this.data.currentPriority || this.data.loading) {
@@ -500,7 +455,6 @@ Page({
     this.setData({ currentPriority: value })
     this.fetchList()
   },
-
   handleCoordinationTap(event) {
     const value = String(event.currentTarget.dataset.value || "")
     if (!value || value === this.data.currentCoordination || this.data.loading) {
@@ -509,7 +463,6 @@ Page({
     this.setData({ currentCoordination: value })
     this.fetchList()
   },
-
   handleCityTap(event) {
     const value = String(event.currentTarget.dataset.value || "")
     if (!value || value === this.data.currentCity || this.data.loading) {
@@ -518,7 +471,6 @@ Page({
     this.setData({ currentCity: value })
     this.fetchList()
   },
-
   handleReset() {
     if (this.data.loading) {
       return
@@ -530,23 +482,18 @@ Page({
       currentCoordination: "all",
       currentCity: "all"
     })
-
     this.fetchList()
   },
-
   handleLoadMore() {
     if (this.data.loading || !this.data.hasMore) {
       return
     }
-
     this.fetchList({ append: true })
   },
-
   handleExport() {
     if (this.data.loading) {
       return
     }
-
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       wx.showToast({
         title: "云能力未初始化",
@@ -554,7 +501,6 @@ Page({
       })
       return
     }
-
     const filters = {
       status: this.data.currentStatus,
       schedulePriority: this.data.currentPriority,
@@ -569,7 +515,6 @@ Page({
     this._bookingExportRequestId = requestId
     this.clearBookingExportTimer()
     this.setData({ loading: true })
-
     let settled = false
     const isActive = () => !settled && this._bookingExportRequestId === requestId
     const finishRequest = () => {
@@ -590,11 +535,9 @@ Page({
         icon: "none"
       })
     }
-
     this._bookingExportRequestTimer = setTimeout(() => {
       handleFailure("导出超时，请重试")
     }, BOOKING_MANAGE_EXPORT_TIMEOUT_MS)
-
     const requestOptions = {
       name: "bookingExportCsv",
       data: filters,
@@ -607,7 +550,6 @@ Page({
           handleFailure(result && result.message)
           return
         }
-
         this.saveExportedCsv({
           fileName: ensureCsvFileName(result.fileName),
           csvText: result.csvText,
@@ -623,14 +565,12 @@ Page({
         handleFailure(error && (error.errMsg || error.message))
       }
     }
-
     try {
       wx.cloud.callFunction(requestOptions)
     } catch (error) {
       handleFailure(error && (error.errMsg || error.message))
     }
   },
-
   saveExportedCsv({
     fileName,
     csvText,
@@ -652,10 +592,8 @@ Page({
       handleFailure("文件系统不可用", "保存失败")
       return
     }
-
     const basePath = wx.env && wx.env.USER_DATA_PATH ? wx.env.USER_DATA_PATH : ""
     const filePath = basePath ? `${basePath}/${fileName}` : fileName
-
     const writeOptions = {
       filePath,
       data: csvText,
@@ -695,14 +633,12 @@ Page({
         handleFailure(error && (error.errMsg || error.message), "保存失败")
       }
     }
-
     try {
       fs.writeFile(writeOptions)
     } catch (error) {
       handleFailure(error && (error.errMsg || error.message), "保存失败")
     }
   },
-
   handleShareExportedFile() {
     if (this.data.loading) {
       return
@@ -714,10 +650,8 @@ Page({
       })
       return
     }
-
     this.shareCsvFile(this.data.exportFilePath, this.data.exportFileName)
   },
-
   handleOpenExportedFile() {
     if (this.data.loading) {
       return
@@ -729,10 +663,8 @@ Page({
       })
       return
     }
-
     this.openCsvFile(this.data.exportFilePath)
   },
-
   handleDeleteExportedFile() {
     const filePath = String(this.data.exportFilePath || "")
     if (this.data.loading || !filePath) {
@@ -778,7 +710,6 @@ Page({
       }
     })
   },
-
   shareCsvFile(filePath, fileName) {
     const action = beginPageCsvFileAction(this, filePath)
     const share = wx.shareFileMessage
@@ -790,7 +721,6 @@ Page({
       this.openCsvFile(filePath)
       return
     }
-
     if (typeof share === "function") {
       share({
         filePath,
@@ -811,7 +741,6 @@ Page({
           if (isUserCancelError(error)) {
             return
           }
-
           if (isTapGestureShareError(error)) {
             wx.showToast({
               title: "将打开文件",
@@ -820,7 +749,6 @@ Page({
             this.openCsvFile(filePath)
             return
           }
-
           if (isDevtoolsNotSupportedShareError(error)) {
             wx.showToast({
               title: "将打开文件",
@@ -829,7 +757,6 @@ Page({
             this.openCsvFile(filePath)
             return
           }
-
           wx.showToast({
             title: "分享失败",
             icon: "none"
@@ -838,10 +765,8 @@ Page({
       })
       return
     }
-
     this.openCsvFile(filePath)
   },
-
   openCsvFile(filePath) {
     const action = beginPageCsvFileAction(this, filePath)
     const open = wx.openDocument
@@ -863,7 +788,6 @@ Page({
       })
       return
     }
-
     if (!isPageCsvFileActionActive(this, action)) {
       return
     }
@@ -872,27 +796,22 @@ Page({
       icon: "none"
     })
   },
-
   handleRemarkInput(event) {
     const index = Number(event.currentTarget.dataset.index)
     if (!Number.isInteger(index) || index < 0) {
       return
     }
-
     const value = normalizeRemark(event.detail && event.detail.value)
     this.setData({
       [`list[${index}].adminRemarkDraft`]: value
     })
   },
-
   handleViewDetail(event) {
     const id = String(event.currentTarget.dataset.id || "").trim()
     if (this.data.loading || !id) {
       return
     }
-
     const current = this.data.list.find((item) => item.id === id)
-
     const action = beginPageNativeAction(this)
     wx.navigateTo({
       url: `/pages/booking-manage-detail/booking-manage-detail?id=${id}`,
@@ -917,7 +836,6 @@ Page({
       }
     })
   },
-
   handleCallPhone(event) {
     if (this.data.loading) {
       return
@@ -930,7 +848,6 @@ Page({
       })
       return
     }
-
     const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.makePhoneCall({
       phoneNumber: phone,
@@ -949,20 +866,16 @@ Page({
       }
     })
   },
-
   handleUpdateStatus(event) {
     if (this.data.loading) {
       return
     }
-
     const id = String(event.currentTarget.dataset.id || "").trim()
     const status = String(event.currentTarget.dataset.status || "").trim()
     if (!id || !status) {
       return
     }
-
     const statusText = STATUS_TEXT_MAP[status] || status
-
     const action = beginPageNativeAction(this, {
       exclusiveKey: "booking-status-confirmation"
     })
@@ -975,29 +888,23 @@ Page({
         if (!isPageNativeActionActive(this, action) || !modalRes || !modalRes.confirm) {
           return
         }
-
         this.updateStatus(id, status)
       }
     })
   },
-
   handleSaveRemark(event) {
     if (this.data.loading) {
       return
     }
-
     const id = String(event.currentTarget.dataset.id || "").trim()
     const index = Number(event.currentTarget.dataset.index)
     if (!id || !Number.isInteger(index) || index < 0) {
       return
     }
-
     const current = this.data.list[index] || {}
     const adminRemark = normalizeRemark(current.adminRemarkDraft)
-
     this.saveRemark(id, adminRemark)
   },
-
   updateStatus(id, status) {
     this.runBookingMutation({
       name: "bookingUpdateStatus",
@@ -1013,7 +920,6 @@ Page({
           this.setData({ loading: false })
           return
         }
-
         showStatusUpdateFeedback(result, () => {
           if (!isCurrent()) {
             return
@@ -1024,7 +930,6 @@ Page({
       }
     })
   },
-
   saveRemark(id, adminRemark) {
     this.runBookingMutation({
       name: "bookingUpdateAdminRemark",
@@ -1040,17 +945,14 @@ Page({
           this.setData({ loading: false })
           return
         }
-
         wx.showToast({
           title: "备注已保存",
           icon: "none"
         })
-
         this.fetchList()
       }
     })
   },
-
   runBookingMutation(options) {
     const input = options && typeof options === "object" ? options : {}
     if (this.data.loading) {
@@ -1063,12 +965,10 @@ Page({
       })
       return
     }
-
     const requestId = Number(this._bookingMutationRequestId || 0) + 1
     this._bookingMutationRequestId = requestId
     this.clearBookingMutationTimer()
     this.setData({ loading: true })
-
     let settled = false
     const isCurrent = () => this._bookingMutationRequestId === requestId
     const finishRequest = () => {
@@ -1089,11 +989,9 @@ Page({
         icon: "none"
       })
     }
-
     this._bookingMutationRequestTimer = setTimeout(() => {
       handleFailure(input.timeoutTitle || "操作超时，请重试")
     }, BOOKING_MANAGE_MUTATION_TIMEOUT_MS)
-
     const requestOptions = {
       name: input.name,
       data: input.data,
@@ -1110,14 +1008,12 @@ Page({
         handleFailure(error && (error.errMsg || error.message))
       }
     }
-
     try {
       wx.cloud.callFunction(requestOptions)
     } catch (error) {
       handleFailure(error && (error.errMsg || error.message))
     }
   },
-
   fetchList(input) {
     const done = typeof input === "function" ? input : input && input.done
     const append = Boolean(input && typeof input === "object" && input.append)
@@ -1126,7 +1022,6 @@ Page({
     const requestId = Number(this._bookingListRequestId || 0) + 1
     this._bookingListRequestId = requestId
     this.finishBookingListRequestEffects()
-
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       this.setData({
         loading: false,
@@ -1137,7 +1032,6 @@ Page({
       }
       return
     }
-
     const filters = {
       status: this.data.currentStatus,
       schedulePriority: this.data.currentPriority,
@@ -1154,7 +1048,6 @@ Page({
     this.setData({
       loading: true
     })
-
     let settled = false
     const finishRequest = () => {
       if (settled || this._bookingListRequestId !== requestId) {
@@ -1186,11 +1079,9 @@ Page({
         list: append ? this.data.list : []
       })
     }
-
     this._bookingListRequestTimer = setTimeout(() => {
       handleFailure("加载超时，请重试")
     }, BOOKING_MANAGE_LIST_TIMEOUT_MS)
-
     const requestOptions = {
       name: "bookingList",
       data: filters,
@@ -1241,9 +1132,7 @@ Page({
             ...buildJourneyView(status)
           }
         })
-
         const nextList = append ? this.data.list.concat(formatted) : formatted
-
         this.setData({
           loading: false,
           page: Number.isInteger(result.page) ? result.page : nextPage,
@@ -1260,14 +1149,12 @@ Page({
         handleFailure(error && (error.errMsg || error.message))
       }
     }
-
     try {
       wx.cloud.callFunction(requestOptions)
     } catch (error) {
       handleFailure(error && (error.errMsg || error.message))
     }
   },
-
   finishBookingListRequestEffects() {
     if (this._bookingListRequestTimer) {
       clearTimeout(this._bookingListRequestTimer)
@@ -1279,7 +1166,6 @@ Page({
       done()
     }
   },
-
   clearBookingMutationTimer() {
     if (!this._bookingMutationRequestTimer) {
       return
@@ -1287,7 +1173,6 @@ Page({
     clearTimeout(this._bookingMutationRequestTimer)
     this._bookingMutationRequestTimer = null
   },
-
   clearBookingExportTimer() {
     if (!this._bookingExportRequestTimer) {
       return

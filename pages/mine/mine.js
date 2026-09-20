@@ -351,18 +351,47 @@ Page({
           : envVersion
     } catch (error) {}
 
-    this.setData({
-      envVersion,
-      menuItems: buildVisibleMenuItems({
+    let cachedPermissions = null
+    try {
+      if (typeof wx !== "undefined" && typeof wx.getStorageSync === "function") {
+        cachedPermissions = wx.getStorageSync("mine_permissions_snapshot")
+      }
+    } catch (e) {}
+
+    if (cachedPermissions && typeof cachedPermissions === "object") {
+      this.setData({
         envVersion,
-        canManageRoles: false,
-        canManageConfig: false,
-        canViewAuditLogs: false,
-        canViewErrorLogs: false,
-        canManageVehicles: false,
-        canManageBookings: false
+        permissionsLoading: false,
+        permissionsReady: true,
+        myPermissions: {
+          canManageBookings: Boolean(cachedPermissions.canManageBookings),
+          canManageRoles: Boolean(cachedPermissions.canManageRoles)
+        },
+        ...buildMemberRole(cachedPermissions),
+        menuItems: buildVisibleMenuItems({
+          envVersion,
+          canManageRoles: Boolean(cachedPermissions.canManageRoles),
+          canManageConfig: Boolean(cachedPermissions.canManageConfig),
+          canViewAuditLogs: Boolean(cachedPermissions.canViewAuditLogs),
+          canViewErrorLogs: Boolean(cachedPermissions.canViewErrorLogs),
+          canManageVehicles: Boolean(cachedPermissions.canManageVehicles),
+          canManageBookings: Boolean(cachedPermissions.canManageBookings)
+        })
       })
-    })
+    } else {
+      this.setData({
+        envVersion,
+        menuItems: buildVisibleMenuItems({
+          envVersion,
+          canManageRoles: false,
+          canManageConfig: false,
+          canViewAuditLogs: false,
+          canViewErrorLogs: false,
+          canManageVehicles: false,
+          canManageBookings: false
+        })
+      })
+    }
 
     this.loadMyPermissions()
     this.loadOperationConfig()
@@ -503,6 +532,9 @@ Page({
 
           if (!finish()) {
             return
+          }
+          if (typeof wx !== "undefined" && typeof wx.setStorageSync === "function") {
+            try { wx.setStorageSync("mine_permissions_snapshot", result) } catch (e) {}
           }
           this.setData({
             permissionsLoading: false,

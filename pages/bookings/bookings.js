@@ -210,7 +210,7 @@ Page({
   onLoad() {
     const perf = createPerformanceHelpers(this); this._perf = perf; this.applyState = perf.applyState; this.flushStateNow = perf.flushStateNow;
     activatePageNativeActions(this)
-    const app = getApp()
+    const app = typeof getApp === "function" ? getApp() : null
     const env =
       app &&
       app.globalData &&
@@ -218,7 +218,7 @@ Page({
         ? app.globalData.cloudEnvId
         : undefined
 
-    if (wx.cloud && typeof wx.cloud.init === "function") {
+    if (typeof wx !== "undefined" && wx.cloud && typeof wx.cloud.init === "function") {
       try {
         wx.cloud.init({
           env,
@@ -227,11 +227,30 @@ Page({
       } catch (error) {}
     }
 
+    try {
+      if (typeof wx !== "undefined" && typeof wx.getStorageSync === "function") {
+        const snapshot = wx.getStorageSync("bookings_last_snapshot")
+        if (Array.isArray(snapshot) && snapshot.length > 0) {
+          this.applyBookingList(snapshot, {
+            initialLoading: false,
+            loading: false,
+            loadFailed: false,
+            page: 0,
+            hasMore: true
+          })
+        }
+      }
+    } catch (e) {}
+
     this._unsubscribeNetwork = onNetworkReconnect(() => {
       if (this.data.loadError) {
         this.loadList()
       }
     })
+  },
+
+  onReachBottom() {
+    this.handleLoadMore()
   },
 
   onShow() {
@@ -401,6 +420,9 @@ Page({
           }
         })
         const nextList = append ? this.data.list.concat(list) : list
+        if (!append && typeof wx !== "undefined" && typeof wx.setStorageSync === "function") {
+          try { wx.setStorageSync("bookings_last_snapshot", nextList) } catch (e) {}
+        }
         this.applyBookingList(nextList, {
           page: Number.isInteger(result.page) ? result.page : nextPage,
           hasMore: Boolean(result.hasMore),

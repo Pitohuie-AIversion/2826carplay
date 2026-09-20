@@ -1,6 +1,5 @@
 <view wx:if="{{pageAuthorized}}" class="health-page management-page">
   <view class="page-glow"></view>
-
   <view class="hero-card ui-card ui-card-gradient">
     <view class="hero-top">
       <view class="hero-copy">
@@ -18,7 +17,6 @@
       </view>
     </view>
   </view>
-
   <view wx:if="{{loading}}" class="health-skeleton" aria-hidden="true">
     <view class="health-skeleton-summary ui-card">
       <view class="health-skeleton-summary-mark manage-skeleton-pulse"></view>
@@ -34,7 +32,6 @@
       <view class="health-skeleton-check" wx:for="{{[1, 2, 3]}}" wx:key="*this"><view class="health-skeleton-check-icon manage-skeleton-pulse"></view><view class="health-skeleton-check-copy"><view class="health-skeleton-check-title manage-skeleton-pulse"></view><view class="health-skeleton-line manage-skeleton-pulse"></view></view><view class="health-skeleton-check-status manage-skeleton-pulse"></view></view>
     </view>
   </view>
-
   <view wx:elif="{{loadError}}" class="error-card ui-card">
     <view class="error-native-icon" aria-hidden="true"></view>
     <view class="error-copy">
@@ -43,7 +40,6 @@
     </view>
     <button class="retry-button ui-btn ui-btn-ghost" bindtap="handleRefresh"><view class="retry-native-icon" aria-hidden="true"></view>重试</button>
   </view>
-
   <block wx:else>
     <view class="summary-card ui-card summary-{{summary.level}}">
       <view class="summary-mark" aria-hidden="true">
@@ -54,7 +50,6 @@
         <view class="summary-desc">{{summary.desc}}</view>
       </view>
     </view>
-
     <view class="completion-card ui-card" aria-role="group" aria-label="上线准备完成度 {{summary.completionPercent}}%，自动正常 {{summary.passed}} / {{summary.total}}，人工确认 {{manualCompletedCount}} / {{manualChecks.length}}">
       <view class="completion-top">
         <view>
@@ -75,7 +70,6 @@
         <view class="completion-stat completion-stat-manual"><view class="completion-stat-icon completion-stat-icon-manual" aria-hidden="true"></view><view class="completion-stat-value">{{manualCompletedCount}}/{{manualChecks.length}}</view><view class="completion-stat-label">人工确认</view></view>
       </view>
     </view>
-
     <view class="section-card ui-card">
       <view class="section-heading">
         <view class="section-heading-icon-wrap">
@@ -84,7 +78,6 @@
         </view>
         <view class="section-index">{{summary.total}}</view>
       </view>
-
       <view class="check-list">
         <view class="check-item" wx:for="{{checks}}" wx:key="key">
           <view class="check-kind-icon-wrap {{item.statusClass}}"><view class="check-kind-icon {{item.iconClass}}" aria-hidden="true"></view></view>
@@ -97,7 +90,6 @@
         </view>
       </view>
     </view>
-
     <view class="section-card ui-card">
       <view class="section-heading">
         <view class="section-heading-icon-wrap">

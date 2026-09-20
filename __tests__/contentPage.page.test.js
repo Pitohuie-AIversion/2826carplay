@@ -307,4 +307,30 @@ describe("pages/content-page 服务指南", () => {
     expect(url).toContain("contentId=guide_drive_02")
     expect(url).toContain("vehicleId=car_mx5")
   })
+
+  test("loadGuide 命中本地 storage 快照实现 0ms 首屏直出", () => {
+    const cachedGuide = {
+      id: "guide-cold",
+      title: "自驾全攻略",
+      summary: "周末出行准备清单",
+      body: "1. 证件准备\n请携带有效驾照。"
+    }
+    const cachedVehicles = [{ id: "car-911", name: "保时捷 911" }]
+    global.wx = {
+      getStorageSync: jest.fn((key) => {
+        if (key === "guide_guide-cold") {
+          return { guide: cachedGuide, vehicles: cachedVehicles }
+        }
+        return null
+      }),
+      cloud: { callFunction: jest.fn() },
+      setNavigationBarTitle: jest.fn()
+    }
+    const page = createPage(loadPageDefinition())
+    page.loadGuide("guide-cold")
+    expect(page.data.guide).toEqual(cachedGuide)
+    expect(page.data.guideLoading).toBe(false)
+    expect(page.data.pageTitle).toBe("自驾全攻略")
+    expect(page.data.relatedVehicles).toEqual(cachedVehicles)
+  })
 })

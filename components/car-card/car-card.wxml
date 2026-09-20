@@ -43,7 +43,6 @@
       </view>
       <view class="car-status ui-status {{car.statusClass}}">{{car.statusText}}</view>
     </view>
-
     <view class="car-bottom">
       <view class="car-meta">
         <view class="car-name">{{car.nickname || car.name}}</view>

@@ -1,6 +1,5 @@
 <view class="bookings-page">
   <view class="page-glow"></view>
-
   <view class="page-header">
     <view>
       <view class="page-kicker">MY JOURNEYS</view>
@@ -9,7 +8,6 @@
     </view>
     <image class="header-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
   </view>
-
   <view wx:if="{{(initialLoading || loading) && !list.length}}" class="bookings-skeleton" aria-hidden="true">
     <view class="skeleton-heading">
       <view>
@@ -45,7 +43,6 @@
       </view>
     </view>
   </view>
-
   <view wx:elif="{{loadFailed && !list.length}}" class="empty ui-card">
     <image class="empty-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
     <view class="empty-title">加载失败</view>
@@ -55,7 +52,6 @@
       <text>重新加载</text>
     </button>
   </view>
-
   <view wx:elif="{{list.length}}" class="booking-list">
     <view class="list-heading">
       <view>
@@ -64,7 +60,6 @@
       </view>
       <view class="list-count">{{currentFilterLabel}} · {{visibleList.length}} 条</view>
     </view>
-
     <view class="journey-summary journey-summary-with-filter ui-card">
       <view class="journey-summary-caption">{{hasMore ? '当前已加载记录' : '全部预约状态'}}</view>
       <view class="journey-summary-grid">
@@ -127,7 +122,6 @@
         >已取消</button>
       </view>
     </view>
-
     <view wx:if="{{visibleList.length}}">
     <view class="booking-item ui-card" wx:for="{{visibleList}}" wx:key="id">
       <view class="booking-accent booking-accent-{{item.journeyProgress.tone}}"></view>
@@ -138,7 +132,6 @@
           <text>{{item.statusText}}</text>
         </view>
       </view>
-
       <view class="booking-name-row">
         <view class="vehicle-native-icon" aria-hidden="true">
           <view class="vehicle-native-window"></view>
@@ -150,7 +143,6 @@
           <view wx:if="{{item.vehicleReference}}" class="booking-vehicle-reference">{{item.vehicleReference}}</view>
         </view>
       </view>
-
       <view class="journey-panel">
         <view class="journey-date">
           <view class="journey-label">取车</view>
@@ -168,12 +160,10 @@
           <view class="journey-value">{{item.endDate}}</view>
         </view>
       </view>
-
       <view class="booking-city">
         <view class="city-pin"></view>
         <text>{{item.city || '待确认城市'}}</text>
       </view>
-
       <view class="booking-progress booking-progress-{{item.journeyProgress.tone}}" aria-role="group" aria-label="预约进度，{{item.journeyProgress.stageText}}">
         <view class="booking-progress-heading">
           <view class="booking-progress-kicker">BOOKING PROGRESS</view>
@@ -191,7 +181,6 @@
           <text>已结束</text>
         </view>
       </view>
-
       <view class="booking-guidance booking-guidance-{{item.statusGuidance.tone}}">
         <view class="booking-guidance-native-icon" aria-hidden="true">
           <view class="booking-guidance-icon-mark"></view>
@@ -201,7 +190,6 @@
           <view class="booking-guidance-desc">{{item.statusGuidance.desc}}</view>
         </view>
       </view>
-
       <view wx:if="{{item.note}}" class="booking-note-box">
         <view class="booking-note-heading">
           <view class="note-native-icon" aria-hidden="true">
@@ -212,7 +200,6 @@
         </view>
         <view class="booking-note">{{item.note}}</view>
       </view>
-
       <view class="booking-actions">
         <button class="booking-btn ui-btn ui-btn-primary {{item.canCancel ? '' : 'booking-btn-last'}}" data-id="{{item.id}}" bindtap="handleViewDetail">
           <view class="native-action-icon native-action-icon-document" aria-hidden="true"><view class="document-line"></view></view>
@@ -230,7 +217,6 @@
       </view>
     </view>
     </view>
-
     <view wx:else class="filter-empty ui-card">
       <view class="filter-empty-icon" aria-hidden="true">
         <view class="filter-empty-line filter-empty-line-top"></view>
@@ -243,14 +229,12 @@
         <text>查看全部预约</text>
       </button>
     </view>
-
     <button wx:if="{{hasMore}}" class="load-more ui-btn ui-btn-ghost action-with-icon" loading="{{loading}}" disabled="{{loading}}" bindtap="handleLoadMore">
       <view wx:if="{{!loading}}" class="native-action-icon native-action-icon-more" aria-hidden="true"></view>
       <text>{{loading ? '正在加载' : '加载更多预约'}}</text>
     </button>
     <view wx:else class="list-end">{{hasMore ? '' : '已加载全部预约'}}</view>
   </view>
-
   <view wx:else class="empty ui-card">
     <image class="empty-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
     <view class="empty-kicker">NO RESERVATIONS</view>

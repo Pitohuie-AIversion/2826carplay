@@ -1,11 +1,9 @@
 const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
-
 const STATUS_META = {
   pass: { label: "正常", className: "check-pass" },
   warning: { label: "待确认", className: "check-warning" },
   fail: { label: "需修复", className: "check-fail" }
 }
-
 const MANUAL_REVIEW_STORAGE_KEY = "system_health_manual_review_v1"
 const SYSTEM_HEALTH_TIMEOUT_MS = 20 * 1000
 const MANUAL_CHECK_DEFINITIONS = [
@@ -20,7 +18,6 @@ const MANUAL_CHECK_DEFINITIONS = [
   { key: "devices", label: "分别用 Android 与 iPhone 完成一次预约主流程", iconClass: "manual-kind-icon-devices" },
   { key: "compliance", label: "核对备案、隐私保护指引、客服与审核素材", iconClass: "manual-kind-icon-compliance" }
 ]
-
 function formatCheckedAt(value) {
   const date = new Date(value)
   if (!value || Number.isNaN(date.getTime())) {
@@ -31,7 +28,6 @@ function formatCheckedAt(value) {
     date.getHours()
   )}:${pad(date.getMinutes())}`
 }
-
 function formatDayKey(value) {
   const date = value instanceof Date ? value : new Date(value || Date.now())
   if (Number.isNaN(date.getTime())) {
@@ -40,7 +36,6 @@ function formatDayKey(value) {
   const pad = (number) => String(number).padStart(2, "0")
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
 }
-
 function buildManualChecks(completedKeys) {
   const completed = new Set(Array.isArray(completedKeys) ? completedKeys : [])
   return MANUAL_CHECK_DEFINITIONS.map((item) => ({
@@ -48,7 +43,6 @@ function buildManualChecks(completedKeys) {
     checked: completed.has(item.key)
   }))
 }
-
 function buildViewSummary(input, manualCompletedCount, manualTotal) {
   const total = Number(input && input.total) || 0
   const passed = Number(input && input.passed) || 0
@@ -63,7 +57,6 @@ function buildViewSummary(input, manualCompletedCount, manualTotal) {
   let level = "ready"
   let title = "上线检查已完成"
   let desc = "自动检查与人工确认均已完成"
-
   if (failed > 0) {
     level = "blocked"
     title = "存在技术阻塞"
@@ -77,7 +70,6 @@ function buildViewSummary(input, manualCompletedCount, manualTotal) {
     title = "自动检查通过，等待人工确认"
     desc = `人工确认 ${completedManual}/${totalManual}，完成后再安排正式发布`
   }
-
   return {
     total,
     passed,
@@ -91,7 +83,6 @@ function buildViewSummary(input, manualCompletedCount, manualTotal) {
     completionPercent
   }
 }
-
 function normalizeChecks(checks) {
   return (Array.isArray(checks) ? checks : []).map((item) => {
     const meta = STATUS_META[item.status] || STATUS_META.fail
@@ -120,7 +111,6 @@ function normalizeChecks(checks) {
     }
   })
 }
-
 Page({
   data: {
     pageAuthorized: false,
@@ -144,7 +134,6 @@ Page({
     manualChecks: buildManualChecks(),
     manualCompletedCount: 0
   },
-
   onLoad() {
     this.restoreManualChecks()
     requirePagePermission(this, {
@@ -155,7 +144,6 @@ Page({
       }
     })
   },
-
   onPullDownRefresh() {
     if (!this.data.pageAuthorized) {
       wx.stopPullDownRefresh()
@@ -166,19 +154,16 @@ Page({
       done: () => wx.stopPullDownRefresh()
     })
   },
-
   onUnload() {
     cancelPagePermissionCheck(this)
     this._healthRequestId = Number(this._healthRequestId || 0) + 1
     this.finishHealthRequestEffects()
   },
-
   handleRefresh() {
     if (!this.data.loading && !this.data.refreshing) {
       this.loadHealth({ refreshing: true })
     }
   },
-
   restoreManualChecks() {
     let completedKeys = []
     try {
@@ -190,7 +175,6 @@ Page({
         completedKeys = stored.completedKeys
       }
     } catch (error) {}
-
     const manualChecks = buildManualChecks(completedKeys)
     const manualCompletedCount = manualChecks.filter((item) => item.checked).length
     this.setData({
@@ -203,7 +187,6 @@ Page({
       )
     })
   },
-
   handleManualToggle(event) {
     const key = String(event.currentTarget.dataset.key || "")
     if (!key) {
@@ -232,7 +215,6 @@ Page({
       )
     })
   },
-
   loadHealth(options) {
     const input = options && typeof options === "object" ? options : {}
     const requestId = Number(this._healthRequestId || 0) + 1
@@ -249,15 +231,12 @@ Page({
       }
       return
     }
-
     this._healthRequestDone = typeof input.done === "function" ? input.done : null
-
     this.setData({
       loading: !input.refreshing,
       refreshing: Boolean(input.refreshing),
       loadError: ""
     })
-
     let settled = false
     const finishRequest = () => {
       if (settled || this._healthRequestId !== requestId) {
@@ -277,11 +256,9 @@ Page({
         loadError: message
       })
     }
-
     this._healthRequestTimer = setTimeout(() => {
       handleFailure("上线检查超时，请检查网络后重试")
     }, SYSTEM_HEALTH_TIMEOUT_MS)
-
     const requestOptions = {
       name: "systemHealthCheck",
       success: (res) => {
@@ -297,7 +274,6 @@ Page({
           })
           return
         }
-
         const rawSummary = {
           total: Number(result.summary && result.summary.total) || 0,
           passed: Number(result.summary && result.summary.passed) || 0,
@@ -324,7 +300,6 @@ Page({
       },
       complete: () => {}
     }
-
     try {
       wx.cloud.callFunction(requestOptions)
     } catch (error) {
@@ -333,7 +308,6 @@ Page({
       )
     }
   },
-
   finishHealthRequestEffects() {
     if (this._healthRequestTimer) {
       clearTimeout(this._healthRequestTimer)

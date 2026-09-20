@@ -1,6 +1,5 @@
 <view class="favorites-page">
   <view class="page-glow"></view>
-
   <view class="hero-card ui-card ui-card-gradient">
     <view class="hero-top">
       <view>
@@ -11,7 +10,6 @@
       <image class="hero-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
     </view>
   </view>
-
   <view
     wx:if="{{initialLoading && !list.length}}"
     class="loading-list"
@@ -47,7 +45,6 @@
       <view class="favorite-skeleton-action favorite-skeleton-pulse"></view>
     </view>
   </view>
-
   <view wx:elif="{{loadError && !list.length}}" class="empty-card ui-card">
     <image class="empty-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
     <view class="empty-kicker">COLLECTION UNAVAILABLE</view>
@@ -57,7 +54,6 @@
       <view class="favorite-action-content"><view class="favorite-action-native-icon favorite-retry-native-icon" aria-hidden="true"></view><text>重新加载</text></view>
     </button>
   </view>
-
   <view wx:elif="{{list.length}}" class="favorite-content">
     <view class="collection-overview ui-card">
       <view class="collection-summary">
@@ -99,7 +95,6 @@
         </button>
       </view>
     </view>
-
     <view wx:if="{{visibleList.length}}" class="favorite-list">
       <view class="favorite-item" wx:for="{{visibleList}}" wx:key="id">
         <car-card car="{{item}}" bind:cardtap="handleCarTap" />
@@ -118,7 +113,6 @@
         </view>
       </view>
     </view>
-
     <view wx:else class="filter-empty ui-card">
       <view class="filter-empty-icon" aria-hidden="true">
         <view class="filter-empty-line filter-empty-line-top"></view>
@@ -130,7 +124,6 @@
         <view class="favorite-action-content"><view class="favorite-action-native-icon favorite-list-native-icon" aria-hidden="true"></view><text>查看全部收藏</text></view>
       </button>
     </view>
-
     <view class="favorite-list-footer">
       <button
         wx:if="{{hasMore}}"
@@ -144,7 +137,6 @@
       <view wx:else class="list-end"><view class="favorite-complete-native-icon" aria-hidden="true"></view><text>已加载全部收藏</text></view>
     </view>
   </view>
-
   <view wx:else class="empty-card ui-card">
     <image class="empty-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
     <view class="empty-kicker">YOUR GARAGE AWAITS</view>

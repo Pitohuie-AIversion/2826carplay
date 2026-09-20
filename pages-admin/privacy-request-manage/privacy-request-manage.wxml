@@ -10,7 +10,6 @@
       <image class="hero-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
     </view>
   </view>
-
   <view class="filter-card ui-card">
     <view class="section-heading">
       <view>
@@ -89,7 +88,6 @@
       <view class="filter-result-value">{{currentStatusLabel}} · {{currentTypeLabel}} · {{total}}{{truncated ? '+' : ''}} 条</view>
     </view>
   </view>
-
   <view
     wx:if="{{(initialLoading || loading) && !list.length}}"
     class="manage-request-skeleton"
@@ -124,7 +122,6 @@
       </view>
     </view>
   </view>
-
   <view wx:elif="{{list.length}}" class="request-list">
     <view class="list-heading">
       <view>
@@ -133,7 +130,6 @@
       </view>
       <view class="list-count">{{total}}{{truncated ? '+' : ''}} 条</view>
     </view>
-
     <view class="request-card ui-card {{item.cardStatusClass}}" wx:for="{{list}}" wx:key="id">
       <view class="request-head">
         <view class="request-title-wrap">
@@ -189,7 +185,6 @@
         </button>
       </view>
     </view>
-
     <button
       wx:if="{{hasMore}}"
       class="load-more-btn ui-btn ui-btn-ghost"
@@ -201,7 +196,6 @@
     </button>
     <view wx:else class="list-end">已加载全部申请</view>
   </view>
-
   <view wx:else class="empty-card ui-card">
     <image class="manage-empty-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
     <view class="manage-empty-kicker">NO PRIVACY REQUESTS</view>

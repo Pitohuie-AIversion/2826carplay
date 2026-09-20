@@ -5,7 +5,6 @@ const {
   cancelPageNativeActions,
   isPageNativeActionActive
 } = require("../../shared/pageNativeAction")
-
 const BOOKING_STATUS_LABELS = {
   pending: "待联系",
   contacted: "已联系",
@@ -15,16 +14,13 @@ const BOOKING_STATUS_LABELS = {
   completed: "已完成",
   cancelled: "已取消"
 }
-
 const VEHICLE_STATUS_LABELS = {
   idle: "可预约",
   active: "使用中",
   maintenance: "维护中",
   retired: "已停用"
 }
-
 const OVERVIEW_SOURCE_TIMEOUT_MS = 15 * 1000
-
 function callCloud(name, data) {
   return new Promise((resolve) => {
     let settled = false
@@ -46,11 +42,9 @@ function callCloud(name, data) {
         message: (error && (error.errMsg || error.message)) || "数据加载失败"
       })
     }
-
     timeoutId = setTimeout(() => {
       handleFailure({ message: "数据请求超时，请稍后刷新" })
     }, OVERVIEW_SOURCE_TIMEOUT_MS)
-
     try {
       wx.cloud.callFunction({
         name,
@@ -73,7 +67,6 @@ function callCloud(name, data) {
     }
   })
 }
-
 function formatShortTime(value) {
   if (!value) {
     return "—"
@@ -88,7 +81,6 @@ function formatShortTime(value) {
   const minute = `${date.getMinutes()}`.padStart(2, "0")
   return `${month}-${day} ${hour}:${minute}`
 }
-
 function buildVehicleMetrics(result) {
   const stats = result && result.stats ? result.stats : {}
   const dashboard = result && result.dashboard ? result.dashboard : {}
@@ -99,7 +91,6 @@ function buildVehicleMetrics(result) {
     { key: "maintenance", label: "维护中", value: Number(dashboard.maintenance) || 0, tone: "warning", iconClass: "metric-icon-maintenance" }
   ]
 }
-
 function buildBookingMetrics(result) {
   const dashboard = result && result.dashboard ? result.dashboard : {}
   return [
@@ -109,7 +100,6 @@ function buildBookingMetrics(result) {
     { key: "recent", label: "近 7 天", value: Number(dashboard.recentCreated7d) || 0, tone: "success", iconClass: "metric-icon-recent" }
   ]
 }
-
 function buildRecentBookings(result) {
   const list = result && Array.isArray(result.recentCreatedList) ? result.recentCreatedList : []
   return list.slice(0, 3).map((item) => ({
@@ -123,7 +113,6 @@ function buildRecentBookings(result) {
     timeText: formatShortTime(item.createdAt)
   }))
 }
-
 function buildRecentVehicles(result) {
   const list = result && Array.isArray(result.recentAddedList) ? result.recentAddedList : []
   return list.slice(0, 3).map((item) => ({
@@ -137,7 +126,6 @@ function buildRecentVehicles(result) {
     timeText: formatShortTime(item.createdAt)
   }))
 }
-
 Page({
   data: {
     pageAuthorized: false,
@@ -169,7 +157,6 @@ Page({
     operationStateClass: "operation-state-pending",
     lastSyncedText: ""
   },
-
   onLoad() {
     activatePageNativeActions(this)
     requirePagePermission(this, {
@@ -186,7 +173,6 @@ Page({
       }
     })
   },
-
   onPullDownRefresh() {
     if (!this.data.pageAuthorized) {
       wx.stopPullDownRefresh()
@@ -197,20 +183,17 @@ Page({
       done: () => wx.stopPullDownRefresh()
     })
   },
-
   onUnload() {
     cancelPagePermissionCheck(this)
     cancelPageNativeActions(this)
     this._overviewRequestId = Number(this._overviewRequestId || 0) + 1
     this.finishOverviewRequestEffects()
   },
-
   handleRefresh() {
     if (!this.data.loading && !this.data.refreshing) {
       this.loadOverview({ refreshing: true })
     }
   },
-
   handleRouteTap(event) {
     const url = String(event.currentTarget.dataset.url || "")
     if (!url) {
@@ -230,7 +213,6 @@ Page({
       }
     })
   },
-
   loadOverview(options) {
     const input = options && typeof options === "object" ? options : {}
     this.finishOverviewRequestEffects()
@@ -238,7 +220,6 @@ Page({
     this._overviewRequestId = requestId
     this._overviewRequestDone =
       typeof input.done === "function" ? input.done : null
-
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       this.setData({
         loading: false,
@@ -248,7 +229,6 @@ Page({
       this.finishOverviewRequestEffects()
       return
     }
-
     const permissions = {
       canManageVehicles: Boolean(this.data.canManageVehicles),
       canManageBookings: Boolean(this.data.canManageBookings),
@@ -264,7 +244,6 @@ Page({
       loadError: "",
       requestedSourceCount
     })
-
     const vehicleTask = permissions.canManageVehicles
       ? callCloud("vehicleList", { page: 0, pageSize: 1 })
       : Promise.resolve(null)
@@ -274,7 +253,6 @@ Page({
     const summaryTask = permissions.canManageBookings || permissions.canManageRoles
       ? callCloud("operationSummaryGet")
       : Promise.resolve(null)
-
     let settled = false
     const isCurrent = () => this._overviewRequestId === requestId
     const finishRequest = () => {
@@ -285,7 +263,6 @@ Page({
       this.finishOverviewRequestEffects()
       return true
     }
-
     Promise.all([vehicleTask, bookingTask, summaryTask])
       .then(([vehicleResult, bookingResult, summaryResult]) => {
         const vehicleLoaded = Boolean(vehicleResult && vehicleResult.ok)
@@ -294,7 +271,6 @@ Page({
         const errors = [vehicleResult, bookingResult, summaryResult]
           .filter((result) => result && !result.ok && result.message)
           .map((result) => result.message)
-
         const summaryCounts = summaryLoaded && summaryResult.counts ? summaryResult.counts : {}
         const unavailableMetrics =
           summaryLoaded && Array.isArray(summaryResult.unavailable) ? summaryResult.unavailable : []
@@ -334,7 +310,6 @@ Page({
           ? Number(summaryCounts.storageCleanupPending) || 0
           : 0
         const alerts = []
-
         if (
           permissions.canManageBookings &&
           (coordinationCountAvailable || (!hasCoordinationCount && bookingLoaded))
@@ -410,7 +385,6 @@ Page({
             url: "/pages/mine/mine"
           })
         }
-
         const loadedSourceCount =
           Number(vehicleLoaded) + Number(bookingLoaded) + Number(summaryLoaded)
         const actionableAlerts = alerts.filter(
@@ -428,7 +402,6 @@ Page({
           iconClass: `alert-native-icon-${item.key}`,
           actionLabel: Number(item.value) > 0 ? "立即处理" : "查看详情"
         }))
-
         if (!finishRequest()) {
           return
         }
@@ -473,7 +446,6 @@ Page({
         })
       })
   },
-
   finishOverviewRequestEffects() {
     if (typeof this._overviewRequestDone === "function") {
       const done = this._overviewRequestDone

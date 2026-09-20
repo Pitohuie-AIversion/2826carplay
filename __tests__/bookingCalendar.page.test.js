@@ -245,4 +245,52 @@ describe("pages/booking-calendar", () => {
     expect(page.data.isCurrentMonth).toBe(true)
     expect(page.fetchBookings).toHaveBeenCalledTimes(1)
   })
+
+  test("日历优先从本地快照恢复日程与档期以实现 SWR 秒开", () => {
+    const mockSnapshot = {
+      list: [{ id: "cached_b1", vehicleName: "保时捷 911", startDate: "2026-08-10", endDate: "2026-08-12", status: "confirmed" }],
+      blocks: [{ id: "cached_blk1", kind: "maintenance", startDate: "2026-08-15", endDate: "2026-08-16" }],
+      priceRules: [],
+      vehicles: [{ id: "v1", name: "保时捷 911", priceDay: 2800 }],
+      truncated: false
+    }
+    global.wx = {
+      getStorageSync: jest.fn((key) => {
+        if (key === "booking_calendar_2026-08") return mockSnapshot
+        return null
+      }),
+      setStorageSync: jest.fn()
+    }
+    const page = createPage(loadPageDefinition(), {
+      monthKey: "2026-08",
+      loading: true
+    })
+
+    const restored = page.restoreCalendarSnapshot("2026-08")
+    expect(restored).toBe(true)
+    expect(page.data.loading).toBe(false)
+    expect(page.data.allBookings.length).toBe(1)
+    expect(page.data.allBlocks.length).toBe(1)
+  })
+
+  test("输入日历表单时触发未保存防护，重置与离开时安全清除", () => {
+    global.wx = {
+      enableAlertBeforeUnload: jest.fn(),
+      disableAlertBeforeUnload: jest.fn()
+    }
+    const page = createPage(loadPageDefinition(), {
+      blockForm: { vehicleId: "v1", kind: "maintenance", startDate: "", endDate: "", reason: "" }
+    })
+
+    page.handleCalendarFormInput({
+      currentTarget: { dataset: { form: "blockForm", field: "reason" } },
+      detail: { value: "定期常规保养" }
+    })
+    expect(page._hasUnsavedChanges).toBe(true)
+    expect(global.wx.enableAlertBeforeUnload).toHaveBeenCalled()
+
+    page.handleResetBlockForm()
+    expect(page._hasUnsavedChanges).toBe(false)
+    expect(global.wx.disableAlertBeforeUnload).toHaveBeenCalled()
+  })
 })

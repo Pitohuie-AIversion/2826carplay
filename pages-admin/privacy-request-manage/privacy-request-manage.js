@@ -6,17 +6,14 @@ const {
   cancelPageNativeActions,
   isPageNativeActionActive
 } = require("../../shared/pageNativeAction")
-
 const PRIVACY_MANAGE_LIST_TIMEOUT_MS = 15 * 1000
 const PRIVACY_MANAGE_WRITE_TIMEOUT_MS = 20 * 1000
-
 const TYPE_OPTIONS = [
   { value: "all", label: "全部类型" },
   { value: "access", label: "查询" },
   { value: "correction", label: "更正" },
   { value: "deletion", label: "删除" }
 ]
-
 const STATUS_OPTIONS = [
   { value: "all", label: "全部状态" },
   { value: "pending", label: "待处理" },
@@ -25,7 +22,6 @@ const STATUS_OPTIONS = [
   { value: "rejected", label: "未通过" },
   { value: "cancelled", label: "已撤回" }
 ]
-
 const TYPE_META = {
   access: {
     label: "查询信息",
@@ -43,7 +39,6 @@ const TYPE_META = {
     iconClass: "request-type-icon-deletion"
   }
 }
-
 const STATUS_META = {
   pending: { label: "待处理", className: "status-pending" },
   processing: { label: "处理中", className: "status-processing" },
@@ -51,12 +46,10 @@ const STATUS_META = {
   rejected: { label: "未通过", className: "status-rejected" },
   cancelled: { label: "已撤回", className: "status-cancelled" }
 }
-
 function getOptionLabel(options, value, fallback) {
   const option = options.find((item) => item.value === value)
   return option ? option.label : fallback
 }
-
 function buildRequestJourney(item) {
   const status = String(item.status || "pending")
   if (status === "processing") {
@@ -100,7 +93,6 @@ function buildRequestJourney(item) {
     journeyHint: "下一步：确认申请并开始处理"
   }
 }
-
 function formatDisplayTime(value) {
   if (!value) {
     return ""
@@ -116,7 +108,6 @@ function formatDisplayTime(value) {
   const minute = `${date.getMinutes()}`.padStart(2, "0")
   return `${year}-${month}-${day} ${hour}:${minute}`
 }
-
 Page({
   data: {
     pageAuthorized: false,
@@ -138,7 +129,6 @@ Page({
     total: 0,
     truncated: false
   },
-
   onLoad() {
     activatePageNativeActions(this)
     requirePagePermission(this, {
@@ -147,7 +137,6 @@ Page({
       onAuthorized: () => this.fetchList()
     })
   },
-
   onShow() {
     if (
       this.data.pageAuthorized &&
@@ -158,7 +147,6 @@ Page({
       this.fetchList()
     }
   },
-
   onUnload() {
     cancelPagePermissionCheck(this)
     cancelPageNativeActions(this)
@@ -170,7 +158,6 @@ Page({
     this.clearPrivacyManageWriteTimer()
     this._privacyManageWriteActive = false
   },
-
   onPullDownRefresh() {
     if (!this.data.pageAuthorized || this.data.updatingId) {
       wx.stopPullDownRefresh()
@@ -180,7 +167,6 @@ Page({
       done: () => wx.stopPullDownRefresh()
     })
   },
-
   handleTypeTap(event) {
     const value = String(event.currentTarget.dataset.value || "")
     if (
@@ -196,7 +182,6 @@ Page({
     })
     this.fetchList()
   },
-
   handleStatusTap(event) {
     const value = String(event.currentTarget.dataset.value || "")
     if (
@@ -212,13 +197,11 @@ Page({
     })
     this.fetchList()
   },
-
   handleKeywordInput(event) {
     this.setData({
       keyword: String((event.detail && event.detail.value) || "")
     })
   },
-
   handleClearKeyword() {
     if (!this.data.keyword || this.data.updatingId) {
       return
@@ -231,14 +214,12 @@ Page({
       this.fetchList()
     })
   },
-
   handleSearch() {
     if (this.data.updatingId) {
       return
     }
     this.fetchList()
   },
-
   handleResetFilters() {
     if (
       this.data.updatingId ||
@@ -262,13 +243,11 @@ Page({
       this.fetchList()
     })
   },
-
   handleLoadMore() {
     if (!this.data.loading && !this.data.updatingId && this.data.hasMore) {
       this.fetchList({ append: true })
     }
   },
-
   handleCopyOpenid(event) {
     if (this.data.loading || this.data.updatingId) {
       return
@@ -304,7 +283,6 @@ Page({
       }
     })
   },
-
   handleInventoryTap(event) {
     const id = String(event.currentTarget.dataset.id || "")
     if (this.data.loading || this.data.updatingId || !id) {
@@ -324,14 +302,12 @@ Page({
       }
     })
   },
-
   handleRequestAction(event) {
     const id = String(event.currentTarget.dataset.id || "")
     const item = this.data.list.find((record) => record.id === id)
     if (!item || !item.canHandle || this.data.loading || this.data.updatingId) {
       return
     }
-
     const canComplete = item.type !== "access" || Boolean(item.dataExportedAt)
     const actions = []
     if (item.status === "pending") {
@@ -341,7 +317,6 @@ Page({
       actions.push({ label: "完成申请", status: "completed" })
     }
     actions.push({ label: "驳回申请", status: "rejected" })
-
     const nativeAction = beginPageNativeAction(this, {
       exclusiveKey: "privacy-status-confirmation"
     })
@@ -365,7 +340,6 @@ Page({
       }
     })
   },
-
   promptResolution(item, action) {
     const nativeAction = beginPageNativeAction(this, {
       exclusiveKey: "privacy-status-confirmation"
@@ -393,7 +367,6 @@ Page({
       }
     })
   },
-
   updateStatus(item, status, resolutionNote) {
     if (
       !item ||
@@ -404,7 +377,6 @@ Page({
     ) {
       return
     }
-
     const payload = {
       id: String(item.id),
       status: String(status || ""),
@@ -436,7 +408,6 @@ Page({
       }
     })
   },
-
   runPrivacyManageWrite(options) {
     const input = options && typeof options === "object" ? options : {}
     if (this._privacyManageWriteActive) {
@@ -450,13 +421,11 @@ Page({
       })
       return
     }
-
     const requestId = Number(this._privacyManageWriteRequestId || 0) + 1
     this._privacyManageWriteRequestId = requestId
     this._privacyManageWriteActive = true
     this.clearPrivacyManageWriteTimer()
     this.setData({ updatingId: String(input.updatingId || "") })
-
     let settled = false
     const isCurrent = () => this._privacyManageWriteRequestId === requestId
     const finishRequest = () => {
@@ -478,11 +447,9 @@ Page({
         icon: "none"
       })
     }
-
     this._privacyManageWriteTimer = setTimeout(() => {
       handleFailure(input.timeoutTitle || "操作超时，请重试")
     }, PRIVACY_MANAGE_WRITE_TIMEOUT_MS)
-
     const requestOptions = {
       name: input.name,
       data: input.data,
@@ -500,14 +467,12 @@ Page({
       },
       complete: () => {}
     }
-
     try {
       wx.cloud.callFunction(requestOptions)
     } catch (error) {
       handleFailure(error && (error.errMsg || error.message))
     }
   },
-
   fetchList(options) {
     const input = options && typeof options === "object" ? options : {}
     const append = Boolean(input.append)
@@ -517,7 +482,6 @@ Page({
     this._privacyManageListRequestId = requestId
     this._privacyManageListDone =
       typeof input.done === "function" ? input.done : null
-
     if (this.data.updatingId) {
       this.finishPrivacyManageListEffects()
       return
@@ -532,7 +496,6 @@ Page({
       this.finishPrivacyManageListEffects()
       return
     }
-
     const filters = {
       page: nextPage,
       pageSize: this.data.pageSize,
@@ -569,11 +532,9 @@ Page({
         truncated: append ? this.data.truncated : false
       })
     }
-
     this._privacyManageListTimer = setTimeout(() => {
       handleFailure("加载超时，请重试")
     }, PRIVACY_MANAGE_LIST_TIMEOUT_MS)
-
     const requestOptions = {
       name: "privacyRequestList",
       data: filters,
@@ -599,7 +560,6 @@ Page({
           })
           return
         }
-
         const list = Array.isArray(result.list)
             ? result.list.map((item) => {
               const statusMeta = STATUS_META[item.status] || STATUS_META.pending
@@ -639,14 +599,12 @@ Page({
       },
       complete: () => {}
     }
-
     try {
       wx.cloud.callFunction(requestOptions)
     } catch (error) {
       handleFailure(error && (error.errMsg || error.message))
     }
   },
-
   finishPrivacyManageListEffects() {
     if (this._privacyManageListTimer) {
       clearTimeout(this._privacyManageListTimer)
@@ -658,7 +616,6 @@ Page({
       done()
     }
   },
-
   clearPrivacyManageWriteTimer() {
     if (this._privacyManageWriteTimer) {
       clearTimeout(this._privacyManageWriteTimer)

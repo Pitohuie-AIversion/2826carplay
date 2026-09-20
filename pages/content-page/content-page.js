@@ -146,8 +146,32 @@ Page({
   },
 
   loadGuide(contentId) {
+    try {
+      if (contentId && typeof wx !== "undefined" && typeof wx.getStorageSync === "function") {
+        const cached = wx.getStorageSync(`guide_${contentId}`)
+        if (cached && cached.guide) {
+          const guide = cached.guide
+          this.setData({
+            guide,
+            guideLoading: false,
+            guideError: "",
+            pageTitle: guide.title,
+            heroDesc: guide.summary,
+            documentTitle: guide.title,
+            relatedVehicles: Array.isArray(cached.vehicles) ? cached.vehicles : []
+          })
+          this.applyContent(guide.body)
+          if (typeof wx.setNavigationBarTitle === "function") {
+            wx.setNavigationBarTitle({ title: guide.title })
+          }
+        }
+      }
+    } catch (e) {}
+
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
-      this.setData({ guideLoading: false, guideError: "云能力未初始化" })
+      if (!this.data.guide) {
+        this.setData({ guideLoading: false, guideError: "云能力未初始化" })
+      }
       return
     }
     wx.cloud.callFunction({
@@ -156,10 +180,15 @@ Page({
       success: (res) => {
         const result = res && res.result
         if (!result || !result.ok || !result.guide) {
-          this.setData({ guideLoading: false, guideError: (result && result.message) || "内容加载失败" })
+          if (!this.data.guide) {
+            this.setData({ guideLoading: false, guideError: (result && result.message) || "内容加载失败" })
+          }
           return
         }
         const guide = result.guide
+        if (contentId && typeof wx !== "undefined" && typeof wx.setStorageSync === "function") {
+          try { wx.setStorageSync(`guide_${contentId}`, { guide, vehicles: result.vehicles }) } catch (e) {}
+        }
         const attribution = sanitizeAttribution({
           ...this.data.attribution,
           contentId: guide.slug || guide.id,
@@ -179,7 +208,11 @@ Page({
         wx.setNavigationBarTitle({ title: guide.title })
         trackEvent("content_view", attribution.vehicleId, attribution)
       },
-      fail: () => this.setData({ guideLoading: false, guideError: "内容加载失败，请稍后重试" })
+      fail: () => {
+        if (!this.data.guide) {
+          this.setData({ guideLoading: false, guideError: "内容加载失败，请稍后重试" })
+        }
+      }
     })
   },
 

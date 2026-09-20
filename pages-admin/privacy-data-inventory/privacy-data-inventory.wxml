@@ -1,6 +1,5 @@
 <view wx:if="{{pageAuthorized}}" class="inventory-page management-page">
   <view class="page-glow"></view>
-
   <view class="hero-card ui-card ui-card-gradient">
     <view class="hero-top">
       <view class="hero-copy">
@@ -16,7 +15,6 @@
       <view class="refresh-link {{refreshing ? 'refresh-link-disabled' : ''}}" bindtap="handleRefresh" hover-class="{{refreshing ? 'none' : 'refresh-link-pressed'}}" aria-role="button" aria-disabled="{{refreshing}}" aria-label="{{refreshing ? '正在重新核验相关数据' : '重新核验相关数据'}}"><view class="refresh-native-icon {{refreshing ? 'refresh-native-icon-spinning' : ''}}" aria-hidden="true"></view>{{refreshing ? '核验中…' : '重新核验'}}</view>
     </view>
   </view>
-
   <view wx:if="{{loading}}" class="inventory-skeleton" aria-hidden="true">
     <view class="inventory-skeleton-request ui-card">
       <view class="inventory-skeleton-heading"><view class="inventory-skeleton-request-heading"><view class="inventory-skeleton-type manage-skeleton-pulse"></view><view><view class="inventory-skeleton-kicker manage-skeleton-pulse"></view><view class="inventory-skeleton-title manage-skeleton-pulse"></view></view></view><view class="inventory-skeleton-status manage-skeleton-pulse"></view></view>
@@ -34,7 +32,6 @@
       <view class="inventory-skeleton-record"><view class="inventory-skeleton-record-title manage-skeleton-pulse"></view><view class="inventory-skeleton-line manage-skeleton-pulse"></view><view class="inventory-skeleton-line inventory-skeleton-line-short manage-skeleton-pulse"></view></view>
     </view>
   </view>
-
   <view wx:elif="{{loadError}}" class="error-card ui-card">
     <view class="error-native-icon" aria-hidden="true"></view>
     <view class="error-copy">
@@ -43,13 +40,11 @@
     </view>
     <button class="retry-button ui-btn ui-btn-ghost" bindtap="handleRefresh"><view class="retry-native-icon" aria-hidden="true"></view>重试</button>
   </view>
-
   <block wx:else>
     <view wx:if="{{partial}}" class="warning-card ui-card">
       <view class="warning-native-icon" aria-hidden="true"></view>
       <view class="warning-copy"><view class="warning-title">清单未完全展示</view><view class="warning-desc">{{issueText}}。请缩小人工核验范围或修复对应集合，暂勿直接完成申请。</view></view>
     </view>
-
     <view class="request-card ui-card">
       <view class="section-heading">
         <view class="request-heading-wrap">
@@ -69,7 +64,6 @@
       <view class="request-meta"><view class="time-native-icon" aria-hidden="true"></view><view><view class="request-meta-label">申请时间</view><view>{{request.createdAtText}}</view></view></view>
       <view class="request-description"><view class="description-native-icon" aria-hidden="true"></view><view class="request-description-copy"><view class="request-meta-label">申请说明</view><view class="request-description-value">{{request.description || '未填写申请说明'}}</view></view></view>
     </view>
-
     <view wx:if="{{request.type === 'access'}}" class="export-card ui-card">
       <view class="section-heading">
         <view class="section-heading-icon-wrap">
@@ -109,13 +103,11 @@
         </view>
       </view>
     </view>
-
     <view class="inventory-progress-card ui-card {{inventoryStatusClass}}" aria-role="group" aria-label="数据核验覆盖 {{inventoryProgress}}%，{{verifiedCategoryCount}} / 5 类完整，{{inventoryStatusLabel}}">
       <view class="inventory-progress-head"><view><view class="section-eyebrow">VERIFICATION COVERAGE</view><view class="inventory-progress-title">核验覆盖</view></view><view class="inventory-status-pill"><view class="inventory-status-dot"></view>{{inventoryStatusLabel}}</view></view>
       <view class="inventory-progress-track" aria-hidden="true"><view class="inventory-progress-value" style="width: {{inventoryProgress}}%;"></view></view>
       <view class="inventory-progress-foot"><view>{{verifiedCategoryCount}} / 5 类完整</view><view>共关联 {{totalRecordCount}} 条记录</view></view>
     </view>
-
     <view class="metric-grid">
       <view class="metric-card ui-card {{bookings.stateClass}}">
         <view class="metric-native-icon {{bookings.iconClass}}" aria-hidden="true"></view>
@@ -148,7 +140,6 @@
         <view class="metric-state"><view class="metric-state-dot"></view>{{privacyRequests.stateLabel}}</view>
       </view>
     </view>
-
     <view class="section-card ui-card">
       <view class="section-heading">
         <view class="section-heading-icon-wrap">
@@ -167,7 +158,6 @@
       </view>
       <view wx:else class="empty-text"><view class="inventory-empty-native-icon" aria-hidden="true"></view><text>未发现交接记录</text></view>
     </view>
-
     <view class="section-card ui-card">
       <view class="section-heading">
         <view class="section-heading-icon-wrap">
@@ -186,7 +176,6 @@
       </view>
       <view wx:else class="empty-text"><view class="inventory-empty-native-icon" aria-hidden="true"></view><text>未发现报价记录</text></view>
     </view>
-
     <view class="section-card ui-card">
       <view class="section-heading">
         <view class="section-heading-icon-wrap">
@@ -219,7 +208,6 @@
       </view>
       <view wx:else class="empty-text"><view class="inventory-empty-native-icon" aria-hidden="true"></view><text>未发现预约记录</text></view>
     </view>
-
     <view class="section-card ui-card">
       <view class="section-heading">
         <view class="section-heading-icon-wrap">
@@ -236,7 +224,6 @@
       </view>
       <view wx:else class="empty-text"><view class="inventory-empty-native-icon" aria-hidden="true"></view><text>未发现收藏记录</text></view>
     </view>
-
     <view class="section-card ui-card">
       <view class="section-heading">
         <view class="section-heading-icon-wrap">
@@ -258,7 +245,6 @@
       </view>
       <view wx:else class="empty-text"><view class="inventory-empty-native-icon" aria-hidden="true"></view><text>未发现其他隐私申请</text></view>
     </view>
-
     <view class="privacy-note ui-card">
       <view class="privacy-note-native-icon" aria-hidden="true"></view><view>匿名分析事件不保存 OpenID、姓名、手机号、城市或备注，无法也无需关联到具体用户。该清单仅用于人工核验，不会自动更正或删除记录。</view>
     </view>

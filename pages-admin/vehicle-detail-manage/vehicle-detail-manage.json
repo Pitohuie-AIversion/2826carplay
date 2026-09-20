@@ -1,6 +1,1 @@
-{
-  "navigationBarTitleText": "车辆详情",
-  "enablePullDownRefresh": true,
-  "backgroundColor": "#101010",
-  "backgroundTextStyle": "light"
-}
+{"navigationBarTitleText":"车辆详情","enablePullDownRefresh":true,"backgroundColor":"#101010","backgroundTextStyle":"light"}

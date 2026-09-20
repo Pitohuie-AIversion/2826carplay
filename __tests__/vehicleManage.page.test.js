@@ -1,4 +1,4 @@
-﻿const fs = require("fs")
+const fs = require("fs")
 const path = require("path")
 
 jest.mock("../shared/pageAuth", () => ({
@@ -344,5 +344,22 @@ describe("pages/vehicle-manage 车辆管理列表体验", () => {
     page.data.deletingId = "car_busy"
     page.deleteVehicle("car_2")
     expect(wx.cloud.callFunction).toHaveBeenCalledTimes(1)
+  })
+
+  test("触底生命周期触发车辆列表下一页加载", () => {
+    const page = createPage(loadPageDefinition(), {
+      pageAuthorized: true,
+      loading: false,
+      hasMore: true
+    })
+    page.fetchList = jest.fn()
+
+    page.onReachBottom()
+    expect(page.fetchList).toHaveBeenCalledWith({ append: true })
+
+    page.data.hasMore = false
+    page.fetchList.mockClear()
+    page.onReachBottom()
+    expect(page.fetchList).not.toHaveBeenCalled()
   })
 })

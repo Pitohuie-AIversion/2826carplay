@@ -1,6 +1,5 @@
 <view wx:if="{{pageAuthorized}}" class="calendar-page management-page">
   <view class="page-glow"></view>
-
   <view class="hero-card ui-card ui-card-gradient">
     <view class="hero-top">
       <view>
@@ -11,7 +10,6 @@
       <image class="hero-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
     </view>
   </view>
-
   <view wx:if="{{loading}}" class="calendar-skeleton" aria-hidden="true">
     <view class="summary-grid">
       <view class="summary-card calendar-skeleton-summary ui-card" wx:for="{{[1, 2, 3]}}" wx:key="*this">
@@ -65,7 +63,6 @@
       </view>
     </view>
   </view>
-
   <view wx:elif="{{loadError}}" class="state-card ui-card">
     <view class="state-native-icon" aria-hidden="true"><view class="state-alert-mark"></view></view>
     <view class="state-title">暂时无法加载日历</view>
@@ -75,7 +72,6 @@
       <text>重新加载</text>
     </button>
   </view>
-
   <block wx:else>
     <view class="summary-grid">
       <view class="summary-card ui-card">
@@ -104,7 +100,6 @@
       </view>
       <view>本月有 {{summary.conflictDayCount}} 天出现同车预约重叠，请优先人工核对。</view>
     </view>
-
     <view class="calendar-card ui-card">
       <view class="month-switcher">
         <view
@@ -140,7 +135,6 @@
           <view class="month-chevron month-chevron-right" aria-hidden="true"></view>
         </view>
       </view>
-
       <view class="weekday-row">
         <view class="weekday-item" wx:for="{{weekdayLabels}}" wx:key="*this">{{item}}</view>
       </view>
@@ -172,7 +166,6 @@
         <view><text class="legend-dot legend-blocked"></text>不可用占用</view>
       </view>
     </view>
-
     <view class="day-card ui-card calendar-resource-card">
       <view class="section-heading">
         <view>
@@ -199,7 +192,6 @@
         <view class="inline-empty-desc">普通咨询不会锁定车辆。</view>
       </view>
     </view>
-
     <view class="day-card ui-card calendar-resource-card">
       <view class="section-heading">
         <view>
@@ -226,7 +218,6 @@
         <view class="inline-empty-desc">最终金额仍以顾问发送的报价版本为准。</view>
       </view>
     </view>
-
     <view class="day-card ui-card calendar-editor-card">
       <view class="section-heading">
         <view>
@@ -253,7 +244,6 @@
         <button wx:if="{{editingBlockId}}" class="calendar-cancel-button" bindtap="handleResetBlockForm">取消编辑</button>
       </view>
     </view>
-
     <view class="day-card ui-card calendar-editor-card">
       <view class="section-heading">
         <view>
@@ -278,7 +268,6 @@
         <button wx:if="{{editingRuleId}}" class="calendar-cancel-button" bindtap="handleResetPriceForm">取消编辑</button>
       </view>
     </view>
-
     <view class="day-card ui-card">
       <view class="section-heading">
         <view>
@@ -339,7 +328,6 @@
         <view class="inline-empty-desc">没有未取消的预约记录，可切换其他日期查看。</view>
       </view>
     </view>
-
     <view wx:if="{{truncated}}" class="scope-tip tip-with-icon">
       <view class="tip-native-icon tip-native-icon-alert" aria-hidden="true"><view class="tip-alert-mark"></view></view>
       <view>预约超过 2000 条，当前日历只展示最近载入的记录。</view>

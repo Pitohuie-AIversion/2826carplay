@@ -1,4 +1,4 @@
-﻿const vehicleUtils = require("../../shared/vehicle")
+const vehicleUtils = require("../../shared/vehicle")
 const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
 const { formatToastTitle } = require("../../shared/uiFeedback")
 const {
@@ -7,7 +7,6 @@ const {
   cancelPageNativeActions,
   isPageNativeActionActive
 } = require("../../shared/pageNativeAction")
-
 const STATUS_OPTIONS = [
   { value: "all", label: "全部" },
   { value: "active", label: "在用" },
@@ -15,27 +14,23 @@ const STATUS_OPTIONS = [
   { value: "maintenance", label: "维修" },
   { value: "retired", label: "停用" }
 ]
-
 const STATUS_LABEL_MAP = {
   active: "在用",
   idle: "闲置",
   maintenance: "维修",
   retired: "停用"
 }
-
 const STATUS_CLASS_MAP = {
   active: "status-active",
   idle: "status-idle",
   maintenance: "status-maintenance",
   retired: "status-retired"
 }
-
 const STATUS_OP_OPTIONS = [
   { value: "idle", label: "设为闲置" },
   { value: "active", label: "设为在用" },
   { value: "maintenance", label: "设为维修" }
 ]
-
 const VEHICLE_TYPE_LABEL_MAP = {
   sedan: "轿车",
   suv: "SUV",
@@ -44,32 +39,26 @@ const VEHICLE_TYPE_LABEL_MAP = {
   truck: "卡车",
   other: "其他"
 }
-
 const TRANSMISSION_LABEL_MAP = {
   manual: "手动挡",
   automatic: "自动挡"
 }
-
 const FUEL_TYPE_LABEL_MAP = {
   gasoline: "燃油",
   electric: "纯电",
   hybrid: "混动"
 }
-
 const DEFAULT_PAGE_SIZE = 20
 const VEHICLE_LIST_TIMEOUT_MS = 15 * 1000
 const VEHICLE_MUTATION_TIMEOUT_MS = 20 * 1000
-
 function formatDisplayTime(value) {
   if (!value) {
     return ""
   }
-
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) {
     return ""
   }
-
   const year = date.getFullYear()
   const month = `${date.getMonth() + 1}`.padStart(2, "0")
   const day = `${date.getDate()}`.padStart(2, "0")
@@ -77,7 +66,6 @@ function formatDisplayTime(value) {
   const minute = `${date.getMinutes()}`.padStart(2, "0")
   return `${year}-${month}-${day} ${hour}:${minute}`
 }
-
 function buildStatusSummary(stats) {
   return [
     { key: "idle", label: "在库", value: stats.idle || 0 },
@@ -86,19 +74,16 @@ function buildStatusSummary(stats) {
     { key: "recentAdded7d", label: "近7天新增", value: stats.recentAdded7d || 0 }
   ]
 }
-
 function buildStatusRatioSegments(stats) {
   const idle = Number(stats && stats.idle) || 0
   const active = Number(stats && stats.active) || 0
   const maintenance = Number(stats && stats.maintenance) || 0
   const total = idle + active + maintenance
-
   const base = [
     { key: "idle", label: "在库", value: idle, className: "ratio-idle" },
     { key: "active", label: "在用", value: active, className: "ratio-active" },
     { key: "maintenance", label: "维修中", value: maintenance, className: "ratio-maintenance" }
   ]
-
   if (!total) {
     return base.map((item) => ({
       ...item,
@@ -106,19 +91,16 @@ function buildStatusRatioSegments(stats) {
       percentText: "0%"
     }))
   }
-
   const rawPercents = base.map((item) => (item.value / total) * 100)
   const floors = rawPercents.map((value) => Math.floor(value))
   let used = floors.reduce((sum, n) => sum + n, 0)
   let remain = 100 - used
-
   const order = rawPercents
     .map((value, index) => ({
       index,
       frac: value - floors[index]
     }))
     .sort((a, b) => b.frac - a.frac)
-
   const percents = floors.slice()
   let i = 0
   while (remain > 0 && i < order.length) {
@@ -129,27 +111,22 @@ function buildStatusRatioSegments(stats) {
       i = 0
     }
   }
-
   return base.map((item, index) => ({
     ...item,
     percent: percents[index],
     percentText: `${percents[index]}%`
   }))
 }
-
 function formatPriceDayText(priceDay) {
   if (Number.isInteger(priceDay) && priceDay > 0) {
     return `￥${priceDay} / 24小时`
   }
-
   return "—"
 }
-
 function buildMediaHealth(item) {
   const source = item && typeof item === "object" ? item : {}
   const imageCount = Math.max(0, Number(source.imageCount) || 0)
   const hasCover = Boolean(source.coverImage)
-
   if (!hasCover) {
     return {
       imageCount,
@@ -158,7 +135,6 @@ function buildMediaHealth(item) {
       mediaProgress: 0
     }
   }
-
   if (imageCount < 3) {
     return {
       imageCount,
@@ -167,7 +143,6 @@ function buildMediaHealth(item) {
       mediaProgress: Math.round((imageCount / 3) * 100)
     }
   }
-
   return {
     imageCount,
     mediaStatusText: "素材充足",
@@ -175,7 +150,6 @@ function buildMediaHealth(item) {
     mediaProgress: 100
   }
 }
-
 function buildArchiveSummary(stats) {
   const source = stats && typeof stats === "object" ? stats : {}
   return [
@@ -185,7 +159,6 @@ function buildArchiveSummary(stats) {
     { key: "missing", label: "资料缺失", value: Number(source.missing) || 0, className: "archive-summary-missing" }
   ]
 }
-
 function buildArchiveHealthView(item) {
   const health = item && item.archiveHealth && typeof item.archiveHealth === "object"
     ? item.archiveHealth
@@ -200,12 +173,10 @@ function buildArchiveHealthView(item) {
       : `暂无有效更新日期 · 缺失 ${Number(health.missingCount) || 0} 项`
   }
 }
-
 function buildRecentAddedViewModel(list) {
   if (!Array.isArray(list)) {
     return []
   }
-
   return list.map((item) => ({
     id: item.id || "",
     plateNumber: vehicleUtils.normalizePlateNumber(item.plateNumber),
@@ -217,7 +188,6 @@ function buildRecentAddedViewModel(list) {
     createdAtText: formatDisplayTime(item.createdAt)
   }))
 }
-
 Page({
   data: {
     loading: false,
@@ -241,7 +211,6 @@ Page({
     emptyTitle: "暂无车辆数据",
     emptyDesc: "当前筛选条件下没有匹配的车辆记录"
   },
-
   onLoad() {
     activatePageNativeActions(this)
     requirePagePermission(this, {
@@ -252,7 +221,6 @@ Page({
       }
     })
   },
-
   onShow() {
     if (
       !this.data.pageAuthorized ||
@@ -261,10 +229,8 @@ Page({
     ) {
       return
     }
-
     this.fetchList()
   },
-
   onPullDownRefresh() {
     if (
       !this.data.pageAuthorized ||
@@ -277,7 +243,17 @@ Page({
       wx.stopPullDownRefresh()
     })
   },
-
+  onReachBottom() {
+    if (
+      !this.data.pageAuthorized ||
+      this.data.loading ||
+      !this.data.hasMore ||
+      this.isVehicleMutationBusy()
+    ) {
+      return
+    }
+    this.fetchList({ append: true })
+  },
   onUnload() {
     cancelPagePermissionCheck(this)
     cancelPageNativeActions(this)
@@ -286,7 +262,6 @@ Page({
     this.finishVehicleListRequestEffects()
     this.finishVehicleMutationEffects()
   },
-
   isVehicleMutationBusy() {
     return Boolean(
       this.data.updatingId ||
@@ -294,15 +269,12 @@ Page({
       this._vehicleMutationLoadingVisible
     )
   },
-
   handleKeywordInput(event) {
     const value = String((event.detail && event.detail.value) || "")
-
     this.setData({
       keyword: value
     })
   },
-
   handleClearKeyword() {
     if (!this.data.keyword || this.data.loading || this.isVehicleMutationBusy()) {
       return
@@ -315,17 +287,14 @@ Page({
       this.fetchList()
     })
   },
-
   handleKeywordConfirm() {
     if (this.data.loading || this.isVehicleMutationBusy()) {
       return
     }
     this.fetchList()
   },
-
   handleStatusTap(event) {
     const status = event.currentTarget.dataset.status
-
     if (
       !status ||
       status === this.data.currentStatus ||
@@ -334,14 +303,11 @@ Page({
     ) {
       return
     }
-
     this.setData({
       currentStatus: status
     })
-
     this.fetchList()
   },
-
   handleReset() {
     if (this.data.loading || this.isVehicleMutationBusy()) {
       return
@@ -350,18 +316,14 @@ Page({
       keyword: "",
       currentStatus: "all"
     })
-
     this.fetchList()
   },
-
   handleLoadMore() {
     if (this.data.loading || this.isVehicleMutationBusy() || !this.data.hasMore) {
       return
     }
-
     this.fetchList({ append: true })
   },
-
   handleGoCreate() {
     if (this.data.loading || this.isVehicleMutationBusy()) {
       return
@@ -380,10 +342,8 @@ Page({
       }
     })
   },
-
   handleEdit(event) {
     const id = String(event.currentTarget.dataset.id || "").trim()
-
     if (this.data.loading || this.isVehicleMutationBusy()) {
       return
     }
@@ -394,7 +354,6 @@ Page({
       })
       return
     }
-
     const action = beginPageNativeAction(this)
     wx.navigateTo({
       url: `/pages-admin/vehicle-edit/vehicle-edit?id=${id}`,
@@ -409,10 +368,8 @@ Page({
       }
     })
   },
-
   handleViewDetail(event) {
     const id = String(event.currentTarget.dataset.id || "").trim()
-
     if (this.data.loading || this.isVehicleMutationBusy()) {
       return
     }
@@ -423,7 +380,6 @@ Page({
       })
       return
     }
-
     const action = beginPageNativeAction(this)
     wx.navigateTo({
       url: `/pages-admin/vehicle-detail-manage/vehicle-detail-manage?id=${id}`,
@@ -438,15 +394,12 @@ Page({
       }
     })
   },
-
   handleCoverImageError(event) {
     const index = Number(event.currentTarget.dataset.index)
     const list = Array.isArray(this.data.list) ? this.data.list : []
-
     if (!Number.isInteger(index) || index < 0 || index >= list.length) {
       return
     }
-
     const nextList = list.map((item, itemIndex) => itemIndex === index
       ? {
           ...item,
@@ -457,30 +410,23 @@ Page({
           mediaProgress: 0
         }
       : item)
-
     this.setData({ list: nextList })
   },
-
   handleUpdateStatus(event) {
     if (this.data.loading || this.data.updatingId || this.data.deletingId) {
       return
     }
-
     const id = String(event.currentTarget.dataset.id || "").trim()
     const status = String(event.currentTarget.dataset.status || "").trim()
     const currentStatus = String(event.currentTarget.dataset.currentStatus || "").trim()
     const plateNumber = String(event.currentTarget.dataset.plateNumber || "").trim()
-
     if (!id || !status) {
       return
     }
-
     if (status === currentStatus) {
       return
     }
-
     const statusText = STATUS_LABEL_MAP[status] || status
-
     const action = beginPageNativeAction(this, {
       exclusiveKey: "vehicle-write-confirmation"
     })
@@ -493,16 +439,13 @@ Page({
         if (!isPageNativeActionActive(this, action) || !modalRes || !modalRes.confirm) {
           return
         }
-
         this.updateVehicleStatus(id, status)
       }
     })
   },
-
   handleRetire(event) {
     const id = String(event.currentTarget.dataset.id || "").trim()
     const plateNumber = String(event.currentTarget.dataset.plateNumber || "").trim()
-
     if (!id) {
       wx.showToast({
         title: "车辆编号缺失",
@@ -510,11 +453,9 @@ Page({
       })
       return
     }
-
     if (this.data.updatingId || this.data.deletingId) {
       return
     }
-
     const action = beginPageNativeAction(this, {
       exclusiveKey: "vehicle-write-confirmation"
     })
@@ -527,16 +468,13 @@ Page({
         if (!isPageNativeActionActive(this, action) || !modalRes || !modalRes.confirm) {
           return
         }
-
         this.retireVehicle(id)
       }
     })
   },
-
   handleRestore(event) {
     const id = String(event.currentTarget.dataset.id || "").trim()
     const plateNumber = String(event.currentTarget.dataset.plateNumber || "").trim()
-
     if (!id) {
       wx.showToast({
         title: "车辆编号缺失",
@@ -544,11 +482,9 @@ Page({
       })
       return
     }
-
     if (this.data.updatingId || this.data.deletingId) {
       return
     }
-
     const action = beginPageNativeAction(this, {
       exclusiveKey: "vehicle-write-confirmation"
     })
@@ -561,16 +497,13 @@ Page({
         if (!isPageNativeActionActive(this, action) || !modalRes || !modalRes.confirm) {
           return
         }
-
         this.restoreVehicle(id)
       }
     })
   },
-
   handleDelete(event) {
     const id = String(event.currentTarget.dataset.id || "").trim()
     const plateNumber = String(event.currentTarget.dataset.plateNumber || "").trim()
-
     if (!id) {
       wx.showToast({
         title: "车辆编号缺失",
@@ -578,11 +511,9 @@ Page({
       })
       return
     }
-
     if (this.data.updatingId || this.data.deletingId) {
       return
     }
-
     const action = beginPageNativeAction(this, {
       exclusiveKey: "vehicle-write-confirmation"
     })
@@ -595,12 +526,10 @@ Page({
         if (!isPageNativeActionActive(this, action) || !modalRes || !modalRes.confirm) {
           return
         }
-
         this.deleteVehicle(id)
       }
     })
   },
-
   updateVehicleStatus(id, status) {
     this.runVehicleMutation({
       id,
@@ -618,7 +547,6 @@ Page({
           })
           return
         }
-
         wx.showToast({
         title: formatToastTitle(result.message, "状态已更新"),
           icon: "success"
@@ -627,7 +555,6 @@ Page({
       }
     })
   },
-
   retireVehicle(id) {
     this.runVehicleMutation({
       id,
@@ -645,17 +572,14 @@ Page({
           })
           return
         }
-
         wx.showToast({
         title: formatToastTitle(result.message, "停用成功"),
           icon: "success"
         })
-
         this.fetchList()
       }
     })
   },
-
   restoreVehicle(id) {
     this.runVehicleMutation({
       id,
@@ -673,22 +597,18 @@ Page({
           })
           return
         }
-
         wx.showToast({
         title: formatToastTitle(result.message, "恢复成功"),
           icon: "success"
         })
-
         this.fetchList()
       }
     })
   },
-
   deleteVehicle(id) {
     if (this.data.deletingId) {
       return
     }
-
     this.runVehicleMutation({
       id,
       stateField: "deletingId",
@@ -702,12 +622,10 @@ Page({
           this.showDeleteFailure(id, result)
           return
         }
-
         wx.showToast({
         title: formatToastTitle(result.message, "删除成功"),
           icon: "success"
         })
-
         this.fetchList()
       },
       onFailure: () => {
@@ -715,7 +633,6 @@ Page({
       }
     })
   },
-
   runVehicleMutation(options) {
     const input = options && typeof options === "object" ? options : {}
     const id = String(input.id || "").trim()
@@ -729,7 +646,6 @@ Page({
       })
       return
     }
-
     const requestId = Number(this._vehicleMutationRequestId || 0) + 1
     this._vehicleMutationRequestId = requestId
     this.finishVehicleMutationEffects()
@@ -740,7 +656,6 @@ Page({
       mask: true
     })
     this._vehicleMutationLoadingVisible = true
-
     let settled = false
     const finishRequest = () => {
       if (settled || this._vehicleMutationRequestId !== requestId) {
@@ -764,11 +679,9 @@ Page({
         icon: "none"
       })
     }
-
     this._vehicleMutationRequestTimer = setTimeout(() => {
       handleFailure(input.timeoutTitle || "操作超时，请重试")
     }, VEHICLE_MUTATION_TIMEOUT_MS)
-
     const requestOptions = {
       name: input.name,
       data: input.data,
@@ -787,18 +700,15 @@ Page({
       },
       complete: () => {}
     }
-
     try {
       wx.cloud.callFunction(requestOptions)
     } catch (error) {
       handleFailure(error && (error.errMsg || error.message))
     }
   },
-
   showDeleteFailure(id, result) {
     const code = String((result && result.code) || "").trim()
     const message = String((result && result.message) || "").trim()
-
     if (code === "VEHICLE_HAS_BOOKINGS") {
       const action = beginPageNativeAction(this)
       wx.showModal({
@@ -815,7 +725,6 @@ Page({
       })
       return
     }
-
     if (code === "NOT_FOUND") {
       const action = beginPageNativeAction(this)
       wx.showModal({
@@ -832,11 +741,9 @@ Page({
       })
       return
     }
-
     const content = code === "FORBIDDEN"
       ? "当前账号没有删除车辆的权限，请重新进入小程序刷新权限，或检查管理员配置。"
       : message || "云端删除请求未完成，请检查网络后重试。"
-
     const action = beginPageNativeAction(this)
     wx.showModal({
       title: code === "FORBIDDEN" ? "无删除权限" : "删除未完成",
@@ -857,7 +764,6 @@ Page({
       }
     })
   },
-
   fetchList(input) {
     const done = typeof input === "function" ? input : input && input.done
     const append = Boolean(input && typeof input === "object" && input.append)
@@ -866,31 +772,26 @@ Page({
     const requestId = Number(this._vehicleListRequestId || 0) + 1
     this._vehicleListRequestId = requestId
     this.finishVehicleListRequestEffects()
-
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       wx.showToast({
         title: "云能力未初始化",
         icon: "none"
       })
-
       if (typeof done === "function") {
         done()
       }
       return
     }
-
     const filters = {
       keyword: String(this.data.keyword || "").trim(),
       status: this.data.currentStatus,
       page: nextPage,
       pageSize
     }
-
     this._vehicleListRequestDone = typeof done === "function" ? done : null
     this.setData({
       loading: true
     })
-
     let settled = false
     const finishRequest = () => {
       if (settled || this._vehicleListRequestId !== requestId) {
@@ -915,11 +816,9 @@ Page({
         list: append ? this.data.list : []
       })
     }
-
     this._vehicleListRequestTimer = setTimeout(() => {
       handleFailure("查询超时，请重试")
     }, VEHICLE_LIST_TIMEOUT_MS)
-
     const requestOptions = {
       name: "vehicleList",
       data: filters,
@@ -928,19 +827,16 @@ Page({
           return
         }
         const result = res && res.result ? res.result : null
-
         if (!result || !result.ok) {
           wx.showToast({
           title: formatToastTitle(result && result.message, "查询失败"),
             icon: "none"
           })
-
           this.setData({
             loading: false
           })
           return
         }
-
         const list = Array.isArray(result.list)
           ? result.list.map((item) => ({
               ...item,
@@ -959,9 +855,7 @@ Page({
               ...buildArchiveHealthView(item)
             }))
           : []
-
         const nextList = append ? this.data.list.concat(list) : list
-
         this.setData({
           loading: false,
           total: result.total || 0,
@@ -980,14 +874,12 @@ Page({
       },
       complete: () => {}
     }
-
     try {
       wx.cloud.callFunction(requestOptions)
     } catch (error) {
       handleFailure(error && (error.errMsg || error.message))
     }
   },
-
   finishVehicleListRequestEffects() {
     if (this._vehicleListRequestTimer) {
       clearTimeout(this._vehicleListRequestTimer)
@@ -999,7 +891,6 @@ Page({
       done()
     }
   },
-
   finishVehicleMutationEffects() {
     if (this._vehicleMutationRequestTimer) {
       clearTimeout(this._vehicleMutationRequestTimer)

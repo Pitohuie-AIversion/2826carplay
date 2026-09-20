@@ -1,6 +1,5 @@
 <view class="detail-page" wx:if="{{booking.id}}">
   <view class="page-glow"></view>
-
   <view class="receipt-card ui-card">
     <view class="receipt-top">
       <view class="receipt-brand">
@@ -12,17 +11,14 @@
       </view>
       <view class="booking-status ui-status ui-status-lg {{statusClass}}"><view class="booking-status-dot"></view><text>{{statusText}}</text></view>
     </view>
-
     <view class="receipt-divider">
       <view class="receipt-notch receipt-notch-left"></view>
       <view class="dashed-line"></view>
       <view class="receipt-notch receipt-notch-right"></view>
     </view>
-
     <view class="vehicle-label">RESERVED VEHICLE</view>
     <view class="booking-name">{{booking.vehicleName || "—"}}</view>
     <view wx:if="{{booking.vehicleReference}}" class="booking-vehicle-reference">{{booking.vehicleReference}}</view>
-
     <view class="journey-panel">
       <view class="journey-date">
         <view class="journey-label">取车日期</view>
@@ -43,7 +39,6 @@
         <view class="journey-value">{{booking.endDate || "—"}}</view>
       </view>
     </view>
-
     <view class="receipt-footer">
       <view>
         <view class="footer-label">取车城市</view>
@@ -58,7 +53,6 @@
       </view>
     </view>
   </view>
-
   <view class="info-card ui-card">
     <view class="section-heading">
       <view>
@@ -152,7 +146,6 @@
       <view class="edit-tip tip-with-icon"><view class="tip-info-native-icon" aria-hidden="true"><view class="tip-info-mark"></view></view><view>只修改本次预约的联系信息，不会更改行程日期或车辆。</view></view>
     </view>
   </view>
-
   <view class="info-card ui-card">
     <view class="section-heading">
       <view>
@@ -204,7 +197,6 @@
       </button>
     </view>
   </view>
-
   <view wx:if="{{latestQuote.id}}" class="customer-quote-card ui-card">
     <view class="section-heading">
       <view>
@@ -226,7 +218,6 @@
     <view wx:if="{{latestQuote.customerNote}}" class="quote-rule"><view class="quote-rule-label">报价备注</view><view>{{latestQuote.customerNote}}</view></view>
     <view wx:if="{{latestQuote.adjustmentNote}}" class="quote-adjustment-summary"><view class="quote-rule-label">我的调整说明</view><view>{{latestQuote.adjustmentNote}}</view></view>
     <view class="quote-boundary">确认报价仅表示认可当前费用方案，不代表已经付款、签署合同或锁定车辆。</view>
-
     <view wx:if="{{booking.status === 'quoted' && latestQuote.status === 'sent'}}" class="quote-response">
       <button class="quote-confirm-btn ui-btn ui-btn-primary" loading="{{quoteResponding}}" disabled="{{loading || quoteResponding}}" bindtap="handleConfirmQuote">确认报价（尚未付款）</button>
       <view class="quote-adjustment-form">
@@ -240,7 +231,6 @@
     <view wx:elif="{{booking.status === 'adjustment_requested'}}" class="quote-response-state quote-response-adjustment">调整申请已提交，请等待顾问重新报价。</view>
     <view wx:elif="{{latestQuote.status === 'expired'}}" class="quote-response-state">当前报价已失效，请联系顾问重新报价。</view>
   </view>
-
   <view wx:if="{{handovers.pickup.id || handovers.return.id}}" class="customer-handover-card ui-card">
     <view class="section-heading">
       <view><view class="section-kicker">VEHICLE HANDOVER</view><view class="section-title">车辆交接记录</view></view>
@@ -261,7 +251,6 @@
     <button class="ui-btn ui-btn-danger-ghost emergency-call-btn" bindtap="handleEmergencyCall">一键拨打救援 / 紧急联系电话</button>
     <view class="emergency-boundary">电话将接通人工服务渠道；本页面不提供实时调度、定位跟踪或到达时间承诺。紧急人身危险请直接拨打 110 / 119 / 120。</view>
   </view>
-
   <view wx:if="{{booking.note && !editing}}" class="note-card ui-card">
     <view class="section-heading">
       <view>
@@ -272,7 +261,6 @@
     </view>
     <view class="note-content">{{booking.note}}</view>
   </view>
-
   <view wx:if="{{booking.status !== 'cancelled'}}" class="checklist-card ui-card">
     <view class="section-heading checklist-heading" bindtap="handleToggleChecklist" hover-class="checklist-heading-pressed" aria-role="button" aria-expanded="{{checklistExpanded}}" aria-label="行前证件与交付清单">
       <view>
@@ -315,7 +303,6 @@
       </view>
     </view>
   </view>
-
   <view class="detail-actions-card ui-card">
     <view class="section-heading">
       <view>
@@ -347,13 +334,11 @@
     </view>
     <view class="detail-action-note tip-with-icon"><view class="tip-info-native-icon" aria-hidden="true"><view class="tip-info-mark"></view></view><view>预约信息仅供本次服务核对，最终安排以顾问确认为准。</view></view>
   </view>
-
   <view wx:if="{{canCancel}}" class="actions">
     <view class="action-note tip-with-icon"><view class="tip-info-native-icon tip-info-native-icon-danger" aria-hidden="true"><view class="tip-info-mark"></view></view><view>如行程发生变化，可在顾问确认前取消预约</view></view>
     <button class="cancel-btn ui-btn ui-btn-danger-ghost action-with-icon" loading="{{cancelling}}" disabled="{{loading || editing || saving || subscriptionRequesting || cancelling}}" bindtap="handleCancel"><view wx:if="{{!cancelling}}" class="cancel-booking-native-icon" aria-hidden="true"></view><text>{{cancelling ? '正在取消' : '取消本次预约'}}</text></button>
   </view>
 </view>
-
 <view wx:elif="{{initialLoading || loading}}" class="detail-page detail-skeleton-page" aria-hidden="true">
   <view class="detail-skeleton-card ui-card">
     <view class="detail-skeleton-top">
@@ -387,7 +372,6 @@
     </view>
   </view>
 </view>
-
 <view wx:else class="detail-page state-page">
   <view class="state-card ui-card">
     <image class="state-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />

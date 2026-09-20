@@ -7,7 +7,6 @@ const {
   cancelPageNativeActions,
   isPageNativeActionActive
 } = require("../../shared/pageNativeAction")
-
 const BOOKING_DETAIL_LOAD_TIMEOUT_MS = 15 * 1000
 const BOOKING_DETAIL_WRITE_TIMEOUT_MS = 20 * 1000
 const HANDOVER_ANGLES = [
@@ -17,7 +16,6 @@ const HANDOVER_ANGLES = [
   { angle: "right", label: "右侧" }
 ]
 const HANDOVER_MAX_IMAGE_BYTES = 10 * 1024 * 1024
-
 const STATUS_TEXT_MAP = {
   pending: "待联系",
   contacted: "已联系",
@@ -27,7 +25,6 @@ const STATUS_TEXT_MAP = {
   completed: "已完成",
   cancelled: "已取消"
 }
-
 const STATUS_CLASS_MAP = {
   pending: "status-pending",
   contacted: "status-contacted",
@@ -37,19 +34,16 @@ const STATUS_CLASS_MAP = {
   completed: "status-completed",
   cancelled: "status-cancelled"
 }
-
 const PRIORITY_TEXT_MAP = {
   priority: "优先",
   normal: "常规",
   standby: "候补"
 }
-
 const COORDINATION_TEXT_MAP = {
   pending: "待协调",
   coordinating: "协调中",
   resolved: "已协调"
 }
-
 function showStatusUpdateFeedback(result, done) {
   const next = typeof done === "function" ? done : () => {}
   let settled = false
@@ -80,7 +74,6 @@ function showStatusUpdateFeedback(result, done) {
     }
     return
   }
-
   const title =
     notificationStatus === "sent"
       ? "提醒已发送"
@@ -96,17 +89,14 @@ function showStatusUpdateFeedback(result, done) {
     finish()
   }
 }
-
 function formatDisplayTime(value) {
   if (!value) {
     return ""
   }
-
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) {
     return ""
   }
-
   const year = date.getFullYear()
   const month = `${date.getMonth() + 1}`.padStart(2, "0")
   const day = `${date.getDate()}`.padStart(2, "0")
@@ -114,11 +104,9 @@ function formatDisplayTime(value) {
   const minute = `${date.getMinutes()}`.padStart(2, "0")
   return `${year}-${month}-${day} ${hour}:${minute}`
 }
-
 function normalizeRemark(value) {
   return String(value || "").slice(0, 200)
 }
-
 function normalizePhone(value) {
   const phone = String(value || "").trim()
   const digitCount = phone.replace(/\D/g, "").length
@@ -127,12 +115,10 @@ function normalizePhone(value) {
   }
   return phone
 }
-
 function formatYuan(cents) {
   const value = Math.max(0, Number(cents || 0))
   return (value / 100).toFixed(2)
 }
-
 function normalizeQuote(item) {
   const quote = item && typeof item === "object" ? item : {}
   return {
@@ -166,7 +152,6 @@ function normalizeQuote(item) {
     expiredAtText: formatDisplayTime(quote.expiredAt)
   }
 }
-
 function createQuoteForm(quote) {
   const source = quote && typeof quote === "object" ? quote : {}
   return {
@@ -180,11 +165,9 @@ function createQuoteForm(quote) {
     customerNote: source.customerNote || ""
   }
 }
-
 function getChinaToday() {
   return new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10)
 }
-
 function createHandoverForm() {
   return {
     mileageKm: "",
@@ -195,7 +178,6 @@ function createHandoverForm() {
     photos: HANDOVER_ANGLES.map((item) => ({ ...item, fileId: "", url: "" }))
   }
 }
-
 function normalizeHandover(item) {
   const record = item && typeof item === "object" ? item : {}
   const status = String(record.status || "")
@@ -210,7 +192,6 @@ function normalizeHandover(item) {
     photos: Array.isArray(record.photos) ? record.photos : []
   }
 }
-
 function normalizeBooking(item) {
   const booking = item && typeof item === "object" ? item : {}
   const status = String(booking.status || "pending").trim() || "pending"
@@ -252,7 +233,6 @@ function normalizeBooking(item) {
     updatedAt: booking.updatedAt || ""
   }
 }
-
 function normalizeConflictBooking(item) {
   const booking = item && typeof item === "object" ? item : {}
   const status = String(booking.status || "pending").trim() || "pending"
@@ -283,7 +263,6 @@ function normalizeConflictBooking(item) {
     coordinationClass: `coordination-${coordinationStatus}`
   }
 }
-
 Page({
   data: {
     id: "",
@@ -321,18 +300,14 @@ Page({
     handoverHistory: [],
     handoverReadyForCompletion: false
   },
-
   applyState(patch) { this.setData(patch) },
-
   onLoad(options) {
     const perf = createPerformanceHelpers(this); this._perf = perf; this.applyState = perf.applyState; this.flushStateNow = perf.flushStateNow;
     activatePageNativeActions(this)
     const id = String((options && options.id) || "").trim()
     this.setData({ id })
-
     const app = getApp()
     const env = app && app.globalData && app.globalData.cloudEnvId ? app.globalData.cloudEnvId : undefined
-
     if (wx.cloud && typeof wx.cloud.init === "function") {
       try {
         wx.cloud.init({
@@ -341,7 +316,6 @@ Page({
         })
       } catch (error) {}
     }
-
     const eventChannel = this.getOpenerEventChannel && this.getOpenerEventChannel()
     if (eventChannel && typeof eventChannel.on === "function") {
       const eventAction = beginPageNativeAction(this)
@@ -363,7 +337,6 @@ Page({
       this._manageBookingDetailEventHandler = handleManageBookingDetail
       eventChannel.on("acceptManageBookingDetail", handleManageBookingDetail)
     }
-
     requirePagePermission(this, {
       required: "canManageBookings",
       noPermissionMessage: "无权访问预约详情管理",
@@ -376,7 +349,6 @@ Page({
       }
     })
   },
-
   onShow() {
     if (
       this.data.pageAuthorized &&
@@ -388,7 +360,6 @@ Page({
       this.loadDetail()
     }
   },
-
   isBookingDetailInteractionBusy() {
     return Boolean(
       this.data.loading ||
@@ -399,7 +370,6 @@ Page({
       this._bookingDetailStatusFeedbackPending
     )
   },
-
   onPullDownRefresh() {
     if (
       this.isBookingDetailInteractionBusy() ||
@@ -419,7 +389,6 @@ Page({
       }
     })
   },
-
   onUnload() {
     cancelPagePermissionCheck(this)
     cancelPageNativeActions(this)
@@ -447,7 +416,6 @@ Page({
     this.cleanupPendingHandoverUploads()
     if (this._perf && typeof this._perf.dispose === 'function') try { this._perf.dispose(); } catch(e) {}
   },
-
   applyBooking(booking, conflictResult, quoteResult, handoverResult) {
     const conflictData = conflictResult && typeof conflictResult === "object"
       ? conflictResult
@@ -494,7 +462,6 @@ Page({
       conflictCheckSkipped: Boolean(conflictData.skipped)
     })
   },
-
   finishBookingDetailLoadEffects() {
     this.clearBookingDetailTimer()
     if (typeof this._bookingDetailLoadDone === "function") {
@@ -505,7 +472,6 @@ Page({
       } catch (error) {}
     }
   },
-
   loadDetail(options) {
     const input = options && typeof options === "object" ? options : {}
     const id = String(this.data.id || "").trim()
@@ -519,7 +485,6 @@ Page({
       }
       return
     }
-
     if (
       this.data.coordinationLoading ||
       this.data.remarkDirty ||
@@ -531,11 +496,9 @@ Page({
       }
       return
     }
-
     const requestId = Number(this._bookingDetailRequestId || 0) + 1
     this._bookingDetailRequestId = requestId
     this.finishBookingDetailLoadEffects()
-
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       this.applyState({
         initialLoading: false,
@@ -548,13 +511,11 @@ Page({
       }
       return
     }
-
     this._bookingDetailLoadDone = typeof input.done === "function" ? input.done : null
     this.applyState({
       loading: true,
       loadFailed: false
     })
-
     let settled = false
     const finishRequest = () => {
       if (settled || this._bookingDetailRequestId !== requestId) {
@@ -579,11 +540,9 @@ Page({
         loadErrorText: message || "预约详情加载失败，请稍后重试"
       })
     }
-
     this._bookingDetailTimer = setTimeout(() => {
       handleFailure("详情加载超时，请重试")
     }, BOOKING_DETAIL_LOAD_TIMEOUT_MS)
-
     const requestOptions = {
       name: "bookingDetail",
       data: {
@@ -608,7 +567,6 @@ Page({
           })
           return
         }
-
         this.applyBooking(normalizeBooking(current), {
           list: result.conflicts,
           total: result.conflictTotal,
@@ -625,14 +583,12 @@ Page({
         handleFailure(error && (error.errMsg || error.message))
       }
     }
-
     try {
       wx.cloud.callFunction(requestOptions)
     } catch (error) {
       handleFailure(error && (error.errMsg || error.message))
     }
   },
-
   handleRemarkInput(event) {
     if (this.isBookingDetailInteractionBusy()) {
       return
@@ -646,7 +602,6 @@ Page({
       remarkDirty: value !== savedValue
     })
   },
-
   handleSaveRemark() {
     if (
       this.data.loading ||
@@ -656,10 +611,8 @@ Page({
     ) {
       return
     }
-
     const id = String(this.data.id || "").trim()
     const adminRemark = normalizeRemark(this.data.booking.adminRemarkDraft)
-
     this.runBookingDetailMutation({
       name: "bookingUpdateAdminRemark",
       data: {
@@ -679,7 +632,6 @@ Page({
           this.applyState({ loading: false })
           return
         }
-
         wx.showToast({
           title: "备注已保存",
           icon: "none"
@@ -691,7 +643,6 @@ Page({
       }
     })
   },
-
   handleQuoteInput(event) {
     if (this.isBookingDetailInteractionBusy()) return
     const field = String(event.currentTarget.dataset.field || "")
@@ -700,12 +651,10 @@ Page({
     const maxLength = field === "customerNote" ? 300 : field === "depositText" ? 200 : 20
     this.setData({ [`quoteForm.${field}`]: String(event.detail && event.detail.value || "").slice(0, maxLength), quoteDirty: true })
   },
-
   handleQuoteValidUntilChange(event) {
     if (this.isBookingDetailInteractionBusy()) return
     this.setData({ "quoteForm.validUntil": String(event.detail && event.detail.value || ""), quoteDirty: true })
   },
-
   buildQuotePayload(action) {
     const form = this.data.quoteForm || {}
     return {
@@ -721,7 +670,6 @@ Page({
       customerNote: form.customerNote
     }
   },
-
   handleSaveQuoteDraft() {
     if (this.isBookingDetailInteractionBusy() || !this.data.id) return
     this.runBookingDetailMutation({
@@ -743,7 +691,6 @@ Page({
       }
     })
   },
-
   handleSendQuote() {
     if (this.isBookingDetailInteractionBusy() || this.data.quoteDirty || !this.data.quoteDraft.id) return
     const action = beginPageNativeAction(this, { exclusiveKey: "quote-send-confirmation" })
@@ -777,7 +724,6 @@ Page({
       }
     })
   },
-
   handleExpireQuote(event) {
     if (this.isBookingDetailInteractionBusy()) return
     const quoteId = String(event.currentTarget.dataset.id || "")
@@ -796,7 +742,6 @@ Page({
       }
     })
   },
-
   handleUpdateCoordination(event) {
     if (
       this.data.loading ||
@@ -809,7 +754,6 @@ Page({
     ) {
       return
     }
-
     const field = String(event.currentTarget.dataset.field || "")
     const value = String(event.currentTarget.dataset.value || "")
     if (
@@ -819,19 +763,16 @@ Page({
     ) {
       return
     }
-
     const schedulePriority =
       field === "schedulePriority" ? value : this.data.booking.schedulePriority
     const coordinationStatus =
       field === "coordinationStatus" ? value : this.data.booking.coordinationStatus
-
     if (
       schedulePriority === this.data.booking.schedulePriority &&
       coordinationStatus === this.data.booking.coordinationStatus
     ) {
       return
     }
-
     const id = String(this.data.id || "").trim()
     this.runBookingDetailMutation({
       name: "bookingUpdateCoordination",
@@ -853,7 +794,6 @@ Page({
           this.applyState({ coordinationLoading: false })
           return
         }
-
         wx.showToast({
           title: result.changed === false ? "协调安排未变化" : "协调安排已更新",
           icon: "none"
@@ -865,7 +805,6 @@ Page({
       }
     })
   },
-
   callPhone(value) {
     if (this.isBookingDetailInteractionBusy()) {
       return
@@ -878,7 +817,6 @@ Page({
       })
       return
     }
-
     const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.makePhoneCall({
       phoneNumber: phone,
@@ -897,15 +835,12 @@ Page({
       }
     })
   },
-
   handleCallPhone() {
     this.callPhone(this.data.booking && this.data.booking.phone)
   },
-
   handleConflictCall(event) {
     this.callPhone(event.currentTarget.dataset.phone)
   },
-
   handleConflictTap(event) {
     const id = String(event.currentTarget.dataset.id || "").trim()
     if (this.isBookingDetailInteractionBusy() || !id || id === this.data.id) {
@@ -925,7 +860,6 @@ Page({
       }
     })
   },
-
   handleCopyContact(event) {
     if (this.isBookingDetailInteractionBusy()) {
       return
@@ -938,7 +872,6 @@ Page({
     if (!labels[field]) {
       return
     }
-
     const value = String((this.data.booking && this.data.booking[field]) || "").trim()
     if (!value) {
       wx.showToast({
@@ -947,7 +880,6 @@ Page({
       })
       return
     }
-
     const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.setClipboardData({
       data: value,
@@ -971,7 +903,6 @@ Page({
       }
     })
   },
-
   handleHandoverStageChange(event) {
     if (this.data.handoverLoading) return
     const stage = String(event.currentTarget.dataset.stage || "")
@@ -979,7 +910,6 @@ Page({
     this.cleanupPendingHandoverUploads()
     this.setData({ handoverStage: stage, handoverForm: createHandoverForm() })
   },
-
   handleHandoverInput(event) {
     if (this.data.handoverLoading) return
     const field = String(event.currentTarget.dataset.field || "")
@@ -987,13 +917,11 @@ Page({
     const maxLength = field.includes("Note") ? 500 : 8
     this.setData({ [`handoverForm.${field}`]: String(event.detail && event.detail.value || "").slice(0, maxLength) })
   },
-
   handleHandoverEnergyType(event) {
     if (this.data.handoverLoading) return
     const values = ["fuel", "electric"]
     this.setData({ "handoverForm.energyType": values[Number(event.detail && event.detail.value)] || "fuel" })
   },
-
   handleChooseHandoverPhoto(event) {
     if (this.data.handoverLoading || !wx.chooseImage || !wx.cloud || !wx.cloud.uploadFile) return
     const angle = String(event.currentTarget.dataset.angle || "")
@@ -1039,7 +967,6 @@ Page({
       }
     })
   },
-
   queueHandoverUploadCleanup(fileList, stage) {
     const files = (Array.isArray(fileList) ? fileList : []).filter(Boolean)
     if (!files.length || !wx.cloud || !wx.cloud.callFunction) return
@@ -1049,13 +976,11 @@ Page({
       fail: () => {}
     })
   },
-
   cleanupPendingHandoverUploads() {
     const form = this.data && this.data.handoverForm
     const fileList = form && Array.isArray(form.photos) ? form.photos.map((item) => item.fileId).filter(Boolean) : []
     if (fileList.length) this.queueHandoverUploadCleanup(fileList, this.data.handoverStage)
   },
-
   handleSubmitHandover() {
     if (this.data.handoverLoading || this.data.booking.status !== "confirmed") return
     const form = this.data.handoverForm
@@ -1101,7 +1026,6 @@ Page({
       }
     })
   },
-
   handlePreviewHandoverPhoto(event) {
     const url = String(event.currentTarget.dataset.url || "")
     const urls = (event.currentTarget.dataset.urls || []).filter(Boolean)
@@ -1114,9 +1038,7 @@ Page({
       }
     })
   },
-
   handleHandoverImageError() {},
-
   handleArchiveHandover(event) {
     if (this.data.handoverLoading) return
     const handoverId = String(event.currentTarget.dataset.id || "")
@@ -1150,7 +1072,6 @@ Page({
       }
     })
   },
-
   handleUpdateStatus(event) {
     if (
       this.data.loading ||
@@ -1162,14 +1083,11 @@ Page({
     ) {
       return
     }
-
     const status = String(event.currentTarget.dataset.status || "").trim()
     if (!status) {
       return
     }
-
     const statusText = STATUS_TEXT_MAP[status] || status
-
     const action = beginPageNativeAction(this, {
       exclusiveKey: "booking-status-confirmation"
     })
@@ -1182,12 +1100,10 @@ Page({
         if (!isPageNativeActionActive(this, action) || !res || !res.confirm) {
           return
         }
-
         this.updateStatus(status)
       }
     })
   },
-
   updateStatus(status) {
     if (
       this.data.loading ||
@@ -1202,7 +1118,6 @@ Page({
     if (!id) {
       return
     }
-
     this.runBookingDetailMutation({
       name: "bookingUpdateStatus",
       data: {
@@ -1222,7 +1137,6 @@ Page({
           this.applyState({ loading: false })
           return
         }
-
         this.applyState({ loading: false })
         this._bookingDetailStatusFeedbackPending = true
         showStatusUpdateFeedback(result, () => {
@@ -1234,7 +1148,6 @@ Page({
       }
     })
   },
-
   runBookingDetailMutation(options) {
     const input = options && typeof options === "object" ? options : {}
     if (
@@ -1255,7 +1168,6 @@ Page({
       })
       return
     }
-
     const requestId = Number(this._bookingDetailMutationRequestId || 0) + 1
     this._bookingDetailMutationRequestId = requestId
     this._bookingDetailMutationActive = true
@@ -1263,7 +1175,6 @@ Page({
     if (input.startState) {
       this.applyState(input.startState)
     }
-
     let settled = false
     const isCurrent = () =>
       this._bookingDetailMutationRequestId === requestId
@@ -1288,11 +1199,9 @@ Page({
         icon: "none"
       })
     }
-
     this._bookingDetailMutationTimer = setTimeout(() => {
       handleFailure(input.timeoutTitle || "操作超时，请重试")
     }, BOOKING_DETAIL_WRITE_TIMEOUT_MS)
-
     const requestOptions = {
       name: input.name,
       data: input.data,
@@ -1309,35 +1218,30 @@ Page({
         handleFailure(error && (error.errMsg || error.message))
       }
     }
-
     try {
       wx.cloud.callFunction(requestOptions)
     } catch (error) {
       handleFailure(error && (error.errMsg || error.message))
     }
   },
-
   clearBookingDetailTimer() {
     if (this._bookingDetailTimer) {
       clearTimeout(this._bookingDetailTimer)
       this._bookingDetailTimer = null
     }
   },
-
   clearBookingDetailMutationTimer() {
     if (this._bookingDetailMutationTimer) {
       clearTimeout(this._bookingDetailMutationTimer)
       this._bookingDetailMutationTimer = null
     }
   },
-
   handleRetryLoad() {
     if (this.isBookingDetailInteractionBusy() || this.data.remarkDirty) {
       return
     }
     this.loadDetail()
   },
-
   handleBackManage() {
     const action = beginPageNativeAction(this)
     const pages = getCurrentPages()
@@ -1372,7 +1276,6 @@ Page({
       })
       return
     }
-
     wx.redirectTo({
       url: "/pages/booking-manage/booking-manage",
       fail: () => {

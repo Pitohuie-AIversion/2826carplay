@@ -14,10 +14,8 @@ const {
   saveCsvFile,
   shareCsvFile
 } = require("../../shared/csvFile")
-
 const ERROR_LIST_TIMEOUT_MS = 15 * 1000
 const ERROR_EXPORT_TIMEOUT_MS = 20 * 1000
-
 const FUNC_OPTIONS = [
   { value: "all", label: "全部" },
   { value: "analyticsCleanup", label: "匿名数据清理" },
@@ -40,19 +38,16 @@ const FUNC_OPTIONS = [
   { value: "roleUpsert", label: "权限分配" },
   { value: "operationConfigUpdate", label: "运营配置" }
 ]
-
 const FUNC_LABEL_MAP = FUNC_OPTIONS.reduce((map, item) => {
   map[item.value] = item.label
   return map
 }, {})
-
 function buildErrorView(item) {
   const func = String(item.function || "")
   const sourceLabel = FUNC_LABEL_MAP[func] || "未知服务"
   let sourceGroup = "系统运营"
   let eventClass = "error-event-operation"
   let eventIconClass = "error-event-icon-operation"
-
   if (func === "bootstrapAdmin" || func === "roleUpsert") {
     sourceGroup = "权限安全"
     eventClass = "error-event-access"
@@ -70,14 +65,12 @@ function buildErrorView(item) {
     eventClass = "error-event-privacy"
     eventIconClass = "error-event-icon-privacy"
   }
-
   let diagnosticHint = "结合发生时间前往云函数日志查看完整调用链"
   if (item.errorCode) {
     diagnosticHint = `优先按错误码 ${item.errorCode} 检索云函数日志`
   } else if (item.stage) {
     diagnosticHint = `建议先检查“${item.stage}”阶段的调用与配置`
   }
-
   return {
     sourceLabel,
     sourceGroup,
@@ -87,17 +80,14 @@ function buildErrorView(item) {
     diagnosticHint
   }
 }
-
 function formatDisplayTime(value) {
   if (!value) {
     return ""
   }
-
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) {
     return ""
   }
-
   const year = date.getFullYear()
   const month = `${date.getMonth() + 1}`.padStart(2, "0")
   const day = `${date.getDate()}`.padStart(2, "0")
@@ -105,7 +95,6 @@ function formatDisplayTime(value) {
   const minute = `${date.getMinutes()}`.padStart(2, "0")
   return `${year}-${month}-${day} ${hour}:${minute}`
 }
-
 function buildSummary(item) {
   const parts = []
   if (item.vehicleId) {
@@ -125,7 +114,6 @@ function buildSummary(item) {
   }
   return parts.join("\n")
 }
-
 function buildSummaryRows(summary) {
   return String(summary || "")
     .split("\n")
@@ -141,7 +129,6 @@ function buildSummaryRows(summary) {
       }
     })
 }
-
 function buildMessagePreview(message) {
   const text = String(message || "").trim()
   if (!text) {
@@ -152,7 +139,6 @@ function buildMessagePreview(message) {
   }
   return `${text.slice(0, 140)}…`
 }
-
 Page({
   data: {
     initialLoading: true,
@@ -175,7 +161,6 @@ Page({
     emptyTitle: "暂无错误日志",
     emptyDesc: "当云函数出现异常时，会在此记录，便于线上排障"
   },
-
   onLoad() {
     activatePageCsvFileActions(this)
     this.setData({
@@ -189,7 +174,6 @@ Page({
       }
     })
   },
-
   onPullDownRefresh() {
     if (!this.data.pageAuthorized) {
       wx.stopPullDownRefresh()
@@ -199,7 +183,6 @@ Page({
       wx.stopPullDownRefresh()
     })
   },
-
   onUnload() {
     cancelPagePermissionCheck(this)
     cancelPageCsvFileActions(this)
@@ -208,12 +191,10 @@ Page({
     this.finishErrorListRequestEffects()
     this.clearExportRequestTimer()
   },
-
   handleKeywordInput(event) {
     const value = String((event.detail && event.detail.value) || "")
     this.setData({ keyword: value })
   },
-
   handleClearKeyword() {
     if (!this.data.keyword) {
       return
@@ -226,24 +207,20 @@ Page({
       this.fetchList()
     })
   },
-
   handleSearch() {
     this.fetchList()
   },
-
   handleFuncTap(event) {
     const value = event.currentTarget.dataset.value
     if (!value || value === this.data.currentFunc) {
       return
     }
-
     this.setData({
       currentFunc: value,
       currentFuncLabel: value === "all" ? "全部函数" : FUNC_LABEL_MAP[value] || "未知服务"
     })
     this.fetchList()
   },
-
   handleResetFilters() {
     if (!this.data.keyword && this.data.currentFunc === "all") {
       return
@@ -260,15 +237,12 @@ Page({
       this.fetchList()
     })
   },
-
   handleLoadMore() {
     if (this.data.loading || !this.data.hasMore) {
       return
     }
-
     this.fetchList({ append: true })
   },
-
   handleExport() {
     if (this.data.loading || this.data.exporting) {
       return
@@ -280,7 +254,6 @@ Page({
       })
       return
     }
-
     const filter = this.data.currentFunc === "all" ? "" : this.data.currentFunc
     const keyword = String(this.data.keyword || "")
     const exportSerial = Number(this._exportRequestSerial || 0) + 1
@@ -289,7 +262,6 @@ Page({
     this.setData({
       exporting: true
     })
-
     let settled = false
     const isActive = () => !settled && exportSerial === this._exportRequestSerial
     const finishRequest = () => {
@@ -310,11 +282,9 @@ Page({
         icon: "none"
       })
     }
-
     this._exportRequestTimer = setTimeout(() => {
       handleFailure("导出超时，请重试")
     }, ERROR_EXPORT_TIMEOUT_MS)
-
     const requestOptions = {
       name: "logExportCsv",
       data: {
@@ -332,7 +302,6 @@ Page({
           handleFailure(result && result.message)
           return
         }
-
         let savePromise
         try {
           savePromise = saveCsvFile({
@@ -387,14 +356,12 @@ Page({
       },
       complete: () => {}
     }
-
     try {
       wx.cloud.callFunction(requestOptions)
     } catch (error) {
       handleFailure(error && (error.errMsg || error.message))
     }
   },
-
   handleShareExportedFile() {
     if (this.data.exporting || !this.data.exportFilePath || !this.data.exportFileName) {
       return
@@ -411,7 +378,6 @@ Page({
       this.handleOpenExportedFile()
     })
   },
-
   handleOpenExportedFile() {
     if (this.data.exporting || !this.data.exportFilePath) {
       return
@@ -428,7 +394,6 @@ Page({
       })
     })
   },
-
   handleDeleteExportedFile() {
     const filePath = String(this.data.exportFilePath || "")
     if (this.data.exporting || !filePath) {
@@ -474,7 +439,6 @@ Page({
       }
     })
   },
-
   fetchList(input) {
     const done = typeof input === "function" ? input : input && input.done
     const append = Boolean(input && typeof input === "object" && input.append)
@@ -484,7 +448,6 @@ Page({
     const requestId = Number(this._errorListRequestId || 0) + 1
     this._errorListRequestId = requestId
     this.finishErrorListRequestEffects()
-
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       this.setData({
         initialLoading: false,
@@ -496,12 +459,10 @@ Page({
       }
       return
     }
-
     this._errorListRequestDone = typeof done === "function" ? done : null
     this.setData({
       loading: true
     })
-
     let settled = false
     const finishRequest = () => {
       if (settled || this._errorListRequestId !== requestId) {
@@ -529,11 +490,9 @@ Page({
         page: append ? this.data.page : 0
       })
     }
-
     this._errorListRequestTimer = setTimeout(() => {
       handleFailure("加载超时，请重试")
     }, ERROR_LIST_TIMEOUT_MS)
-
     const requestOptions = {
       name: "errorLogList",
       data: {
@@ -563,7 +522,6 @@ Page({
           })
           return
         }
-
         const list = Array.isArray(result.list)
           ? result.list.map((item) => {
               const summary = buildSummary(item)
@@ -577,7 +535,6 @@ Page({
               }
             })
           : []
-
         this.setData({
           initialLoading: false,
           loading: false,
@@ -593,14 +550,12 @@ Page({
       },
       complete: () => {}
     }
-
     try {
       wx.cloud.callFunction(requestOptions)
     } catch (error) {
       handleFailure(error && (error.errMsg || error.message))
     }
   },
-
   finishErrorListRequestEffects() {
     if (this._errorListRequestTimer) {
       clearTimeout(this._errorListRequestTimer)
@@ -612,7 +567,6 @@ Page({
       done()
     }
   },
-
   clearExportRequestTimer() {
     if (!this._exportRequestTimer) {
       return

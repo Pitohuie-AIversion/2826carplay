@@ -6,10 +6,8 @@ const {
   cancelPageNativeActions,
   isPageNativeActionActive
 } = require("../../shared/pageNativeAction")
-
 const ANALYTICS_OVERVIEW_TIMEOUT_MS = 15 * 1000
 const ANALYTICS_CLEANUP_TIMEOUT_MS = 20 * 1000
-
 function buildMetrics(metrics, conversionRate) {
   const source = metrics && typeof metrics === "object" ? metrics : {}
   return [
@@ -19,7 +17,6 @@ function buildMetrics(metrics, conversionRate) {
     { key: "conversion", label: "详情转化率", value: `${Number(conversionRate) || 0}%`, tone: "accent", icon: "chart" }
   ]
 }
-
 function buildFunnel(metrics) {
   const source = metrics && typeof metrics === "object" ? metrics : {}
   const list = [
@@ -37,7 +34,6 @@ function buildFunnel(metrics) {
     rate: firstStageValue ? Math.min(100, Math.round((item.value / firstStageValue) * 100)) : 0
   }))
 }
-
 function buildDecisionItems(metrics) {
   const source = metrics && typeof metrics === "object" ? metrics : {}
   return [
@@ -56,7 +52,6 @@ function buildDecisionItems(metrics) {
     }
   ]
 }
-
 function buildQuoteMetrics(metrics) {
   const source = metrics && typeof metrics === "object" ? metrics : {}
   return [
@@ -66,7 +61,6 @@ function buildQuoteMetrics(metrics) {
     { key: "adjustment", label: "调整申请", value: Number(source.adjustmentRequests) || 0, meta: "用户主动申请调整次数" }
   ]
 }
-
 function buildTrustProfileMetrics(metrics) {
   const source = metrics && typeof metrics === "object" ? metrics : {}
   return [
@@ -75,7 +69,6 @@ function buildTrustProfileMetrics(metrics) {
     { key: "booking", label: "预约发起比", value: `${Number(source.bookingStartRate) || 0}%`, meta: `${Number(source.bookingStarts) || 0} 次预约 / ${Number(source.profileViews) || 0} 次档案查看` }
   ]
 }
-
 function buildContentMetrics(metrics) {
   const source = metrics && typeof metrics === "object" ? metrics : {}
   return [
@@ -85,7 +78,6 @@ function buildContentMetrics(metrics) {
     { key: "confirmed", label: "内容到确认预约转化率", value: `${Number(source.confirmedConversionRate) || 0}%`, meta: `${Number(source.confirmedBookings) || 0} 次报价确认` }
   ]
 }
-
 function buildTrend(trend) {
   const list = Array.isArray(trend) ? trend : []
   const max = Math.max(...list.map((item) => Number(item.value) || 0), 1)
@@ -98,7 +90,6 @@ function buildTrend(trend) {
     }
   })
 }
-
 function buildContentTrendItems(trend) {
   const list = Array.isArray(trend) ? trend : []
   const max = Math.max(...list.map((item) => Number(item.total) || 0), 1)
@@ -121,14 +112,12 @@ function buildContentTrendItems(trend) {
     }
   })
 }
-
 const SCENE_LABEL_MAP = {
   weekend_trip: "周末自驾",
   business_reception: "商务接待",
   group_travel: "组队出游",
   ev_experience: "新能源试驾"
 }
-
 function buildSceneFunnelItems(sceneFunnels) {
   const list = Array.isArray(sceneFunnels) ? sceneFunnels : []
   return list.map((item) => {
@@ -162,7 +151,6 @@ function buildSceneFunnelItems(sceneFunnels) {
     }
   })
 }
-
 Page({
   data: {
     pageAuthorized: false,
@@ -197,7 +185,6 @@ Page({
     canCleanup: false,
     cleanupLoading: false
   },
-
   onLoad() {
     activatePageNativeActions(this)
     requirePagePermission(this, {
@@ -212,7 +199,6 @@ Page({
       }
     })
   },
-
   onPullDownRefresh() {
     if (!this.data.pageAuthorized || this.data.cleanupLoading) {
       wx.stopPullDownRefresh()
@@ -220,7 +206,6 @@ Page({
     }
     this.fetchOverview(() => wx.stopPullDownRefresh())
   },
-
   onUnload() {
     cancelPagePermissionCheck(this)
     cancelPageNativeActions(this)
@@ -229,7 +214,6 @@ Page({
     this.finishOverviewRequestEffects()
     this.finishCleanupRequestEffects()
   },
-
   handlePeriodTap(event) {
     const days = Number(event.currentTarget.dataset.days)
     if (
@@ -243,7 +227,6 @@ Page({
     this.setData({ days })
     this.fetchOverview()
   },
-
   handleTopNTap(event) {
     const topN = Number(event.currentTarget.dataset.topn)
     if (
@@ -257,19 +240,16 @@ Page({
     this.setData({ topN })
     this.fetchOverview()
   },
-
   handleRetry() {
     if (this.data.loading || this.data.cleanupLoading) {
       return
     }
     this.fetchOverview()
   },
-
   handleCleanup() {
     if (this.data.loading || this.data.cleanupLoading || !this.data.canCleanup) {
       return
     }
-
     const action = beginPageNativeAction(this, {
       exclusiveKey: "analytics-cleanup-confirmation"
     })
@@ -285,7 +265,6 @@ Page({
       }
     })
   },
-
   runCleanup() {
     if (
       this.data.loading ||
@@ -296,14 +275,12 @@ Page({
     ) {
       return
     }
-
     const requestId = Number(this._cleanupRequestId || 0) + 1
     this._cleanupRequestId = requestId
     this.finishCleanupRequestEffects()
     this.setData({ cleanupLoading: true })
     wx.showLoading({ title: "清理中…", mask: true })
     this._cleanupLoadingVisible = true
-
     let settled = false
     const isCurrent = () => this._cleanupRequestId === requestId
     const finishRequest = () => {
@@ -324,11 +301,9 @@ Page({
       })
       this.setData({ cleanupLoading: false })
     }
-
     this._cleanupRequestTimer = setTimeout(() => {
       handleFailure("清理超时，请重试")
     }, ANALYTICS_CLEANUP_TIMEOUT_MS)
-
     const requestOptions = {
       name: "analyticsCleanup",
       data: {
@@ -347,7 +322,6 @@ Page({
           })
           return
         }
-
         let cleanupResultSettled = false
         const finishCleanupResult = () => {
           if (cleanupResultSettled || !isCurrent()) {
@@ -379,14 +353,12 @@ Page({
       },
       complete: () => {}
     }
-
     try {
       wx.cloud.callFunction(requestOptions)
     } catch (error) {
       handleFailure(error && (error.errMsg || error.message))
     }
   },
-
   fetchOverview(done) {
     const requestId = Number(this._overviewRequestId || 0) + 1
     this._overviewRequestId = requestId
@@ -401,7 +373,6 @@ Page({
       }
       return
     }
-
     this._overviewRequestDone = typeof done === "function" ? done : null
     const days = this.data.days
     const topN = this.data.topN
@@ -410,7 +381,6 @@ Page({
       loadError: "",
       noPermission: false
     })
-
     let settled = false
     const finishRequest = () => {
       if (settled || this._overviewRequestId !== requestId) {
@@ -430,11 +400,9 @@ Page({
         noPermission: false
       })
     }
-
     this._overviewRequestTimer = setTimeout(() => {
       handleFailure("数据分析加载超时，请检查网络后重试")
     }, ANALYTICS_OVERVIEW_TIMEOUT_MS)
-
     const requestOptions = {
       name: "analyticsOverview",
       data: {
@@ -490,14 +458,12 @@ Page({
       },
       complete: () => {}
     }
-
     try {
       wx.cloud.callFunction(requestOptions)
     } catch (error) {
       handleFailure(error && (error.errMsg || error.message))
     }
   },
-
   finishOverviewRequestEffects() {
     if (this._overviewRequestTimer) {
       clearTimeout(this._overviewRequestTimer)
@@ -509,7 +475,6 @@ Page({
       done()
     }
   },
-
   finishCleanupRequestEffects() {
     if (this._cleanupRequestTimer) {
       clearTimeout(this._cleanupRequestTimer)

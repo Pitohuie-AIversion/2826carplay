@@ -1,4 +1,5 @@
 const { formatToastTitle } = require("../../shared/uiFeedback")
+const { markUnsaved, clearUnsaved } = require("../../shared/unsavedChanges")
 const {
   activatePageNativeActions,
   beginPageNativeAction,
@@ -153,7 +154,31 @@ Page({
 
   onLoad() {
     activatePageNativeActions(this)
+    try {
+      if (typeof wx !== "undefined" && typeof wx.getStorageSync === "function") {
+        const snapshot = wx.getStorageSync("privacy_requests_snapshot")
+        if (Array.isArray(snapshot) && snapshot.length > 0) {
+          this.applyRequestList(snapshot, {
+            filter: this.data.currentFilter,
+            page: 0,
+            hasMore: true
+          })
+          this.setData({ initialLoading: false, loading: false })
+        }
+      }
+    } catch (e) {}
     this.fetchList()
+  },
+
+  onReachBottom() {
+    this.handleLoadMore()
+  },
+
+  handleLoadMore() {
+    if (this.data.loading || this.data.submitting || !this.data.hasMore) {
+      return
+    }
+    this.fetchList({ append: true })
   },
 
   onPullDownRefresh() {
@@ -169,6 +194,7 @@ Page({
   },
 
   onUnload() {
+    clearUnsaved(this)
     cancelPageNativeActions(this)
     this._listRequestId = Number(this._listRequestId || 0) + 1
     this._submitRequestSerial = Number(this._submitRequestSerial || 0) + 1
@@ -199,7 +225,13 @@ Page({
     if (this.data.submitting) {
       return
     }
-    this.setData(buildDescriptionState((event.detail && event.detail.value) || ""))
+    const value = (event.detail && event.detail.value) || ""
+    if (value.trim().length > 0) {
+      markUnsaved(this)
+    } else {
+      clearUnsaved(this)
+    }
+    this.setData(buildDescriptionState(value))
   },
 
   handleRecordFilterTap(event) {
@@ -296,6 +328,7 @@ Page({
           })
           return
         }
+        clearUnsaved(this)
         this.setData({
           ...buildDescriptionState(""),
           submitting: false
@@ -566,6 +599,9 @@ Page({
           ? result.list
           : []
         const nextList = append ? this.data.list.concat(list) : list
+        if (!append && typeof wx !== "undefined" && typeof wx.setStorageSync === "function") {
+          try { wx.setStorageSync("privacy_requests_snapshot", nextList) } catch (e) {}
+        }
         this.applyRequestList(nextList, {
           filter: this.data.currentFilter,
           page: Number.isInteger(result.page) ? result.page : nextPage,

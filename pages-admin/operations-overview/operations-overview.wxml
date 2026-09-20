@@ -1,6 +1,5 @@
 ﻿<view wx:if="{{pageAuthorized}}" class="overview-page management-page">
   <view class="page-glow"></view>
-
   <view class="hero-card ui-card ui-card-gradient">
     <view class="hero-top">
       <view class="hero-copy">
@@ -21,7 +20,6 @@
     </view>
     <view class="hero-sync {{syncStateClass}}" aria-role="group" aria-label="运营数据同步进度 {{syncProgress}}%，{{syncStateLabel}}"><view class="hero-sync-track" aria-hidden="true"><view class="hero-sync-progress" style="width: {{syncProgress}}%;"></view></view><view class="hero-sync-meta"><view>{{syncStateLabel}}</view><view>{{syncProgress}}%</view></view></view>
   </view>
-
   <view wx:if="{{loading}}" class="overview-skeleton" aria-hidden="true">
     <view class="overview-skeleton-pulse ui-card">
       <view class="overview-skeleton-stat" wx:for="{{[1, 2, 3]}}" wx:key="*this">
@@ -50,7 +48,6 @@
       </view>
     </view>
   </view>
-
   <view wx:else>
     <view wx:if="{{loadError}}" class="error-card ui-card">
       <view class="error-native-icon" aria-hidden="true"></view>
@@ -60,7 +57,6 @@
       </view>
       <button class="retry-button ui-btn ui-btn-ghost" bindtap="handleRefresh"><view class="retry-native-icon" aria-hidden="true"></view>重试</button>
     </view>
-
     <view wx:if="{{vehicleLoaded || bookingLoaded || summaryLoaded}}" class="pulse-strip ui-card">
       <view class="pulse-item">
         <view class="pulse-native-icon pulse-native-icon-action" aria-hidden="true"></view>
@@ -80,7 +76,6 @@
         <view class="pulse-label">数据完整度</view>
       </view>
     </view>
-
     <view class="section-card ui-card">
       <view class="section-heading">
         <view class="section-heading-icon-wrap">
@@ -111,7 +106,6 @@
         </view>
       </view>
     </view>
-
     <view wx:if="{{canManageBookings}}" class="section-card ui-card">
       <view class="section-heading">
         <view class="section-heading-icon-wrap">
@@ -132,7 +126,6 @@
         <view class="inline-empty-copy"><view class="inline-empty-title">预约统计暂时不可用</view><view class="inline-empty-desc">已同步的其他模块不受影响，可稍后刷新重试</view></view>
       </view>
     </view>
-
     <view wx:if="{{canManageVehicles}}" class="section-card ui-card">
       <view class="section-heading">
         <view class="section-heading-icon-wrap">
@@ -153,7 +146,6 @@
         <view class="inline-empty-copy"><view class="inline-empty-title">车辆统计暂时不可用</view><view class="inline-empty-desc">已同步的其他模块不受影响，可稍后刷新重试</view></view>
       </view>
     </view>
-
     <view wx:if="{{canManageBookings && recentBookings.length}}" class="section-card ui-card">
       <view class="section-heading">
         <view class="section-heading-icon-wrap">
@@ -183,7 +175,6 @@
         <view class="recent-chevron" aria-hidden="true"></view>
       </view>
     </view>
-
     <view wx:if="{{canManageVehicles && recentVehicles.length}}" class="section-card ui-card">
       <view class="section-heading">
         <view class="section-heading-icon-wrap">

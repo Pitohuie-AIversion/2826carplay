@@ -1,5 +1,4 @@
 @import "../../shared/management-shell.wxss";
-
 .calendar-page {
   min-height: 100vh;
   padding: 24rpx calc(24rpx + env(safe-area-inset-right)) calc(70rpx + env(safe-area-inset-bottom)) calc(24rpx + env(safe-area-inset-left));
@@ -7,7 +6,6 @@
   box-sizing: border-box;
   color: #eef2f7;
 }
-
 .hero-card,
 .calendar-card,
 .day-card,
@@ -15,161 +13,134 @@
   margin-bottom: 22rpx;
   padding: 28rpx;
 }
-
 .calendar-skeleton {
   position: relative;
   z-index: 1;
 }
-
 .calendar-skeleton-summary-value {
   width: 64rpx;
   height: 34rpx;
   margin: 0 auto;
   border-radius: 10rpx;
 }
-
 .calendar-skeleton-summary-label {
   width: 82rpx;
   height: 17rpx;
   margin: 12rpx auto 0;
   border-radius: 7rpx;
 }
-
 .calendar-skeleton-month-button {
   width: 58rpx;
   height: 58rpx;
   border-radius: 50%;
 }
-
 .calendar-skeleton-month-copy {
   display: flex;
   align-items: center;
   flex-direction: column;
 }
-
 .calendar-skeleton-month-kicker {
   width: 190rpx;
   height: 15rpx;
   border-radius: 7rpx;
 }
-
 .calendar-skeleton-month-title {
   width: 128rpx;
   height: 27rpx;
   margin-top: 10rpx;
   border-radius: 8rpx;
 }
-
 .calendar-skeleton-weekdays {
   padding-bottom: 14rpx;
 }
-
 .calendar-skeleton-weekday {
   width: 18rpx;
   height: 16rpx;
   margin: 0 auto;
   border-radius: 6rpx;
 }
-
 .calendar-skeleton-grid {
   overflow: hidden;
 }
-
 .calendar-skeleton-date {
   display: flex;
   align-items: flex-start;
   justify-content: center;
 }
-
 .calendar-skeleton-date-muted {
   opacity: 0.48;
 }
-
 .calendar-skeleton-date-number {
   width: 22rpx;
   height: 19rpx;
   border-radius: 7rpx;
 }
-
 .calendar-skeleton-date:nth-child(4n) {
   border-color: rgba(96, 151, 237, 0.08);
   background: rgba(72, 126, 209, 0.025);
 }
-
 .calendar-skeleton-legend {
   display: flex;
   justify-content: flex-end;
   margin-top: 18rpx;
 }
-
 .calendar-skeleton-legend-item {
   width: 82rpx;
   height: 15rpx;
   margin-left: 20rpx;
   border-radius: 7rpx;
 }
-
 .calendar-skeleton-day {
   opacity: 0.72;
 }
-
 .calendar-skeleton-day-heading,
 .calendar-skeleton-booking-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
-
 .calendar-skeleton-day-kicker {
   width: 168rpx;
   height: 15rpx;
   border-radius: 7rpx;
 }
-
 .calendar-skeleton-day-title {
   width: 204rpx;
   height: 25rpx;
   margin-top: 10rpx;
   border-radius: 8rpx;
 }
-
 .calendar-skeleton-day-index {
   width: 34rpx;
   height: 19rpx;
   border-radius: 7rpx;
 }
-
 .calendar-skeleton-booking-row {
   margin-top: 24rpx;
   padding-top: 20rpx;
   border-top: 1rpx solid rgba(255, 255, 255, 0.05);
 }
-
 .calendar-skeleton-booking-copy {
   flex: 1;
   min-width: 0;
 }
-
 .calendar-skeleton-booking-title {
   width: 54%;
   height: 21rpx;
   border-radius: 7rpx;
 }
-
 .calendar-skeleton-booking-line {
   width: 72%;
   height: 16rpx;
   margin-top: 11rpx;
   border-radius: 7rpx;
 }
-
 .calendar-skeleton-booking-status {
   width: 92rpx;
   height: 38rpx;
   margin-left: 20rpx;
   border-radius: 999rpx;
 }
-
 .hero-top,
 .month-switcher,
 .section-heading,
@@ -179,7 +150,6 @@
   align-items: center;
   justify-content: space-between;
 }
-
 .page-kicker,
 .month-kicker,
 .section-eyebrow {
@@ -188,32 +158,27 @@
   font-weight: 650;
   letter-spacing: 2.5rpx;
 }
-
 .hero-title {
   margin-top: 7rpx;
   font-size: 38rpx;
   font-weight: 700;
 }
-
 .hero-desc {
   margin-top: 10rpx;
   color: #8996a6;
   font-size: 21rpx;
 }
-
 .hero-emblem {
   width: 80rpx;
   height: 80rpx;
   border: 1rpx solid rgba(105, 155, 236, 0.25);
   border-radius: 50%;
 }
-
 .summary-grid {
   display: flex;
   justify-content: space-between;
   margin-bottom: 22rpx;
 }
-
 .conflict-overview,
 .day-conflict-tip {
   display: flex;
@@ -227,7 +192,6 @@
   font-size: 17rpx;
   line-height: 1.55;
 }
-
 .conflict-overview-mark {
   display: flex;
   flex: 0 0 auto;
@@ -239,7 +203,6 @@
   border: 1rpx solid rgba(237, 166, 91, 0.36);
   border-radius: 50%;
 }
-
 .conflict-alert-icon {
   position: relative;
   width: 3rpx;
@@ -248,7 +211,6 @@
   border-radius: 3rpx;
   background: currentColor;
 }
-
 .conflict-alert-icon::after {
   position: absolute;
   bottom: -5rpx;
@@ -259,14 +221,12 @@
   background: currentColor;
   content: "";
 }
-
 .summary-card {
   width: calc(33.333% - 9rpx);
   padding: 18rpx 10rpx 21rpx;
   text-align: center;
   box-sizing: border-box;
 }
-
 .summary-native-icon {
   position: relative;
   width: 30rpx;
@@ -275,12 +235,10 @@
   color: #7897c4;
   box-sizing: border-box;
 }
-
 .summary-native-icon-calendar {
   border: 2rpx solid currentColor;
   border-radius: 5rpx;
 }
-
 .summary-native-icon-calendar::before {
   position: absolute;
   top: 6rpx;
@@ -290,7 +248,6 @@
   background: currentColor;
   content: "";
 }
-
 .summary-native-icon-calendar::after {
   position: absolute;
   top: -4rpx;
@@ -302,7 +259,6 @@
   box-shadow: 13rpx 0 0 currentColor;
   content: "";
 }
-
 .summary-calendar-grid {
   position: absolute;
   top: 13rpx;
@@ -313,7 +269,6 @@
   background: currentColor;
   box-shadow: 7rpx 0 0 currentColor, 14rpx 0 0 currentColor, 0 7rpx 0 currentColor, 7rpx 7rpx 0 currentColor;
 }
-
 .summary-native-icon-contact {
   display: flex;
   align-items: center;
@@ -322,7 +277,6 @@
   border-radius: 50%;
   color: #efb168;
 }
-
 .summary-contact-handle {
   width: 11rpx;
   height: 18rpx;
@@ -333,7 +287,6 @@
   box-sizing: border-box;
   transform: rotate(-38deg);
 }
-
 .summary-native-icon-vehicle {
   width: 34rpx;
   height: 23rpx;
@@ -343,7 +296,6 @@
   border-radius: 7rpx;
   color: #82b0fa;
 }
-
 .summary-vehicle-window {
   position: absolute;
   top: 4rpx;
@@ -352,7 +304,6 @@
   height: 5rpx;
   border-top: 2rpx solid currentColor;
 }
-
 .summary-vehicle-wheel,
 .booking-vehicle-wheel {
   position: absolute;
@@ -364,47 +315,38 @@
   background: currentColor;
   box-sizing: border-box;
 }
-
 .summary-vehicle-wheel-left,
 .booking-vehicle-wheel-left {
   left: 4rpx;
 }
-
 .summary-vehicle-wheel-right,
 .booking-vehicle-wheel-right {
   right: 4rpx;
 }
-
 .summary-value {
   color: #e9edf4;
   font-size: 34rpx;
   font-weight: 700;
 }
-
 .summary-warning { color: #efb168; }
 .summary-primary { color: #82b0fa; }
-
 .summary-label {
   margin-top: 8rpx;
   color: #788493;
   font-size: 17rpx;
 }
-
 .month-switcher {
   text-align: center;
 }
-
 .month-copy {
   min-width: 0;
 }
-
 .month-title-row {
   display: flex;
   align-items: center;
   justify-content: center;
   margin-top: 5rpx;
 }
-
 .month-button {
   display: flex;
   align-items: center;
@@ -416,12 +358,10 @@
   color: #86b1f4;
   transition: opacity 120ms ease, transform 120ms ease;
 }
-
 .month-button-pressed {
   opacity: 0.7;
   transform: scale(0.9);
 }
-
 .month-chevron {
   width: 12rpx;
   height: 12rpx;
@@ -429,22 +369,18 @@
   border-bottom: 3rpx solid currentColor;
   box-sizing: border-box;
 }
-
 .month-chevron-left {
   margin-left: 5rpx;
   transform: rotate(135deg);
 }
-
 .month-chevron-right {
   margin-right: 5rpx;
   transform: rotate(-45deg);
 }
-
 .month-title {
   font-size: 27rpx;
   font-weight: 650;
 }
-
 .month-current-button {
   display: flex;
   align-items: center;
@@ -461,7 +397,6 @@
   box-sizing: border-box;
   transition: opacity 120ms ease, transform 120ms ease;
 }
-
 .month-current-icon {
   position: relative;
   flex-shrink: 0;
@@ -472,7 +407,6 @@
   border-radius: 50%;
   box-sizing: border-box;
 }
-
 .month-current-icon::after {
   position: absolute;
   top: 3rpx;
@@ -483,36 +417,30 @@
   background: currentColor;
   content: "";
 }
-
 .month-current-button-pressed {
   opacity: 0.72;
   transform: scale(0.96);
 }
-
 .weekday-row,
 .date-grid {
   display: flex;
   flex-wrap: wrap;
 }
-
 .weekday-row {
   margin-top: 25rpx;
   padding-bottom: 12rpx;
   border-bottom: 1rpx solid rgba(255, 255, 255, 0.06);
 }
-
 .weekday-item,
 .date-cell {
   width: 14.2857%;
   text-align: center;
   box-sizing: border-box;
 }
-
 .weekday-item {
   color: #667489;
   font-size: 16rpx;
 }
-
 .date-cell {
   position: relative;
   height: 74rpx;
@@ -522,32 +450,26 @@
   border-radius: 16rpx;
   transition: opacity 120ms ease, transform 120ms ease;
 }
-
 .date-cell-pressed,
 .booking-item-pressed {
   opacity: 0.72;
   transform: scale(0.975);
 }
-
 .date-cell-selected {
   border-color: rgba(102, 161, 255, 0.34);
   background: rgba(84, 143, 255, 0.11);
 }
-
 .date-cell-conflict {
   border-color: rgba(235, 155, 74, 0.38);
   background: rgba(209, 123, 36, 0.09);
 }
-
 .date-cell-selected.date-cell-conflict {
   box-shadow: 0 0 0 3rpx rgba(84, 143, 255, 0.16);
 }
-
 .date-cell-today .date-number {
   color: #8bb8ff;
   font-weight: 700;
 }
-
 .date-cell-today::after {
   position: absolute;
   right: 0;
@@ -561,12 +483,10 @@
   box-shadow: 0 0 9rpx rgba(108, 161, 245, 0.5);
   content: "";
 }
-
 .date-number {
   color: #a9b2bf;
   font-size: 19rpx;
 }
-
 .date-count {
   position: absolute;
   right: 5rpx;
@@ -581,7 +501,6 @@
   line-height: 28rpx;
   box-sizing: border-box;
 }
-
 .pending-dot {
   width: 7rpx;
   height: 7rpx;
@@ -589,7 +508,6 @@
   border-radius: 50%;
   background: #ecaa5d;
 }
-
 .calendar-legend {
   display: flex;
   flex-wrap: wrap;
@@ -599,13 +517,11 @@
   color: #6f7c8c;
   font-size: 15rpx;
 }
-
 .calendar-legend view {
   display: flex;
   align-items: center;
   white-space: nowrap;
 }
-
 .legend-dot,
 .legend-swatch {
   display: inline-block;
@@ -615,47 +531,38 @@
   margin-right: 8rpx;
   border-radius: 50%;
 }
-
 .legend-swatch {
   width: 11rpx;
   height: 11rpx;
   box-sizing: border-box;
 }
-
 .legend-today {
   border: 2rpx solid #6ca1f5;
   background: transparent;
 }
-
 .legend-selected {
   border: 1rpx solid rgba(102, 161, 255, 0.5);
   border-radius: 3rpx;
   background: rgba(84, 143, 255, 0.2);
 }
-
 .legend-booking { background: #6ca1f5; }
 .legend-pending { background: #ecaa5d; }
 .legend-conflict { background: #dc6f55; }
-
 .section-title {
   margin-top: 5rpx;
   font-size: 25rpx;
   font-weight: 650;
 }
-
 .section-index {
   color: #58687f;
   font-size: 16rpx;
 }
-
 .booking-list {
   margin-top: 18rpx;
 }
-
 .day-conflict-tip {
   margin: 18rpx 0 0;
 }
-
 .day-conflict-icon {
   display: flex;
   align-items: center;
@@ -667,13 +574,11 @@
   border: 1rpx solid rgba(237, 166, 91, 0.32);
   border-radius: 50%;
 }
-
 .booking-item {
   padding: 20rpx 0;
   border-bottom: 1rpx solid rgba(255, 255, 255, 0.06);
   transition: opacity 120ms ease, transform 120ms ease;
 }
-
 .booking-item-conflict {
   margin: 0 -14rpx;
   padding: 20rpx 14rpx;
@@ -681,13 +586,11 @@
   border-radius: 16rpx;
   background: rgba(220, 111, 85, 0.055);
 }
-
 .booking-vehicle-row {
   display: flex;
   align-items: center;
   min-width: 0;
 }
-
 .booking-vehicle-icon {
   position: relative;
   flex-shrink: 0;
@@ -699,7 +602,6 @@
   color: #6f96ce;
   box-sizing: border-box;
 }
-
 .booking-vehicle-window {
   position: absolute;
   top: 4rpx;
@@ -708,7 +610,6 @@
   height: 4rpx;
   border-top: 2rpx solid currentColor;
 }
-
 .booking-conflict-chip {
   flex: 0 0 auto;
   margin-left: 12rpx;
@@ -719,20 +620,16 @@
   color: #e08b77;
   font-size: 14rpx;
 }
-
 .booking-item:last-child {
   border-bottom: 0;
 }
-
 .booking-item.booking-item-conflict:last-child {
   border-bottom: 1rpx solid rgba(220, 111, 85, 0.2);
 }
-
 .booking-main {
   flex: 1;
   min-width: 0;
 }
-
 .booking-vehicle {
   overflow: hidden;
   font-size: 21rpx;
@@ -740,7 +637,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
 .booking-meta,
 .booking-range {
   display: flex;
@@ -749,7 +645,6 @@
   color: #778392;
   font-size: 16rpx;
 }
-
 .booking-document-icon {
   position: relative;
   flex-shrink: 0;
@@ -760,7 +655,6 @@
   border-radius: 3rpx;
   box-sizing: border-box;
 }
-
 .booking-document-line,
 .booking-document-icon::after {
   position: absolute;
@@ -771,15 +665,12 @@
   background: #63748c;
   content: "";
 }
-
 .booking-document-line {
   top: 5rpx;
 }
-
 .booking-document-icon::after {
   top: 11rpx;
 }
-
 .booking-calendar-icon {
   position: relative;
   flex-shrink: 0;
@@ -790,7 +681,6 @@
   border-radius: 3rpx;
   box-sizing: border-box;
 }
-
 .booking-calendar-icon::before {
   position: absolute;
   top: 4rpx;
@@ -800,20 +690,17 @@
   background: #63748c;
   content: "";
 }
-
 .booking-route {
   display: flex;
   align-items: center;
   width: 34rpx;
   margin: 0 8rpx;
 }
-
 .booking-route-line {
   flex: 1;
   height: 1rpx;
   background: linear-gradient(90deg, #5b83bd, rgba(91, 131, 189, 0.18));
 }
-
 .booking-route-chevron {
   width: 6rpx;
   height: 6rpx;
@@ -822,11 +709,9 @@
   box-sizing: border-box;
   transform: rotate(-45deg);
 }
-
 .booking-side {
   margin-left: 16rpx;
 }
-
 .status-pill {
   display: flex;
   align-items: center;
@@ -836,7 +721,6 @@
   color: #82aef3;
   font-size: 15rpx;
 }
-
 .status-pill-dot {
   flex-shrink: 0;
   width: 7rpx;
@@ -846,17 +730,14 @@
   background: currentColor;
   box-shadow: 0 0 9rpx currentColor;
 }
-
 .status-pending {
   background: rgba(237, 170, 87, 0.1);
   color: #edaf67;
 }
-
 .status-completed {
   background: rgba(82, 210, 151, 0.1);
   color: #5bd7a0;
 }
-
 .booking-arrow {
   display: flex;
   align-items: center;
@@ -866,7 +747,6 @@
   margin-left: 12rpx;
   color: #5f718a;
 }
-
 .booking-chevron {
   width: 9rpx;
   height: 9rpx;
@@ -875,7 +755,6 @@
   box-sizing: border-box;
   transform: rotate(-45deg);
 }
-
 .state-card,
 .inline-empty,
 .scope-tip,
@@ -885,7 +764,6 @@
   line-height: 1.65;
   text-align: center;
 }
-
 .state-native-icon {
   display: flex;
   align-items: center;
@@ -898,7 +776,6 @@
   color: #dba064;
   box-sizing: border-box;
 }
-
 .state-alert-mark,
 .tip-alert-mark {
   position: relative;
@@ -908,7 +785,6 @@
   border-radius: 3rpx;
   background: currentColor;
 }
-
 .state-alert-mark::after,
 .tip-alert-mark::after {
   position: absolute;
@@ -920,17 +796,14 @@
   background: currentColor;
   content: "";
 }
-
 .state-title {
   color: #e9edf3;
   font-size: 23rpx;
   font-weight: 600;
 }
-
 .state-desc {
   margin-top: 8rpx;
 }
-
 .retry-button {
   display: flex;
   align-items: center;
@@ -942,13 +815,11 @@
   font-size: 20rpx;
   line-height: 1;
 }
-
 .action-with-icon {
   display: flex;
   align-items: center;
   justify-content: center;
 }
-
 .retry-native-icon {
   position: relative;
   width: 23rpx;
@@ -959,7 +830,6 @@
   border-radius: 50%;
   box-sizing: border-box;
 }
-
 .retry-native-icon::after {
   position: absolute;
   top: -4rpx;
@@ -971,11 +841,9 @@
   content: "";
   transform: rotate(20deg);
 }
-
 .inline-empty {
   padding: 36rpx 0 14rpx;
 }
-
 .inline-empty-icon {
   position: relative;
   width: 42rpx;
@@ -985,7 +853,6 @@
   border-radius: 7rpx;
   box-sizing: border-box;
 }
-
 .inline-empty-icon::before {
   position: absolute;
   top: 9rpx;
@@ -995,7 +862,6 @@
   background: #50637e;
   content: "";
 }
-
 .inline-empty-icon::after {
   position: absolute;
   top: -5rpx;
@@ -1007,7 +873,6 @@
   box-shadow: 19rpx 0 0 #50637e;
   content: "";
 }
-
 .inline-empty-calendar-line {
   position: absolute;
   top: 22rpx;
@@ -1017,20 +882,17 @@
   border-radius: 2rpx;
   background: #50637e;
 }
-
 .inline-empty-title {
   margin-top: 13rpx;
   color: #a7b1bf;
   font-size: 20rpx;
   font-weight: 600;
 }
-
 .inline-empty-desc {
   margin-top: 5rpx;
   color: #687587;
   font-size: 16rpx;
 }
-
 .scope-tip,
 .mode-tip {
   margin-top: 15rpx;
@@ -1040,13 +902,11 @@
   background: rgba(255, 255, 255, 0.025);
   font-size: 16rpx;
 }
-
 .tip-with-icon {
   display: flex;
   align-items: center;
   text-align: left;
 }
-
 .tip-native-icon {
   display: flex;
   align-items: center;
@@ -1060,11 +920,9 @@
   color: #607895;
   box-sizing: border-box;
 }
-
 .tip-native-icon-alert {
   color: #bd8552;
 }
-
 .tip-info-mark {
   position: relative;
   width: 3rpx;
@@ -1073,7 +931,6 @@
   border-radius: 2rpx;
   background: currentColor;
 }
-
 .tip-info-mark::before {
   position: absolute;
   top: -6rpx;
@@ -1084,17 +941,14 @@
   background: currentColor;
   content: "";
 }
-
 .date-cell-blocked {
   border-color: rgba(196, 126, 77, 0.38);
   background: rgba(151, 88, 51, 0.12);
 }
-
 .blocked-dot,
 .legend-blocked {
   background: #d58b58;
 }
-
 .blocked-dot {
   position: absolute;
   right: 9rpx;
@@ -1103,18 +957,15 @@
   height: 7rpx;
   border-radius: 50%;
 }
-
 .calendar-resource-card,
 .calendar-editor-card {
   margin-top: 18rpx;
 }
-
 .resource-list {
   display: flex;
   flex-direction: column;
   gap: 12rpx;
 }
-
 .resource-item {
   display: flex;
   align-items: center;
@@ -1125,37 +976,31 @@
   border-radius: 16rpx;
   background: rgba(255, 255, 255, 0.025);
 }
-
 .resource-main {
   min-width: 0;
 }
-
 .resource-title {
   color: #d8e0ea;
   font-size: 21rpx;
   font-weight: 650;
 }
-
 .resource-meta,
 .resource-reason {
   margin-top: 6rpx;
   color: #718096;
   font-size: 16rpx;
 }
-
 .resource-price {
   margin-top: 7rpx;
   color: #d5a36e;
   font-size: 22rpx;
   font-weight: 700;
 }
-
 .resource-actions {
   display: flex;
   flex-shrink: 0;
   gap: 8rpx;
 }
-
 .resource-button,
 .calendar-save-button,
 .calendar-cancel-button {
@@ -1167,17 +1012,14 @@
   font-size: 17rpx;
   line-height: 2.3;
 }
-
 .resource-button-danger {
   border-color: rgba(190, 103, 85, 0.3);
   background: rgba(145, 70, 58, 0.12);
   color: #d59b8f;
 }
-
 .compact-empty {
   padding: 20rpx;
 }
-
 .calendar-form-control,
 .calendar-form-textarea {
   width: 100%;
@@ -1190,12 +1032,10 @@
   font-size: 19rpx;
   box-sizing: border-box;
 }
-
 .calendar-form-control-pressed {
   border-color: rgba(91, 143, 210, 0.35);
   background: rgba(70, 108, 157, 0.12);
 }
-
 .calendar-form-control .picker-chevron {
   float: right;
   width: 10rpx;
@@ -1205,40 +1045,33 @@
   border-bottom: 2rpx solid #6f829a;
   transform: rotate(45deg);
 }
-
 .calendar-form-counter {
   margin-top: 10rpx;
   color: #66758a;
   font-size: 15rpx;
   text-align: right;
 }
-
 .calendar-form-readonly {
   color: #d6a774;
 }
-
 .calendar-form-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12rpx;
 }
-
 .calendar-form-textarea {
   min-height: 110rpx;
 }
-
 .calendar-form-actions {
   display: flex;
   gap: 12rpx;
   margin-top: 14rpx;
 }
-
 .calendar-save-button,
 .calendar-cancel-button {
   flex: 1;
   padding: 5rpx 12rpx;
 }
-
 .calendar-save-button {
   background: rgba(73, 116, 174, 0.24);
   color: #c5d8f1;

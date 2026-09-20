@@ -10,7 +10,6 @@
       <image class="hero-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
     </view>
   </view>
-
   <view class="filter-card ui-card">
     <view class="section-heading">
       <view>
@@ -39,7 +38,6 @@
         aria-label="清空搜索关键词"
       ><view class="management-search-clear-icon" aria-hidden="true"></view></button>
     </view>
-
     <view class="func-scroll-shell ui-scroll-shell">
       <scroll-view class="func-scroll" scroll-x scroll-with-animation scroll-into-view="error-func-{{currentFunc}}" enhanced enable-flex show-scrollbar="{{false}}" aria-label="异常来源筛选，可横向滑动">
         <view class="func-list">
@@ -60,12 +58,10 @@
       </scroll-view>
       <view wx:if="{{funcOptions.length > 3}}" class="ui-scroll-cue" aria-hidden="true"></view>
     </view>
-
     <view class="actions">
       <button class="action-btn ui-btn ui-btn-primary" bindtap="handleSearch"><view class="button-native-icon query-native-icon" aria-hidden="true"></view>查询</button>
       <button class="action-btn action-btn-last ui-btn ui-btn-ghost" loading="{{exporting}}" disabled="{{loading || exporting}}" bindtap="handleExport"><view wx:if="{{!exporting}}" class="button-native-icon export-native-icon" aria-hidden="true"></view><text>{{exporting ? '正在导出' : '导出 CSV'}}</text></button>
     </view>
-
     <view wx:if="{{exportFilePath}}" class="export-actions">
       <view class="export-tip"><view class="file-native-icon" aria-hidden="true"></view><view class="export-tip-copy"><view class="export-tip-label">诊断文件已就绪</view><view class="export-tip-name">{{exportFileName}}</view></view></view>
       <view class="export-buttons">
@@ -74,14 +70,12 @@
         <button class="export-button export-button-danger ui-btn ui-btn-ghost" disabled="{{exporting}}" bindtap="handleDeleteExportedFile"><view class="export-action-icon delete-native-icon" aria-hidden="true"></view>删除</button>
       </view>
     </view>
-
     <view class="filter-result-bar">
       <view class="filter-result-state"><view class="filter-result-dot"></view><view>诊断范围</view></view>
       <view class="filter-result-value">{{currentFuncLabel}} · {{total}}{{truncated ? '+' : ''}} 条</view>
     </view>
     <view wx:if="{{truncated}}" class="result-warning"><view class="warning-native-icon" aria-hidden="true"></view><view>当前最多展示已读取的 2000 条记录，请缩小筛选范围。</view></view>
   </view>
-
   <view wx:if="{{(initialLoading || loading) && !list.length}}" class="log-list-skeleton log-list-skeleton-error" aria-hidden="true">
     <view class="log-skeleton-heading">
       <view>
@@ -108,7 +102,6 @@
       <view class="log-skeleton-line log-skeleton-line-short manage-skeleton-pulse"></view>
     </view>
   </view>
-
   <view wx:elif="{{list.length}}" class="error-list">
     <view class="list-heading">
       <view>
@@ -143,13 +136,11 @@
         </view>
       </view>
     </view>
-
     <view class="load-more">
       <button wx:if="{{hasMore && !loading}}" class="load-more-btn ui-btn ui-btn-ghost" bindtap="handleLoadMore"><view class="log-action-content"><view class="load-more-native-icon" aria-hidden="true"></view><text>加载更多</text></view></button>
       <view wx:elif="{{!hasMore}}" class="load-more-end"><view class="load-complete-native-icon" aria-hidden="true"></view><text>已加载全部</text></view>
     </view>
   </view>
-
   <view wx:else class="empty ui-card">
     <image class="manage-empty-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
     <view class="manage-empty-kicker">SYSTEM HEALTHY</view>

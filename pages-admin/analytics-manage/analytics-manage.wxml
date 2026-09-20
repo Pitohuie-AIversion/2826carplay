@@ -1,6 +1,5 @@
 <view wx:if="{{pageAuthorized}}" class="analytics-page management-page">
   <view class="page-glow"></view>
-
   <view class="hero-card ui-card ui-card-gradient">
     <view class="hero-top">
       <view>
@@ -26,7 +25,6 @@
       </view>
     </view>
   </view>
-
   <view wx:if="{{loading}}" class="analytics-skeleton" aria-hidden="true">
     <view class="metric-grid">
       <view class="metric-card metric-skeleton-card ui-card" wx:for="{{[1, 2, 3, 4]}}" wx:key="*this">
@@ -63,21 +61,18 @@
       </view>
     </view>
   </view>
-
   <view wx:elif="{{loadError}}" class="state-card ui-card">
     <view class="analytics-state-icon" aria-hidden="true"><view class="analytics-state-mark"></view></view>
     <view class="state-title">暂时无法加载数据</view>
     <view class="state-desc">{{loadError}}</view>
     <button class="retry-button ui-btn ui-btn-ghost" bindtap="handleRetry"><view class="analytics-action-content"><view class="analytics-action-native-icon analytics-retry-native-icon" aria-hidden="true"></view><text>重新加载</text></view></button>
   </view>
-
   <view wx:elif="{{noPermission}}" class="state-card ui-card no-permission-state">
     <view class="analytics-state-icon no-permission-icon" aria-hidden="true"><view class="analytics-state-mark no-permission-mark"></view></view>
     <view class="state-title">无权查看数据分析</view>
     <view class="state-desc">当前账号没有数据分析查看权限。请联系管理员在角色管理里授予「车辆管理」「预约管理」或「角色管理」任意一项权限。</view>
     <button class="retry-button ui-btn ui-btn-ghost" bindtap="handleRetry"><view class="analytics-action-content"><view class="analytics-action-native-icon analytics-retry-native-icon" aria-hidden="true"></view><text>重新检测权限</text></view></button>
   </view>
-
   <block wx:else>
     <view class="metric-grid">
       <view class="metric-card metric-{{item.tone}} ui-card" wx:for="{{metricItems}}" wx:key="key">
@@ -90,7 +85,6 @@
         <view class="metric-value">{{item.value}}</view>
       </view>
     </view>
-
     <view class="section-card ui-card">
       <view class="section-heading">
         <view><view class="section-eyebrow">CONTENT ATTRIBUTION</view><view class="section-title">内容增长与渠道归因</view></view>
@@ -136,7 +130,6 @@
         <view class="rank-item" wx:for="{{topContentSources}}" wx:key="key"><view class="rank-number">{{index + 1}}</view><view class="rank-copy"><view class="rank-name">{{item.channel}} / {{item.scene || 'all'}}</view><view class="rank-meta">事件 {{item.events}} · 预约 {{item.bookingSubmits}} · 确认 {{item.confirmed}}</view></view></view>
       </view>
     </view>
-
     <view class="section-card ui-card">
       <view class="section-heading">
         <view>
@@ -174,7 +167,6 @@
         <view wx:if="{{contentTrendItems.length > 10}}" class="ui-scroll-cue trend-scroll-cue" aria-hidden="true"></view>
       </view>
     </view>
-
     <view class="section-card ui-card">
       <view class="section-heading">
         <view>
@@ -213,7 +205,6 @@
         </view>
       </view>
     </view>
-
     <view class="section-card ui-card">
       <view class="section-heading">
         <view>
@@ -230,7 +221,6 @@
         </view>
       </view>
     </view>
-
     <view class="section-card ui-card">
       <view class="section-heading">
         <view>
@@ -247,7 +237,6 @@
         </view>
       </view>
     </view>
-
     <view class="section-card ui-card">
       <view class="section-heading">
         <view>
@@ -274,7 +263,6 @@
         </view>
       </view>
     </view>
-
     <view class="section-card ui-card">
       <view class="section-heading">
         <view>
@@ -292,7 +280,6 @@
       </view>
       <view class="decision-note">比率为同周期匿名事件汇总，不用于识别或追踪单个用户。</view>
     </view>
-
     <view class="section-card ui-card">
       <view class="section-heading">
         <view>
@@ -316,7 +303,6 @@
         <view wx:if="{{trendItems.length > 10}}" class="ui-scroll-cue trend-scroll-cue" aria-hidden="true"></view>
       </view>
     </view>
-
     <view class="section-card ui-card">
       <view class="section-heading">
         <view>
@@ -341,10 +327,8 @@
         <view class="analytics-empty-desc">产生浏览、收藏或预约行为后，这里会生成车辆热度排行。</view>
       </view>
     </view>
-
     <view wx:if="{{truncated}}" class="scope-tip"><view class="analytics-tip-native-icon analytics-warning-native-icon" aria-hidden="true"><view class="analytics-warning-native-mark"></view></view><text>数据量超过 5000 条，当前统计为最近记录的汇总结果。</text></view>
     <view class="privacy-tip"><view class="analytics-tip-native-icon analytics-lock-native-icon" aria-hidden="true"><view class="analytics-lock-native-shackle"></view></view><text>仅统计事件类型、可选内容 ID、车辆 ID、渠道/场景枚举与时间，不保存用户身份、预约 ID 和表单内容。</text></view>
-
     <view wx:if="{{canCleanup}}" class="section-card cleanup-card ui-card">
       <view class="section-heading">
         <view>

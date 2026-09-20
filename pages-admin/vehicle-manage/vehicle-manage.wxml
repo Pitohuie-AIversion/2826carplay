@@ -11,7 +11,6 @@
     </view>
     <button class="hero-button ui-btn ui-btn-primary" disabled="{{loading || updatingId !== '' || deletingId !== ''}}" bindtap="handleGoCreate"><view class="hero-button-content"><view class="create-native-icon" aria-hidden="true"></view><text>新增车辆</text></view></button>
   </view>
-
   <view class="section-card ui-card">
     <view class="section-heading">
       <view>
@@ -43,7 +42,6 @@
       </view>
       <button class="search-button ui-btn ui-btn-primary" bindtap="handleKeywordConfirm"><view class="vehicle-action-content"><view class="search-action-native-icon" aria-hidden="true"></view><text>查询</text></view></button>
     </view>
-
     <view class="status-scroll-shell ui-scroll-shell">
       <scroll-view class="status-scroll" scroll-x scroll-with-animation scroll-into-view="vehicle-status-{{currentStatus}}" enhanced enable-flex show-scrollbar="{{false}}" aria-label="车辆状态筛选，可横向滑动">
         <view class="status-list">
@@ -64,15 +62,12 @@
       </scroll-view>
       <view wx:if="{{statusOptions.length > 3}}" class="ui-scroll-cue" aria-hidden="true"></view>
     </view>
-
     <view class="action-row">
       <view class="result-count">共 {{total}}{{truncated ? '+' : ''}} 条记录</view>
       <button class="reset-button ui-btn ui-btn-ghost" bindtap="handleReset"><view class="vehicle-action-content"><view class="reset-native-icon" aria-hidden="true"></view><text>重置筛选</text></view></button>
     </view>
   </view>
-
   <view wx:if="{{truncated}}" class="result-limit-tip"><view class="limit-warning-native-icon" aria-hidden="true"><view class="limit-warning-native-mark"></view></view><text>当前最多展示已读取的 2000 辆，请缩小筛选范围。</text></view>
-
   <view class="dashboard-card ui-card ui-card-gradient">
     <view class="dashboard-head">
       <view>
@@ -87,7 +82,6 @@
         <view class="summary-label">{{item.label}}</view>
       </view>
     </view>
-
     <view class="ratio-card">
       <view class="ratio-head">
         <view class="dashboard-title">状态占比</view>
@@ -109,7 +103,6 @@
         </view>
       </view>
     </view>
-
     <view class="archive-dashboard">
       <view class="ratio-head">
         <view class="dashboard-title">可信档案新鲜度</view>
@@ -122,13 +115,11 @@
         </view>
       </view>
     </view>
-
     <view class="recent-block">
       <view class="recent-head">
         <view class="dashboard-title">近 7 天新增车辆</view>
         <view class="dashboard-desc">展示最近新增的 5 辆车，可直接查看详情</view>
       </view>
-
       <view wx:if="{{recentAddedList.length}}" class="recent-list">
         <view wx:for="{{recentAddedList}}" wx:key="id" class="recent-item" data-id="{{item.id}}" bindtap="handleViewDetail" hover-class="recent-item-pressed" aria-role="button" aria-label="查看车辆 {{item.plateNumber || '未填写车牌'}}，{{item.brandModel}} 详情">
           <view class="recent-main">
@@ -139,14 +130,12 @@
           <view class="recent-entry-side"><view class="vehicle-status ui-status {{item.statusClass}}">{{item.statusText}}</view><view class="recent-entry-chevron" aria-hidden="true"></view></view>
         </view>
       </view>
-
       <view wx:else class="recent-empty">
         <view class="recent-empty-native-icon vehicle-recent-empty-native-icon" aria-hidden="true"></view>
         <view class="recent-empty-copy"><view class="recent-empty-title">近 7 天暂无新增车辆</view><view class="recent-empty-desc">新增车辆完成后会显示在这里</view></view>
       </view>
     </view>
   </view>
-
   <view class="loading-wrap" wx:if="{{loading}}" aria-hidden="true">
     <view class="manage-loading-head">
       <view>
@@ -168,7 +157,6 @@
       </view>
     </view>
   </view>
-
   <view class="vehicle-list" wx:elif="{{list.length}}">
     <view class="list-heading">
       <view>
@@ -190,7 +178,6 @@
           </view>
           <view class="image-count-badge"><view class="image-count-icon" aria-hidden="true"></view><text>{{item.imageCount}} 张</text></view>
         </view>
-
         <view class="vehicle-main">
           <view class="vehicle-card-head">
             <view>
@@ -209,7 +196,6 @@
           </view>
         </view>
       </view>
-
       <view class="vehicle-meta-grid">
         <view class="meta-item"><view class="meta-label">车辆类型</view><view class="meta-value">{{item.vehicleTypeText}}</view></view>
         <view class="meta-item"><view class="meta-label">取车城市</view><view class="meta-value">{{item.locationText}}</view></view>
@@ -218,13 +204,11 @@
         <view class="meta-item"><view class="meta-label">燃油类型</view><view class="meta-value">{{item.fuelTypeText}}</view></view>
         <view class="meta-item"><view class="meta-label">座位数</view><view class="meta-value">{{item.seatsText}}</view></view>
       </view>
-
       <view class="vehicle-record-meta">
         <view class="vehicle-record-item"><view class="record-native-icon record-native-icon-date" aria-hidden="true"></view><view><view class="vehicle-record-label">注册日期</view><view class="vehicle-record-value">{{item.registerDate || "—"}}</view></view></view>
         <view class="vehicle-record-item"><view class="record-native-icon record-native-icon-time" aria-hidden="true"></view><view><view class="vehicle-record-label">最近更新</view><view class="vehicle-record-value">{{item.updatedAtText || "—"}}</view></view></view>
         <view class="vehicle-record-item"><view class="record-native-icon record-native-icon-user" aria-hidden="true"></view><view class="vehicle-record-copy"><view class="vehicle-record-label">创建人</view><view class="vehicle-record-value vehicle-record-value-ellipsis">{{item.createdByOpenid || "—"}}</view></view></view>
       </view>
-
       <view wx:if="{{item.status !== 'retired'}}" class="status-op-card">
         <view class="status-op-heading"><view><view class="status-op-title">快速切换状态</view><view class="status-op-desc">状态会同步影响客户侧展示与预约入口</view></view><view class="status-op-live"><view class="status-op-live-dot"></view><text>{{item.statusText}}</text></view></view>
         <view class="status-op-row">
@@ -245,7 +229,6 @@
           </button>
         </view>
       </view>
-
       <view class="card-primary-actions">
         <button class="detail-button ui-btn ui-btn-ghost" data-id="{{item.id}}" disabled="{{loading || updatingId !== '' || deletingId !== ''}}" bindtap="handleViewDetail"><view class="vehicle-action-content"><view class="detail-native-icon" aria-hidden="true"></view><text>查看详情</text></view></button>
         <button class="edit-button ui-btn ui-btn-primary" data-id="{{item.id}}" disabled="{{loading || updatingId !== '' || deletingId !== ''}}" bindtap="handleEdit"><view class="vehicle-action-content"><view class="edit-native-icon" aria-hidden="true"></view><text>编辑车辆</text></view></button>
@@ -259,13 +242,11 @@
         </view>
       </view>
     </view>
-
     <view class="load-more">
       <button wx:if="{{hasMore && !loading}}" class="load-more-btn ui-btn ui-btn-ghost" bindtap="handleLoadMore"><view class="vehicle-action-content"><view class="load-more-native-icon" aria-hidden="true"></view><text>加载更多</text></view></button>
       <view wx:elif="{{!hasMore}}" class="load-more-end"><view class="load-complete-native-icon" aria-hidden="true"></view><text>已加载全部</text></view>
     </view>
   </view>
-
   <view class="empty-card ui-card" wx:else>
     <image class="manage-empty-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
     <view class="manage-empty-kicker">NO MATCHING VEHICLES</view>

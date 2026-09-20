@@ -753,5 +753,49 @@ describe("我的预约旅程状态", () => {
     expect(wxss).toContain(".calendar-native-icon")
     expect(wxss).toContain(".location-native-icon")
   })
+
+  test("pages/bookings 支持 onReachBottom 触底翻页并从 storage 恢复快照", () => {
+    const json = JSON.parse(fs.readFileSync(path.resolve(__dirname, "../pages/bookings/bookings.json"), "utf8"))
+    expect(json.onReachBottomDistance).toBe(200)
+
+    const page = createPage(loadPageDefinition("../pages/bookings/bookings"))
+    page.handleLoadMore = jest.fn()
+    page.onReachBottom()
+    expect(page.handleLoadMore).toHaveBeenCalledTimes(1)
+
+    const mockSnapshot = [
+      { id: "b1", vehicleName: "保时捷 911", status: "confirmed" }
+    ]
+    global.wx = {
+      getStorageSync: jest.fn((key) => {
+        if (key === "bookings_last_snapshot") return mockSnapshot
+        return null
+      }),
+      cloud: { callFunction: jest.fn() }
+    }
+    const page2 = createPage(loadPageDefinition("../pages/bookings/bookings"))
+    page2.applyBookingList = jest.fn()
+    page2.onLoad()
+    expect(page2.applyBookingList).toHaveBeenCalledWith(mockSnapshot, expect.objectContaining({ initialLoading: false }))
+  })
+
+  test("pages/booking-detail 支持冷启动从 storage 快照提取 SWR 数据秒开", () => {
+    const cachedDetail = {
+      booking: { id: "b-swr-1", vehicleName: "法拉利 F8", status: "confirmed" },
+      latestQuote: { status: "confirmed" },
+      handovers: { pickup: {}, return: {} }
+    }
+    global.wx = {
+      getStorageSync: jest.fn((key) => {
+        if (key === "booking_detail_b-swr-1") return cachedDetail
+        return null
+      }),
+      cloud: { callFunction: jest.fn() }
+    }
+    const page = createPage(loadPageDefinition("../pages/booking-detail/booking-detail"))
+    page.applyBooking = jest.fn()
+    page.onLoad({ id: "b-swr-1" })
+    expect(page.applyBooking).toHaveBeenCalledWith(cachedDetail.booking, cachedDetail.latestQuote, cachedDetail.handovers)
+  })
 })
 

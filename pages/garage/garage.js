@@ -281,7 +281,17 @@ Page({
     if (hasAttribution(attribution) && attribution.channel && attribution.channel !== "direct" && isShareLanding()) {
       trackEvent("share_open", attribution.vehicleId, attribution)
     }
-    const app = getApp()
+    const initCategory = String((options && options.category) || "").trim()
+    const initCity = String((options && options.city) || "").trim()
+    const initSortBy = String((options && options.sortBy) || "").trim()
+    if (initCategory || initCity || initSortBy) {
+      this.setData({
+        currentCategory: initCategory || this.data.currentCategory,
+        selectedCity: initCity || this.data.selectedCity,
+        sortBy: initSortBy || this.data.sortBy
+      })
+    }
+    const app = typeof getApp === "function" ? getApp() : null
     const env =
       app &&
       app.globalData &&
@@ -289,7 +299,7 @@ Page({
         ? app.globalData.cloudEnvId
         : undefined
 
-    if (wx.cloud && typeof wx.cloud.init === "function") {
+    if (typeof wx !== "undefined" && wx.cloud && typeof wx.cloud.init === "function") {
       try {
         wx.cloud.init({
           env,
@@ -303,6 +313,15 @@ Page({
         this.loadCars()
       }
     })
+
+    try {
+      if (typeof wx !== "undefined" && typeof wx.getStorageSync === "function") {
+        const snapshot = wx.getStorageSync("garage_last_snapshot")
+        if (snapshot && Array.isArray(snapshot.cars) && snapshot.cars.length > 0) {
+          this.applyCars(snapshot.cars, snapshot.pagination)
+        }
+      }
+    } catch (e) {}
   },
 
   onShow() {
@@ -344,6 +363,10 @@ Page({
         }
       }
     })
+  },
+
+  onReachBottom() {
+    this.handleLoadMore()
   },
 
   onUnload() {
@@ -658,6 +681,14 @@ Page({
         preloadImages(topCovers, { priority: 30 })
       } catch (e) {}
     }
+    if (sortedCars.length > 0 && typeof wx !== "undefined" && typeof wx.setStorageSync === "function") {
+      try {
+        wx.setStorageSync("garage_last_snapshot", {
+          cars: sortedCars,
+          pagination: serverSummary
+        })
+      } catch (e) {}
+    }
   },
 
   filterCars(categoryId, availableOnlyInput, searchKeywordInput, serverSummary, keepSearchDebouncing, selectedCityInput, sortByInput) {
@@ -914,9 +945,13 @@ Page({
 
   onShareAppMessage() {
     trackEvent("share")
+    const params = ["channel=wechat_share"]
+    if (this.data.currentCategory && this.data.currentCategory !== "all") params.push(`category=${encodeURIComponent(this.data.currentCategory)}`)
+    if (this.data.selectedCity) params.push(`city=${encodeURIComponent(this.data.selectedCity)}`)
+    if (this.data.sortBy && this.data.sortBy !== "default") params.push(`sortBy=${encodeURIComponent(this.data.sortBy)}`)
     return {
       title: "极境车库",
-      path: `/pages/garage/garage?${buildQuery({ channel: "wechat_share" })}`
+      path: `/pages/garage/garage?${params.join("&")}`
     }
   }
 })

@@ -12,7 +12,6 @@ const { triggerHapticFeedback } = require("../../shared/hapticFeedback")
 const BOOKING_DETAIL_LOAD_TIMEOUT_MS = 15 * 1000
 const BOOKING_DETAIL_MUTATION_TIMEOUT_MS = 12 * 1000
 const SUBSCRIPTION_REQUEST_TIMEOUT_MS = 15 * 1000
-
 function mapStatusText(status) {
   const value = String(status || "").trim()
   if (value === "contacted") {
@@ -29,7 +28,6 @@ function mapStatusText(status) {
   }
   return "待联系"
 }
-
 function mapStatusClass(status) {
   const value = String(status || "").trim()
   if (value === "contacted") {
@@ -46,17 +44,14 @@ function mapStatusClass(status) {
   }
   return "status-pending"
 }
-
 function canCancelBooking(status) {
   const value = String(status || "").trim()
   return ["pending", "contacted", "quoted", "adjustment_requested", "confirmed"].includes(value)
 }
-
 function canEditBooking(status) {
   const value = String(status || "").trim()
   return value === "pending" || value === "contacted"
 }
-
 function buildStatusGuidance(status) {
   const value = String(status || "pending").trim() || "pending"
   const guidanceMap = {
@@ -98,7 +93,6 @@ function buildStatusGuidance(status) {
   }
   return guidanceMap[value] || guidanceMap.pending
 }
-
 function buildProgressSteps(status) {
   const value = String(status || "pending").trim() || "pending"
   const cancelled = value === "cancelled"
@@ -107,7 +101,6 @@ function buildProgressSteps(status) {
   const labels = cancelled
     ? ["预约已提交", "预约已取消", "流程已结束"]
     : ["预约已提交", "顾问联系", "收到报价", "确认方案", "行程完成"]
-
   return labels.map((label, index) => {
     let stateClass = "progress-upcoming"
     if (index < activeIndex) {
@@ -115,7 +108,6 @@ function buildProgressSteps(status) {
     } else if (index === activeIndex) {
       stateClass = cancelled ? "progress-cancelled" : "progress-current"
     }
-
     return {
       key: `${value}-${index}`,
       label,
@@ -127,11 +119,9 @@ function buildProgressSteps(status) {
     }
   })
 }
-
 function formatYuan(cents) {
   return (Math.max(0, Number(cents || 0)) / 100).toFixed(2)
 }
-
 function normalizeQuote(item) {
   const quote = item && typeof item === "object" ? item : {}
   return {
@@ -155,7 +145,6 @@ function normalizeQuote(item) {
     expiredAtText: formatDisplayTime(quote.expiredAt)
   }
 }
-
 function normalizeHandover(item) {
   if (!item || typeof item !== "object") return {}
   const status = String(item.status || "")
@@ -170,17 +159,14 @@ function normalizeHandover(item) {
     photos: Array.isArray(item.photos) ? item.photos.filter((photo) => photo && photo.url) : []
   }
 }
-
 function formatDisplayTime(value) {
   if (!value) {
     return ""
   }
-
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) {
     return ""
   }
-
   const year = date.getFullYear()
   const month = `${date.getMonth() + 1}`.padStart(2, "0")
   const day = `${date.getDate()}`.padStart(2, "0")
@@ -188,12 +174,10 @@ function formatDisplayTime(value) {
   const minute = `${date.getMinutes()}`.padStart(2, "0")
   return `${year}-${month}-${day} ${hour}:${minute}`
 }
-
 function formatBookingReference(value) {
   const id = String(value || "").trim()
   return id ? `#${id.slice(-8).toUpperCase()}` : "—"
 }
-
 function getJourneySpanText(startDate, endDate) {
   const start = new Date(`${String(startDate || "")}T00:00:00`)
   const end = new Date(`${String(endDate || "")}T00:00:00`)
@@ -203,7 +187,6 @@ function getJourneySpanText(startDate, endDate) {
   const days = Math.round((end.getTime() - start.getTime()) / 86400000)
   return days === 0 ? "当日取还" : `${days} 天跨度`
 }
-
 function normalizeBooking(item) {
   const booking = item && typeof item === "object" ? item : {}
   const status = String(booking.status || "pending").trim() || "pending"
@@ -228,7 +211,6 @@ function normalizeBooking(item) {
     updatedAt: booking.updatedAt || ""
   }
 }
-
 Page({
   data: {
     id: "",
@@ -268,9 +250,7 @@ Page({
       note: ""
     }
   },
-
   applyState(patch) { this.setData(patch) },
-
   onLoad(options) {
     const perf = createPerformanceHelpers(this); this._perf = perf; this.applyState = perf.applyState; this.flushStateNow = perf.flushStateNow;
     this._bookingDetailUnloaded = false
@@ -279,11 +259,9 @@ Page({
       id,
       initialLoading: Boolean(id)
     })
-
-    const app = getApp()
+    const app = typeof getApp === "function" ? getApp() : null
     const env = app && app.globalData && app.globalData.cloudEnvId ? app.globalData.cloudEnvId : undefined
-
-    if (wx.cloud && typeof wx.cloud.init === "function") {
+    if (typeof wx !== "undefined" && wx.cloud && typeof wx.cloud.init === "function") {
       try {
         wx.cloud.init({
           env,
@@ -291,7 +269,14 @@ Page({
         })
       } catch (error) {}
     }
-
+    try {
+      if (id && typeof wx !== "undefined" && typeof wx.getStorageSync === "function") {
+        const cached = wx.getStorageSync(`booking_detail_${id}`)
+        if (cached && cached.booking && cached.booking.id) {
+          this.applyBooking(cached.booking, cached.latestQuote, cached.handovers)
+        }
+      }
+    } catch (e) {}
     const eventChannel = this.getOpenerEventChannel && this.getOpenerEventChannel()
     if (eventChannel && typeof eventChannel.on === "function") {
       const handleBookingDetail = (payload) => {
@@ -313,10 +298,8 @@ Page({
       this._bookingDetailEventHandler = handleBookingDetail
       eventChannel.on("acceptBookingDetail", handleBookingDetail)
     }
-
     this.loadNotificationConfig()
   },
-
   onShow() {
     if (
       this.data.id &&
@@ -331,7 +314,6 @@ Page({
       this.loadDetail()
     }
   },
-
   onPullDownRefresh() {
     if (
       this.data.editing ||
@@ -355,7 +337,6 @@ Page({
       }
     })
   },
-
   onUnload() {
     cancelPageNativeActions(this)
     this._bookingDetailUnloaded = true
@@ -387,7 +368,6 @@ Page({
     this.clearQuoteResponseTimer()
     if (this._perf && typeof this._perf.dispose === 'function') try { this._perf.dispose(); } catch(e) {}
   },
-
   finishDetailLoadEffects() {
     this.clearDetailLoadTimer()
     if (typeof this._detailLoadDone === "function") {
@@ -398,7 +378,6 @@ Page({
       } catch (error) {}
     }
   },
-
   applyBooking(booking, latestQuote, handovers) {
     const quote = normalizeQuote(latestQuote)
     const pickupHandover = normalizeHandover(handovers && handovers.pickup)
@@ -437,8 +416,16 @@ Page({
         note: booking.note
       }
     })
+    if (booking && booking.id && typeof wx !== "undefined" && typeof wx.setStorageSync === "function") {
+      try {
+        wx.setStorageSync(`booking_detail_${booking.id}`, {
+          booking,
+          latestQuote: quote,
+          handovers: { pickup: pickupHandover, return: returnHandover }
+        })
+      } catch (e) {}
+    }
   },
-
   loadNotificationConfig() {
     this.cancelOperationConfigRequest()
     this._cancelOperationConfigRequest = requestOperationConfig({
@@ -452,14 +439,12 @@ Page({
       }
     })
   },
-
   cancelOperationConfigRequest() {
     if (typeof this._cancelOperationConfigRequest === "function") {
       this._cancelOperationConfigRequest()
       this._cancelOperationConfigRequest = null
     }
   },
-
   handleRequestStatusSubscription() {
     const templateId = String(this.data.bookingStatusTemplateId || "").trim()
     if (
@@ -482,7 +467,6 @@ Page({
       })
       return
     }
-
     const requestId = Number(this._subscriptionRequestId || 0) + 1
     this._subscriptionRequestId = requestId
     this.clearSubscriptionRequestTimer()
@@ -508,7 +492,6 @@ Page({
         })
       })
     }, SUBSCRIPTION_REQUEST_TIMEOUT_MS)
-
     try {
       wx.requestSubscribeMessage({
         tmplIds: [templateId],
@@ -546,7 +529,6 @@ Page({
       })
     }
   },
-
   loadDetail(options) {
     if (
       this.data.editing ||
@@ -562,7 +544,6 @@ Page({
     const requestId = Number(this._detailRequestId || 0) + 1
     this._detailRequestId = requestId
     this.finishDetailLoadEffects()
-
     if (!this.data.id) {
       this.applyState({
         initialLoading: false,
@@ -574,7 +555,6 @@ Page({
       }
       return
     }
-
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       this.applyState({
         initialLoading: false,
@@ -588,13 +568,11 @@ Page({
       }
       return
     }
-
     this._detailLoadDone = options && typeof options.done === "function" ? options.done : null
     this.applyState({
       loading: true,
       loadFailed: false
     })
-
     let settled = false
     const finishRequest = () => {
       if (settled || requestId !== this._detailRequestId) {
@@ -620,11 +598,9 @@ Page({
         loadErrorText: String(message || "预约详情加载失败，请稍后重试")
       })
     }
-
     this._detailLoadTimer = setTimeout(() => {
       handleFailure("预约详情加载超时，请检查网络后重试")
     }, BOOKING_DETAIL_LOAD_TIMEOUT_MS)
-
     const bookingId = String(this.data.id || "").trim()
     const requestOptions = {
       name: "bookingMyDetail",
@@ -635,8 +611,10 @@ Page({
         }
         const result = res && res.result ? res.result : null
         const current = result && result.ok ? result.detail : null
-
         if (!current) {
+          if (typeof wx !== "undefined" && typeof wx.removeStorageSync === "function") {
+            try { wx.removeStorageSync(`booking_detail_${bookingId}`) } catch (e) {}
+          }
           wx.showToast({
           title: formatToastTitle(result && result.message, "预约不存在"),
             icon: "none"
@@ -650,21 +628,18 @@ Page({
           })
           return
         }
-
         this.applyBooking(normalizeBooking(current), result.latestQuote, result.handovers)
       },
       fail: (error) => {
         handleFailure((error && (error.errMsg || error.message)) || "预约详情加载失败，请稍后重试")
       }
     }
-
     try {
       wx.cloud.callFunction(requestOptions)
     } catch (error) {
       handleFailure((error && (error.errMsg || error.message)) || "预约详情加载失败，请稍后重试")
     }
   },
-
   clearDetailLoadTimer() {
     if (!this._detailLoadTimer) {
       return
@@ -672,12 +647,10 @@ Page({
     clearTimeout(this._detailLoadTimer)
     this._detailLoadTimer = null
   },
-
   handleAdjustmentInput(event) {
     if (this.data.quoteResponding || this.data.loading) return
     this.setData({ adjustmentNote: String(event.detail && event.detail.value || "").slice(0, 200) })
   },
-
   handleConfirmQuote() {
     if (this.data.quoteResponding || this.data.loading || this.data.booking.status !== "quoted" || !this.data.latestQuote.id) return
     wx.showModal({
@@ -690,7 +663,6 @@ Page({
       }
     })
   },
-
   handleRequestQuoteAdjustment() {
     if (this.data.quoteResponding || this.data.loading || this.data.booking.status !== "quoted" || !this.data.latestQuote.id) return
     if (!String(this.data.adjustmentNote || "").trim()) {
@@ -699,7 +671,6 @@ Page({
     }
     this.respondToQuote("requestAdjustment")
   },
-
   respondToQuote(action) {
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function" || this.data.quoteResponding) return
     const requestId = Number(this._quoteResponseRequestId || 0) + 1
@@ -747,13 +718,11 @@ Page({
       fail(error && (error.errMsg || error.message))
     }
   },
-
   clearQuoteResponseTimer() {
     if (!this._quoteResponseTimer) return
     clearTimeout(this._quoteResponseTimer)
     this._quoteResponseTimer = null
   },
-
   handleCancel() {
     if (
       !this.data.canCancel ||
@@ -766,7 +735,6 @@ Page({
     ) {
       return
     }
-
     const bookingId = String(this.data.id || "").trim()
     const confirmationSerial = Number(this._cancelConfirmationSerial || 0) + 1
     this._cancelConfirmationSerial = confirmationSerial
@@ -798,7 +766,6 @@ Page({
           ) {
             return
           }
-
           if (
             !res ||
             !res.confirm ||
@@ -811,7 +778,6 @@ Page({
           ) {
             return
           }
-
           this._cancelConfirmationSerial = confirmationSerial + 1
           this.cancelBooking(bookingId)
         },
@@ -823,7 +789,6 @@ Page({
       finishConfirmation()
     }
   },
-
   handleStartEdit() {
     if (
       !this.data.canEdit ||
@@ -845,7 +810,6 @@ Page({
       }
     })
   },
-
   handleEditInput(event) {
     if (
       !this.data.editing ||
@@ -868,7 +832,6 @@ Page({
       [`editForm.${field}`]: value
     })
   },
-
   handleCancelEdit() {
     if (
       this.data.loading ||
@@ -882,14 +845,12 @@ Page({
       editing: false
     })
   },
-
   validateEditForm() {
     const form = this.data.editForm || {}
     const userName = String(form.userName || "").trim()
     const phone = String(form.phone || "").trim()
     const city = String(form.city || "").trim()
     const note = String(form.note || "").trim()
-
     if (!userName) {
       return "请输入联系人姓名"
     }
@@ -910,7 +871,6 @@ Page({
     }
     return ""
   },
-
   handleSaveEdit() {
     if (
       !this.data.editing ||
@@ -937,7 +897,6 @@ Page({
       })
       return
     }
-
     const bookingId = String(this.data.id || "").trim()
     const submittedForm = {
       userName: String((this.data.editForm && this.data.editForm.userName) || "").trim(),
@@ -949,7 +908,6 @@ Page({
     this._saveRequestSerial = saveSerial
     this.clearSaveRequestTimer()
     this.applyState({ saving: true })
-
     let settled = false
     const finishRequest = () => {
       if (settled || saveSerial !== this._saveRequestSerial) {
@@ -969,11 +927,9 @@ Page({
         icon: "none"
       })
     }
-
     this._saveRequestTimer = setTimeout(() => {
       handleFailure("保存超时，请重试")
     }, BOOKING_DETAIL_MUTATION_TIMEOUT_MS)
-
     const requestOptions = {
       name: "bookingUpdateMyContact",
       data: {
@@ -997,7 +953,6 @@ Page({
           }
           return
         }
-
         wx.showToast({
           title: result.updated ? "联系信息已更新" : "信息未发生变化",
           icon: "none"
@@ -1009,14 +964,12 @@ Page({
         handleFailure(error && (error.errMsg || error.message))
       }
     }
-
     try {
       wx.cloud.callFunction(requestOptions)
     } catch (error) {
       handleFailure(error && (error.errMsg || error.message))
     }
   },
-
   clearSaveRequestTimer() {
     if (!this._saveRequestTimer) {
       return
@@ -1024,7 +977,6 @@ Page({
     clearTimeout(this._saveRequestTimer)
     this._saveRequestTimer = null
   },
-
   cancelBooking(id) {
     const bookingId = String(id || this.data.id || "").trim()
     if (
@@ -1045,12 +997,10 @@ Page({
       })
       return
     }
-
     const cancelSerial = Number(this._cancelRequestSerial || 0) + 1
     this._cancelRequestSerial = cancelSerial
     this.clearCancelRequestTimer()
     this.applyState({ loading: true, cancelling: true })
-
     let settled = false
     const finishRequest = () => {
       if (settled || cancelSerial !== this._cancelRequestSerial) {
@@ -1070,11 +1020,9 @@ Page({
       })
       this.applyState({ loading: false, cancelling: false })
     }
-
     this._cancelRequestTimer = setTimeout(() => {
       handleFailure("取消预约超时，请重试")
     }, BOOKING_DETAIL_MUTATION_TIMEOUT_MS)
-
     const requestOptions = {
       name: "bookingCancel",
       data: { id: bookingId },
@@ -1091,7 +1039,6 @@ Page({
           this.applyState({ loading: false, cancelling: false })
           return
         }
-
         wx.showToast({
           title: "预约已取消",
           icon: "none"
@@ -1103,14 +1050,12 @@ Page({
         handleFailure(error && (error.errMsg || error.message))
       }
     }
-
     try {
       wx.cloud.callFunction(requestOptions)
     } catch (error) {
       handleFailure(error && (error.errMsg || error.message))
     }
   },
-
   clearCancelRequestTimer() {
     if (!this._cancelRequestTimer) {
       return
@@ -1118,7 +1063,6 @@ Page({
     clearTimeout(this._cancelRequestTimer)
     this._cancelRequestTimer = null
   },
-
   clearSubscriptionRequestTimer() {
     if (!this._subscriptionRequestTimer) {
       return
@@ -1126,7 +1070,6 @@ Page({
     clearTimeout(this._subscriptionRequestTimer)
     this._subscriptionRequestTimer = null
   },
-
   handleConfirmHandover(event) {
     if (this.data.loading || this.data.handoverResponding) return
     const stage = String(event.currentTarget.dataset.stage || "")
@@ -1169,7 +1112,6 @@ Page({
       }
     })
   },
-
   handlePreviewHandoverPhoto(event) {
     const stage = String(event.currentTarget.dataset.stage || "")
     const current = String(event.currentTarget.dataset.url || "")
@@ -1184,9 +1126,7 @@ Page({
       }
     })
   },
-
   handleHandoverImageError() {},
-
   handleEmergencyCall() {
     const phoneNumber = String(this.data.servicePhone || "").trim()
     if (!/^\+?[0-9-]{6,20}$/.test(phoneNumber)) {
@@ -1202,7 +1142,6 @@ Page({
       }
     })
   },
-
   handleRetryLoad() {
     if (
       this.data.loading ||
@@ -1215,7 +1154,6 @@ Page({
     }
     this.loadDetail()
   },
-
   handleCopyBookingId() {
     const id = String((this.data.booking && this.data.booking.id) || "").trim()
     if (!id || typeof wx.setClipboardData !== "function") {
@@ -1248,7 +1186,6 @@ Page({
       }
     })
   },
-
   handleViewVehicle() {
     const vehicleId = String((this.data.booking && this.data.booking.vehicleId) || "").trim()
     if (!vehicleId) {
@@ -1271,7 +1208,6 @@ Page({
       }
     })
   },
-
   handleAddToCalendar() {
     if (!this.isBookingDetailActive()) {
       return
@@ -1284,7 +1220,6 @@ Page({
       })
       return
     }
-
     if (typeof wx.addPhoneCalendar !== "function") {
       wx.showToast({
         title: "系统暂不支持",
@@ -1292,7 +1227,6 @@ Page({
       })
       return
     }
-
     const parseDateToSeconds = (dateStr, hour) => {
       const parts = String(dateStr).split("-").map(Number)
       if (parts.length === 3) {
@@ -1300,13 +1234,11 @@ Page({
       }
       return Math.floor(Date.now() / 1000)
     }
-
     const startTime = parseDateToSeconds(booking.startDate, 10)
     const endTime = parseDateToSeconds(booking.endDate, 18)
     const vehicleName = booking.vehicleName || "尊享座驾"
     const city = String(booking.city || "").trim()
     const bookingRef = this.data.bookingReference || booking.id || ""
-
     wx.addPhoneCalendar({
       title: `极境车库用车 · ${vehicleName}`,
       startTime,
@@ -1339,7 +1271,6 @@ Page({
       }
     })
   },
-
   handleOpenLocation() {
     if (!this.isBookingDetailActive()) {
       return
@@ -1351,7 +1282,6 @@ Page({
     const longitude = isShanghai ? 121.4737 : 120.1551
     const name = `极境车库 · ${isShanghai ? "上海交付中心" : "杭州交付中心"}`
     const address = isShanghai ? "上海市浦东新区世博大道极境交付中心" : "杭州市西湖区西溪路极境车库"
-
     if (typeof wx.openLocation === "function") {
       wx.openLocation({
         latitude,
@@ -1376,7 +1306,6 @@ Page({
       })
     }
   },
-
   handleBackBookings() {
     if (!this.isBookingDetailActive()) {
       return
@@ -1413,7 +1342,6 @@ Page({
       })
       return
     }
-
     wx.redirectTo({
       url: "/pages/bookings/bookings",
       fail: () => {
@@ -1435,14 +1363,12 @@ Page({
       }
     })
   },
-
   handleToggleChecklist() {
     triggerHapticFeedback("light")
     this.setData({
       checklistExpanded: !this.data.checklistExpanded
     })
   },
-
   isBookingDetailActive() {
     return this._bookingDetailUnloaded !== true
   }

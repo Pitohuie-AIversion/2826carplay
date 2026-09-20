@@ -1,6 +1,5 @@
 <view wx:if="{{pageAuthorized}}" class="workbench-page management-page">
   <view class="page-glow"></view>
-
   <view class="hero-card ui-card ui-card-gradient">
     <view class="hero-top">
       <view>
@@ -29,7 +28,6 @@
       </view>
     </view>
   </view>
-
   <view wx:if="{{loading}}" class="workbench-skeleton" aria-hidden="true">
     <view class="workbench-skeleton-summary-grid">
       <view class="workbench-skeleton-summary ui-card" wx:for="{{[1, 2, 3, 4]}}" wx:key="*this"><view class="workbench-skeleton-summary-icon manage-skeleton-pulse"></view><view class="workbench-skeleton-summary-value manage-skeleton-pulse"></view><view class="workbench-skeleton-summary-label manage-skeleton-pulse"></view></view>
@@ -45,7 +43,6 @@
       <view class="workbench-skeleton-booking"><view class="workbench-skeleton-booking-icon manage-skeleton-pulse"></view><view class="workbench-skeleton-booking-copy"><view class="workbench-skeleton-line workbench-skeleton-line-title manage-skeleton-pulse"></view><view class="workbench-skeleton-line manage-skeleton-pulse"></view><view class="workbench-skeleton-line workbench-skeleton-line-short manage-skeleton-pulse"></view></view><view class="workbench-skeleton-status manage-skeleton-pulse"></view></view>
     </view>
   </view>
-
   <view wx:elif="{{loadError && !allBookings.length}}" class="state-card ui-card">
     <view class="state-error-icon" aria-hidden="true"><view class="state-error-mark"></view></view>
     <view>
@@ -54,10 +51,8 @@
       <button class="retry-button ui-btn ui-btn-ghost action-with-icon" bindtap="handleRetry"><view class="retry-native-icon" aria-hidden="true"></view><text>重新加载</text></button>
     </view>
   </view>
-
   <block wx:else>
     <view wx:if="{{loadError}}" class="inline-error"><view class="inline-error-native-icon" aria-hidden="true"><view class="inline-error-native-mark"></view></view><text>{{loadError}}</text></view>
-
     <view class="summary-grid">
       <view class="summary-card ui-card {{selectedMode === 'todo' ? 'summary-card-active summary-card-active-primary' : ''}}" data-mode="todo" bindtap="handleSummaryTap" hover-class="summary-card-pressed" aria-role="button" aria-pressed="{{selectedMode === 'todo'}}" aria-label="筛选全部待办，共 {{summary.todo}} 条">
         <view class="summary-native-icon summary-native-icon-todo" aria-hidden="true"><view class="summary-todo-line summary-todo-line-top"></view><view class="summary-todo-line"></view></view>
@@ -80,7 +75,6 @@
         <view class="summary-label">候补预约</view>
       </view>
     </view>
-
     <view class="stage-card ui-card">
       <view class="stage-heading">
         <view>
@@ -130,7 +124,6 @@
         </view>
       </view>
     </view>
-
     <view class="queue-card ui-card">
       <view class="search-box">
         <view class="search-symbol" aria-hidden="true"></view>
@@ -156,7 +149,6 @@
         <text>本地筛选 {{queue.length}} / {{queueTotal}} 条</text>
         <text class="search-privacy">关键词不会上传</text>
       </view>
-
       <view class="section-heading">
         <view>
           <view class="section-eyebrow">ACTION QUEUE</view>
@@ -167,7 +159,6 @@
           <view wx:if="{{viewCustomized}}" class="reset-view" aria-role="button" aria-label="清除工作台筛选与排序" bindtap="handleResetView" hover-class="reset-view-pressed"><view class="reset-view-native-icon" aria-hidden="true"></view><text>重置视图</text></view>
         </view>
       </view>
-
       <view class="filter-scroll-shell ui-scroll-shell">
         <scroll-view class="filter-scroll" scroll-x scroll-with-animation scroll-into-view="workbench-filter-{{selectedMode}}" enhanced show-scrollbar="{{false}}" aria-label="待办队列筛选，可横向滑动">
           <view class="filter-row">
@@ -186,7 +177,6 @@
         </scroll-view>
         <view wx:if="{{filterOptions.length > 3}}" class="ui-scroll-cue" aria-hidden="true"></view>
       </view>
-
       <view class="sort-toolbar">
         <view class="sort-heading">
           <view class="sort-label">队列排序</view>
@@ -205,7 +195,6 @@
           >{{item.label}}</view>
         </view>
       </view>
-
       <view wx:if="{{queue.length}}" class="queue-list">
         <view class="queue-item" wx:for="{{queue}}" wx:key="id">
           <view class="queue-top">
@@ -326,7 +315,6 @@
           </view>
         </view>
       </view>
-
       <view wx:else class="queue-empty">
         <view class="queue-empty-mark {{keyword ? 'queue-empty-mark-search' : ''}}" aria-hidden="true">
           <view wx:if="{{keyword}}" class="queue-empty-search-icon"></view>
@@ -336,7 +324,6 @@
         <view class="queue-empty-desc">{{keyword ? '可更换关键词，或清除搜索查看当前分类的全部记录。' : '可切换其他分类，或前往预约管理查看全部记录。'}}</view>
       </view>
     </view>
-
     <button class="manage-button ui-btn ui-btn-ghost action-with-icon" disabled="{{loading || refreshing || updatingId !== '' || savingRemark || statusUpdatingId !== ''}}" bindtap="handleOpenBookingManage"><view class="manage-native-icon" aria-hidden="true"><view class="manage-native-line manage-native-line-top"></view><view class="manage-native-line"></view></view><text>前往预约管理</text></button>
     <view wx:if="{{truncated}}" class="scope-tip scope-tip-with-icon"><view class="scope-native-icon" aria-hidden="true"><view class="scope-alert-mark"></view></view><view>预约超过 2000 条，工作台只汇总当前已读取范围，请缩小筛选或分批处理。</view></view>
   </block>

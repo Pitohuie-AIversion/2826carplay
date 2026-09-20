@@ -7,7 +7,6 @@
   background: linear-gradient(180deg, #141a25 0%, #0b0d10 620rpx);
   box-sizing: border-box;
 }
-
 .page-glow {
   position: absolute;
   top: -220rpx;
@@ -18,7 +17,6 @@
   background: rgba(47, 104, 198, 0.12);
   filter: blur(90rpx);
 }
-
 .receipt-card,
 .info-card,
 .note-card,
@@ -27,14 +25,12 @@
   position: relative;
   z-index: 1;
 }
-
 .receipt-card {
   padding: 30rpx;
   overflow: hidden;
   border-color: rgba(93, 145, 228, 0.18);
   background: linear-gradient(145deg, #1b2330, #14181e 70%);
 }
-
 .receipt-card::after {
   position: absolute;
   right: -80rpx;
@@ -45,7 +41,6 @@
   border-radius: 50%;
   content: "";
 }
-
 .receipt-top,
 .receipt-brand,
 .receipt-footer,
@@ -54,11 +49,9 @@
   align-items: center;
   justify-content: space-between;
 }
-
 .receipt-brand {
   justify-content: flex-start;
 }
-
 .brand-emblem {
   width: 68rpx;
   height: 68rpx;
@@ -66,7 +59,6 @@
   border: 1rpx solid rgba(105, 154, 235, 0.24);
   border-radius: 50%;
 }
-
 .brand-kicker,
 .vehicle-label,
 .section-kicker,
@@ -77,7 +69,6 @@
   line-height: 1.4;
   letter-spacing: 2rpx;
 }
-
 .brand-title {
   margin-top: 3rpx;
   color: #e8ecf2;
@@ -85,7 +76,6 @@
   font-weight: 600;
   line-height: 1.4;
 }
-
 .booking-status {
   display: flex;
   align-items: center;
@@ -93,7 +83,6 @@
   margin-left: 16rpx;
   border: 1rpx solid rgba(255, 255, 255, 0.12);
 }
-
 .booking-status-dot {
   flex-shrink: 0;
   width: 8rpx;
@@ -103,16 +92,13 @@
   background: currentColor;
   box-shadow: 0 0 10rpx currentColor;
 }
-
 .receipt-divider {
   position: relative;
   margin: 26rpx -30rpx 24rpx;
 }
-
 .dashed-line {
   border-top: 1rpx dashed rgba(255, 255, 255, 0.12);
 }
-
 .receipt-notch {
   position: absolute;
   top: -13rpx;
@@ -122,15 +108,12 @@
   border-radius: 50%;
   background: #0e1116;
 }
-
 .receipt-notch-left {
   left: -13rpx;
 }
-
 .receipt-notch-right {
   right: -13rpx;
 }
-
 .booking-name {
   position: relative;
   z-index: 1;
@@ -141,7 +124,6 @@
   line-height: 1.4;
   word-break: break-word;
 }
-
 .booking-vehicle-reference {
   position: relative;
   z-index: 1;
@@ -150,7 +132,6 @@
   font-size: 20rpx;
   line-height: 1.4;
 }
-
 .journey-panel {
   position: relative;
   z-index: 1;
@@ -162,22 +143,18 @@
   border-radius: 20rpx;
   background: rgba(255, 255, 255, 0.028);
 }
-
 .journey-date {
   flex-shrink: 0;
 }
-
 .journey-date-end {
   text-align: right;
 }
-
 .journey-label,
 .footer-label {
   color: #687483;
   font-size: 18rpx;
   line-height: 1.4;
 }
-
 .journey-value {
   margin-top: 6rpx;
   color: #edf0f4;
@@ -185,7 +162,6 @@
   font-weight: 600;
   line-height: 1.4;
 }
-
 .journey-route {
   display: flex;
   align-items: center;
@@ -193,26 +169,22 @@
   flex: 1;
   margin: 9rpx 18rpx 0;
 }
-
 .route-track {
   display: flex;
   align-items: center;
   width: 100%;
 }
-
 .route-dot {
   width: 7rpx;
   height: 7rpx;
   border-radius: 50%;
   background: #548fff;
 }
-
 .route-line {
   flex: 1;
   height: 1rpx;
   background: linear-gradient(90deg, #548fff, rgba(84, 143, 255, 0.15));
 }
-
 .route-arrow {
   display: flex;
   align-items: center;
@@ -221,7 +193,6 @@
   height: 18rpx;
   color: #667c9f;
 }
-
 .route-chevron {
   width: 8rpx;
   height: 8rpx;
@@ -230,7 +201,6 @@
   box-sizing: border-box;
   transform: rotate(-45deg);
 }
-
 .route-span {
   margin-top: 8rpx;
   color: #65768d;
@@ -238,26 +208,22 @@
   line-height: 1.3;
   white-space: nowrap;
 }
-
 .receipt-footer {
   position: relative;
   z-index: 1;
   align-items: flex-end;
   margin-top: 24rpx;
 }
-
 .footer-value {
   margin-top: 5rpx;
   color: #d8dde5;
   font-size: 22rpx;
   font-weight: 600;
 }
-
 .receipt-code {
   max-width: 55%;
   text-align: right;
 }
-
 .code-value {
   color: #c1d2e9;
   font-family: monospace;
@@ -266,7 +232,6 @@
   line-height: 1.4;
   letter-spacing: 0.8rpx;
 }
-
 .code-row {
   display: flex;
   align-items: center;
@@ -277,7 +242,6 @@
   border-radius: 999rpx;
   background: rgba(61, 104, 171, 0.07);
 }
-
 .copy-code-btn {
   display: flex;
   align-items: center;
@@ -295,37 +259,31 @@
   line-height: 1;
   transition: opacity 120ms ease, transform 120ms ease;
 }
-
 .copy-code-btn-pressed {
   opacity: 0.72;
   transform: scale(0.97);
 }
-
 .copy-code-btn::after {
   border: 0;
 }
-
 .info-card,
 .note-card,
 .detail-actions-card {
   margin-top: 20rpx;
   padding: 28rpx;
 }
-
 .detail-actions-card {
   border-color: rgba(84, 143, 255, 0.12);
   background:
     radial-gradient(circle at 92% 0%, rgba(69, 126, 218, 0.09), transparent 42%),
     rgba(20, 24, 30, 0.96);
 }
-
 .detail-action-buttons {
   display: flex;
   flex-wrap: wrap;
   gap: 14rpx;
   margin-top: 22rpx;
 }
-
 .detail-action-btn {
   display: flex;
   align-items: center;
@@ -339,16 +297,13 @@
   line-height: 1;
   box-sizing: border-box;
 }
-
 .detail-action-btn-last {
   margin-right: 0;
 }
-
 .detail-action-btn-pressed {
   opacity: 0.8;
   transform: scale(0.98);
 }
-
 .calendar-native-icon {
   position: relative;
   width: 20rpx;
@@ -359,7 +314,6 @@
   color: #7da5ea;
   box-sizing: border-box;
 }
-
 .calendar-native-icon::before {
   position: absolute;
   top: 4rpx;
@@ -369,7 +323,6 @@
   background: currentColor;
   content: "";
 }
-
 .calendar-native-icon::after {
   position: absolute;
   top: -4rpx;
@@ -381,7 +334,6 @@
   box-shadow: 8rpx 0 0 currentColor;
   content: "";
 }
-
 .location-native-icon {
   position: relative;
   width: 18rpx;
@@ -389,7 +341,6 @@
   margin-right: 8rpx;
   color: #7da5ea;
 }
-
 .location-native-pin {
   position: absolute;
   top: 0;
@@ -401,7 +352,6 @@
   transform: rotate(-45deg);
   box-sizing: border-box;
 }
-
 .location-native-pin::after {
   position: absolute;
   top: 3rpx;
@@ -412,7 +362,6 @@
   background: currentColor;
   content: "";
 }
-
 .detail-action-note {
   margin-top: 14rpx;
   color: #626e7d;
@@ -420,7 +369,6 @@
   line-height: 1.55;
   text-align: center;
 }
-
 .section-title {
   margin-top: 4rpx;
   color: #f1f4f8;
@@ -428,19 +376,16 @@
   font-weight: 650;
   line-height: 1.4;
 }
-
 .section-index {
   color: #52637b;
   font-size: 18rpx;
   font-weight: 600;
   line-height: 1.4;
 }
-
 .section-side {
   display: flex;
   align-items: center;
 }
-
 .edit-contact-btn {
   display: flex;
   align-items: center;
@@ -454,12 +399,10 @@
   font-size: 20rpx;
   line-height: 1;
 }
-
 .info-grid {
   display: flex;
   margin: 22rpx -6rpx 0;
 }
-
 .info-item {
   width: calc(50% - 12rpx);
   margin: 0 6rpx;
@@ -469,13 +412,11 @@
   background: rgba(255, 255, 255, 0.025);
   box-sizing: border-box;
 }
-
 .info-label {
   color: #697482;
   font-size: 19rpx;
   line-height: 1.45;
 }
-
 .info-value {
   margin-top: 8rpx;
   color: #e9edf2;
@@ -484,22 +425,18 @@
   line-height: 1.5;
   word-break: break-all;
 }
-
 .edit-form {
   margin-top: 22rpx;
   padding-top: 4rpx;
 }
-
 .edit-field {
   margin-bottom: 20rpx;
 }
-
 .edit-label {
   margin-bottom: 10rpx;
   color: #778393;
   font-size: 20rpx;
 }
-
 .edit-input,
 .edit-textarea {
   width: 100%;
@@ -511,29 +448,24 @@
   font-size: 22rpx;
   box-sizing: border-box;
 }
-
 .edit-input {
   height: 78rpx;
 }
-
 .edit-textarea {
   height: 180rpx;
   padding-top: 18rpx;
   line-height: 1.6;
 }
-
 .edit-count {
   margin-top: 7rpx;
   color: #66717f;
   font-size: 19rpx;
   text-align: right;
 }
-
 .edit-actions {
   display: flex;
   margin-top: 4rpx;
 }
-
 .edit-save-btn,
 .edit-cancel-btn {
   display: flex;
@@ -545,11 +477,9 @@
   font-size: 22rpx;
   line-height: 1;
 }
-
 .edit-cancel-btn {
   margin-left: 14rpx;
 }
-
 .edit-tip {
   margin-top: 14rpx;
   color: #66717f;
@@ -557,18 +487,15 @@
   line-height: 1.6;
   text-align: left;
 }
-
 .action-with-icon,
 .tip-with-icon {
   display: flex;
   align-items: center;
   justify-content: center;
 }
-
 .tip-with-icon {
   align-items: flex-start;
 }
-
 .copy-native-icon {
   position: relative;
   flex-shrink: 0;
@@ -579,7 +506,6 @@
   border-radius: 3rpx;
   box-sizing: border-box;
 }
-
 .copy-native-icon::after {
   position: absolute;
   top: -5rpx;
@@ -591,7 +517,6 @@
   border-radius: 0 3rpx 0 0;
   content: "";
 }
-
 .edit-native-icon {
   width: 15rpx;
   height: 5rpx;
@@ -601,7 +526,6 @@
   box-sizing: border-box;
   transform: rotate(-42deg);
 }
-
 .save-native-icon,
 .booking-list-native-icon,
 .note-native-icon {
@@ -614,7 +538,6 @@
   border-radius: 4rpx;
   box-sizing: border-box;
 }
-
 .save-native-line,
 .save-native-icon::after,
 .booking-list-native-line,
@@ -629,26 +552,22 @@
   background: currentColor;
   content: "";
 }
-
 .save-native-line,
 .booking-list-native-line-top,
 .note-native-line {
   top: 5rpx;
 }
-
 .save-native-icon::after,
 .booking-list-native-line,
 .note-native-icon::after {
   top: 12rpx;
 }
-
 .cancel-edit-native-icon {
   position: relative;
   width: 17rpx;
   height: 17rpx;
   margin-right: 7rpx;
 }
-
 .cancel-edit-native-icon::before,
 .cancel-edit-native-icon::after {
   position: absolute;
@@ -660,15 +579,12 @@
   background: currentColor;
   content: "";
 }
-
 .cancel-edit-native-icon::before {
   transform: rotate(45deg);
 }
-
 .cancel-edit-native-icon::after {
   transform: rotate(-45deg);
 }
-
 .tip-info-native-icon {
   display: flex;
   align-items: center;
@@ -682,11 +598,9 @@
   color: #637995;
   box-sizing: border-box;
 }
-
 .tip-info-native-icon-danger {
   color: #a56c6c;
 }
-
 .tip-info-mark {
   position: relative;
   width: 3rpx;
@@ -695,7 +609,6 @@
   border-radius: 2rpx;
   background: currentColor;
 }
-
 .tip-info-mark::before {
   position: absolute;
   top: -6rpx;
@@ -706,17 +619,14 @@
   background: currentColor;
   content: "";
 }
-
 .timeline {
   margin-top: 24rpx;
   padding-left: 2rpx;
 }
-
 .timeline-item {
   display: flex;
   align-items: flex-start;
 }
-
 .timeline-dot {
   flex-shrink: 0;
   width: 12rpx;
@@ -726,53 +636,44 @@
   border-radius: 50%;
   background: #15181d;
 }
-
 .timeline-dot-active {
   border-color: #548fff;
   box-shadow: 0 0 16rpx rgba(84, 143, 255, 0.35);
 }
-
 .timeline-line {
   width: 2rpx;
   height: 32rpx;
   margin: 5rpx 0 5rpx 7rpx;
   background: rgba(255, 255, 255, 0.09);
 }
-
 .timeline-label {
   color: #d6dbe2;
   font-size: 22rpx;
   font-weight: 600;
   line-height: 1.5;
 }
-
 .timeline-value {
   margin-top: 4rpx;
   color: #737e8c;
   font-size: 19rpx;
   line-height: 1.5;
 }
-
 .progress-track {
   display: flex;
   align-items: flex-start;
   margin-top: 28rpx;
 }
-
 .progress-step {
   flex: 1;
   min-width: 0;
 }
-
 .progress-step-last {
   flex: 0 0 120rpx;
 }
-
 .progress-visual {
   display: flex;
   align-items: center;
 }
-
 .progress-node {
   display: flex;
   align-items: center;
@@ -789,7 +690,6 @@
   line-height: 1;
   box-sizing: border-box;
 }
-
 .progress-node-check {
   width: 8rpx;
   height: 15rpx;
@@ -799,7 +699,6 @@
   box-sizing: border-box;
   transform: rotate(45deg);
 }
-
 .progress-node-cancel {
   width: 15rpx;
   height: 2rpx;
@@ -807,14 +706,12 @@
   background: currentColor;
   transform: rotate(-45deg);
 }
-
 .progress-connector {
   flex: 1;
   height: 2rpx;
   margin: 0 10rpx;
   background: rgba(255, 255, 255, 0.09);
 }
-
 .progress-label {
   max-width: 130rpx;
   margin-top: 12rpx;
@@ -822,7 +719,6 @@
   font-size: 18rpx;
   line-height: 1.45;
 }
-
 .progress-done .progress-node,
 .progress-current .progress-node {
   border-color: #548fff;
@@ -830,27 +726,22 @@
   color: #a9c8ff;
   box-shadow: 0 0 18rpx rgba(84, 143, 255, 0.22);
 }
-
 .progress-done .progress-connector {
   background: linear-gradient(90deg, #548fff, rgba(84, 143, 255, 0.28));
 }
-
 .progress-done .progress-label,
 .progress-current .progress-label {
   color: #c7d4e7;
 }
-
 .progress-cancelled .progress-node {
   border-color: #d86969;
   background: rgba(216, 105, 105, 0.13);
   color: #ffc1c1;
   box-shadow: 0 0 18rpx rgba(216, 105, 105, 0.18);
 }
-
 .progress-cancelled .progress-label {
   color: #efb0b0;
 }
-
 .status-guidance {
   display: flex;
   align-items: flex-start;
@@ -860,7 +751,6 @@
   border-radius: 18rpx;
   background: rgba(84, 143, 255, 0.05);
 }
-
 .status-guidance-mark {
   flex-shrink: 0;
   width: 8rpx;
@@ -869,7 +759,6 @@
   border-radius: 999rpx;
   background: #5d96f4;
 }
-
 .status-guidance-native-icon {
   position: relative;
   display: flex;
@@ -884,7 +773,6 @@
   color: #5d96f4;
   box-sizing: border-box;
 }
-
 .status-guidance-icon-mark {
   width: 4rpx;
   height: 9rpx;
@@ -892,52 +780,43 @@
   background: currentColor;
   box-shadow: 0 12rpx 0 -1rpx currentColor;
 }
-
 .status-guidance-title {
   color: #cbdaf0;
   font-size: 21rpx;
   font-weight: 600;
   line-height: 1.45;
 }
-
 .status-guidance-desc {
   margin-top: 6rpx;
   color: #758498;
   font-size: 18rpx;
   line-height: 1.58;
 }
-
 .status-guidance-contacted {
   border-color: rgba(74, 184, 134, 0.15);
   background: rgba(74, 184, 134, 0.05);
 }
-
 .status-guidance-contacted .status-guidance-mark {
   background: #59c894;
 }
-
 .status-guidance-contacted .status-guidance-native-icon {
   border-color: #59c894;
   color: #59c894;
 }
-
 .status-guidance-completed,
 .status-guidance-cancelled {
   border-color: rgba(139, 148, 161, 0.12);
   background: rgba(139, 148, 161, 0.04);
 }
-
 .status-guidance-completed .status-guidance-mark,
 .status-guidance-cancelled .status-guidance-mark {
   background: #788493;
 }
-
 .status-guidance-completed .status-guidance-native-icon,
 .status-guidance-cancelled .status-guidance-native-icon {
   border-color: #788493;
   color: #788493;
 }
-
 .timeline-meta {
   display: flex;
   align-items: stretch;
@@ -947,28 +826,23 @@
   border-radius: 18rpx;
   background: rgba(255, 255, 255, 0.025);
 }
-
 .timeline-meta-item {
   flex: 1;
   min-width: 0;
 }
-
 .timeline-meta-item-end {
   text-align: right;
 }
-
 .timeline-meta-divider {
   width: 1rpx;
   margin: 0 20rpx;
   background: rgba(255, 255, 255, 0.08);
 }
-
 .timeline-meta-label {
   color: #65717f;
   font-size: 17rpx;
   line-height: 1.4;
 }
-
 .timeline-meta-value {
   margin-top: 7rpx;
   color: #aab3bf;
@@ -976,7 +850,6 @@
   line-height: 1.5;
   word-break: break-word;
 }
-
 .subscription-panel {
   display: flex;
   align-items: center;
@@ -986,13 +859,11 @@
   border-radius: 18rpx;
   background: rgba(84, 143, 255, 0.055);
 }
-
 .subscription-copy {
   flex: 1;
   min-width: 0;
   padding-right: 18rpx;
 }
-
 .subscription-native-icon {
   position: relative;
   flex-shrink: 0;
@@ -1005,7 +876,6 @@
   color: #6f9ce1;
   box-sizing: border-box;
 }
-
 .subscription-native-icon::after {
   position: absolute;
   right: -3rpx;
@@ -1016,7 +886,6 @@
   background: currentColor;
   content: "";
 }
-
 .subscription-bell-clapper {
   position: absolute;
   bottom: -7rpx;
@@ -1026,21 +895,18 @@
   border-radius: 50%;
   background: currentColor;
 }
-
 .subscription-title {
   color: #c8d8ef;
   font-size: 22rpx;
   font-weight: 600;
   line-height: 1.5;
 }
-
 .subscription-desc {
   margin-top: 5rpx;
   color: #73849a;
   font-size: 19rpx;
   line-height: 1.55;
 }
-
 .subscription-btn {
   display: flex;
   align-items: center;
@@ -1053,7 +919,6 @@
   font-size: 20rpx;
   line-height: 1;
 }
-
 .subscription-action-native-icon {
   position: relative;
   width: 18rpx;
@@ -1064,7 +929,6 @@
   border-radius: 9rpx 9rpx 3rpx 3rpx;
   box-sizing: border-box;
 }
-
 .subscription-action-native-icon::after {
   position: absolute;
   right: -2rpx;
@@ -1074,16 +938,13 @@
   background: currentColor;
   content: "";
 }
-
 .section-title-with-icon {
   display: flex;
   align-items: center;
 }
-
 .note-native-icon {
   color: #7588a5;
 }
-
 .vehicle-native-icon {
   position: relative;
   flex-shrink: 0;
@@ -1094,7 +955,6 @@
   border-radius: 6rpx;
   box-sizing: border-box;
 }
-
 .vehicle-native-window {
   position: absolute;
   top: 4rpx;
@@ -1103,7 +963,6 @@
   height: 4rpx;
   border-top: 2rpx solid currentColor;
 }
-
 .vehicle-native-wheel {
   position: absolute;
   bottom: -5rpx;
@@ -1114,15 +973,12 @@
   background: currentColor;
   box-sizing: border-box;
 }
-
 .vehicle-native-wheel-left {
   left: 4rpx;
 }
-
 .vehicle-native-wheel-right {
   right: 4rpx;
 }
-
 .note-content {
   margin-top: 20rpx;
   padding: 20rpx;
@@ -1134,11 +990,9 @@
   line-height: 1.7;
   word-break: break-word;
 }
-
 .actions {
   margin-top: 24rpx;
 }
-
 .action-note {
   margin-bottom: 12rpx;
   color: #66717f;
@@ -1146,7 +1000,6 @@
   line-height: 1.5;
   text-align: left;
 }
-
 .cancel-btn,
 .retry-btn {
   display: flex;
@@ -1159,7 +1012,6 @@
   line-height: 1;
   box-sizing: border-box;
 }
-
 .cancel-booking-native-icon {
   position: relative;
   width: 21rpx;
@@ -1169,7 +1021,6 @@
   border-radius: 50%;
   box-sizing: border-box;
 }
-
 .cancel-booking-native-icon::after {
   position: absolute;
   top: 8rpx;
@@ -1181,27 +1032,23 @@
   content: "";
   transform: rotate(-45deg);
 }
-
 .state-page {
   display: flex;
   align-items: flex-start;
   justify-content: center;
   padding-top: 100rpx;
 }
-
 .state-card {
   width: 100%;
   padding: 62rpx 34rpx;
   text-align: center;
 }
-
 .state-emblem {
   width: 108rpx;
   height: 108rpx;
   border-radius: 50%;
   opacity: 0.82;
 }
-
 .state-title {
   margin-top: 22rpx;
   color: #f3f5f8;
@@ -1209,18 +1056,15 @@
   font-weight: 650;
   line-height: 1.4;
 }
-
 .state-desc {
   margin-top: 12rpx;
   color: #838d9b;
   font-size: 23rpx;
   line-height: 1.65;
 }
-
 .retry-btn {
   margin-top: 26rpx;
 }
-
 .back-btn {
   display: flex;
   align-items: center;
@@ -1233,7 +1077,6 @@
   line-height: 1;
   box-sizing: border-box;
 }
-
 .retry-native-icon {
   position: relative;
   width: 23rpx;
@@ -1244,7 +1087,6 @@
   border-radius: 50%;
   box-sizing: border-box;
 }
-
 .retry-native-icon::after {
   position: absolute;
   top: -4rpx;
@@ -1256,7 +1098,6 @@
   content: "";
   transform: rotate(20deg);
 }
-
 .back-native-icon {
   width: 12rpx;
   height: 12rpx;
@@ -1266,23 +1107,19 @@
   box-sizing: border-box;
   transform: rotate(45deg);
 }
-
 .detail-skeleton-page {
   padding-top: 38rpx;
 }
-
 .detail-skeleton-card,
 .detail-skeleton-info {
   position: relative;
   z-index: 1;
 }
-
 .detail-skeleton-card {
   padding: 30rpx;
   border-color: rgba(93, 145, 228, 0.14);
   background: linear-gradient(145deg, #1b2330, #14181e 70%);
 }
-
 .detail-skeleton-top,
 .detail-skeleton-brand,
 .detail-skeleton-journey,
@@ -1292,57 +1129,48 @@
   align-items: center;
   justify-content: space-between;
 }
-
 .detail-skeleton-brand {
   justify-content: flex-start;
 }
-
 .detail-skeleton-emblem {
   width: 68rpx;
   height: 68rpx;
   margin-right: 16rpx;
   border-radius: 50%;
 }
-
 .detail-skeleton-kicker {
   width: 148rpx;
   height: 15rpx;
   border-radius: 8rpx;
 }
-
 .detail-skeleton-brand-title {
   width: 114rpx;
   height: 22rpx;
   margin-top: 10rpx;
   border-radius: 8rpx;
 }
-
 .detail-skeleton-status {
   width: 108rpx;
   height: 50rpx;
   margin-left: 16rpx;
   border-radius: 999rpx;
 }
-
 .detail-skeleton-divider {
   height: 1rpx;
   margin: 28rpx -30rpx 25rpx;
   background: rgba(255, 255, 255, 0.09);
 }
-
 .detail-skeleton-label {
   width: 156rpx;
   height: 15rpx;
   border-radius: 8rpx;
 }
-
 .detail-skeleton-title {
   width: 66%;
   height: 40rpx;
   margin-top: 16rpx;
   border-radius: 10rpx;
 }
-
 .detail-skeleton-journey {
   margin-top: 25rpx;
   padding: 25rpx 22rpx;
@@ -1350,62 +1178,51 @@
   border-radius: 20rpx;
   background: rgba(255, 255, 255, 0.02);
 }
-
 .detail-skeleton-date {
   width: 142rpx;
   height: 38rpx;
   border-radius: 9rpx;
 }
-
 .detail-skeleton-route {
   flex: 1;
   height: 4rpx;
   margin: 0 24rpx;
   border-radius: 999rpx;
 }
-
 .detail-skeleton-footer {
   margin-top: 26rpx;
 }
-
 .detail-skeleton-footer-item {
   width: 38%;
   height: 34rpx;
   border-radius: 9rpx;
 }
-
 .detail-skeleton-info {
   margin-top: 20rpx;
   padding: 28rpx;
 }
-
 .detail-skeleton-section-title {
   width: 166rpx;
   height: 31rpx;
   border-radius: 9rpx;
 }
-
 .detail-skeleton-info-grid {
   margin-top: 24rpx;
 }
-
 .detail-skeleton-info-item {
   width: calc(50% - 8rpx);
   height: 108rpx;
   border-radius: 18rpx;
 }
-
 .skeleton-pulse {
   background: linear-gradient(105deg, #181c22 12%, #29313c 34%, #181c22 56%);
   background-size: 220% 100%;
   animation: bookingDetailSkeletonPulse 1.6s ease-in-out infinite;
 }
-
 @keyframes bookingDetailSkeletonPulse {
   0% {
     background-position: 160% 0;
   }
-
   100% {
     background-position: -70% 0;
   }
@@ -1413,7 +1230,6 @@
 .customer-quote-card {
   margin-top: 24rpx;
 }
-
 .quote-valid {
   border: 1rpx solid rgba(82, 143, 255, 0.4);
   border-radius: 999rpx;
@@ -1421,13 +1237,11 @@
   color: #b9ceff;
   font-size: 21rpx;
 }
-
 .quote-rental-meta {
   margin-top: 20rpx;
   color: #8f98a7;
   font-size: 23rpx;
 }
-
 .quote-breakdown {
   margin-top: 22rpx;
   border: 1rpx solid rgba(255, 255, 255, 0.09);
@@ -1435,7 +1249,6 @@
   overflow: hidden;
   background: rgba(6, 8, 12, 0.58);
 }
-
 .quote-row,
 .quote-total {
   display: flex;
@@ -1446,11 +1259,9 @@
   color: #bac1cc;
   font-size: 24rpx;
 }
-
 .quote-row + .quote-row {
   border-top: 1rpx solid rgba(255, 255, 255, 0.055);
 }
-
 .quote-total {
   border-top: 1rpx solid rgba(82, 143, 255, 0.3);
   background: rgba(82, 143, 255, 0.08);
@@ -1458,7 +1269,6 @@
   font-size: 29rpx;
   font-weight: 700;
 }
-
 .quote-rule,
 .quote-adjustment-summary,
 .quote-boundary,
@@ -1471,30 +1281,25 @@
   font-size: 23rpx;
   line-height: 1.65;
 }
-
 .quote-rule-label {
   margin-bottom: 8rpx;
   color: #eef2f8;
   font-size: 23rpx;
   font-weight: 600;
 }
-
 .quote-adjustment-summary,
 .quote-response-adjustment {
   color: #f0c887;
   background: rgba(225, 164, 72, 0.08);
 }
-
 .quote-boundary {
   border: 1rpx solid rgba(255, 255, 255, 0.09);
   color: #9099a7;
 }
-
 .quote-response { margin-top: 24rpx; }
 .quote-confirm-btn,
 .quote-adjust-btn { width: 100%; margin: 0; }
 .quote-adjustment-form { margin-top: 22rpx; }
-
 .quote-adjustment-input {
   box-sizing: border-box;
   width: 100%;
@@ -1507,7 +1312,6 @@
   font-size: 24rpx;
   line-height: 1.6;
 }
-
 .quote-adjustment-count {
   margin-top: -38rpx;
   margin-bottom: 18rpx;
@@ -1516,7 +1320,6 @@
   font-size: 20rpx;
   text-align: right;
 }
-
 .quote-response-confirmed {
   color: #8ad5b2;
   background: rgba(77, 184, 132, 0.08);
@@ -1535,24 +1338,20 @@
 .handover-confirm-btn, .emergency-call-btn { margin-top: 20rpx; }
 .handover-confirmed-time { margin-top: 16rpx; color: #84d3ae; font-size: 22rpx; }
 .emergency-boundary { color: #c3a7a7; background: rgba(212,104,104,.08); }
-
 .checklist-card {
   margin-top: 24rpx;
   border-color: rgba(91, 148, 235, 0.22);
   background: linear-gradient(160deg, rgba(20, 27, 39, 0.95), rgba(13, 17, 24, 0.98));
 }
-
 .checklist-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
   cursor: pointer;
 }
-
 .checklist-heading-pressed {
   opacity: 0.85;
 }
-
 .checklist-toggle-badge {
   display: flex;
   align-items: center;
@@ -1564,7 +1363,6 @@
   font-size: 18rpx;
   line-height: 1;
 }
-
 .checklist-chevron {
   width: 10rpx;
   height: 10rpx;
@@ -1574,27 +1372,22 @@
   transform: rotate(45deg) translateY(-2rpx);
   transition: transform 160ms ease;
 }
-
 .checklist-chevron-open {
   transform: rotate(225deg) translate(-2rpx, -2rpx);
 }
-
 .checklist-body {
   margin-top: 18rpx;
 }
-
 .checklist-item {
   display: flex;
   align-items: flex-start;
   padding: 16rpx 0;
   border-bottom: 1rpx solid rgba(255, 255, 255, 0.055);
 }
-
 .checklist-item-last {
   border-bottom: 0;
   padding-bottom: 4rpx;
 }
-
 .checklist-badge {
   flex-shrink: 0;
   display: flex;
@@ -1611,19 +1404,16 @@
   font-size: 18rpx;
   font-weight: 700;
 }
-
 .checklist-info {
   flex: 1;
   min-width: 0;
 }
-
 .checklist-title {
   color: #e2e8f2;
   font-size: 22rpx;
   font-weight: 600;
   line-height: 1.4;
 }
-
 .checklist-desc {
   margin-top: 6rpx;
   color: #8895a6;

@@ -1,6 +1,1 @@
-{
-  "navigationBarTitleText": "车辆管理",
-  "enablePullDownRefresh": true,
-  "backgroundColor": "#101010",
-  "backgroundTextStyle": "light"
-}
+{"navigationBarTitleText":"车辆管理","enablePullDownRefresh":true,"onReachBottomDistance":200,"backgroundColor":"#101010","backgroundTextStyle":"light"}

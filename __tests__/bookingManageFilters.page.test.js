@@ -404,5 +404,22 @@ describe("pages/booking-manage workflow filters", () => {
     expect(page.data.currentCity).toBe("all")
     page.onUnload()
   })
+
+  test("触底生命周期触发下一页加载", () => {
+    const page = createPage(loadPageDefinition(), {
+      pageAuthorized: true,
+      loading: false,
+      hasMore: true
+    })
+    page.fetchList = jest.fn()
+
+    page.onReachBottom()
+    expect(page.fetchList).toHaveBeenCalledWith({ append: true })
+
+    page.data.hasMore = false
+    page.fetchList.mockClear()
+    page.onReachBottom()
+    expect(page.fetchList).not.toHaveBeenCalled()
+  })
 })
 

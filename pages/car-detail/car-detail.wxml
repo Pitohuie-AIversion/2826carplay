@@ -16,7 +16,6 @@
     <view class="detail-loading-line detail-loading-line-short skeleton-pulse"></view>
   </view>
 </view>
-
 <view class="detail-page" wx:elif="{{car}}">
   <view class="hero-shell">
     <swiper wx:if="{{car.hasImages}}" class="hero-swiper" indicator-dots="{{false}}" autoplay="{{false}}" circular="{{car.imageItems.length > 1}}" bindchange="handleHeroSwiperChange">
@@ -29,13 +28,13 @@
             </view>
             <view class="hero-image-loading-text">LOADING VEHICLE</view>
           </view>
-          <view wx:if="{{item.failed}}" class="hero-image-fallback">
+          <view wx:if="{{item.failed}}" class="hero-image-fallback" hover-class="button-hover" bindtap="handleRetryHeroImage" data-index="{{index}}" aria-role="button" aria-label="图片加载失败，点击重试">
             <view class="hero-placeholder-brand-row">
               <image class="hero-placeholder-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
               <view class="hero-placeholder-brand">{{car.brand}}</view>
             </view>
             <view class="hero-placeholder-name">{{car.name}}</view>
-            <view class="hero-placeholder-text">该图片暂时无法显示</view>
+            <view class="hero-placeholder-text">该图片暂时无法显示 · 点击重试</view>
           </view>
           <image
             wx:if="{{!item.failed && item.displaySrc}}"
@@ -90,7 +89,6 @@
       <text>点击查看大图</text>
     </view>
   </view>
-
   <view class="summary-card ui-card">
     <view class="summary-top">
       <view class="summary-identity">
@@ -126,7 +124,6 @@
         </button>
       </view>
     </view>
-
     <view class="price-row">
       <view>
         <view class="price-label">基础日租参考</view>
@@ -134,12 +131,10 @@
       </view>
       <view class="price-note">不含未列明项目</view>
     </view>
-
     <view class="tag-list">
       <text wx:for="{{car.tags}}" wx:key="*this" class="tag-item">{{item}}</text>
     </view>
   </view>
-
   <view class="pricing-card ui-card">
     <view class="section-heading pricing-heading">
       <view class="section-heading-copy">
@@ -175,7 +170,6 @@
       <text class="service-hours-text">管家咨询 09:00 - 22:00 · 紧急救援 24H 服务</text>
     </view>
   </view>
-
   <view class="notice-card ui-card" wx:if="{{car.statusNoticeText}}">
     <view class="section-heading">
       <view class="section-mark"></view>
@@ -183,7 +177,6 @@
     </view>
     <view class="notice-text">{{car.statusNoticeText}}</view>
   </view>
-
   <view wx:if="{{relatedGuides.length}}" class="info-card related-guide-card ui-card">
     <view class="section-heading"><view class="section-mark"></view><view><view class="section-title">相关路线与指南</view><view class="section-kicker">SCENARIO GUIDES</view></view></view>
     <view class="related-guide-item" wx:for="{{relatedGuides}}" wx:key="id" data-id="{{item.id}}" data-scene="{{item.scenario}}" bindtap="handleRelatedGuideTap" hover-class="related-guide-item-pressed" aria-role="button">
@@ -191,7 +184,6 @@
       <view class="related-guide-arrow">→</view>
     </view>
   </view>
-
   <view class="info-card ui-card">
     <view class="section-heading">
       <view class="section-mark"></view>
@@ -199,7 +191,6 @@
     </view>
     <view class="section-text">{{car.description}}</view>
   </view>
-
   <view class="info-card ui-card">
     <view class="section-heading">
       <view class="section-mark"></view>
@@ -232,7 +223,6 @@
       </view>
     </view>
   </view>
-
   <view class="info-card performance-card ui-card" aria-role="group" aria-label="驾控性能与特色亮点">
     <view class="section-heading performance-heading">
       <view class="section-heading-copy">
@@ -272,7 +262,6 @@
       </view>
     </view>
   </view>
-
   <view class="info-card trust-profile-card ui-card">
     <view class="section-heading trust-profile-heading">
       <view class="section-heading-copy"><view class="section-mark"></view><view><view class="section-title">车辆可信档案</view><view class="section-kicker">TRUST PROFILE</view></view></view>
@@ -302,7 +291,6 @@
       </view>
     </view>
   </view>
-
   <view class="info-card ui-card">
     <view class="section-heading">
       <view class="section-mark"></view>
@@ -316,7 +304,6 @@
       </view>
     </view>
   </view>
-
   <view class="info-card ui-card rental-rules-card">
     <view class="section-heading">
       <view class="section-mark"></view>
@@ -334,7 +321,6 @@
       </view>
     </view>
   </view>
-
   <view class="detail-bottom-bar">
     <view class="bottom-action-meta">
       <view class="bottom-action-status {{car.statusClass}}">
@@ -358,14 +344,12 @@
       </button>
     </view>
   </view>
-
   <view wx:if="{{posterModalVisible}}" class="poster-modal-overlay" bindtap="handleClosePosterModal" hover-class="none" aria-role="button" aria-modal="true">
     <view class="poster-modal-dialog ui-card" catchtap="true">
       <view class="poster-modal-header">
         <view class="poster-modal-title">车型专属海报</view>
         <view class="poster-modal-close" bindtap="handleClosePosterModal" hover-class="poster-modal-close-hover" aria-role="button" aria-label="关闭海报弹窗">✕</view>
       </view>
-
       <view class="poster-canvas-wrap">
         <canvas type="2d" id="posterCanvas" class="poster-canvas"></canvas>
         <view wx:if="{{posterGenerating}}" class="poster-loading-box">
@@ -373,7 +357,6 @@
           <text class="poster-loading-text">正在生成高清海报…</text>
         </view>
       </view>
-
       <view class="poster-modal-footer">
         <button class="ui-btn ui-btn-primary poster-save-action" bindtap="handleSavePoster" disabled="{{posterGenerating}}">
           保存海报到相册
@@ -383,7 +366,6 @@
     </view>
   </view>
 </view>
-
 <view class="empty-page ui-card" wx:else>
   <image class="empty-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
   <view class="empty-kicker">VEHICLE PROFILE</view>

@@ -427,4 +427,30 @@ describe("pages/favorites 收藏车辆视图", () => {
     expect(page.data.list.map((item) => item.id)).toEqual(["favorite-error"])
     expect(wx.showToast).toHaveBeenCalledWith({ title: "取消收藏失败", icon: "none" })
   })
+
+  test("onReachBottom 自动触发 handleLoadMore 分页加载", () => {
+    const page = createPage(loadPageDefinition())
+    page.handleLoadMore = jest.fn()
+    page.onReachBottom()
+    expect(page.handleLoadMore).toHaveBeenCalledTimes(1)
+
+    const json = JSON.parse(fs.readFileSync(path.resolve(__dirname, "../pages/favorites/favorites.json"), "utf8"))
+    expect(json.onReachBottomDistance).toBe(200)
+  })
+
+  test("冷启动时优先从 storage 恢复 favorites_last_snapshot 实现 0ms 秒开", () => {
+    const mockFavorites = [{ id: "fav-porsche", name: "Porsche 911", status: "available" }]
+    global.wx = {
+      getStorageSync: jest.fn((key) => {
+        if (key === "favorites_last_snapshot") return mockFavorites
+        return null
+      }),
+      cloud: { callFunction: jest.fn() }
+    }
+    const page = createPage(loadPageDefinition())
+    page.applyFavoriteList = jest.fn()
+    page.onLoad()
+    expect(page.applyFavoriteList).toHaveBeenCalledWith(mockFavorites, expect.objectContaining({ page: 0, hasMore: true }))
+    expect(page.data.initialLoading).toBe(false)
+  })
 })

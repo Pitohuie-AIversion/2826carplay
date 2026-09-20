@@ -719,6 +719,58 @@ describe("pages/car-detail 客户侧车辆状态", () => {
     expect(wxss).toContain(".perf-metrics-grid")
     expect(wxss).toContain(".perf-tag-dot")
   })
+
+  test("loadCarDetail 支持从 storage 缓存秒开 (SWR 策略)", () => {
+    const cachedCar = {
+      id: "car-swr-1",
+      name: "保时捷 911 GT3",
+      brand: "保时捷",
+      priceDay: 4500,
+      status: "available",
+      images: ["cloud://car-1.jpg"]
+    }
+    global.wx = {
+      getStorageSync: jest.fn((key) => {
+        if (key === "car_detail_car-swr-1") {
+          return cachedCar
+        }
+        return null
+      }),
+      cloud: {
+        callFunction: jest.fn()
+      },
+      setNavigationBarTitle: jest.fn()
+    }
+    const page = createPage(loadPageDefinition())
+    page.loadCarDetail("car-swr-1")
+    expect(page.data.car).not.toBeNull()
+    expect(page.data.car.name).toBe("保时捷 911 GT3")
+  })
+
+  test("handleRetryHeroImage 允许重试失败的主图并恢复加载状态", () => {
+    const page = createPage(loadPageDefinition())
+    page.data.car = {
+      id: "car-1",
+      imageItems: [
+        { src: "cloud://img1.jpg", displaySrc: "", failed: true, loaded: false }
+      ]
+    }
+    global.wx = {
+      vibrateShort: jest.fn()
+    }
+    page.handleRetryHeroImage({
+      currentTarget: {
+        dataset: { index: 0 }
+      }
+    })
+    expect(page.data["car.imageItems[0].failed"]).toBe(false)
+    expect(page.data["car.imageItems[0].loaded"]).toBe(false)
+
+    const pageDir = path.resolve(__dirname, "../pages/car-detail")
+    const wxml = fs.readFileSync(path.join(pageDir, "car-detail.wxml"), "utf8")
+    expect(wxml).toContain("handleRetryHeroImage")
+    expect(wxml).toContain("点击重试")
+  })
 })
 
 

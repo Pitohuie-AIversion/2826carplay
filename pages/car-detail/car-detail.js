@@ -454,7 +454,16 @@ Page({
       return
     }
 
-    const cachedCar = carDetailMemoryCache.get(carId)
+    let cachedCar = carDetailMemoryCache.get(carId)
+    if (!cachedCar && typeof wx !== "undefined" && typeof wx.getStorageSync === "function") {
+      try {
+        const stored = wx.getStorageSync(`car_detail_${carId}`)
+        if (stored && stored.id) {
+          cachedCar = stored
+          carDetailMemoryCache.set(carId, stored)
+        }
+      } catch (e) {}
+    }
     if (cachedCar && !this.data.car) {
       this.applyCar(cachedCar)
     }
@@ -512,12 +521,18 @@ Page({
             const oldestKey = carDetailMemoryCache.keys().next().value
             carDetailMemoryCache.delete(oldestKey)
           }
+          if (typeof wx !== "undefined" && typeof wx.setStorageSync === "function") {
+            try { wx.setStorageSync(`car_detail_${carId}`, car) } catch (e) {}
+          }
           this.applyCar(car)
           return
         }
 
         if (result && result.code === "NOT_FOUND") {
           carDetailMemoryCache.delete(carId)
+          if (typeof wx !== "undefined" && typeof wx.removeStorageSync === "function") {
+            try { wx.removeStorageSync(`car_detail_${carId}`) } catch (e) {}
+          }
           this.applyCar(null)
           return
         }
@@ -737,6 +752,26 @@ Page({
       [`car.imageItems[${index}].loaded`]: false,
       [`car.imageItems[${index}].failed`]: true
     })
+  },
+
+  handleRetryHeroImage(event) {
+    const index = Number(event && event.currentTarget && event.currentTarget.dataset && event.currentTarget.dataset.index)
+    if (!Number.isInteger(index) || index < 0) return
+    triggerHapticFeedback("light")
+    const car = this.data.car
+    const item = car && car.imageItems && car.imageItems[index]
+    if (!item || !item.src) return
+    this.setData({
+      [`car.imageItems[${index}].failed`]: false,
+      [`car.imageItems[${index}].loaded`]: false
+    })
+    resolveImage(item.src, { priority: 90 })
+      .then((resolved) => {
+        if (resolved) {
+          this.setData({ [`car.imageItems[${index}].displaySrc`]: resolved })
+        }
+      })
+      .catch(() => {})
   },
 
   handleHeroSwiperChange(event) {

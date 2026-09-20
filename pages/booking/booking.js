@@ -484,6 +484,7 @@ Page({
       formProgress: buildFormProgress(nextForm, this.data.privacyAgreed),
       bookingSummary: buildBookingSummary(nextForm, this.data.carName)
     })
+    markUnsaved(this)
   },
 
   handleDateChange(event) {

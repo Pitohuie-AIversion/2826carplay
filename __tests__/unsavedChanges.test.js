@@ -30,7 +30,8 @@ describe("未保存修改提醒", () => {
       "pages-admin/vehicle-create/vehicle-create.js",
       "pages-admin/vehicle-edit/vehicle-edit.js",
       "pages-admin/role-manage/role-manage.js",
-      "pages-admin/config-manage/config-manage.js"
+      "pages-admin/config-manage/config-manage.js",
+      "pages/booking/booking.js"
     ].forEach((relativePath) => {
       const source = fs.readFileSync(path.resolve(__dirname, `../${relativePath}`), "utf8")
       expect(source).toContain("markUnsaved(this")

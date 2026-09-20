@@ -8,6 +8,7 @@
     "test:integration": "jest __tests__/vehicleCreate.int.test.js",
     "check:structure": "node scripts/checkProjectStructure.js",
     "check:package": "node scripts/checkMiniProgramPackage.js",
+    "simulate:clicks": "node scripts/simulateAllComponentClicks.js",
     "check:secrets": "node scripts/checkRepositorySecrets.js",
     "check:drafts": "node scripts/contentDraftsValidate.js",
     "check:indexes": "node scripts/checkDatabaseIndexes.js",

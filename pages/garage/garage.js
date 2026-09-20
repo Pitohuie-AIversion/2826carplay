@@ -124,7 +124,7 @@ function buildCategoriesWithCount(carList, serverCountMap) {
   const baseCategoryIds = baseCategories.map((item) => item.id)
 
   const dynamicCategories = Object.keys(countMap)
-    .filter((id) => !baseCategoryIds.includes(id))
+    .filter((id) => id !== "all" && !baseCategoryIds.includes(id))
     .sort()
     .map((id) => ({
       id,

@@ -586,6 +586,26 @@ describe("pages/garage 首页车辆筛选", () => {
     page.onLoad()
     expect(page.applyCars).toHaveBeenCalledWith(mockCars, { total: 1 })
   })
+
+  test("服务端 categoryCounts 包含 all 时分类列表不会产生重复 key all", () => {
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(({ success }) => success({
+          result: {
+            ok: true,
+            page: 0,
+            total: 2,
+            categoryCounts: { all: 2, supercar: 2 },
+            list: [{ id: "c1", category: "supercar" }]
+          }
+        }))
+      }
+    }
+    const page = createPage(loadPageDefinition())
+    page.loadCars()
+    const allCategories = page.data.categories.filter((item) => item.id === "all")
+    expect(allCategories.length).toBe(1)
+  })
 })
 
 

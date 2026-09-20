@@ -254,34 +254,20 @@
   content: "";
 }
 .error-page.management-page .log-func {
-  color: #f0e9eb;
-  font-size: 25rpx;
-}
-.error-page.management-page .log-time {
-  color: #72686c;
-  font-size: 19rpx;
-}
-.error-page.management-page .log-message {
-  padding: 16rpx 18rpx;
-  border-left: 3rpx solid rgba(198, 79, 93, 0.58);
-  border-radius: 0 14rpx 14rpx 0;
-  background: rgba(198, 79, 93, 0.055);
-  color: #c9b7bb;
-  font-size: 21rpx;
-}
-.error-page.management-page .log-summary {
-  color: #91878b;
-  font-size: 20rpx;
-}
-.error-page.management-page .log-func {
   display: -webkit-box;
   min-width: 0;
   overflow: hidden;
-  line-height: 1.4;
+  line-height: 1.35;
+  color: #f0e9eb;
+  font-size: 28rpx;
   text-overflow: ellipsis;
   word-break: break-word;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+}
+.error-page.management-page .log-summary {
+  color: #91878b;
+  font-size: 20rpx;
 }
 .error-page.management-page .log-skeleton-card {
   border-color: rgba(199, 73, 88, 0.1);
@@ -611,10 +597,7 @@
   font-weight: 600;
   line-height: 1.4;
 }
-.error-page.management-page .log-func {
-  font-size: 28rpx;
-  line-height: 1.35;
-}
+
 .log-func-code {
   margin-top: 4rpx;
   overflow: hidden;
@@ -631,6 +614,7 @@
   flex-shrink: 0;
   margin-top: 3rpx;
   color: #76666b;
+  font-size: 19rpx;
   line-height: 1.35;
 }
 .time-native-icon {
@@ -670,6 +654,8 @@
   border-left: 3rpx solid rgba(214, 91, 105, 0.68);
   border-radius: 0 14rpx 14rpx 0;
   background: rgba(198, 79, 93, 0.055);
+  color: #c9b7bb;
+  font-size: 21rpx;
 }
 .message-native-icon {
   position: relative;

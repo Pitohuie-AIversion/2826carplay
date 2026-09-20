@@ -569,9 +569,6 @@
 .request-title-copy {
   min-width: 0;
 }
-.request-time {
-  color: #6e7988;
-}
 .time-native-icon {
   position: relative;
   flex-shrink: 0;

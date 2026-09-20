@@ -247,34 +247,20 @@
   content: "";
 }
 .audit-page.management-page .log-action {
-  color: #eaf0f8;
-  font-size: 25rpx;
-}
-.audit-page.management-page .log-time {
-  color: #687381;
-  font-size: 19rpx;
-}
-.audit-page.management-page .log-openid {
-  padding: 14rpx 16rpx;
-  border-radius: 14rpx;
-  background: rgba(255, 255, 255, 0.025);
-  color: #8290a3;
-  font-family: monospace;
-  font-size: 19rpx;
-}
-.audit-page.management-page .log-summary {
-  color: #9aa4b1;
-  font-size: 21rpx;
-}
-.audit-page.management-page .log-action {
   display: -webkit-box;
   min-width: 0;
   overflow: hidden;
-  line-height: 1.4;
+  line-height: 1.35;
+  color: #eaf0f8;
+  font-size: 28rpx;
   text-overflow: ellipsis;
   word-break: break-word;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+}
+.audit-page.management-page .log-summary {
+  color: #9aa4b1;
+  font-size: 21rpx;
 }
 .audit-page.management-page .actions {
   margin-top: 18rpx;
@@ -595,10 +581,7 @@
   background: currentColor;
   box-shadow: 0 0 10rpx currentColor;
 }
-.audit-page.management-page .log-action {
-  font-size: 28rpx;
-  line-height: 1.35;
-}
+
 .log-action-code {
   margin-top: 4rpx;
   overflow: hidden;
@@ -615,6 +598,7 @@
   flex-shrink: 0;
   margin-top: 3rpx;
   color: #69768a;
+  font-size: 19rpx;
   line-height: 1.35;
 }
 .time-native-icon {
@@ -650,6 +634,11 @@
   align-items: center;
   margin-top: 20rpx;
   padding: 15rpx 17rpx;
+  border-radius: 14rpx;
+  background: rgba(255, 255, 255, 0.025);
+  color: #8290a3;
+  font-family: monospace;
+  font-size: 19rpx;
 }
 .operator-native-icon {
   position: relative;

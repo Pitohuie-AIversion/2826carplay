@@ -191,14 +191,12 @@
 .metric-icon-chart::before {
   position: absolute;
   bottom: 2rpx;
+  left: 2rpx;
   width: 4rpx;
+  height: 8rpx;
   border-radius: 3rpx 3rpx 0 0;
   background: currentColor;
   content: "";
-}
-.metric-icon-chart::before {
-  left: 2rpx;
-  height: 8rpx;
   box-shadow: 8rpx -5rpx 0 currentColor, 16rpx -11rpx 0 currentColor;
 }
 .metric-primary .metric-value { color: #83b1fb; }

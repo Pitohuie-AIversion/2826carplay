@@ -560,7 +560,6 @@
   background: linear-gradient(145deg, rgba(31, 43, 61, 0.98), rgba(20, 24, 31, 0.98) 68%);
 }
 .pricing-heading,
-.section-heading-copy,
 .pricing-base-row,
 .disclosure-button,
 .estimate-disclaimer {
@@ -573,6 +572,9 @@
   justify-content: space-between;
 }
 .section-heading-copy {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
   min-width: 0;
 }
 .section-kicker {
@@ -1175,11 +1177,6 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 16rpx;
-}
-.section-heading-copy {
-  display: flex;
-  align-items: center;
-  gap: 14rpx;
 }
 .trust-status {
   flex: 0 0 auto;

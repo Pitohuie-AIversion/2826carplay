@@ -8,7 +8,7 @@ const TOOLING_FILES = new Set([
   "project.config.json",
   "project.private.config.json"
 ])
-const TOOLING_DIRECTORIES = new Set([".git", ".codex", ".agents", ".trae"])
+const TOOLING_DIRECTORIES = new Set([".git", ".github", ".codex", ".agents", ".trae"])
 
 function normalizeRelativePath(value) {
   return String(value || "")

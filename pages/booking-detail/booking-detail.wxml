@@ -273,6 +273,49 @@
     <view class="note-content">{{booking.note}}</view>
   </view>
 
+  <view wx:if="{{booking.status !== 'cancelled'}}" class="checklist-card ui-card">
+    <view class="section-heading checklist-heading" bindtap="handleToggleChecklist" hover-class="checklist-heading-pressed" aria-role="button" aria-expanded="{{checklistExpanded}}" aria-label="行前证件与交付清单">
+      <view>
+        <view class="section-kicker">PRE-TRIP CHECKLIST</view>
+        <view class="section-title">行前证件与交付清单</view>
+      </view>
+      <view class="checklist-toggle-badge">
+        <text>{{checklistExpanded ? '收起' : '展开'}}</text>
+        <view class="checklist-chevron {{checklistExpanded ? 'checklist-chevron-open' : ''}}" aria-hidden="true"></view>
+      </view>
+    </view>
+    <view wx:if="{{checklistExpanded}}" class="checklist-body">
+      <view class="checklist-item">
+        <view class="checklist-badge">01</view>
+        <view class="checklist-info">
+          <view class="checklist-title">承租人身份证原件</view>
+          <view class="checklist-desc">出示本人二代身份证原件且在有效期内，需与实名信息一致。</view>
+        </view>
+      </view>
+      <view class="checklist-item">
+        <view class="checklist-badge">02</view>
+        <view class="checklist-info">
+          <view class="checklist-title">中华人民共和国机动车驾驶证</view>
+          <view class="checklist-desc">需持准驾 C1/C2 以上正副本，驾龄建议满 1 年以上且无暂扣记录。</view>
+        </view>
+      </view>
+      <view class="checklist-item">
+        <view class="checklist-badge">03</view>
+        <view class="checklist-info">
+          <view class="checklist-title">押金预授权准备</view>
+          <view class="checklist-desc">需准备本人信用卡或流动资金用于现场车辆押金及违章押金。</view>
+        </view>
+      </view>
+      <view class="checklist-item checklist-item-last">
+        <view class="checklist-badge">04</view>
+        <view class="checklist-info">
+          <view class="checklist-title">现场验车与交接确认</view>
+          <view class="checklist-desc">交接前环车检查车身划痕、轮毂、随车随行工具及油/电量现状并记录。</view>
+        </view>
+      </view>
+    </view>
+  </view>
+
   <view class="detail-actions-card ui-card">
     <view class="section-heading">
       <view>

@@ -653,6 +653,72 @@ describe("pages/car-detail 客户侧车辆状态", () => {
     expect(page.data.car.name).toBe("Porsche 911 GT3")
     page.onUnload()
   })
+
+  test("详情页展示驾控性能与亮点卡片并自适应豪华车型指标", () => {
+    global.wx = { setNavigationBarTitle: jest.fn() }
+    const page = createPage(loadPageDefinition())
+
+    // 测试保时捷 911 性能与驾控标签
+    page.applyCar({
+      id: "vehicle-porsche-911",
+      name: "保时捷 911 Carrera S",
+      brand: "保时捷",
+      category: "supercar",
+      status: "available",
+      images: []
+    })
+
+    expect(page.data.car.performance).toBeDefined()
+    expect(page.data.car.performance.acceleration).toBe("3.4s")
+    expect(page.data.car.performance.horsepower).toBe("450Ps")
+    expect(page.data.car.performance.drivetrain).toBe("后置后驱 (RR)")
+    expect(page.data.car.performance.torque).toBe("530N·m")
+    expect(page.data.car.performance.highlights).toContain("Sport Chrono 弹射起步")
+
+    // 测试法拉利 F8 性能指标
+    page.applyCar({
+      id: "vehicle-ferrari-f8",
+      name: "法拉利 F8 Tributo",
+      brand: "法拉利",
+      category: "supercar",
+      status: "available",
+      images: []
+    })
+    expect(page.data.car.performance.acceleration).toBe("2.9s")
+    expect(page.data.car.performance.horsepower).toBe("720Ps")
+    expect(page.data.car.performance.drivetrain).toBe("中置后驱 (MR)")
+
+    // 测试云端自定义性能数据覆盖
+    page.applyCar({
+      id: "vehicle-custom",
+      name: "极境定制版",
+      brand: "极境",
+      status: "available",
+      images: [],
+      performance: {
+        acceleration: "2.5s",
+        horsepower: "1000Ps",
+        drivetrain: "三电机四驱",
+        torque: "1200N·m",
+        highlights: ["碳陶刹车", "全碳车身"]
+      }
+    })
+    expect(page.data.car.performance.acceleration).toBe("2.5s")
+    expect(page.data.car.performance.horsepower).toBe("1000Ps")
+    expect(page.data.car.performance.highlights).toEqual(["碳陶刹车", "全碳车身"])
+
+    const pageDir = path.resolve(__dirname, "../pages/car-detail")
+    const wxml = fs.readFileSync(path.join(pageDir, "car-detail.wxml"), "utf8")
+    const wxss = fs.readFileSync(path.join(pageDir, "car-detail.wxss"), "utf8")
+    expect(wxml).toContain("performance-card")
+    expect(wxml).toContain("PERFORMANCE & HIGHLIGHTS")
+    expect(wxml).toContain("car.performance.acceleration")
+    expect(wxml).toContain("car.performance.horsepower")
+    expect(wxml).toContain("car.performance.highlights")
+    expect(wxss).toContain(".performance-card")
+    expect(wxss).toContain(".perf-metrics-grid")
+    expect(wxss).toContain(".perf-tag-dot")
+  })
 })
 
 

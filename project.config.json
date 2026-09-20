@@ -95,6 +95,14 @@
       {
         "type": "file",
         "value": "vehicleImageUpdate.zip"
+      },
+      {
+        "type": "folder",
+        "value": ".github"
+      },
+      {
+        "type": "file",
+        "value": "debug-debugger-code-quality-issues.md"
       }
     ],
     "include": []

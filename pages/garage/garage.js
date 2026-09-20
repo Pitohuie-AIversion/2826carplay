@@ -9,6 +9,7 @@ const {
 } = require("../../shared/pageNativeAction")
 const { preloadImages, clearExpiredCache } = require("../../shared/imageCache")
 const { onNetworkReconnect } = require("../../shared/networkStatus")
+const { triggerHapticFeedback } = require("../../shared/hapticFeedback")
 const { createPerformanceHelpers } = require("../../shared/performance")
 const mockCategories = require("../../data/categories")
 
@@ -222,6 +223,7 @@ Page({
     servicePhone: "15715710090",
     currentCategory: "all",
     availableOnly: false,
+    sortBy: "default",
     cityOptions: ["杭州", "上海"],
     selectedCity: "",
     searchKeyword: "",
@@ -658,7 +660,7 @@ Page({
     }
   },
 
-  filterCars(categoryId, availableOnlyInput, searchKeywordInput, serverSummary, keepSearchDebouncing, selectedCityInput) {
+  filterCars(categoryId, availableOnlyInput, searchKeywordInput, serverSummary, keepSearchDebouncing, selectedCityInput, sortByInput) {
     const nextCategory = categoryId || "all"
     const availableOnly =
       typeof availableOnlyInput === "boolean" ? availableOnlyInput : this.data.availableOnly
@@ -666,6 +668,8 @@ Page({
       typeof searchKeywordInput === "string" ? searchKeywordInput : this.data.searchKeyword
     const selectedCity =
       typeof selectedCityInput === "string" ? selectedCityInput : this.data.selectedCity
+    const sortBy =
+      typeof sortByInput === "string" ? sortByInput : (this.data.sortBy || "default")
     const categoryCars =
       nextCategory === "all"
         ? this.data.cars.slice()
@@ -677,16 +681,23 @@ Page({
       ? statusCars.filter((car) => String((car && car.location) || "").toLowerCase().includes(selectedCity.toLowerCase()))
       : statusCars
     const filteredCars = cityCars.filter((car) => matchesCarSearch(car, searchKeyword))
+    let sortedCars = filteredCars.slice()
+    if (sortBy === "price_asc") {
+      sortedCars.sort((a, b) => (Number(a.priceDay) || 0) - (Number(b.priceDay) || 0))
+    } else if (sortBy === "price_desc") {
+      sortedCars.sort((a, b) => (Number(b.priceDay) || 0) - (Number(a.priceDay) || 0))
+    }
 
     this.applyState({
       currentCategory: nextCategory,
       availableOnly,
       searchKeyword,
       selectedCity,
+      sortBy,
       searchResultCount: serverSummary && Number.isFinite(serverSummary.total)
         ? serverSummary.total
-        : filteredCars.length,
-      filteredCars,
+        : sortedCars.length,
+      filteredCars: sortedCars,
       categorySummary: serverSummary && Number.isFinite(serverSummary.categoryTotal)
         ? {
             name: (this.data.categories.find((item) => item.id === nextCategory) || {}).name || "",
@@ -777,6 +788,24 @@ Page({
         this.loadCars({ force: true })
       }
     }
+  },
+
+  handleSortChange(event) {
+    const sort = String(event.currentTarget.dataset.sort || "default").trim()
+    if (sort === this.data.sortBy) {
+      return
+    }
+    triggerHapticFeedback("light")
+    this.setData({ sortBy: sort })
+    this.filterCars(
+      this.data.currentCategory,
+      this.data.availableOnly,
+      this.data.searchKeyword,
+      null,
+      false,
+      this.data.selectedCity,
+      sort
+    )
   },
 
   handleLoadMore() {

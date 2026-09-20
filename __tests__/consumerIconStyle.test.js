@@ -675,7 +675,7 @@ describe("用户主流程原生图标", () => {
       })
     })
 
-    expect(clipboardCount).toBe(7)
+    expect(clipboardCount).toBe(8)
   })
 
   test("轻量系统反馈只在操作来源仍是当前页面时展示", () => {
@@ -691,7 +691,7 @@ describe("用户主流程原生图标", () => {
     )
     const bookingDetailSource = read("pages/booking-detail/booking-detail.js")
 
-    expect(currentOnlyActionCount).toBe(19)
+    expect(currentOnlyActionCount).toBe(20)
     expect(bookingDetailSource).toContain("isPageCurrent(this)")
     expect(read("app.js")).toContain("nativeActionAppVisible = false")
     expect(read("app.js")).toContain("nativeActionAppVisible = true")

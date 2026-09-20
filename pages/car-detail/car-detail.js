@@ -120,6 +120,39 @@ function buildTrustArchiveView(input) {
   }
 }
 
+const PERFORMANCE_PRESETS = [
+  { match: ["911", "gt3", "gt2"], acc: "3.4s", power: "450Ps", drive: "后置后驱 (RR)", torque: "530N·m", tags: ["水平对置 6 缸双涡轮", "Sport Chrono 弹射起步", "可调运动排气阀门", "PASM 主动悬挂系统"] },
+  { match: ["718", "cayman", "boxster"], acc: "4.1s", power: "300Ps", drive: "中置后驱 (MR)", torque: "380N·m", tags: ["50:50 黄金中置配重", "动态变速箱支承", "运动排气系统", "PSM 动态稳定管理"] },
+  { match: ["f8", "ferrari", "488"], acc: "2.9s", power: "720Ps", drive: "中置后驱 (MR)", torque: "770N·m", tags: ["3.9T V8 双涡轮引擎", "F1 赛道双离合变速箱", "侧滑角控制系统 SSC", "碳纤维运动方向盘"] },
+  { match: ["m4", "m3", "m5", "m8"], acc: "3.5s", power: "510Ps", drive: "M xDrive 智能四驱", torque: "650N·m", tags: ["S58 双涡轮增压发动机", "M 专属排气声浪系统", "可调节制动脚感", "后驱漂移模式切换"] },
+  { match: ["mustang", "野马", "5.0"], acc: "4.3s", power: "466Ps", drive: "后轮驱动 (RWD)", torque: "556N·m", tags: ["5.0L V8 自然吸气声浪", "主动声浪控制排气", "Line Lock 弹射暖胎", "MagneRide 避震系统"] },
+  { match: ["mx-5", "miata"], acc: "6.5s", power: "184Ps", drive: "前中置后驱 (FMR)", torque: "205N·m", tags: ["轻量化 1.05 吨车身", "高转速自然吸气引擎", "一键手动软顶敞篷", "机械式限滑差速器 LSD"] },
+  { match: ["mini", "cooper"], acc: "6.7s", power: "192Ps", drive: "前轮驱动 (FWD)", torque: "280N·m", tags: ["卡丁车级敏捷转向", "中置双出运动排气", "运动底盘调校", "MINI 驾控体验模式"] },
+  { match: ["740", "s450", "a8", "panamera", "sedan"], acc: "5.6s", power: "340Ps", drive: "后轮驱动 / 智能四驱", torque: "450N·m", tags: ["双腔空气悬架系统", "静音电吸车门", "豪华环绕座舱音响", "后排头等舱舒享座椅"] },
+  { match: ["suv", "g63", "cullinan", "urus"], acc: "3.8s", power: "585Ps", drive: "全时四驱 (AWD)", torque: "850N·m", tags: ["全地形自适应驾驶模式", "空气悬架底盘升降", "运动排气阀门控制", "前后桥电子差速锁"] }
+]
+
+function buildPerformanceHighlights(car) {
+  const source = car && typeof car === "object" ? car : {}
+  const rawPerf = source.performance && typeof source.performance === "object" ? source.performance : {}
+  const target = `${source.name || ""} ${source.brand || ""} ${source.category || ""}`.toLowerCase()
+  const matched = PERFORMANCE_PRESETS.find(item => item.match.some(key => target.includes(key)))
+
+  const defaultAcc = (matched && matched.acc) || "4.2s"
+  const defaultPower = (matched && matched.power) || "380Ps"
+  const defaultDrivetrain = (matched && matched.drive) || "后轮驱动 (RWD)"
+  const defaultTorque = (matched && matched.torque) || "500N·m"
+  const defaultHighlights = (matched && matched.tags) || ["可变运动排气声浪", "专属驾控运动底盘", "驾驶模式自定义切换"]
+
+  return {
+    acceleration: String(rawPerf.acceleration || source.acceleration || defaultAcc),
+    horsepower: String(rawPerf.horsepower || source.horsepower || defaultPower),
+    drivetrain: String(rawPerf.drivetrain || source.drivetrain || defaultDrivetrain),
+    torque: String(rawPerf.torque || source.torque || defaultTorque),
+    highlights: Array.isArray(rawPerf.highlights) && rawPerf.highlights.length ? rawPerf.highlights : defaultHighlights
+  }
+}
+
 function formatCarViewModel(car) {
   const transmissionMap = {
     manual: "手动挡",
@@ -187,6 +220,7 @@ function formatCarViewModel(car) {
     seatsText: car.seatsText || (car.seats ? `${car.seats} 座` : "—"),
     brand: car.brand || "未知品牌",
     location: car.location || "门店咨询",
+    performance: buildPerformanceHighlights(car),
     trustArchive: buildTrustArchiveView(car.trustArchive),
     vehicleYear: car.vehicleYear || (car.registerDate ? String(car.registerDate).slice(0, 4) : "—")
   }
@@ -1249,6 +1283,37 @@ Page({
       })
     } else {
       wx.showToast({ title: "系统暂不支持", icon: "none" })
+    }
+  },
+
+  handleCopyCarId() {
+    const carId = this.data.car && this.data.car.id ? String(this.data.car.id) : ""
+    if (!carId) {
+      wx.showToast({ title: "暂无车辆编号", icon: "none" })
+      return
+    }
+    const action = beginPageNativeAction(this, { requireCurrent: true })
+    if (typeof wx.setClipboardData === "function") {
+      wx.setClipboardData({
+        data: carId,
+        success: () => {
+          triggerHapticFeedback("light")
+          if (isPageNativeActionActive(this, action)) {
+            wx.showToast({
+              title: "车辆编号已复制",
+              icon: "success"
+            })
+          }
+        },
+        fail: () => {
+          if (isPageNativeActionActive(this, action)) {
+            wx.showToast({
+              title: "复制失败",
+              icon: "none"
+            })
+          }
+        }
+      })
     }
   },
 

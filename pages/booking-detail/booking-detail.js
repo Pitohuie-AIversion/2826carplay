@@ -260,6 +260,7 @@ Page({
     servicePhone: "",
     latestQuote: {},
     adjustmentNote: "",
+    checklistExpanded: true,
     editForm: {
       userName: "",
       phone: "",
@@ -1432,6 +1433,13 @@ Page({
           }
         })
       }
+    })
+  },
+
+  handleToggleChecklist() {
+    triggerHapticFeedback("light")
+    this.setData({
+      checklistExpanded: !this.data.checklistExpanded
     })
   },
 

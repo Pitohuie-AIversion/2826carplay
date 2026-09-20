@@ -170,6 +170,10 @@
       </view>
     </view>
     <view class="estimate-disclaimer"><view class="estimate-disclaimer-mark" aria-hidden="true">i</view><text>{{pricingOverview.disclaimer}}</text></view>
+    <view class="service-hours-hint">
+      <view class="service-hours-dot" aria-hidden="true"></view>
+      <text class="service-hours-text">管家咨询 09:00 - 22:00 · 紧急救援 24H 服务</text>
+    </view>
   </view>
 
   <view class="notice-card ui-card" wx:if="{{car.statusNoticeText}}">
@@ -222,9 +226,49 @@
         <view class="info-label">座位数</view>
         <view class="info-value">{{car.seatsText}}</view>
       </view>
-      <view class="info-item">
-        <view class="info-label">车辆编号</view>
-        <view class="info-value">{{car.id}}</view>
+      <view class="info-item info-item-clickable" bindtap="handleCopyCarId" hover-class="info-item-pressed" aria-role="button" aria-label="点击复制车辆编号 {{car.id}}">
+        <view class="info-label">车辆编号 <text class="copy-hint-tag">复制</text></view>
+        <view class="info-value info-value-clickable">{{car.id}}</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="info-card performance-card ui-card" aria-role="group" aria-label="驾控性能与特色亮点">
+    <view class="section-heading performance-heading">
+      <view class="section-heading-copy">
+        <view class="section-mark performance-mark"></view>
+        <view>
+          <view class="section-title">驾控性能与亮点</view>
+          <view class="section-kicker">PERFORMANCE & HIGHLIGHTS</view>
+        </view>
+      </view>
+      <view class="perf-top-badge">极境特调</view>
+    </view>
+    <view class="perf-metrics-grid">
+      <view class="perf-metric-item">
+        <view class="perf-metric-label">0-100km/h</view>
+        <view class="perf-metric-value">{{car.performance.acceleration}}</view>
+      </view>
+      <view class="perf-metric-item">
+        <view class="perf-metric-label">峰值马力</view>
+        <view class="perf-metric-value">{{car.performance.horsepower}}</view>
+      </view>
+      <view class="perf-metric-item">
+        <view class="perf-metric-label">驱动形式</view>
+        <view class="perf-metric-value">{{car.performance.drivetrain}}</view>
+      </view>
+      <view class="perf-metric-item">
+        <view class="perf-metric-label">峰值扭矩</view>
+        <view class="perf-metric-value">{{car.performance.torque}}</view>
+      </view>
+    </view>
+    <view class="perf-highlights-box">
+      <view class="perf-highlights-title">核心驾控配置</view>
+      <view class="perf-tag-list">
+        <view class="perf-tag-item" wx:for="{{car.performance.highlights}}" wx:key="*this">
+          <view class="perf-tag-dot" aria-hidden="true"></view>
+          <text>{{item}}</text>
+        </view>
       </view>
     </view>
   </view>

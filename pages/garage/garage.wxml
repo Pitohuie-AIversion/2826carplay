@@ -209,6 +209,48 @@
     </view>
   </view>
 
+  <view
+    wx:if="{{((!initialLoading && !loadingCars) || cars.length) && categorySummary.total}}"
+    class="garage-sort-bar"
+  >
+    <view class="sort-bar-label">排序：</view>
+    <view class="sort-chips">
+      <view
+        class="sort-chip {{sortBy === 'default' ? 'sort-chip-active' : ''}}"
+        data-sort="default"
+        bindtap="handleSortChange"
+        hover-class="sort-chip-pressed"
+        aria-role="button"
+        aria-pressed="{{sortBy === 'default'}}"
+        aria-label="按推荐默认排序"
+      >
+        <text>推荐</text>
+      </view>
+      <view
+        class="sort-chip {{sortBy === 'price_asc' ? 'sort-chip-active' : ''}}"
+        data-sort="price_asc"
+        bindtap="handleSortChange"
+        hover-class="sort-chip-pressed"
+        aria-role="button"
+        aria-pressed="{{sortBy === 'price_asc'}}"
+        aria-label="按日租金由低到高排序"
+      >
+        <text>日租由低到高</text>
+      </view>
+      <view
+        class="sort-chip {{sortBy === 'price_desc' ? 'sort-chip-active' : ''}}"
+        data-sort="price_desc"
+        bindtap="handleSortChange"
+        hover-class="sort-chip-pressed"
+        aria-role="button"
+        aria-pressed="{{sortBy === 'price_desc'}}"
+        aria-label="按日租金由高到低排序"
+      >
+        <text>日租由高到低</text>
+      </view>
+    </view>
+  </view>
+
   <view wx:if="{{contentGuides.length}}" class="garage-guides ui-card">
     <view class="list-heading">
       <view><view class="list-kicker">SCENARIO GUIDES</view><view class="list-title">真实用车场景</view></view>

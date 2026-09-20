@@ -388,5 +388,102 @@ describe("网络重连与触感反馈全链路体验优化", () => {
         expect(vibrateMock).toHaveBeenCalledWith(expect.objectContaining({ style: "medium" }))
       })
     })
+
+    test("garage 价格排序切换触发 light 触感反馈并更新列表排序", () => {
+      jest.isolateModules(() => {
+        const vibrateMock = jest.fn()
+        global.wx = {
+          vibrateShort: vibrateMock,
+          getSystemInfoSync: () => ({ platform: "devtools" })
+        }
+
+        let definition
+        global.Page = jest.fn((def) => {
+          definition = def
+        })
+
+        require("../pages/garage/garage")
+        const cars = [
+          { id: "car_1", name: "保时捷 718", priceDay: 2000, brand: "保时捷", category: "supercar", location: "杭州" },
+          { id: "car_2", name: "法拉利 F8", priceDay: 8000, brand: "法拉利", category: "supercar", location: "杭州" },
+          { id: "car_3", name: "宝马 M4", priceDay: 1500, brand: "宝马", category: "supercar", location: "杭州" }
+        ]
+        const page = createMockPage(definition, {
+          cars,
+          filteredCars: cars,
+          categories: [{ id: "all", name: "全部" }],
+          sortBy: "default",
+          currentCategory: "all",
+          selectedCity: "",
+          searchKeyword: ""
+        })
+
+        // 切换为价格升序
+        page.handleSortChange({ currentTarget: { dataset: { sort: "price_asc" } } })
+        expect(vibrateMock).toHaveBeenCalledWith(expect.objectContaining({ style: "light" }))
+        expect(page.data.sortBy).toBe("price_asc")
+        expect(page.data.filteredCars[0].id).toBe("car_3") // 1500
+        expect(page.data.filteredCars[1].id).toBe("car_1") // 2000
+        expect(page.data.filteredCars[2].id).toBe("car_2") // 8000
+
+        // 切换为价格降序
+        vibrateMock.mockClear()
+        page.handleSortChange({ currentTarget: { dataset: { sort: "price_desc" } } })
+        expect(vibrateMock).toHaveBeenCalledWith(expect.objectContaining({ style: "light" }))
+        expect(page.data.sortBy).toBe("price_desc")
+        expect(page.data.filteredCars[0].id).toBe("car_2") // 8000
+        expect(page.data.filteredCars[2].id).toBe("car_3") // 1500
+      })
+    })
+
+    test("car-detail 车辆编号复制触发 light 触感反馈", () => {
+      jest.isolateModules(() => {
+        const vibrateMock = jest.fn()
+        const setClipboardMock = jest.fn(({ success }) => success && success())
+        global.wx = {
+          vibrateShort: vibrateMock,
+          setClipboardData: setClipboardMock,
+          showToast: jest.fn()
+        }
+
+        let definition
+        global.Page = jest.fn((def) => {
+          definition = def
+        })
+
+        require("../pages/car-detail/car-detail")
+        const page = createMockPage(definition, { car: { id: "car_911_gt3" } })
+
+        page.handleCopyCarId()
+        expect(vibrateMock).toHaveBeenCalledWith(expect.objectContaining({ style: "light" }))
+        expect(setClipboardMock).toHaveBeenCalledWith(
+          expect.objectContaining({ data: "car_911_gt3" })
+        )
+      })
+    })
+
+    test("booking-detail 行前清单折叠切换触发 light 触感反馈", () => {
+      jest.isolateModules(() => {
+        const vibrateMock = jest.fn()
+        global.wx = {
+          vibrateShort: vibrateMock
+        }
+
+        let definition
+        global.Page = jest.fn((def) => {
+          definition = def
+        })
+
+        require("../pages/booking-detail/booking-detail")
+        const page = createMockPage(definition, { checklistExpanded: true })
+
+        page.handleToggleChecklist()
+        expect(vibrateMock).toHaveBeenCalledWith(expect.objectContaining({ style: "light" }))
+        expect(page.data.checklistExpanded).toBe(false)
+
+        page.handleToggleChecklist()
+        expect(page.data.checklistExpanded).toBe(true)
+      })
+    })
   })
 })

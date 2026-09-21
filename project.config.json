@@ -58,6 +58,10 @@
       },
       {
         "type": "file",
+        "value": "AGENTS.md"
+      },
+      {
+        "type": "file",
         "value": "cloudbaserc.json"
       },
       {

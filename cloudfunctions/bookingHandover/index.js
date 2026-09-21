@@ -17,6 +17,7 @@ const BOOKING_FIELDS = {
   _id: true,
   openid: true,
   status: true,
+  vehicleName: true,
   latestPickupHandoverId: true,
   latestPickupHandoverVersion: true,
   latestReturnHandoverId: true,
@@ -150,6 +151,68 @@ async function enqueueDeletion(fileList, source, context, delayMs) {
   })
 }
 
+async function readHandoverTemplateId() {
+  const envValue = String(process.env.BOOKING_HANDOVER_TEMPLATE_ID || process.env.BOOKING_STATUS_TEMPLATE_ID || "").trim()
+  if (envValue) return envValue
+  try {
+    const res = await db.collection("app_configs").where({ key: "operation_settings" }).field({ value: true }).limit(1).get()
+    const list = res && Array.isArray(res.data) ? res.data : []
+    const val = list[0] && list[0].value
+    if (val) return String(val.bookingHandoverTemplateId || val.bookingStatusTemplateId || "").trim()
+  } catch (err) {}
+  return ""
+}
+
+async function sendHandoverNotificationBestEffort(info) {
+  try {
+    const target = text(info && info.targetUser, 128)
+    if (!target) return { status: "skipped", reason: "missing_target" }
+    const templateId = await readHandoverTemplateId()
+    if (!templateId) return { status: "skipped", reason: "not_configured" }
+    if (!cloud.openapi || !cloud.openapi.subscribeMessage || typeof cloud.openapi.subscribeMessage.send !== "function") {
+      return { status: "failed", reason: "api_unavailable" }
+    }
+    const envState = String(process.env.BOOKING_NOTIFY_STATE || "").trim()
+    const miniprogramState = ["developer", "trial", "formal"].includes(envState) ? envState : "formal"
+    const isPickup = info.stage === "pickup"
+    const statusPhrase = isPickup ? "已提车" : "已还车"
+    const remark = isPickup
+      ? `交接完成，里程 ${info.mileageKm || 0}km，祝用车愉快`.slice(0, 20)
+      : `还车入库完成，存证已归档，押金结算中`.slice(0, 20)
+    await cloud.openapi.subscribeMessage.send({
+      touser: target,
+      templateId,
+      page: `pages/booking-detail/booking-detail?id=${encodeURIComponent(String(info.bookingId || ""))}`,
+      miniprogramState,
+      lang: "zh_CN",
+      data: {
+        thing1: { value: String(info.vehicleName || "极境座驾").slice(0, 20) },
+        phrase2: { value: statusPhrase },
+        thing3: { value: remark },
+        time4: { value: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().slice(11, 16) }
+      }
+    })
+    return { status: "sent", reason: "" }
+  } catch (err) {
+    const msg = String(err && (err.message || err.errMsg) || err)
+    const refused = /43101|refuse|not subscribe|未订阅|拒绝/i.test(msg)
+    if (refused) return { status: "not_subscribed", reason: "user_not_subscribed" }
+    try {
+      await db.collection("error_logs").add({
+        data: {
+          function: "bookingHandover",
+          stage: "subscribeMessage",
+          bookingId: info.bookingId,
+          handoverStage: info.stage,
+          errorMessage: msg.slice(0, 300),
+          createdAt: db.serverDate()
+        }
+      })
+    } catch (logErr) {}
+    return { status: "failed", reason: "send_failed" }
+  }
+}
+
 async function submit(input, openid) {
   const validation = validateSubmit(input)
   if (validation.errors.length) return error("VALIDATION_ERROR", "交接记录校验失败", { errors: validation.errors })
@@ -207,10 +270,32 @@ async function submit(input, openid) {
       [`${input.stage}HandoverConfirmedAt`]: null,
       updatedAt: db.serverDate()
     } })
-    return { result: { ok: true, action: "submit", duplicate: false, handoverId, version } }
+    return {
+      result: {
+        ok: true,
+        action: "submit",
+        duplicate: false,
+        handoverId,
+        version,
+        targetOpenid: text(booking.openid, 128),
+        vehicleName: text(booking.vehicleName, 40)
+      }
+    }
   })
   const response = result && result.result ? result.result : result
-  if (response && response.ok && !response.duplicate) await writeAudit({ openid, action: "bookingHandoverSubmit", bookingId: input.bookingId, stage: input.stage, version: response.version, photoCount: ANGLES.length })
+  if (response && response.ok && !response.duplicate) {
+    await writeAudit({ openid, action: "bookingHandoverSubmit", bookingId: input.bookingId, stage: input.stage, version: response.version, photoCount: ANGLES.length })
+    await sendHandoverNotificationBestEffort({
+      bookingId: input.bookingId,
+      targetUser: response.targetOpenid,
+      vehicleName: response.vehicleName,
+      stage: input.stage,
+      version: response.version,
+      mileageKm: input.mileageKm
+    })
+    delete response.targetOpenid
+    delete response.vehicleName
+  }
   return response
 }
 

@@ -7,6 +7,8 @@ const {
   cancelPageNativeActions,
   isPageNativeActionActive
 } = require("../../shared/pageNativeAction")
+const { formatHandoverCsvContent, getHandoverFileName } = require("../../shared/handoverReport")
+const { PRESET_CUSTOMER_TAGS, normalizeTags } = require("../../shared/bookingTags")
 const BOOKING_DETAIL_LOAD_TIMEOUT_MS = 15 * 1000
 const BOOKING_DETAIL_WRITE_TIMEOUT_MS = 20 * 1000
 const HANDOVER_ANGLES = [
@@ -211,10 +213,13 @@ function normalizeBooking(item) {
     startDate: booking.startDate || "",
     endDate: booking.endDate || "",
     city: booking.city || "",
+    pickupLocation: booking.pickupLocation || "",
+    returnLocation: booking.returnLocation || "",
     note: booking.note || "",
     adminRemark: booking.adminRemark || "",
     adminRemarkDraft: booking.adminRemark || "",
     adminRemarkUpdatedAt: booking.adminRemarkUpdatedAt || "",
+    tags: normalizeTags(booking.tags),
     schedulePriority: PRIORITY_TEXT_MAP[booking.schedulePriority]
       ? booking.schedulePriority
       : "normal",
@@ -298,7 +303,10 @@ Page({
     handoverStage: "pickup",
     handoverForm: createHandoverForm(),
     handoverHistory: [],
-    handoverReadyForCompletion: false
+    handoverReadyForCompletion: false,
+    presetTags: PRESET_CUSTOMER_TAGS,
+    exportedHandoverPath: "",
+    exportingHandover: false
   },
   applyState(patch) { this.setData(patch) },
   onLoad(options) {
@@ -1071,6 +1079,100 @@ Page({
         })
       }
     })
+  },
+  handleExportHandoverReport(event) {
+    if (this.data.exportingHandover) return
+    const handoverId = event && event.currentTarget && event.currentTarget.dataset && event.currentTarget.dataset.id
+    const history = Array.isArray(this.data.handoverHistory) ? this.data.handoverHistory : []
+    const target = (handoverId && history.find((h) => h.id === handoverId)) || history[0] || this.data.handoverForm || {}
+    this.setData({ exportingHandover: true })
+    const csvContent = formatHandoverCsvContent(this.data.booking, target)
+    const fileName = getHandoverFileName(this.data.booking, target)
+    const fs = typeof wx !== "undefined" && wx.getFileSystemManager ? wx.getFileSystemManager() : null
+    if (!fs || !wx.env || !wx.env.USER_DATA_PATH) {
+      this.setData({ exportingHandover: false })
+      if (typeof wx !== "undefined" && wx.showToast) wx.showToast({ title: "系统暂不支持文件导出", icon: "none" })
+      return
+    }
+    const filePath = `${wx.env.USER_DATA_PATH}/${fileName}`
+    fs.writeFile({
+      filePath,
+      data: csvContent,
+      encoding: "utf8",
+      success: () => {
+        this.setData({ exportedHandoverPath: filePath, exportingHandover: false })
+        if (typeof wx !== "undefined" && wx.showToast) wx.showToast({ title: "留证单已导出", icon: "success" })
+      },
+      fail: () => {
+        this.setData({ exportingHandover: false })
+        if (typeof wx !== "undefined" && wx.showToast) wx.showToast({ title: "留证单导出失败", icon: "none" })
+      }
+    })
+  },
+  handleOpenExportedHandover() {
+    const filePath = this.data.exportedHandoverPath
+    if (!filePath || typeof wx === "undefined" || typeof wx.openDocument !== "function") return
+    wx.openDocument({
+      filePath,
+      fileType: "csv",
+      fail: () => wx.showToast({ title: "打开文件失败", icon: "none" })
+    })
+  },
+  handleShareExportedHandover() {
+    const filePath = this.data.exportedHandoverPath
+    if (!filePath || typeof wx === "undefined" || typeof wx.shareFileMessage !== "function") return
+    wx.shareFileMessage({
+      filePath,
+      fail: () => wx.showToast({ title: "分享文件取消或失败", icon: "none" })
+    })
+  },
+  handleDeleteExportedHandover() {
+    const filePath = this.data.exportedHandoverPath
+    if (!filePath) return
+    const fs = typeof wx !== "undefined" && wx.getFileSystemManager ? wx.getFileSystemManager() : null
+    if (fs && typeof fs.unlink === "function") {
+      fs.unlink({
+        filePath,
+        success: () => {
+          this.setData({ exportedHandoverPath: "" })
+          if (typeof wx !== "undefined" && wx.showToast) wx.showToast({ title: "缓存已清理", icon: "none" })
+        },
+        complete: () => {
+          this.setData({ exportedHandoverPath: "" })
+        }
+      })
+    } else {
+      this.setData({ exportedHandoverPath: "" })
+    }
+  },
+  handleToggleCustomerTag(event) {
+    const tag = String((event && event.currentTarget && event.currentTarget.dataset && event.currentTarget.dataset.tag) || "").trim()
+    if (!tag || this.isBookingDetailInteractionBusy()) return
+    const booking = this.data.booking || {}
+    const currentTags = Array.isArray(booking.tags) ? [...booking.tags] : []
+    const idx = currentTags.indexOf(tag)
+    let nextTags
+    if (idx >= 0) {
+      nextTags = currentTags.filter((t) => t !== tag)
+    } else {
+      if (currentTags.length >= 5) {
+        if (typeof wx !== "undefined" && wx.showToast) wx.showToast({ title: "最多添加 5 个标签", icon: "none" })
+        return
+      }
+      nextTags = [...currentTags, tag]
+    }
+    const updatedBooking = { ...booking, tags: nextTags }
+    this.setData({
+      booking: updatedBooking,
+      "booking.tags": nextTags
+    })
+    if (this.data.id && typeof wx !== "undefined" && wx.cloud && typeof wx.cloud.callFunction === "function") {
+      wx.cloud.callFunction({
+        name: "bookingUpdateCoordination",
+        data: { id: this.data.id, tags: nextTags },
+        fail: () => {}
+      })
+    }
   },
   handleUpdateStatus(event) {
     if (

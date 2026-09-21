@@ -11,6 +11,7 @@ const {
   normalizeUsablePhone
 } = require("../../shared/bookingWorkbench")
 const { createPerformanceHelpers } = require('../../shared/performance')
+const { hasMatchingTag, PRESET_CUSTOMER_TAGS } = require("../../shared/bookingTags")
 const WORKBENCH_LOAD_TIMEOUT_MS = 15 * 1000
 const WORKBENCH_WRITE_TIMEOUT_MS = 20 * 1000
 const STATUS_LABELS = {
@@ -64,6 +65,7 @@ function formatQueueItem(item) {
     phone: item.phone || "",
     phoneDisplay: normalizedPhone || "手机号待补充",
     phoneAvailable: Boolean(normalizedPhone),
+    tags: Array.isArray(item.tags) ? item.tags : [],
     city: item.city || "未填写城市",
     startDate: item.startDate || "—",
     endDate: item.endDate || "—",
@@ -73,23 +75,28 @@ function formatQueueItem(item) {
     statusClass: `status-${item.status || "pending"}`
   }
 }
-function filterQueueByKeyword(queue, keyword) {
+function filterQueueByKeyword(queue, keyword, selectedTag) {
+  let list = queue
+  if (selectedTag) {
+    list = list.filter((item) => hasMatchingTag(item, selectedTag))
+  }
   const tokens = String(keyword || "")
     .trim()
     .toLowerCase()
     .split(/\s+/)
     .filter(Boolean)
   if (!tokens.length) {
-    return queue
+    return list
   }
-  return queue.filter((item) => {
+  return list.filter((item) => {
     const searchableFields = [
       item.id,
       item.vehicleName,
       item.userName,
       item.phone,
       item.city,
-      item.adminRemark
+      item.adminRemark,
+      Array.isArray(item.tags) ? item.tags.join(" ") : ""
     ].map((value) => String(value || "").toLowerCase())
     return tokens.every((token) =>
       searchableFields.some((field) => field.includes(token))
@@ -180,6 +187,8 @@ Page({
     editingRemarkId: "",
     remarkDraft: "",
     savingRemark: false,
+    selectedTag: "",
+    presetTags: PRESET_CUSTOMER_TAGS,
     statusUpdatingId: "",
     lastSyncedText: "",
     viewCustomized: false
@@ -276,13 +285,14 @@ Page({
     )
     this.setData({
       selectedMode: view.mode,
-      queue: filterQueueByKeyword(formattedQueue, this.data.keyword),
+      queue: filterQueueByKeyword(formattedQueue, this.data.keyword, this.data.selectedTag),
       queueTotal: formattedQueue.length,
       summary: view.summary,
       filterOptions,
       viewCustomized: Boolean(
         view.mode !== "todo" ||
         String(this.data.keyword || "").trim() ||
+        Boolean(this.data.selectedTag) ||
         this.data.selectedSort !== "smart"
       )
     })
@@ -316,16 +326,23 @@ Page({
     this.fetchBookings()
   },
   handleResetView() {
-    if (!this.data.viewCustomized) {
+    if (!this.data.viewCustomized && !this.data.selectedTag) {
       return
     }
     this.setData({
       keyword: "",
+      selectedTag: "",
       selectedSort: "smart",
       sortHint: SORT_OPTIONS[0].hint
     })
     saveSortPreference("smart")
     this.applyWorkbench("todo")
+  },
+  handleTagFilter(event) {
+    const tag = String((event && event.currentTarget && event.currentTarget.dataset && event.currentTarget.dataset.tag) || "").trim()
+    const nextTag = this.data.selectedTag === tag ? "" : tag
+    this.setData({ selectedTag: nextTag })
+    this.applyWorkbench()
   },
   handleSortTap(event) {
     const selectedSort = String(event.currentTarget.dataset.sort || "")

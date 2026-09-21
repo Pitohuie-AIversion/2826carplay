@@ -9,6 +9,8 @@ const {
   isPageCurrent
 } = require("../../shared/pageNativeAction")
 const { triggerHapticFeedback } = require("../../shared/hapticFeedback")
+const { getVehicleReadinessCard } = require("../../shared/vehicleChecklist")
+const { formatLocationDisplay } = require("../../shared/locations")
 const BOOKING_DETAIL_LOAD_TIMEOUT_MS = 15 * 1000
 const BOOKING_DETAIL_MUTATION_TIMEOUT_MS = 12 * 1000
 const SUBSCRIPTION_REQUEST_TIMEOUT_MS = 15 * 1000
@@ -201,6 +203,9 @@ function normalizeBooking(item) {
     startDate: booking.startDate || "",
     endDate: booking.endDate || "",
     city: booking.city || "",
+    pickupLocation: booking.pickupLocation || "",
+    returnLocation: booking.returnLocation || "",
+    category: booking.category || "",
     note: booking.note || "",
     latestQuoteId: booking.latestQuoteId || "",
     latestQuoteVersion: Math.max(0, Number(booking.latestQuoteVersion || 0)),
@@ -243,6 +248,10 @@ Page({
     latestQuote: {},
     adjustmentNote: "",
     checklistExpanded: true,
+    readinessCard: null,
+    readinessExpanded: false,
+    showVoucherModal: false,
+    pickupLocationDisplay: "",
     editForm: {
       userName: "",
       phone: "",
@@ -409,6 +418,8 @@ Page({
       },
       handoverList: [pickupHandover, returnHandover].filter((item) => item.id),
       adjustmentNote: quote.status === "adjustment_requested" ? quote.adjustmentNote : "",
+      readinessCard: getVehicleReadinessCard({ name: booking.vehicleName, category: booking.category }),
+      pickupLocationDisplay: formatLocationDisplay(booking.pickupLocation, booking.city),
       editForm: {
         userName: booking.userName,
         phone: booking.phone,
@@ -1154,11 +1165,14 @@ Page({
     }
     this.loadDetail()
   },
-  handleCopyBookingId() {
-    const id = String((this.data.booking && this.data.booking.id) || "").trim()
+  handleCopyBookingId(event) {
+    const isVoucher = Boolean(event && event.currentTarget && event.currentTarget.dataset && event.currentTarget.dataset.type === "voucher")
+    const b = this.data.booking || {}
+    const voucherText = `【极境出行凭证】\n预约单号：${this.data.bookingReference || b.id}\n专属座驾：${b.vehicleName || "尊享座驾"}\n用车日期：${b.startDate} 至 ${b.endDate}\n取车网点：${this.data.pickupLocationDisplay || b.city || "极境交付中心"}\n出行人：${b.userName} (${b.phone})\n管家专线：400-888-2826`
+    const id = isVoucher ? voucherText : String((b && b.id) || "").trim()
     if (!id || typeof wx.setClipboardData !== "function") {
       wx.showToast({
-        title: "预约编号复制失败",
+        title: isVoucher ? "凭证复制失败" : "预约编号复制失败",
         icon: "none"
       })
       return
@@ -1171,7 +1185,7 @@ Page({
           return
         }
         wx.showToast({
-          title: "预约编号已复制",
+          title: isVoucher ? "凭证信息已复制" : "预约编号已复制",
           icon: "none"
         })
       },
@@ -1180,7 +1194,7 @@ Page({
           return
         }
         wx.showToast({
-          title: "预约编号复制失败",
+          title: isVoucher ? "凭证复制失败" : "预约编号复制失败",
           icon: "none"
         })
       }
@@ -1368,6 +1382,18 @@ Page({
     this.setData({
       checklistExpanded: !this.data.checklistExpanded
     })
+  },
+  handleToggleReadiness() {
+    triggerHapticFeedback("light")
+    this.setData({
+      readinessExpanded: !this.data.readinessExpanded
+    })
+  },
+  handleViewVoucherCard() {
+    this.setData({ showVoucherModal: true })
+  },
+  handleCloseVoucherCard() {
+    this.setData({ showVoucherModal: false })
   },
   isBookingDetailActive() {
     return this._bookingDetailUnloaded !== true

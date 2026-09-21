@@ -7,6 +7,7 @@ const {
   cancelPageNativeActions,
   isPageNativeActionActive
 } = require("../../shared/pageNativeAction")
+const { calculateMaintenanceHealth, buildFleetMaintenanceSummary } = require("../../shared/vehicleMaintenance")
 const STATUS_OPTIONS = [
   { value: "all", label: "全部" },
   { value: "active", label: "在用" },
@@ -203,6 +204,8 @@ Page({
     summaryItems: buildStatusSummary({}),
     statusRatioSegments: buildStatusRatioSegments({}),
     archiveSummaryItems: buildArchiveSummary({}),
+    maintenanceSummary: { urgentCount: 0, upcomingCount: 0, healthyCount: 0, attentionRequired: 0 },
+    filterMaintenanceOnly: false,
     recentAddedList: [],
     list: [],
     page: 0,
@@ -367,6 +370,22 @@ Page({
         })
       }
     })
+  },
+  handleScheduleMaintenance(event) {
+    const id = String((event && event.currentTarget && event.currentTarget.dataset && event.currentTarget.dataset.id) || "").trim()
+    if (!id) return
+    const action = beginPageNativeAction(this)
+    wx.navigateTo({
+      url: `/pages/booking-calendar/booking-calendar?vehicleId=${id}&kind=maintenance`,
+      fail: () => {
+        if (isPageNativeActionActive(this, action)) {
+          wx.showToast({ title: "日历页面打开失败", icon: "none" })
+        }
+      }
+    })
+  },
+  handleToggleMaintenanceFilter() {
+    this.setData({ filterMaintenanceOnly: !this.data.filterMaintenanceOnly })
   },
   handleViewDetail(event) {
     const id = String(event.currentTarget.dataset.id || "").trim()
@@ -852,12 +871,14 @@ Page({
               fuelTypeText: FUEL_TYPE_LABEL_MAP[item.fuelType] || (item.fuelType ? String(item.fuelType) : "—"),
               seatsText: Number.isInteger(item.seats) && item.seats > 0 ? `${item.seats} 座` : "—",
               ...buildMediaHealth(item),
-              ...buildArchiveHealthView(item)
+              ...buildArchiveHealthView(item),
+              ...calculateMaintenanceHealth(item)
             }))
           : []
         const nextList = append ? this.data.list.concat(list) : list
         this.setData({
           loading: false,
+          maintenanceSummary: buildFleetMaintenanceSummary(nextList),
           total: result.total || 0,
           truncated: Boolean(result.truncated),
           summaryItems: buildStatusSummary(result.dashboard || {}),

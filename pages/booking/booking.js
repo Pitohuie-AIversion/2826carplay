@@ -3,6 +3,7 @@ const { trackEvent } = require("../../shared/analytics")
 const { sanitizeAttribution } = require("../../shared/contentAttribution")
 const { formatToastTitle } = require("../../shared/uiFeedback")
 const { requestOperationConfig } = require("../../shared/operationConfigRequest")
+const { getCityHubs } = require("../../shared/locations")
 const {
   activatePageNativeActions,
   beginPageNativeAction,
@@ -178,6 +179,8 @@ Page({
     cityOptions: [],
     cityIndex: -1,
     pickerCityIndex: 0,
+    pickupHubs: [],
+    pickupHubIndex: 0,
     bookingStatusTemplateId: "",
     subscriptionEnabled: false,
     savedContactAvailable: false,
@@ -194,6 +197,8 @@ Page({
       startDate: "",
       endDate: "",
       city: "",
+      pickupLocation: "",
+      returnLocation: "",
       note: ""
     }
   },
@@ -452,10 +457,18 @@ Page({
     if (cityIndex < 0 && currentCity) {
       cityIndex = cityOptions.findIndex((opt) => currentCity.includes(opt) || opt.includes(currentCity))
     }
+    const hubs = getCityHubs(currentCity)
+    const existingPickup = (this.data.form && this.data.form.pickupLocation) || ""
+    const pickupLocation = existingPickup || (hubs[0] ? hubs[0].name : "")
+    let pickupHubIndex = hubs.findIndex((h) => h.name === pickupLocation)
+    if (pickupHubIndex < 0) pickupHubIndex = 0
 
     this.setData({
       cityIndex,
-      pickerCityIndex: cityIndex >= 0 ? cityIndex : 0
+      pickerCityIndex: cityIndex >= 0 ? cityIndex : 0,
+      pickupHubs: hubs,
+      pickupHubIndex,
+      "form.pickupLocation": pickupLocation
     })
   },
 
@@ -743,14 +756,44 @@ Page({
       return
     }
 
+    const selectedCity = cityOptions[index]
+    const hubs = getCityHubs(selectedCity)
+    const pickupLocation = hubs[0] ? hubs[0].name : ""
     const nextForm = {
       ...this.data.form,
-      city: cityOptions[index]
+      city: selectedCity,
+      pickupLocation
     }
     this.setData({
       cityIndex: index,
       pickerCityIndex: index,
-      "form.city": cityOptions[index],
+      pickupHubs: hubs,
+      pickupHubIndex: 0,
+      "form.city": selectedCity,
+      "form.pickupLocation": pickupLocation,
+      submitRequestId: "",
+      bookingSummary: buildBookingSummary(nextForm, this.data.carName)
+    })
+    markUnsaved(this)
+  },
+
+  handlePickupHubChange(event) {
+    if (this.data.isSubmitting) {
+      return
+    }
+    const index = Number(event.detail && event.detail.value)
+    const hubs = this.data.pickupHubs || []
+    if (!Number.isInteger(index) || index < 0 || index >= hubs.length) {
+      return
+    }
+    const hub = hubs[index]
+    const nextForm = {
+      ...this.data.form,
+      pickupLocation: hub.name
+    }
+    this.setData({
+      pickupHubIndex: index,
+      "form.pickupLocation": hub.name,
       submitRequestId: "",
       bookingSummary: buildBookingSummary(nextForm, this.data.carName)
     })
@@ -936,6 +979,8 @@ Page({
           startDate: submittedForm.startDate,
           endDate: submittedForm.endDate,
           city: submittedForm.city,
+          pickupLocation: submittedForm.pickupLocation || "",
+          returnLocation: submittedForm.returnLocation || "",
           note: submittedForm.note,
           attribution: this.data.attribution,
           requestId

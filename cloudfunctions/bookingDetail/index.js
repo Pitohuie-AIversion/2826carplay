@@ -38,6 +38,7 @@ const BOOKING_MANAGE_DETAIL_FIELDS = {
   pickupHandoverConfirmedAt: true,
   returnHandoverConfirmedAt: true,
   status: true,
+  tags: true,
   createdAt: true,
   updatedAt: true
 }
@@ -534,6 +535,7 @@ exports.main = async (event) => {
         pickupHandoverConfirmedAt: formatTime(item.pickupHandoverConfirmedAt),
         returnHandoverConfirmedAt: formatTime(item.returnHandoverConfirmedAt),
         status: item.status || "pending",
+        ...(Array.isArray(item.tags) && item.tags.length ? { tags: item.tags } : {}),
         createdAt: formatTime(item.createdAt),
         updatedAt: formatTime(item.updatedAt)
       },

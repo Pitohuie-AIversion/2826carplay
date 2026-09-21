@@ -93,10 +93,22 @@ Page({
     truncated: false
   },
 
-  onLoad() {
+  onLoad(options) {
     activatePageNativeActions(this)
     const monthKey = this.data.currentMonthKey
     this.setData({ monthKey, isCurrentMonth: true })
+    const initVehicleId = String((options && options.vehicleId) || "").trim()
+    const initKind = String((options && options.kind) || "").trim()
+    if (initVehicleId) {
+      this.setData({
+        blockForm: {
+          ...this.data.blockForm,
+          vehicleId: initVehicleId,
+          kind: initKind === "maintenance" ? "maintenance" : this.data.blockForm.kind,
+          reason: initKind === "maintenance" ? "定期车辆常规保养与安全体检" : this.data.blockForm.reason
+        }
+      })
+    }
     this.restoreCalendarSnapshot(monthKey)
     requirePagePermission(this, {
       required: "canManageBookings",

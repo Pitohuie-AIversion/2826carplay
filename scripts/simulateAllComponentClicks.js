@@ -78,7 +78,14 @@ const mockFs = {
   saveFile: ({ tempFilePath, success }) => {
     if (success) success({ savedFilePath: tempFilePath.replace("tmp_", "saved_") })
   },
-  unlink: ({ success }) => { if (success) success() }
+  unlink: ({ success, complete } = {}) => {
+    if (typeof success === "function") success()
+    if (typeof complete === "function") complete()
+  },
+  writeFile: ({ success, complete } = {}) => {
+    if (typeof success === "function") success()
+    if (typeof complete === "function") complete()
+  }
 }
 
 const appInstance = {
@@ -96,6 +103,7 @@ const pageStack = [
 global.getCurrentPages = () => pageStack
 
 global.wx = {
+  env: { USER_DATA_PATH: "wxfile://usr" },
   getStorageSync: (k) => storage[k] || null,
   setStorageSync: (k, v) => { storage[k] = v },
   removeStorageSync: (k) => { delete storage[k] },
@@ -144,8 +152,9 @@ global.wx = {
       success({ tempFiles: [{ tempFilePath: "wxfile://tmp_photo.jpg", size: 102400 }] })
     }
   },
-  downloadFile: ({ success }) => {
+  downloadFile: ({ success, complete }) => {
     if (typeof success === "function") success({ statusCode: 200, tempFilePath: "wxfile://tmp_download.csv" })
+    if (typeof complete === "function") complete({ statusCode: 200, tempFilePath: "wxfile://tmp_download.csv" })
   },
   openDocument: ({ success }) => { if (typeof success === "function") success() },
   shareFileMessage: ({ success }) => { if (typeof success === "function") success() },
@@ -157,11 +166,13 @@ global.wx = {
   getAccountInfoSync: () => ({ miniProgram: { envVersion: "release", appId: "wx1234567890abcdef" } }),
   cloud: {
     init: () => {},
-    downloadFile: ({ success }) => {
+    downloadFile: ({ success, complete }) => {
       if (typeof success === "function") success({ tempFilePath: "wxfile://tmp_cloud_download.jpg" })
+      if (typeof complete === "function") complete({ tempFilePath: "wxfile://tmp_cloud_download.jpg" })
     },
-    uploadFile: ({ success }) => {
+    uploadFile: ({ success, complete }) => {
       if (typeof success === "function") success({ fileID: "cloud://prod-garage-env/uploaded-file.jpg" })
+      if (typeof complete === "function") complete({ fileID: "cloud://prod-garage-env/uploaded-file.jpg" })
     },
     callFunction: ({ name, data, success, complete }) => {
       let result = { ok: true }
@@ -254,21 +265,27 @@ global.wx = {
           ]
         }
       } else if (name === "bookingMyDetail" || name === "bookingDetail") {
+        const item = {
+          id: "bk-2026-001",
+          bookingId: "bk-2026-001",
+          vehicleId: "car-911",
+          vehicleName: "保时捷 911 Carrera S",
+          startDate: "2026-10-01",
+          endDate: "2026-10-03",
+          status: "pending",
+          coordinationStatus: "unassigned",
+          priority: "normal",
+          city: "上海",
+          userName: "张先生",
+          contactPhone: "13800000000",
+          adminRemark: "",
+          adminRemarkDraft: "",
+          tags: []
+        }
         result = {
           ok: true,
-          booking: {
-            id: "bk-2026-001",
-            vehicleId: "car-911",
-            vehicleName: "保时捷 911 Carrera S",
-            startDate: "2026-10-01",
-            endDate: "2026-10-03",
-            status: "pending",
-            coordinationStatus: "unassigned",
-            priority: "normal",
-            city: "上海",
-            userName: "张先生",
-            contactPhone: "13800000000"
-          },
+          booking: item,
+          detail: item,
           latestQuote: {
             amount: 5600,
             validUntil: "2026-10-01 12:00",
@@ -772,6 +789,10 @@ simulateClick("切换提车服务城市 (handleCityChange)", () => {
   bookingPage.handleCityChange(makeEvent({}, { value: 0 }))
 })
 
+simulateClick("切换接送网点/服务枢纽 (handlePickupHubChange)", () => {
+  bookingPage.handlePickupHubChange(makeEvent({}, { value: 0 }))
+})
+
 simulateClick("主动勾选隐私与租车服务协议 (handlePrivacyAgreementChange)", () => {
   bookingPage.handlePrivacyAgreementChange(makeEvent({}, { value: ["agreed"] }))
   if (!bookingPage.data.privacyAgreed) throw new Error("隐私协议勾选未生效")
@@ -856,6 +877,24 @@ simulateClick("点击开启/订阅服务状态变动通知 (handleRequestStatusS
 
 simulateClick("点击展开/收起验车交接检查清单 (handleToggleChecklist)", () => {
   bookingDetailPage.handleToggleChecklist()
+})
+
+simulateClick("点击展开/收起座驾驾享安全指南 (handleToggleReadiness)", () => {
+  bookingDetailPage.handleToggleReadiness()
+})
+
+simulateClick("点击查看尊享出行凭证 (handleViewVoucherCard)", () => {
+  bookingDetailPage.handleViewVoucherCard()
+  if (!bookingDetailPage.data.showVoucherModal) throw new Error("出行凭证弹窗未打开")
+})
+
+simulateClick("点击一键复制尊享出行凭证信息 (handleCopyBookingId: voucher)", () => {
+  bookingDetailPage.handleCopyBookingId(makeEvent({ type: "voucher" }))
+})
+
+simulateClick("点击关闭尊享出行凭证弹窗 (handleCloseVoucherCard)", () => {
+  bookingDetailPage.handleCloseVoucherCard()
+  if (bookingDetailPage.data.showVoucherModal) throw new Error("出行凭证弹窗未关闭")
 })
 
 simulateClick("点击查看交接单验车照片大图 (handlePreviewHandoverPhoto)", () => {
@@ -1221,6 +1260,13 @@ simulateClick("点击重试加载工作台 (handleRetry)", () => {
   wbPage.handleRetry()
 })
 
+simulateClick("点击按客户标签快速筛选待办 (handleTagFilter: 需要送车)", () => {
+  wbPage.handleTagFilter(makeEvent({ tag: "需要送车" }))
+  if (wbPage.data.selectedTag !== "需要送车") throw new Error("标签筛选未生效")
+  wbPage.handleTagFilter(makeEvent({ tag: "需要送车" }))
+  if (wbPage.data.selectedTag !== "") throw new Error("取消标签筛选未生效")
+})
+
 logSuite("14. 主包页面: pages/booking-manage/booking-manage (预约管理列表)")
 const bmPage = loadPage("pages/booking-manage/booking-manage")
 
@@ -1383,6 +1429,35 @@ simulateClick("点击归档交接档案 (handleArchiveHandover)", () => {
   bmdPage.handleArchiveHandover(makeEvent({ id: "ho-001", stage: "pickup" }))
 })
 
+simulateClick("点击导出交接验车留证单 (handleExportHandoverReport)", () => {
+  bmdPage.handleExportHandoverReport(makeEvent({ id: "ho-001" }))
+})
+
+simulateClick("点击打开导出的验车留证单 (handleOpenExportedHandover)", () => {
+  bmdPage.setData({ exportedHandoverPath: "wxfile://tmp_handover.csv" })
+  bmdPage.handleOpenExportedHandover()
+})
+
+simulateClick("点击转发分享导出的验车留证单 (handleShareExportedHandover)", () => {
+  bmdPage.setData({ exportedHandoverPath: "wxfile://tmp_handover.csv" })
+  bmdPage.handleShareExportedHandover()
+})
+
+simulateClick("点击清理本地验车留证单缓存 (handleDeleteExportedHandover)", () => {
+  bmdPage.setData({ exportedHandoverPath: "wxfile://tmp_handover.csv" })
+  bmdPage.handleDeleteExportedHandover()
+  if (bmdPage.data.exportedHandoverPath) throw new Error("留证单缓存未清除")
+})
+
+simulateClick("点击为客户打上跟进标签 (handleToggleCustomerTag: 高意向)", () => {
+  if (!bmdPage.data.booking) bmdPage.setData({ booking: { tags: [] } })
+  else if (!Array.isArray(bmdPage.data.booking.tags)) bmdPage.setData({ "booking.tags": [] })
+  bmdPage.handleToggleCustomerTag(makeEvent({ tag: "高意向" }))
+  if (!bmdPage.data.booking.tags.includes("高意向")) throw new Error("客户标签添加未生效")
+  bmdPage.handleToggleCustomerTag(makeEvent({ tag: "高意向" }))
+  if (bmdPage.data.booking.tags.includes("高意向")) throw new Error("客户标签取消未生效")
+})
+
 simulateClick("点击返回管理列表 (handleBackManage)", () => {
   bmdPage.handleBackManage()
 })
@@ -1445,6 +1520,17 @@ simulateClick("点击删除车辆记录 (handleDelete)", () => {
 
 simulateClick("点击右上角「新增车辆」入口 (handleGoCreate)", () => {
   vmPage.handleGoCreate()
+})
+
+simulateClick("点击切换维保预警过滤 (handleToggleMaintenanceFilter)", () => {
+  vmPage.handleToggleMaintenanceFilter()
+  if (!vmPage.data.filterMaintenanceOnly) throw new Error("维保过滤开启失败")
+  vmPage.handleToggleMaintenanceFilter()
+  if (vmPage.data.filterMaintenanceOnly) throw new Error("维保过滤关闭失败")
+})
+
+simulateClick("点击车辆快捷排期维保 (handleScheduleMaintenance)", () => {
+  vmPage.handleScheduleMaintenance(makeEvent({ id: "car-911" }))
 })
 
 simulateClick("点击车队列表触底翻页 (handleLoadMore)", () => {

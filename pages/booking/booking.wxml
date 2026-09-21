@@ -295,6 +295,18 @@
         aria-label="填写取车城市，选填"
       />
     </view>
+    <view class="form-item" wx:if="{{pickupHubs.length}}">
+      <view class="form-label-row"><view class="form-label">接送枢纽 / 门店</view><view class="optional-mark">尊享网点</view></view>
+      <picker mode="selector" range="{{pickupHubs}}" range-key="name" value="{{pickupHubIndex}}" disabled="{{isSubmitting}}" bindchange="handlePickupHubChange" aria-label="选择接送枢纽或服务网点">
+        <view class="form-picker {{form.pickupLocation ? 'form-picker-filled' : ''}}" hover-class="booking-picker-pressed">
+          <text>{{form.pickupLocation || '请选择接送枢纽或网点'}}</text>
+          <view class="picker-arrow" aria-hidden="true"><view class="picker-chevron"></view></view>
+        </view>
+      </picker>
+      <view class="field-hint" wx:if="{{pickupHubs[pickupHubIndex] && pickupHubs[pickupHubIndex].address}}">
+        <text>{{pickupHubs[pickupHubIndex].address}} · {{pickupHubs[pickupHubIndex].feeText}}</text>
+      </view>
+    </view>
     <view class="form-item">
       <view class="form-label-row">
         <view class="form-label">备注</view>

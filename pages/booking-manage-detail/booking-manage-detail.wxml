@@ -37,6 +37,10 @@
         <view class="info-label">取车城市</view>
         <view class="info-value">{{booking.city || "—"}}</view>
       </view>
+      <view class="info-item" wx:if="{{booking.pickupLocation}}">
+        <view class="info-label">接送网点</view>
+        <view class="info-value">{{booking.pickupLocation}}</view>
+      </view>
       <view class="info-item">
         <view class="info-label">提交时间</view>
         <view class="info-value">{{createdAtText || "—"}}</view>

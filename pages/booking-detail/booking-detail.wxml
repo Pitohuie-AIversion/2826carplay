@@ -41,8 +41,8 @@
     </view>
     <view class="receipt-footer">
       <view>
-        <view class="footer-label">取车城市</view>
-        <view class="footer-value">{{booking.city || "—"}}</view>
+        <view class="footer-label">取车城市与网点</view>
+        <view class="footer-value">{{pickupLocationDisplay || booking.city || "—"}}</view>
       </view>
       <view class="receipt-code">
         <view class="code-label">BOOKING ID</view>
@@ -51,6 +51,12 @@
           <button class="copy-code-btn action-with-icon" bindtap="handleCopyBookingId" hover-class="copy-code-btn-pressed" aria-label="复制预约编号 {{bookingReference}}"><view class="copy-native-icon" aria-hidden="true"></view><text>复制</text></button>
         </view>
       </view>
+    </view>
+    <view wx:if="{{booking.status === 'confirmed'}}" class="voucher-trigger-wrap">
+      <button class="voucher-trigger-btn ui-btn ui-btn-primary action-with-icon" bindtap="handleViewVoucherCard" aria-label="查看尊享出行凭证">
+        <view class="voucher-native-icon" aria-hidden="true"></view>
+        <text>查看尊享出行凭证</text>
+      </button>
     </view>
   </view>
   <view class="info-card ui-card">
@@ -303,6 +309,49 @@
       </view>
     </view>
   </view>
+  <view wx:if="{{readinessCard}}" class="readiness-card ui-card">
+    <view class="section-heading" bindtap="handleToggleReadiness" hover-class="checklist-heading-pressed" aria-role="button" aria-label="座驾驾享指南 {{readinessExpanded ? '收起' : '展开'}}">
+      <view>
+        <view class="section-kicker">VEHICLE GUIDE</view>
+        <view class="section-title">座驾驾享指南 · {{readinessCard.categoryName}}</view>
+      </view>
+      <view class="section-side">
+        <view class="readiness-toggle-btn ui-btn ui-btn-ghost">
+          <text>{{readinessExpanded ? '收起' : '展开'}}</text>
+        </view>
+      </view>
+    </view>
+    <view wx:if="{{readinessExpanded}}" class="readiness-content">
+      <view class="readiness-tip-item">
+        <view class="readiness-tip-badge">燃油</view>
+        <view class="readiness-tip-info">
+          <view class="readiness-tip-title">补能与燃油标准</view>
+          <view class="readiness-tip-desc">{{readinessCard.fuelNotice}}</view>
+        </view>
+      </view>
+      <view class="readiness-tip-item">
+        <view class="readiness-tip-badge">通行</view>
+        <view class="readiness-tip-info">
+          <view class="readiness-tip-title">底盘与坡道防剐蹭</view>
+          <view class="readiness-tip-desc">{{readinessCard.suspensionNotice}}</view>
+        </view>
+      </view>
+      <view class="readiness-tip-item">
+        <view class="readiness-tip-badge">驾驶</view>
+        <view class="readiness-tip-info">
+          <view class="readiness-tip-title">动力与电子稳定系统</view>
+          <view class="readiness-tip-desc">{{readinessCard.drivingNotice}}</view>
+        </view>
+      </view>
+      <view class="readiness-tip-item readiness-tip-item-last">
+        <view class="readiness-tip-badge">驻车</view>
+        <view class="readiness-tip-info">
+          <view class="readiness-tip-title">停泊与闭锁规范</view>
+          <view class="readiness-tip-desc">{{readinessCard.parkingNotice}}</view>
+        </view>
+      </view>
+    </view>
+  </view>
   <view class="detail-actions-card ui-card">
     <view class="section-heading">
       <view>
@@ -337,6 +386,51 @@
   <view wx:if="{{canCancel}}" class="actions">
     <view class="action-note tip-with-icon"><view class="tip-info-native-icon tip-info-native-icon-danger" aria-hidden="true"><view class="tip-info-mark"></view></view><view>如行程发生变化，可在顾问确认前取消预约</view></view>
     <button class="cancel-btn ui-btn ui-btn-danger-ghost action-with-icon" loading="{{cancelling}}" disabled="{{loading || editing || saving || subscriptionRequesting || cancelling}}" bindtap="handleCancel"><view wx:if="{{!cancelling}}" class="cancel-booking-native-icon" aria-hidden="true"></view><text>{{cancelling ? '正在取消' : '取消本次预约'}}</text></button>
+  </view>
+  <view wx:if="{{showVoucherModal}}" class="voucher-modal-mask" hover-class="none" aria-role="button" aria-label="关闭出行凭证" bindtap="handleCloseVoucherCard" aria-modal="true">
+    <view class="voucher-modal-card ui-card" catchtap="true">
+      <view class="voucher-modal-header">
+        <image class="voucher-brand-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
+        <view class="voucher-modal-kicker">EXTREME MOBILITY VOUCHER</view>
+        <view class="voucher-modal-title">尊享出行确认凭证</view>
+        <view class="voucher-modal-status">方案已确认 · 待尊享履约</view>
+      </view>
+      <view class="voucher-modal-body">
+        <view class="voucher-field-row">
+          <text class="voucher-field-label">预约编号</text>
+          <text class="voucher-field-val">{{bookingReference}}</text>
+        </view>
+        <view class="voucher-field-row">
+          <text class="voucher-field-label">专属座驾</text>
+          <text class="voucher-field-val voucher-field-val-gold">{{booking.vehicleName || "—"}}</text>
+        </view>
+        <view class="voucher-field-row">
+          <text class="voucher-field-label">用车档期</text>
+          <text class="voucher-field-val">{{booking.startDate}} 至 {{booking.endDate}} ({{journeySpanText}})</text>
+        </view>
+        <view class="voucher-field-row">
+          <text class="voucher-field-label">履约网点</text>
+          <text class="voucher-field-val">{{pickupLocationDisplay || booking.city || "极境服务中心"}}</text>
+        </view>
+        <view class="voucher-field-row">
+          <text class="voucher-field-label">出行人</text>
+          <text class="voucher-field-val">{{booking.userName}} · {{booking.phone}}</text>
+        </view>
+        <view class="voucher-field-row voucher-field-row-last">
+          <text class="voucher-field-label">管家专线</text>
+          <text class="voucher-field-val">400-888-2826</text>
+        </view>
+      </view>
+      <view class="voucher-modal-actions">
+        <button class="ui-btn ui-btn-primary action-with-icon" data-type="voucher" bindtap="handleCopyBookingId" aria-label="复制出行凭证信息">
+          <view class="copy-native-icon" aria-hidden="true"></view>
+          <text>复制凭证信息</text>
+        </button>
+        <button class="ui-btn ui-btn-ghost voucher-close-btn" bindtap="handleCloseVoucherCard" aria-label="关闭出行凭证">
+          <text>关闭</text>
+        </button>
+      </view>
+    </view>
   </view>
 </view>
 <view wx:elif="{{initialLoading || loading}}" class="detail-page detail-skeleton-page" aria-hidden="true">

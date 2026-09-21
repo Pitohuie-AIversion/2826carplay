@@ -268,7 +268,7 @@ describe("用户主流程原生图标", () => {
     const privacyCheckbox = bookingMarkup.match(/<checkbox\b[^>]*\/>/)[0]
     const bookingStyle = read("pages/booking/booking.wxss")
 
-    expect(pickerCount).toBe(25)
+    expect(pickerCount).toBe(26)
     expect(privacyGroup).toContain("privacy-agreement-complete")
     expect(privacyGroup).toContain('aria-required="{{true}}"')
     expect(privacyCheckbox).toContain('aria-label="同意隐私政策"')
@@ -736,7 +736,7 @@ describe("用户主流程原生图标", () => {
     const componentScripts = ["components/core-nav/core-nav.js"]
     const scripts = allPageRoutes.map((route) => `${route}.js`).concat(componentScripts)
     const expectedCounts = {
-      navigateTo: 29,
+      navigateTo: 30,
       redirectTo: 19,
       reLaunch: 17,
       navigateBack: 9,

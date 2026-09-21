@@ -95,6 +95,8 @@ function normalizeEvent(event) {
     startDate: normalizeText(payload.startDate, 20),
     endDate: normalizeText(payload.endDate, 20),
     city: normalizeText(payload.city, 20),
+    pickupLocation: normalizeText(payload.pickupLocation, 60),
+    returnLocation: normalizeText(payload.returnLocation, 60),
     note: normalizeText(payload.note, 200),
     requestId: String(payload.requestId || "").trim(),
     attribution: {
@@ -415,6 +417,8 @@ exports.main = async (event) => {
       startDate: input.startDate,
       endDate: input.endDate,
       city: input.city,
+      ...(input.pickupLocation ? { pickupLocation: input.pickupLocation } : {}),
+      ...(input.returnLocation ? { returnLocation: input.returnLocation } : {}),
       note: input.note,
       ...(input.attribution.contentId ? {
         attribution: {

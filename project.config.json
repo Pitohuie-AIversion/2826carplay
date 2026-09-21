@@ -103,6 +103,14 @@
       {
         "type": "file",
         "value": "debug-debugger-code-quality-issues.md"
+      },
+      {
+        "type": "folder",
+        "value": "web-admin"
+      },
+      {
+        "type": "folder",
+        "value": "backups"
       }
     ],
     "include": []

@@ -498,7 +498,18 @@ async function queryStatsProjectionWithFallback() {
   }
 }
 
-function buildFilteredLists(publicList, keyword, category, availableOnly, city) {
+function sortVehicleList(list, sortBy) {
+  if (!Array.isArray(list)) return []
+  if (sortBy === "price_asc") {
+    return list.slice().sort((a, b) => (Number(a.priceDay) || 0) - (Number(b.priceDay) || 0))
+  }
+  if (sortBy === "price_desc") {
+    return list.slice().sort((a, b) => (Number(b.priceDay) || 0) - (Number(a.priceDay) || 0))
+  }
+  return list.slice().sort((prev, next) => next.sort - prev.sort)
+}
+
+function buildFilteredLists(publicList, keyword, category, availableOnly, city, sortBy) {
   const cityFiltered = city
     ? publicList.filter((item) => String((item && item.location) || "").toLowerCase().includes(city.toLowerCase()))
     : publicList
@@ -508,13 +519,14 @@ function buildFilteredLists(publicList, keyword, category, availableOnly, city) 
     ? searchedList
     : searchedList.filter((item) => item.category === category)
   const availableCount = categoryList.filter((item) => item.status === "available").length
-  const fullList = availableOnly
+  const rawList = availableOnly
     ? categoryList.filter((item) => item.status === "available")
     : categoryList
+  const fullList = sortVehicleList(rawList, sortBy)
   return { searchedList, categoryCounts, categoryList, availableCount, fullList }
 }
 
-async function runLegacyFallback(page, pageSize, keyword, category, availableOnly, city) {
+async function runLegacyFallback(page, pageSize, keyword, category, availableOnly, city, sortBy) {
   const vehicleRecords = await readVehicles()
   const publicList = vehicleRecords.list
     .filter((item) => item && item.status !== "retired")
@@ -525,7 +537,8 @@ async function runLegacyFallback(page, pageSize, keyword, category, availableOnl
     keyword,
     category,
     availableOnly,
-    city
+    city,
+    sortBy
   )
   const offset = page * pageSize
   const list = fullList.slice(offset, offset + pageSize)
@@ -543,14 +556,15 @@ async function runLegacyFallback(page, pageSize, keyword, category, availableOnl
     city,
     category,
     availableOnly,
+    sortBy,
     truncated: vehicleRecords.truncated,
     hasMore: offset + pageSize < fullList.length,
     list
   }
 }
 
-async function runNativeOptimized(page, pageSize, keyword, category, availableOnly, skipStats, city) {
-  const hasFilter = Boolean(keyword || (category && category !== "all") || availableOnly || city)
+async function runNativeOptimized(page, pageSize, keyword, category, availableOnly, skipStats, city, sortBy) {
+  const hasFilter = Boolean(keyword || (category && category !== "all") || availableOnly || city || (sortBy && sortBy !== "default"))
 
   if (skipStats && !hasFilter) {
     const pageResult = await queryNativePageWithFallback(page, pageSize)
@@ -584,7 +598,7 @@ async function runNativeOptimized(page, pageSize, keyword, category, availableOn
     .map(mapVehicle)
     .sort((prev, next) => next.sort - prev.sort)
 
-  const statsFiltered = buildFilteredLists(statsPublicList, keyword, category, availableOnly, city)
+  const statsFiltered = buildFilteredLists(statsPublicList, keyword, category, availableOnly, city, sortBy)
   const { searchedList, categoryCounts, categoryList, availableCount, fullList } = statsFiltered
 
   const pagePublicList = pageResult.list
@@ -592,7 +606,7 @@ async function runNativeOptimized(page, pageSize, keyword, category, availableOn
     .map(mapVehicle)
     .sort((prev, next) => next.sort - prev.sort)
 
-  const pageFiltered = buildFilteredLists(pagePublicList, keyword, category, availableOnly, city)
+  const pageFiltered = buildFilteredLists(pagePublicList, keyword, category, availableOnly, city, sortBy)
   const offset = page * pageSize
   const hasMore = offset + pageSize < fullList.length
 
@@ -616,6 +630,7 @@ async function runNativeOptimized(page, pageSize, keyword, category, availableOn
     city,
     category,
     availableOnly,
+    sortBy,
     truncated,
     hasMore,
     list
@@ -634,9 +649,10 @@ exports.main = async (event) => {
     const category = String(payload.category || "all").trim().slice(0, 50) || "all"
     const availableOnly = payload.availableOnly === true
     const skipStats = payload.skipStats === true
+    const sortBy = String(payload.sortBy || "default").trim().slice(0, 50) || "default"
 
     try {
-      return await runNativeOptimized(page, pageSize, keyword, category, availableOnly, skipStats, city)
+      return await runNativeOptimized(page, pageSize, keyword, category, availableOnly, skipStats, city, sortBy)
     } catch (nativeError) {
       console.warn({
         function: "garageVehicleList",
@@ -647,7 +663,7 @@ exports.main = async (event) => {
             : String(nativeError),
         createdAt: new Date().toISOString()
       })
-      return runLegacyFallback(page, pageSize, keyword, category, availableOnly, city)
+      return runLegacyFallback(page, pageSize, keyword, category, availableOnly, city, sortBy)
     }
   } catch (error) {
     console.error({

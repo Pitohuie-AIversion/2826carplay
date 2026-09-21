@@ -421,5 +421,34 @@ describe("pages/booking-manage workflow filters", () => {
     page.onReachBottom()
     expect(page.fetchList).not.toHaveBeenCalled()
   })
+
+  test("点击状态或城市筛选标签立即更新并显式携带筛选条件发起查询", () => {
+    let listCall = null
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn((options) => {
+          listCall = options
+        })
+      },
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition(), {
+      loading: false,
+      currentStatus: "pending",
+      currentCity: "all"
+    })
+
+    page.handleStatusTap({ currentTarget: { dataset: { status: "contacted" } } })
+    expect(page.data.currentStatus).toBe("contacted")
+    expect(listCall).not.toBeNull()
+    expect(listCall.data.status).toBe("contacted")
+
+    listCall = null
+    page.data.loading = false
+    page.handleCityTap({ currentTarget: { dataset: { value: "上海" } } })
+    expect(page.data.currentCity).toBe("上海")
+    expect(listCall).not.toBeNull()
+    expect(listCall.data.city).toBe("上海")
+  })
 })
 

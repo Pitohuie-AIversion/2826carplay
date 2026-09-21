@@ -13,6 +13,13 @@
       "installDependency": true,
       "ignore": [
         "node_modules/**"
+      ],
+      "triggers": [
+        {
+          "name": "dailyCleanupTrigger",
+          "type": "timer",
+          "config": "0 0 2 * * * *"
+        }
       ]
     },
     {
@@ -421,6 +428,13 @@
       "installDependency": true,
       "ignore": [
         "node_modules/**"
+      ],
+      "triggers": [
+        {
+          "name": "dailyFilePurgeTrigger",
+          "type": "timer",
+          "config": "0 0 3 * * * *"
+        }
       ]
     },
     {
@@ -529,6 +543,13 @@
       "installDependency": true,
       "ignore": [
         "node_modules/**"
+      ],
+      "triggers": [
+        {
+          "name": "periodicHealthCheckTrigger",
+          "type": "timer",
+          "config": "0 0 */6 * * * *"
+        }
       ]
     },
     {

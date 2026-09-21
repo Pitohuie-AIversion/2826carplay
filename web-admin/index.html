@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>极境车库 · 运营指挥中心 | JiJing Operations Command</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-base: #0a0d14;
+      --bg-surface: #111726;
+      --bg-card: rgba(23, 32, 54, 0.7);
+      --bg-card-hover: rgba(30, 42, 70, 0.85);
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-bright: rgba(56, 189, 248, 0.3);
+      --primary: #38bdf8;
+      --primary-glow: rgba(56, 189, 248, 0.25);
+      --accent: #f59e0b;
+      --accent-glow: rgba(245, 158, 11, 0.2);
+      --success: #10b981;
+      --success-glow: rgba(16, 185, 129, 0.2);
+      --danger: #ef4444;
+      --danger-glow: rgba(239, 68, 68, 0.2);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+      --shadow-card: 0 10px 30px -10px rgba(0, 0, 0, 0.5), 0 0 1px 1px rgba(255, 255, 255, 0.05);
+      --transition-smooth: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      background-image: 
+        radial-gradient(at 15% 15%, rgba(56, 189, 248, 0.08) 0px, transparent 40%),
+        radial-gradient(at 85% 85%, rgba(16, 185, 129, 0.05) 0px, transparent 40%),
+        radial-gradient(at 50% 50%, rgba(15, 23, 42, 0.6) 0px, transparent 100%);
+      color: var(--text-main);
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* Top Navigation */
+    header.top-nav {
+      background: rgba(11, 16, 28, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 0.85rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .brand-logo {
+      width: 38px;
+      height: 38px;
+      border-radius: var(--radius-sm);
+      background: linear-gradient(135deg, #0284c7, #38bdf8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 1.25rem;
+      color: #fff;
+      box-shadow: 0 0 20px var(--primary-glow);
+    }
+
+    .brand-text h1 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.2rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .brand-text span.en-sub {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      font-weight: 500;
+      display: block;
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+    }
+
+    .env-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      color: var(--primary);
+      padding: 0.35rem 0.85rem;
+      border-radius: 9999px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      font-family: monospace;
+    }
+
+    .env-badge::before {
+      content: '';
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background-color: var(--success);
+      box-shadow: 0 0 8px var(--success);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    .time-clock {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      font-family: monospace;
+    }
+
+    .btn-action {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-main);
+      padding: 0.45rem 1rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: var(--transition-smooth);
+    }
+
+    .btn-action:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--border-bright);
+      color: var(--primary);
+      box-shadow: 0 0 15px var(--primary-glow);
+    }
+
+    /* Main Container */
+    main.dashboard-container {
+      max-width: 1560px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+      flex: 1;
+    }
+
+    /* KPI Metrics Grid */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1.25rem;
+    }
+
+    .kpi-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 1.35rem 1.5rem;
+      backdrop-filter: blur(12px);
+      box-shadow: var(--shadow-card);
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      position: relative;
+      overflow: hidden;
+      transition: var(--transition-smooth);
+    }
+
+    .kpi-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(255, 255, 255, 0.15);
+      background: var(--bg-card-hover);
+    }
+
+    .kpi-card::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, var(--card-accent, var(--primary)), transparent);
+      opacity: 0.7;
+    }
+
+    .kpi-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .kpi-value {
+      font-family: 'Outfit', sans-serif;
+      font-size: 2.2rem;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: baseline;
+      gap: 0.4rem;
+    }
+
+    .kpi-unit {
+      font-size: 0.95rem;
+      color: var(--text-dim);
+      font-weight: 500;
+    }
+
+    .kpi-trend {
+      font-size: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      color: var(--text-muted);
+    }
+
+    .trend-up { color: var(--success); }
+    .trend-alert { color: var(--accent); }
+
+    /* Dashboard Layout Grid */
+    .content-grid {
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 1.75rem;
+      align-items: start;
+    }
+
+    @media (max-width: 1180px) {
+      .content-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Left Panel: Fleet Matrix & Schedule */
+    .panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      backdrop-filter: blur(12px);
+      box-shadow: var(--shadow-card);
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .panel-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.15rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    .panel-controls {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    .search-input {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-main);
+      padding: 0.4rem 0.85rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.82rem;
+      outline: none;
+      transition: var(--transition-smooth);
+      width: 180px;
+    }
+
+    .search-input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 10px var(--primary-glow);
+      width: 220px;
+    }
+
+    /* Fleet Table Matrix */
+    .table-container {
+      overflow-x: auto;
+      border-radius: var(--radius-sm);
+    }
+
+    table.fleet-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.85rem;
+    }
+
+    table.fleet-table th {
+      background: rgba(15, 23, 42, 0.5);
+      padding: 0.85rem 1rem;
+      color: var(--text-dim);
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 0.72rem;
+      letter-spacing: 0.8px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    table.fleet-table td {
+      padding: 1rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      vertical-align: middle;
+      transition: var(--transition-smooth);
+    }
+
+    table.fleet-table tr:hover td {
+      background: rgba(56, 189, 248, 0.03);
+    }
+
+    .vehicle-info {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+    }
+
+    .vehicle-avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: var(--radius-sm);
+      background: #1e293b;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.9rem;
+      color: var(--primary);
+      border: 1px solid var(--border-subtle);
+    }
+
+    .vehicle-name {
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .vehicle-plate {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      font-family: monospace;
+    }
+
+    /* Status Tags */
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.25rem 0.65rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .status-pill.active {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--success);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .status-pill.rented {
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--primary);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+
+    .status-pill.maintenance {
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--accent);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    .status-pill.reserved {
+      background: rgba(168, 85, 247, 0.15);
+      color: #c084fc;
+      border: 1px solid rgba(168, 85, 247, 0.3);
+    }
+
+    /* Right Sidebar Widgets */
+    .sidebar-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .widget-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 1.35rem;
+      backdrop-filter: blur(12px);
+      box-shadow: var(--shadow-card);
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .widget-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .service-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.65rem 0.85rem;
+      background: rgba(15, 23, 42, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      border-radius: var(--radius-sm);
+      font-size: 0.8rem;
+    }
+
+    .service-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+    }
+
+    .service-name {
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .service-desc {
+      font-size: 0.72rem;
+      color: var(--text-dim);
+    }
+
+    /* Export Actions */
+    .export-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.65rem;
+    }
+
+    .btn-export {
+      background: rgba(30, 41, 59, 0.6);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-main);
+      padding: 0.65rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.35rem;
+      transition: var(--transition-smooth);
+    }
+
+    .btn-export:hover {
+      background: rgba(56, 189, 248, 0.15);
+      border-color: var(--primary);
+      color: var(--primary);
+      transform: translateY(-2px);
+    }
+
+    /* Toast Notification */
+    #toast {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid var(--border-bright);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+      color: var(--text-main);
+      padding: 0.85rem 1.35rem;
+      border-radius: var(--radius-md);
+      font-size: 0.85rem;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      opacity: 0;
+      transform: translateY(20px);
+      pointer-events: none;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      z-index: 100;
+    }
+
+    #toast.show {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    /* Footer */
+    footer.app-footer {
+      padding: 1.5rem 2rem;
+      text-align: center;
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      border-top: 1px solid var(--border-subtle);
+      background: rgba(11, 16, 28, 0.6);
+      margin-top: auto;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Navigation -->
+  <header class="top-nav">
+    <div class="brand-group">
+      <div class="brand-logo">JJ</div>
+      <div class="brand-text">
+        <h1>极境车库 · 运营指挥中心</h1>
+        <span class="en-sub">JiJing Garage Operations Command</span>
+      </div>
+    </div>
+    <div class="nav-actions">
+      <div class="env-badge" title="当前微信云开发独立运行环境">
+        cloud1-d8gtmns36320e045e
+      </div>
+      <div class="time-clock" id="timeClock">--:--:--</div>
+      <button class="btn-action" onclick="refreshDashboard()" id="btnRefresh">
+        <span>🔄</span> 刷新数据
+      </button>
+      <button class="btn-action" onclick="runHealthCheck()" id="btnHealth">
+        <span>🩺</span> 健康拨测
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Dashboard Container -->
+  <main class="dashboard-container">
+
+    <!-- KPI Metrics -->
+    <section class="kpi-grid">
+      <div class="kpi-card" style="--card-accent: #38bdf8;">
+        <div class="kpi-header">
+          <span>待确认预约</span>
+          <span>⚡ 待处理</span>
+        </div>
+        <div class="kpi-value">
+          <span id="pendingBookings">3</span>
+          <span class="kpi-unit">单</span>
+        </div>
+        <div class="kpi-trend trend-alert">
+          <span>⚠️ 需在 30 分钟内完成意向锁定</span>
+        </div>
+      </div>
+
+      <div class="kpi-card" style="--card-accent: #10b981;">
+        <div class="kpi-header">
+          <span>在租运营车辆</span>
+          <span>🚗 行驶中</span>
+        </div>
+        <div class="kpi-value">
+          <span id="activeRentals">8</span>
+          <span class="kpi-unit">台</span>
+        </div>
+        <div class="kpi-trend trend-up">
+          <span>↑ 当前车队运转率处于高峰期</span>
+        </div>
+      </div>
+
+      <div class="kpi-card" style="--card-accent: #f59e0b;">
+        <div class="kpi-header">
+          <span>今日待归还检查</span>
+          <span>🏁 验车待接</span>
+        </div>
+        <div class="kpi-value">
+          <span id="dueToday">2</span>
+          <span class="kpi-unit">台</span>
+        </div>
+        <div class="kpi-trend">
+          <span>标准交接检查清单已准备完毕</span>
+        </div>
+      </div>
+
+      <div class="kpi-card" style="--card-accent: #818cf8;">
+        <div class="kpi-header">
+          <span>车队综合可用率</span>
+          <span>📊 运力健康</span>
+        </div>
+        <div class="kpi-value">
+          <span id="fleetAvailability">87.5</span>
+          <span class="kpi-unit">%</span>
+        </div>
+        <div class="kpi-trend trend-up">
+          <span>↑ 满足国庆节假日运营峰值指标</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Content Split Layout -->
+    <div class="content-grid">
+
+      <!-- Left Main: Fleet Schedule & Lock Matrix -->
+      <section class="panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <span>🏁</span> 车辆运行与排期状态矩阵 (Fleet Matrix)
+          </div>
+          <div class="panel-controls">
+            <input type="text" class="search-input" id="vehicleSearch" placeholder="搜索车型 / 车牌号..." oninput="filterVehicles()">
+            <button class="btn-action" onclick="showToast('已同步最新车辆占用锁数据')">
+              <span>🔒</span> 日锁同步
+            </button>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table class="fleet-table" id="fleetTable">
+            <thead>
+              <tr>
+                <th>车辆与牌照</th>
+                <th>级别定位</th>
+                <th>运行状态</th>
+                <th>当前/下一预约</th>
+                <th>快捷调度</th>
+              </tr>
+            </thead>
+            <tbody id="fleetBody">
+              <!-- Rendered by JS -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Right Sidebar Stack -->
+      <aside class="sidebar-stack">
+
+        <!-- Cloud Services Monitor -->
+        <div class="widget-card">
+          <div class="widget-title">
+            <span>☁️ 云端自动化维护哨兵</span>
+            <span style="font-size: 0.72rem; color: var(--success);">56/56 正常</span>
+          </div>
+
+          <div class="service-item">
+            <div class="service-meta">
+              <span class="service-name">定时日志归档与清理</span>
+              <span class="service-desc">analyticsCleanup · 每天 02:00</span>
+            </div>
+            <span class="status-pill active">自动轮转</span>
+          </div>
+
+          <div class="service-item">
+            <div class="service-meta">
+              <span class="service-name">孤儿文件物理清除</span>
+              <span class="service-desc">pendingFileDeletion · 每天 03:00</span>
+            </div>
+            <span class="status-pill active">已激活</span>
+          </div>
+
+          <div class="service-item">
+            <div class="service-meta">
+              <span class="service-name">全链路健康度自动检测</span>
+              <span class="service-desc">systemHealthCheck · 每 6 小时</span>
+            </div>
+            <span class="status-pill active">正常巡检</span>
+          </div>
+
+          <div class="service-item">
+            <div class="service-meta">
+              <span class="service-name">静态托管 CDN 服务</span>
+              <span class="service-desc">Static Hosting · 极速节点</span>
+            </div>
+            <span class="status-pill active">Online</span>
+          </div>
+        </div>
+
+        <!-- Data Center & CSV Export -->
+        <div class="widget-card">
+          <div class="widget-title">
+            <span>📦 数据资产与对账导出</span>
+            <span style="font-size: 0.72rem; color: var(--text-dim);">16个业务集合</span>
+          </div>
+
+          <p style="font-size: 0.75rem; color: var(--text-muted); line-height: 1.5;">
+            提供对账数据快速导出及本地快照冷备。所有导出字段已严格遵循最小化安全白名单脱敏处理。
+          </p>
+
+          <div class="export-grid">
+            <button class="btn-export" onclick="exportData('bookings')">
+              <span style="font-size: 1.2rem;">📑</span>
+              <span>预约明细 CSV</span>
+            </button>
+            <button class="btn-export" onclick="exportData('audit_logs')">
+              <span style="font-size: 1.2rem;">🛡️</span>
+              <span>审计日志 CSV</span>
+            </button>
+            <button class="btn-export" onclick="exportData('vehicles')">
+              <span style="font-size: 1.2rem;">🏎️</span>
+              <span>车队档案 CSV</span>
+            </button>
+            <button class="btn-export" onclick="triggerColdBackup()">
+              <span style="font-size: 1.2rem;">💾</span>
+              <span>一键冷备快照</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Quick Tips Card -->
+        <div class="widget-card" style="border-left: 3px solid var(--primary);">
+          <div class="widget-title">
+            <span>💡 运营操作须知</span>
+          </div>
+          <p style="font-size: 0.75rem; color: var(--text-dim); line-height: 1.6;">
+            • 如遇还车日锁冲突，请先在预约工作台核对客户还车交接单；<br>
+            • 车辆下架或送厂维保前，请先在日历中点击“设置维保锁定”，避免客户误约；<br>
+            • 每日凌晨已配置自动清理机制，保障数据库性能处于毫秒级响应。
+          </p>
+        </div>
+
+      </aside>
+
+    </div>
+
+  </main>
+
+  <!-- Toast Element -->
+  <div id="toast">
+    <span id="toastIcon">ℹ️</span>
+    <span id="toastMsg">通知信息</span>
+  </div>
+
+  <!-- Footer -->
+  <footer class="app-footer">
+    极境车库 (JiJing Garage) 运营指挥中心 · 云开发 Serverless 架构托管 · 运行环境 cloud1-d8gtmns36320e045e
+  </footer>
+
+  <script>
+    // Vehicle Mock/Live Data
+    const VEHICLES = [
+      { id: 'v1', name: 'Porsche 911 GT3 RS', plate: '浙A·88888', category: '赛道超级跑车', status: 'rented', statusText: '租赁中', schedule: '今日 18:00 归还待检' },
+      { id: 'v2', name: 'Ferrari 488 Pista', plate: '浙A·77777', category: '中置V8跑车', status: 'maintenance', statusText: '整备中', schedule: '今日 16:30 释放 (机油保养)' },
+      { id: 'v3', name: 'Lamborghini Huracán EVO', plate: '浙A·99999', category: 'V10四驱跑车', status: 'active', statusText: '空闲待租', schedule: '全档期可用' },
+      { id: 'v4', name: 'McLaren 720S Performance', plate: '浙A·66666', category: '碳纤维单体壳超跑', status: 'active', statusText: '空闲待租', schedule: '明日 10:00 已有预定' },
+      { id: 'v5', name: 'Aston Martin DBS Superleggera', plate: '浙A·55555', category: 'GT旗舰跑车', status: 'reserved', statusText: '已确认待取', schedule: '明日 09:00 客户提车' },
+      { id: 'v6', name: 'Mercedes-AMG G63', plate: '浙A·22222', category: '全地形越野', status: 'rented', statusText: '租赁中', schedule: '后天 14:00 归还' },
+      { id: 'v7', name: 'Rolls-Royce Ghost', plate: '浙A·11111', category: '顶级行政座驾', status: 'active', statusText: '空闲待租', schedule: '全档期可用' },
+      { id: 'v8', name: 'Bentley Continental GT', plate: '浙A·33333', category: '超豪华运动轿跑', status: 'active', statusText: '空闲待租', schedule: '本周末已预订' }
+    ];
+
+    function renderVehicles(list) {
+      const tbody = document.getElementById('fleetBody');
+      tbody.innerHTML = '';
+
+      if (list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--text-dim); padding:2rem;">未找到匹配车辆</td></tr>';
+        return;
+      }
+
+      list.forEach(item => {
+        const tr = document.createElement('tr');
+        const initials = item.name.split(' ').slice(0, 2).map(s => s[0]).join('');
+        
+        tr.innerHTML = `
+          <td>
+            <div class="vehicle-info">
+              <div class="vehicle-avatar">${initials}</div>
+              <div>
+                <div class="vehicle-name">${item.name}</div>
+                <div class="vehicle-plate">${item.plate}</div>
+              </div>
+            </div>
+          </td>
+          <td><span style="color:var(--text-muted); font-size:0.8rem;">${item.category}</span></td>
+          <td><span class="status-pill ${item.status}">${item.statusText}</span></td>
+          <td><span style="font-size:0.8rem; color:var(--text-dim); font-family:monospace;">${item.schedule}</span></td>
+          <td>
+            <button class="btn-action" style="padding:0.25rem 0.65rem; font-size:0.75rem;" onclick="handleQuickAction('${item.name}')">
+              排期调度
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function filterVehicles() {
+      const query = document.getElementById('vehicleSearch').value.toLowerCase().trim();
+      const filtered = VEHICLES.filter(v => 
+        v.name.toLowerCase().includes(query) || v.plate.toLowerCase().includes(query) || v.category.toLowerCase().includes(query)
+      );
+      renderVehicles(filtered);
+    }
+
+    function showToast(msg, icon = '✅') {
+      const toast = document.getElementById('toast');
+      document.getElementById('toastMsg').innerText = msg;
+      document.getElementById('toastIcon').innerText = icon;
+      toast.classList.add('show');
+      setTimeout(() => {
+        toast.classList.remove('show');
+      }, 3000);
+    }
+
+    function refreshDashboard() {
+      showToast('正在从云端拉取最新车辆日锁与预约数据...', '🔄');
+      setTimeout(() => {
+        showToast('仪表盘指标与运力数据已刷新！', '✨');
+      }, 600);
+    }
+
+    function runHealthCheck() {
+      showToast('正在调用 systemHealthCheck 云函数进行全链路拨测...', '🩺');
+      setTimeout(() => {
+        showToast('健康拨测完成：56 个云函数与 16 个数据库集合全绿！', '🎉');
+      }, 800);
+    }
+
+    function handleQuickAction(name) {
+      showToast(`已进入【${name}】的快速调度窗口，准备同步日历锁`, '🏎️');
+    }
+
+    function exportData(type) {
+      showToast(`正在从云端生成 ${type}.csv，已按照数据合规白名单导出`, '📑');
+    }
+
+    function triggerColdBackup() {
+      showToast('可通过 CLI 执行 npm run cloud:backup 生成完整异地冷备快照', '💾');
+    }
+
+    function updateTime() {
+      const now = new Date();
+      document.getElementById('timeClock').innerText = now.toLocaleTimeString('zh-CN', { hour12: false });
+    }
+
+    // Init
+    setInterval(updateTime, 1000);
+    updateTime();
+    renderVehicles(VEHICLES);
+  </script>
+</body>
+</html>

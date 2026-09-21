@@ -303,6 +303,15 @@ Page({
     })
     this.applyWorkbench()
   },
+  handleKeywordConfirm(event) {
+    const value = event && event.detail && typeof event.detail.value === "string"
+      ? event.detail.value
+      : this.data.keyword
+    this.setData({
+      keyword: String(value || "").slice(0, 40)
+    })
+    this.applyWorkbench()
+  },
   handleClearKeyword() {
     if (!this.data.keyword) {
       return

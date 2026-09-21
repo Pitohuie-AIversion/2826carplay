@@ -8,47 +8,11 @@ const {
   isPageNativeActionActive
 } = require("../../shared/pageNativeAction")
 const { onNetworkReconnect } = require("../../shared/networkStatus")
+const { mapStatusText, mapStatusClass, canCancelBooking } = require("../../shared/bookingStatus")
 const BOOKINGS_LOAD_TIMEOUT_MS = 15 * 1000
 const BOOKING_CANCEL_TIMEOUT_MS = 12 * 1000
 
-function mapStatusText(status) {
-  const value = String(status || "").trim()
-  if (value === "contacted") {
-    return "已联系"
-  }
-  if (value === "quoted") return "已报价"
-  if (value === "adjustment_requested") return "待调整"
-  if (value === "confirmed") return "已确认"
-  if (value === "completed") {
-    return "已完成"
-  }
-  if (value === "cancelled") {
-    return "已取消"
-  }
-  return "待联系"
-}
 
-function mapStatusClass(status) {
-  const value = String(status || "").trim()
-  if (value === "contacted") {
-    return "status-contacted"
-  }
-  if (value === "quoted") return "status-quoted"
-  if (value === "adjustment_requested") return "status-adjustment-requested"
-  if (value === "confirmed") return "status-confirmed"
-  if (value === "completed") {
-    return "status-completed"
-  }
-  if (value === "cancelled") {
-    return "status-cancelled"
-  }
-  return "status-pending"
-}
-
-function canCancelBooking(status) {
-  const value = String(status || "").trim()
-  return ["pending", "contacted", "quoted", "adjustment_requested", "confirmed"].includes(value)
-}
 
 function buildStatusGuidance(status) {
   const value = String(status || "pending").trim() || "pending"
@@ -470,13 +434,13 @@ Page({
     if (typeof input.hasMore === "boolean") {
       patch.hasMore = input.hasMore
     }
-    if (typeof input.initialLoading !== undefined) {
+    if (typeof input.initialLoading !== "undefined") {
       patch.initialLoading = input.initialLoading
     }
-    if (typeof input.loading !== undefined) {
+    if (typeof input.loading !== "undefined") {
       patch.loading = input.loading
     }
-    if (typeof input.loadFailed !== undefined) {
+    if (typeof input.loadFailed !== "undefined") {
       patch.loadFailed = input.loadFailed
     }
     this._lastBookingsLoadedAt = Date.now()

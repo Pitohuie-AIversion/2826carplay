@@ -11,49 +11,12 @@ const {
 const { triggerHapticFeedback } = require("../../shared/hapticFeedback")
 const { getVehicleReadinessCard } = require("../../shared/vehicleChecklist")
 const { formatLocationDisplay } = require("../../shared/locations")
+const { mapStatusText, mapStatusClass, canCancelBooking, canEditBooking } = require("../../shared/bookingStatus")
+const { formatDisplayTime } = require("../../shared/formatTime")
 const BOOKING_DETAIL_LOAD_TIMEOUT_MS = 15 * 1000
 const BOOKING_DETAIL_MUTATION_TIMEOUT_MS = 12 * 1000
 const SUBSCRIPTION_REQUEST_TIMEOUT_MS = 15 * 1000
-function mapStatusText(status) {
-  const value = String(status || "").trim()
-  if (value === "contacted") {
-    return "已联系"
-  }
-  if (value === "quoted") return "已报价"
-  if (value === "adjustment_requested") return "待调整"
-  if (value === "confirmed") return "已确认"
-  if (value === "completed") {
-    return "已完成"
-  }
-  if (value === "cancelled") {
-    return "已取消"
-  }
-  return "待联系"
-}
-function mapStatusClass(status) {
-  const value = String(status || "").trim()
-  if (value === "contacted") {
-    return "status-contacted"
-  }
-  if (value === "quoted") return "status-quoted"
-  if (value === "adjustment_requested") return "status-adjustment-requested"
-  if (value === "confirmed") return "status-confirmed"
-  if (value === "completed") {
-    return "status-completed"
-  }
-  if (value === "cancelled") {
-    return "status-cancelled"
-  }
-  return "status-pending"
-}
-function canCancelBooking(status) {
-  const value = String(status || "").trim()
-  return ["pending", "contacted", "quoted", "adjustment_requested", "confirmed"].includes(value)
-}
-function canEditBooking(status) {
-  const value = String(status || "").trim()
-  return value === "pending" || value === "contacted"
-}
+
 function buildStatusGuidance(status) {
   const value = String(status || "pending").trim() || "pending"
   const guidanceMap = {
@@ -161,21 +124,7 @@ function normalizeHandover(item) {
     photos: Array.isArray(item.photos) ? item.photos.filter((photo) => photo && photo.url) : []
   }
 }
-function formatDisplayTime(value) {
-  if (!value) {
-    return ""
-  }
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return ""
-  }
-  const year = date.getFullYear()
-  const month = `${date.getMonth() + 1}`.padStart(2, "0")
-  const day = `${date.getDate()}`.padStart(2, "0")
-  const hour = `${date.getHours()}`.padStart(2, "0")
-  const minute = `${date.getMinutes()}`.padStart(2, "0")
-  return `${year}-${month}-${day} ${hour}:${minute}`
-}
+
 function formatBookingReference(value) {
   const id = String(value || "").trim()
   return id ? `#${id.slice(-8).toUpperCase()}` : "—"

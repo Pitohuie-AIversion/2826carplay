@@ -1,19 +1,13 @@
-﻿const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
+const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
 const {
   activatePageNativeActions,
   beginPageNativeAction,
   cancelPageNativeActions,
   isPageNativeActionActive
 } = require("../../shared/pageNativeAction")
-const BOOKING_STATUS_LABELS = {
-  pending: "待联系",
-  contacted: "已联系",
-  quoted: "已报价",
-  adjustment_requested: "待调整",
-  confirmed: "已确认",
-  completed: "已完成",
-  cancelled: "已取消"
-}
+const { STATUS_TEXT_MAP: BOOKING_STATUS_LABELS } = require("../../shared/bookingStatus")
+const { formatShortTime } = require("../../shared/formatTime")
+const { computeAlerts } = require("../../shared/operationAlerts")
 const VEHICLE_STATUS_LABELS = {
   idle: "可预约",
   active: "使用中",
@@ -66,20 +60,6 @@ function callCloud(name, data) {
       handleFailure(error)
     }
   })
-}
-function formatShortTime(value) {
-  if (!value) {
-    return "—"
-  }
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return "—"
-  }
-  const month = `${date.getMonth() + 1}`.padStart(2, "0")
-  const day = `${date.getDate()}`.padStart(2, "0")
-  const hour = `${date.getHours()}`.padStart(2, "0")
-  const minute = `${date.getMinutes()}`.padStart(2, "0")
-  return `${month}-${day} ${hour}:${minute}`
 }
 function buildVehicleMetrics(result) {
   const stats = result && result.stats ? result.stats : {}

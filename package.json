@@ -25,6 +25,9 @@
     "cloud:auth:audit": "node scripts/cloudAuthAudit.js",
     "cloud:spec:check": "node scripts/cloudSpecCheck.js",
     "cloud:check": "node scripts/cloudCheck.js",
+    "cloud:backup": "node scripts/cloudDbBackup.js",
+    "cloud:admin:deploy": "node scripts/cloudAdminDeploy.js",
+    "cloud:trigger:check": "node scripts/cloudTriggerCheck.js",
     "cloud:help": "node scripts/cloudHelp.js"
   },
   "devDependencies": {

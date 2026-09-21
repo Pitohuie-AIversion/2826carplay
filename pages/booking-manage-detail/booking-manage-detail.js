@@ -9,6 +9,8 @@ const {
 } = require("../../shared/pageNativeAction")
 const { formatHandoverCsvContent, getHandoverFileName } = require("../../shared/handoverReport")
 const { PRESET_CUSTOMER_TAGS, normalizeTags } = require("../../shared/bookingTags")
+const { STATUS_TEXT_MAP, STATUS_CLASS_MAP } = require("../../shared/bookingStatus")
+const { formatDisplayTime } = require("../../shared/formatTime")
 const BOOKING_DETAIL_LOAD_TIMEOUT_MS = 15 * 1000
 const BOOKING_DETAIL_WRITE_TIMEOUT_MS = 20 * 1000
 const HANDOVER_ANGLES = [
@@ -18,24 +20,7 @@ const HANDOVER_ANGLES = [
   { angle: "right", label: "右侧" }
 ]
 const HANDOVER_MAX_IMAGE_BYTES = 10 * 1024 * 1024
-const STATUS_TEXT_MAP = {
-  pending: "待联系",
-  contacted: "已联系",
-  quoted: "已报价",
-  adjustment_requested: "待调整",
-  confirmed: "已确认",
-  completed: "已完成",
-  cancelled: "已取消"
-}
-const STATUS_CLASS_MAP = {
-  pending: "status-pending",
-  contacted: "status-contacted",
-  quoted: "status-quoted",
-  adjustment_requested: "status-adjustment-requested",
-  confirmed: "status-confirmed",
-  completed: "status-completed",
-  cancelled: "status-cancelled"
-}
+
 const PRIORITY_TEXT_MAP = {
   priority: "优先",
   normal: "常规",
@@ -91,21 +76,7 @@ function showStatusUpdateFeedback(result, done) {
     finish()
   }
 }
-function formatDisplayTime(value) {
-  if (!value) {
-    return ""
-  }
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return ""
-  }
-  const year = date.getFullYear()
-  const month = `${date.getMonth() + 1}`.padStart(2, "0")
-  const day = `${date.getDate()}`.padStart(2, "0")
-  const hour = `${date.getHours()}`.padStart(2, "0")
-  const minute = `${date.getMinutes()}`.padStart(2, "0")
-  return `${year}-${month}-${day} ${hour}:${minute}`
-}
+
 function normalizeRemark(value) {
   return String(value || "").slice(0, 200)
 }

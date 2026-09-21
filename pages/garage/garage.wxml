@@ -25,6 +25,7 @@
       maxlength="40"
       confirm-type="search"
       bindinput="handleSearchInput"
+      bindconfirm="handleSearchConfirm"
     />
     <button
       wx:if="{{searchKeyword}}"

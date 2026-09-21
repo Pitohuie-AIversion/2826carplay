@@ -31,6 +31,26 @@ function deepMergePatch(target, patch) {
   return result
 }
 
+function applyPatchToTarget(target, patch) {
+  if (!target || typeof target !== "object" || !isPlainObject(patch)) {
+    return
+  }
+  const keys = Object.keys(patch)
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i]
+    const value = patch[key]
+    if (
+      Object.prototype.hasOwnProperty.call(target, key) &&
+      isPlainObject(value) &&
+      isPlainObject(target[key])
+    ) {
+      applyPatchToTarget(target[key], value)
+    } else {
+      target[key] = value
+    }
+  }
+}
+
 function createPerformanceHelpers(context) {
   let pendingPatch = null
   let flushTimer = null
@@ -96,6 +116,9 @@ function createPerformanceHelpers(context) {
   const applyState = (patch) => {
     if (destroyed || !isPlainObject(patch)) {
       return
+    }
+    if (context && typeof context.data === "object" && context.data !== null) {
+      applyPatchToTarget(context.data, patch)
     }
     if (pendingPatch === null) {
       pendingPatch = Object.assign({}, patch)

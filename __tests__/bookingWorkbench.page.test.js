@@ -1073,5 +1073,19 @@ describe("pages/booking-workbench", () => {
     expect(wxss).toContain(".workbench-inline-pressed")
     expect(wxml).toContain("workbench-button-pressed")
     expect(wxss).toContain(".workbench-button-pressed")
+    expect(wxml).toContain('bindconfirm="handleKeywordConfirm"')
+  })
+
+  test("工作台搜索框软键盘确认 handleKeywordConfirm 立即触发过滤", () => {
+    const page = createPage(loadPageDefinition(), {
+      allBookings: [
+        { id: "b1", vehicleName: "保时捷 911", userName: "张三", phone: "13800000001", status: "pending" },
+        { id: "b2", vehicleName: "法拉利 F8", userName: "李四", phone: "13800000002", status: "pending" }
+      ]
+    })
+    page.handleKeywordConfirm({ detail: { value: "保时捷" } })
+    expect(page.data.keyword).toBe("保时捷")
+    expect(page.data.queue.length).toBe(1)
+    expect(page.data.queue[0].vehicleName).toBe("保时捷 911")
   })
 })

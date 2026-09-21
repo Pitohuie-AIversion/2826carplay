@@ -196,6 +196,7 @@ function pickListCarFields(car) {
     nickname: car.nickname,
     brand: car.brand,
     category: car.category,
+    priceDay: Number(car.priceDay) || 0,
     priceText: car.priceText,
     status: car.status,
     statusText: car.statusText,
@@ -438,6 +439,11 @@ Page({
   loadCars(input) {
     const append = Boolean(input && input.append)
     const force = Boolean(input && input.force)
+    const category = (input && input.category !== undefined) ? input.category : this.data.currentCategory
+    const city = (input && input.city !== undefined) ? input.city : this.data.selectedCity
+    const keyword = (input && input.keyword !== undefined) ? input.keyword : this.data.searchKeyword
+    const availableOnly = (input && typeof input.availableOnly === "boolean") ? input.availableOnly : this.data.availableOnly
+    const sortBy = (input && input.sortBy !== undefined) ? input.sortBy : (this.data.sortBy || "default")
     const nextPage = append ? this.data.page + 1 : 0
     if (this.data.loadingCars && !force) {
       if (input && typeof input.done === "function") {
@@ -512,10 +518,11 @@ Page({
       data: {
         page: nextPage,
         pageSize: this.data.pageSize,
-        keyword: this.data.searchKeyword,
-        city: this.data.selectedCity,
-        category: this.data.currentCategory,
-        availableOnly: this.data.availableOnly,
+        keyword,
+        city,
+        category,
+        availableOnly,
+        sortBy,
         skipStats: append
       },
       success: (res) => {
@@ -539,6 +546,12 @@ Page({
           categoryTotal: Number(result.categoryTotal),
           availableCount: Number(result.availableCount),
           categoryCounts: result.categoryCounts
+        }, {
+          category,
+          city,
+          keyword,
+          availableOnly,
+          sortBy
         })
       },
       fail: handleFailure
@@ -610,7 +623,7 @@ Page({
     })
   },
 
-  applyCars(carList, pagination) {
+  applyCars(carList, pagination, filterParams) {
     const uniqueCars = []
     const ids = new Set()
     ;(Array.isArray(carList) ? carList : []).forEach((car) => {
@@ -624,12 +637,15 @@ Page({
     const sortedCars = sortCars(uniqueCars)
     const categories = buildCategoriesWithCount(sortedCars, pagination && pagination.categoryCounts)
     const categoryIds = categories.map((item) => item.id)
-    const nextCategory = categoryIds.includes(this.data.currentCategory) ? this.data.currentCategory : "all"
+    const params = filterParams && typeof filterParams === "object" ? filterParams : {}
+    const requestedCategory = params.category !== undefined ? params.category : this.data.currentCategory
+    const nextCategory = categoryIds.includes(requestedCategory) ? requestedCategory : "all"
     const nextPagination = pagination || {}
     const currentCategory = nextCategory
-    const availableOnly = typeof this.data.availableOnly === "boolean" ? this.data.availableOnly : false
-    const searchKeyword = typeof this.data.searchKeyword === "string" ? this.data.searchKeyword : ""
-    const selectedCity = typeof this.data.selectedCity === "string" ? this.data.selectedCity : ""
+    const availableOnly = typeof params.availableOnly === "boolean" ? params.availableOnly : !!this.data.availableOnly
+    const searchKeyword = typeof params.keyword === "string" ? params.keyword : (this.data.searchKeyword || "")
+    const selectedCity = typeof params.city === "string" ? params.city : (this.data.selectedCity || "")
+    const sortBy = typeof params.sortBy === "string" ? params.sortBy : (this.data.sortBy || "default")
 
     const categoryCars =
       currentCategory === "all"
@@ -641,7 +657,12 @@ Page({
     const cityCars = selectedCity
       ? statusCars.filter((car) => String((car && car.location) || "").toLowerCase().includes(selectedCity.toLowerCase()))
       : statusCars
-    const filteredCars = cityCars.filter((car) => matchesCarSearch(car, searchKeyword))
+    let filteredCars = cityCars.filter((car) => matchesCarSearch(car, searchKeyword))
+    if (sortBy === "price_asc") {
+      filteredCars.sort((a, b) => (Number(a.priceDay) || 0) - (Number(b.priceDay) || 0))
+    } else if (sortBy === "price_desc") {
+      filteredCars.sort((a, b) => (Number(b.priceDay) || 0) - (Number(a.priceDay) || 0))
+    }
     const serverSummary = nextPagination
 
     const searchResultCount = serverSummary && Number.isFinite(serverSummary.total)
@@ -667,6 +688,7 @@ Page({
       selectedCity,
       searchKeyword,
       searchResultCount,
+      sortBy,
       categorySummary,
       searchDebouncing: false,
       page: Number.isInteger(nextPagination.page) ? nextPagination.page : 0,
@@ -742,10 +764,10 @@ Page({
 
   _runFilteredCarsSearch(keyword) {
     const resolvedKeyword = typeof keyword === "string" ? keyword : this.data.searchKeyword
-    this.filterCars(this.data.currentCategory, this.data.availableOnly, resolvedKeyword, null, false, this.data.selectedCity)
+    this.filterCars(this.data.currentCategory, this.data.availableOnly, resolvedKeyword, null, false, this.data.selectedCity, this.data.sortBy)
     if (canLoadGarageRemotely()) {
       this.setData({ searchDebouncing: false })
-      this.loadCars({ force: true })
+      this.loadCars({ force: true, keyword: resolvedKeyword, sortBy: this.data.sortBy })
     } else {
       this.applyState({ searchDebouncing: false })
     }
@@ -757,19 +779,25 @@ Page({
       searchKeyword: keyword,
       searchDebouncing: Boolean(keyword)
     })
-    this.filterCars(this.data.currentCategory, this.data.availableOnly, keyword, null, true, this.data.selectedCity)
+    this.filterCars(this.data.currentCategory, this.data.availableOnly, keyword, null, true, this.data.selectedCity, this.data.sortBy)
     this._initStubSearchDebounce()
     if (this._debouncedFilterSearch) {
       this._debouncedFilterSearch(keyword)
     }
   },
 
+  handleSearchConfirm(event) {
+    const keyword = String((event && event.detail && event.detail.value) || this.data.searchKeyword || "").slice(0, 50)
+    this.clearSearchDebounce()
+    this._runFilteredCarsSearch(keyword)
+  },
+
   handleClearSearch() {
     if (this.data.searchKeyword) {
       this.clearSearchDebounce()
-      this.filterCars(this.data.currentCategory, this.data.availableOnly, "", null, false, this.data.selectedCity)
+      this.filterCars(this.data.currentCategory, this.data.availableOnly, "", null, false, this.data.selectedCity, this.data.sortBy)
       if (canLoadGarageRemotely()) {
-        this.loadCars({ force: true })
+        this.loadCars({ force: true, keyword: "", sortBy: this.data.sortBy })
       }
     }
   },
@@ -778,9 +806,9 @@ Page({
     const city = String((event && event.currentTarget && event.currentTarget.dataset && event.currentTarget.dataset.city) || "").trim()
     const nextCity = city === this.data.selectedCity ? "" : city
     this.clearSearchDebounce()
-    this.filterCars(this.data.currentCategory, this.data.availableOnly, this.data.searchKeyword, null, false, nextCity)
+    this.filterCars(this.data.currentCategory, this.data.availableOnly, this.data.searchKeyword, null, false, nextCity, this.data.sortBy)
     if (canLoadGarageRemotely()) {
-      this.loadCars({ force: true })
+      this.loadCars({ force: true, city: nextCity, sortBy: this.data.sortBy })
     }
   },
 
@@ -792,9 +820,9 @@ Page({
     }
 
     this.clearSearchDebounce()
-    this.filterCars(categoryId, this.data.availableOnly, this.data.searchKeyword, null, false, this.data.selectedCity)
+    this.filterCars(categoryId, this.data.availableOnly, this.data.searchKeyword, null, false, this.data.selectedCity, this.data.sortBy)
     if (canLoadGarageRemotely()) {
-      this.loadCars({ force: true })
+      this.loadCars({ force: true, category: categoryId, sortBy: this.data.sortBy })
     }
   },
 
@@ -805,18 +833,18 @@ Page({
       return
     }
     this.clearSearchDebounce()
-    this.filterCars(this.data.currentCategory, availableOnly, this.data.searchKeyword, null, false, this.data.selectedCity)
+    this.filterCars(this.data.currentCategory, availableOnly, this.data.searchKeyword, null, false, this.data.selectedCity, this.data.sortBy)
     if (canLoadGarageRemotely()) {
-      this.loadCars({ force: true })
+      this.loadCars({ force: true, availableOnly, sortBy: this.data.sortBy })
     }
   },
 
   handleShowAllStatuses() {
     if (this.data.availableOnly) {
       this.clearSearchDebounce()
-      this.filterCars(this.data.currentCategory, false, this.data.searchKeyword, null, false, this.data.selectedCity)
+      this.filterCars(this.data.currentCategory, false, this.data.searchKeyword, null, false, this.data.selectedCity, this.data.sortBy)
       if (canLoadGarageRemotely()) {
-        this.loadCars({ force: true })
+        this.loadCars({ force: true, availableOnly: false, sortBy: this.data.sortBy })
       }
     }
   },
@@ -837,6 +865,9 @@ Page({
       this.data.selectedCity,
       sort
     )
+    if (canLoadGarageRemotely()) {
+      this.loadCars({ force: true, sortBy: sort })
+    }
   },
 
   handleLoadMore() {

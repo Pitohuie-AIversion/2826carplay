@@ -12,6 +12,8 @@ const {
   cancelPageNativeActions,
   isPageNativeActionActive
 } = require("../../shared/pageNativeAction")
+const { formatDisplayTime } = require("../../shared/formatTime")
+const { STATUS_TEXT_MAP: BOOKING_STATUS_LABELS } = require("../../shared/bookingStatus")
 const {
   canShareCsvFile,
   isUserCancelError,
@@ -55,28 +57,7 @@ const REQUEST_STATUS_CLASS = {
   rejected: "request-status-rejected",
   cancelled: "request-status-cancelled"
 }
-const BOOKING_STATUS_LABELS = {
-  pending: "待联系",
-  contacted: "已联系",
-  quoted: "已报价",
-  adjustment_requested: "待调整",
-  confirmed: "已确认",
-  completed: "已完成",
-  cancelled: "已取消"
-}
-function formatDisplayTime(value) {
-  if (!value) {
-    return "—"
-  }
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return "—"
-  }
-  const pad = (number) => String(number).padStart(2, "0")
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(
-    date.getHours()
-  )}:${pad(date.getMinutes())}`
-}
+
 function normalizeCategory(category, mapper) {
   const source = category && typeof category === "object" ? category : {}
   const list = Array.isArray(source.list) ? source.list.map(mapper) : []
@@ -120,7 +101,7 @@ function buildViewData(result) {
     normalizeCategory(categories.bookings, (item) => ({
       ...item,
       statusLabel: BOOKING_STATUS_LABELS[item.status] || "状态未知",
-      createdAtText: formatDisplayTime(item.createdAt),
+      createdAtText: formatDisplayTime(item.createdAt) || "—",
       dateText:
         item.startDate && item.endDate
           ? `${item.startDate} 至 ${item.endDate}`
@@ -134,7 +115,7 @@ function buildViewData(result) {
     "favorites",
     normalizeCategory(categories.favorites, (item) => ({
       ...item,
-      createdAtText: formatDisplayTime(item.createdAt)
+      createdAtText: formatDisplayTime(item.createdAt) || "—"
     })),
     unavailable,
     truncated,
@@ -145,7 +126,7 @@ function buildViewData(result) {
     normalizeCategory(categories.quotes, (item) => ({
       ...item,
       totalText: (Math.max(0, Number(item.totalCents || 0)) / 100).toFixed(2),
-      createdAtText: formatDisplayTime(item.createdAt)
+      createdAtText: formatDisplayTime(item.createdAt) || "—"
     })),
     unavailable,
     truncated,
@@ -157,7 +138,7 @@ function buildViewData(result) {
       ...item,
       typeLabel: REQUEST_TYPE_LABELS[item.type] || "隐私申请",
       statusLabel: REQUEST_STATUS_LABELS[item.status] || "状态未知",
-      createdAtText: formatDisplayTime(item.createdAt)
+      createdAtText: formatDisplayTime(item.createdAt) || "—"
     })),
     unavailable,
     truncated,
@@ -169,7 +150,7 @@ function buildViewData(result) {
       ...item,
       stageLabel: item.stage === "return" ? "还车" : "取车",
       energyLabel: item.energyType === "electric" ? "电量" : "油量",
-      createdAtText: formatDisplayTime(item.createdAt)
+      createdAtText: formatDisplayTime(item.createdAt) || "—"
     })),
     unavailable,
     truncated,
@@ -212,7 +193,7 @@ function buildViewData(result) {
       typeClass: requestTypeMeta.className,
       typeIconClass: requestTypeMeta.iconClass,
       statusClass: REQUEST_STATUS_CLASS[request.status] || "request-status-unknown",
-      createdAtText: formatDisplayTime(request.createdAt)
+      createdAtText: formatDisplayTime(request.createdAt) || "—"
     },
     bookings,
     quotes,

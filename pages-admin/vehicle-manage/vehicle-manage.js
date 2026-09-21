@@ -8,6 +8,7 @@ const {
   isPageNativeActionActive
 } = require("../../shared/pageNativeAction")
 const { calculateMaintenanceHealth, buildFleetMaintenanceSummary } = require("../../shared/vehicleMaintenance")
+const { formatDisplayTime } = require("../../shared/formatTime")
 const STATUS_OPTIONS = [
   { value: "all", label: "全部" },
   { value: "active", label: "在用" },
@@ -52,21 +53,7 @@ const FUEL_TYPE_LABEL_MAP = {
 const DEFAULT_PAGE_SIZE = 20
 const VEHICLE_LIST_TIMEOUT_MS = 15 * 1000
 const VEHICLE_MUTATION_TIMEOUT_MS = 20 * 1000
-function formatDisplayTime(value) {
-  if (!value) {
-    return ""
-  }
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return ""
-  }
-  const year = date.getFullYear()
-  const month = `${date.getMonth() + 1}`.padStart(2, "0")
-  const day = `${date.getDate()}`.padStart(2, "0")
-  const hour = `${date.getHours()}`.padStart(2, "0")
-  const minute = `${date.getMinutes()}`.padStart(2, "0")
-  return `${year}-${month}-${day} ${hour}:${minute}`
-}
+
 function buildStatusSummary(stats) {
   return [
     { key: "idle", label: "在库", value: stats.idle || 0 },
@@ -287,7 +274,7 @@ Page({
       if (listRequestId !== Number(this._vehicleListRequestId || 0)) {
         return
       }
-      this.fetchList()
+      this.fetchList({ keyword: "" })
     })
   },
   handleKeywordConfirm() {
@@ -309,7 +296,7 @@ Page({
     this.setData({
       currentStatus: status
     })
-    this.fetchList()
+    this.fetchList({ status })
   },
   handleReset() {
     if (this.data.loading || this.isVehicleMutationBusy()) {
@@ -319,7 +306,7 @@ Page({
       keyword: "",
       currentStatus: "all"
     })
-    this.fetchList()
+    this.fetchList({ keyword: "", status: "all" })
   },
   handleLoadMore() {
     if (this.data.loading || this.isVehicleMutationBusy() || !this.data.hasMore) {
@@ -802,8 +789,8 @@ Page({
       return
     }
     const filters = {
-      keyword: String(this.data.keyword || "").trim(),
-      status: this.data.currentStatus,
+      keyword: String(input && typeof input.keyword === "string" ? input.keyword : (this.data.keyword || "")).trim(),
+      status: input && typeof input.status === "string" ? input.status : this.data.currentStatus,
       page: nextPage,
       pageSize
     }
@@ -824,10 +811,12 @@ Page({
       if (!finishRequest()) {
         return
       }
-      wx.showToast({
-        title: formatToastTitle(message, "查询失败"),
-        icon: "none"
-      })
+      if (typeof wx !== "undefined" && typeof wx.showToast === "function") {
+        wx.showToast({
+          title: formatToastTitle(message, "查询失败"),
+          icon: "none"
+        })
+      }
       this.setData({
         loading: false,
         page: append ? this.data.page : 0,
@@ -847,10 +836,12 @@ Page({
         }
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
-          wx.showToast({
-          title: formatToastTitle(result && result.message, "查询失败"),
-            icon: "none"
-          })
+          if (typeof wx !== "undefined" && typeof wx.showToast === "function") {
+            wx.showToast({
+              title: formatToastTitle(result && result.message, "查询失败"),
+              icon: "none"
+            })
+          }
           this.setData({
             loading: false
           })

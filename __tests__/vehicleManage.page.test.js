@@ -362,4 +362,30 @@ describe("pages/vehicle-manage 车辆管理列表体验", () => {
     page.onReachBottom()
     expect(page.fetchList).not.toHaveBeenCalled()
   })
+
+  test("点击车辆状态筛选或重置立即更新并显式携带参数发起查询", () => {
+    let listCall = null
+    wx.cloud.callFunction.mockImplementation((options) => {
+      listCall = options
+    })
+    const page = createPage(loadPageDefinition(), {
+      loading: false,
+      currentStatus: "all",
+      keyword: "保时捷"
+    })
+
+    page.handleStatusTap({ currentTarget: { dataset: { status: "idle" } } })
+    expect(page.data.currentStatus).toBe("idle")
+    expect(listCall).not.toBeNull()
+    expect(listCall.data.status).toBe("idle")
+
+    listCall = null
+    page.data.loading = false
+    page.handleReset()
+    expect(page.data.currentStatus).toBe("all")
+    expect(page.data.keyword).toBe("")
+    expect(listCall).not.toBeNull()
+    expect(listCall.data.status).toBe("all")
+    expect(listCall.data.keyword).toBe("")
+  })
 })

@@ -634,11 +634,21 @@ simulateClick("点击「查看全部状态」重置筛选 (handleShowAllStatuses
 simulateClick("点击排序切换:「价格从低到高」(handleSortChange)", () => {
   garagePage.handleSortChange(makeEvent({ sort: "price_asc" }))
   if (garagePage.data.sortBy !== "price_asc") throw new Error("排序未切换为 price_asc")
+  if (garagePage.data.filteredCars.length >= 2) {
+    const firstPrice = Number(garagePage.data.filteredCars[0].priceDay) || 0
+    const secondPrice = Number(garagePage.data.filteredCars[1].priceDay) || 0
+    if (firstPrice > secondPrice) throw new Error("车辆列表未按价格升序排序")
+  }
 })
 
 simulateClick("在车型搜索框中输入关键字并实时过滤 (handleSearchInput)", () => {
   garagePage.handleSearchInput(makeEvent({}, { value: "保时捷" }))
   if (garagePage.data.searchKeyword !== "保时捷") throw new Error("搜索关键字未保存")
+})
+
+simulateClick("在车型搜索框软键盘确认检索 (handleSearchConfirm)", () => {
+  garagePage.handleSearchConfirm(makeEvent({}, { value: "保时捷" }))
+  if (garagePage.data.searchKeyword !== "保时捷") throw new Error("搜索确认未成功触发")
 })
 
 simulateClick("点击搜索框清空按钮 (handleClearSearch)", () => {
@@ -1692,6 +1702,26 @@ simulateClick("点击快速跳转车队管理模块 (handleRouteTap: vehicleMana
 
 simulateClick("点击快速跳转预约工作台模块 (handleRouteTap: bookingWorkbench)", () => {
   ooPage.handleRouteTap(makeEvent({ url: "/pages/booking-workbench/booking-workbench" }))
+})
+
+simulateClick("点击智能预警告警卡片跳转预约管理 (handleRouteTap: alertBookingManage)", () => {
+  ooPage.handleRouteTap(makeEvent({ url: "/pages/booking-manage/booking-manage" }))
+})
+
+simulateClick("点击维保临期告警卡片跳转车辆管理 (handleRouteTap: alertVehicleManage)", () => {
+  ooPage.handleRouteTap(makeEvent({ url: "/pages-admin/vehicle-manage/vehicle-manage" }))
+})
+
+simulateClick("点击隐私待办告警卡片跳转隐私管理 (handleRouteTap: alertPrivacyManage)", () => {
+  ooPage.handleRouteTap(makeEvent({ url: "/pages-admin/privacy-request-manage/privacy-request-manage" }))
+})
+
+simulateClick("点击存储清理告警卡片跳转我的页面 (handleRouteTap: alertStorageCleanup)", () => {
+  ooPage.handleRouteTap(makeEvent({ url: "/pages/mine/mine" }))
+})
+
+simulateClick("点击运营概览空路由容错 (handleRouteTap: empty)", () => {
+  ooPage.handleRouteTap(makeEvent({ url: "" }))
 })
 
 logSuite("21. 分包页面: pages-admin/analytics-manage/analytics-manage (数据分析与指标统计)")

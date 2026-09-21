@@ -1,4 +1,4 @@
-﻿const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
+const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
 const { formatToastTitle } = require("../../shared/uiFeedback")
 const {
   activatePageNativeActions,
@@ -6,6 +6,7 @@ const {
   cancelPageNativeActions,
   isPageNativeActionActive
 } = require("../../shared/pageNativeAction")
+const { formatDisplayTime } = require("../../shared/formatTime")
 const MAX_IMAGE_UPLOAD_BYTES = 10 * 1024 * 1024
 const MAX_IMAGE_COUNT = 9
 const ALLOWED_IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp"])
@@ -48,21 +49,7 @@ const FUEL_TYPE_LABEL_MAP = {
   electric: "纯电",
   hybrid: "混动"
 }
-function formatDisplayTime(value) {
-  if (!value) {
-    return "—"
-  }
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return "—"
-  }
-  const year = date.getFullYear()
-  const month = `${date.getMonth() + 1}`.padStart(2, "0")
-  const day = `${date.getDate()}`.padStart(2, "0")
-  const hour = `${date.getHours()}`.padStart(2, "0")
-  const minute = `${date.getMinutes()}`.padStart(2, "0")
-  return `${year}-${month}-${day} ${hour}:${minute}`
-}
+
 function buildImageItems(detail) {
   const imageList = Array.isArray(detail.imageList) ? detail.imageList : []
   const coverImage = detail.coverImage || ""
@@ -93,8 +80,8 @@ function formatDetail(detail) {
     seatsText: detail.seats ? `${detail.seats} 座` : "—",
     locationText: detail.location || "—",
     priceDayText: detail.priceDay || detail.priceDay === 0 ? `￥${detail.priceDay} / 24小时` : "—",
-    createdAtText: formatDisplayTime(detail.createdAt),
-    updatedAtText: formatDisplayTime(detail.updatedAt),
+    createdAtText: formatDisplayTime(detail.createdAt) || "—",
+    updatedAtText: formatDisplayTime(detail.updatedAt) || "—",
     vinText: detail.vin || "—",
     engineNumberText: detail.engineNumber || "—",
     publicDescriptionText: detail.publicDescription || "—",

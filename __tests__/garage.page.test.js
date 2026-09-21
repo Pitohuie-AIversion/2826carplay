@@ -606,6 +606,77 @@ describe("pages/garage 首页车辆筛选", () => {
     const allCategories = page.data.categories.filter((item) => item.id === "all")
     expect(allCategories.length).toBe(1)
   })
+
+  test("点击价格排序按钮可正确按日租升序或降序排布车辆", () => {
+    const page = createPage(loadPageDefinition())
+    page.applyCars([
+      { id: "car-mid", name: "宝马 5系", priceDay: 800, category: "luxury_sedan", status: "idle" },
+      { id: "car-high", name: "法拉利 F8", priceDay: 5000, category: "supercar", status: "idle" },
+      { id: "car-low", name: "MINI Cooper", priceDay: 400, category: "luxury_sedan", status: "idle" }
+    ])
+
+    page.handleSortChange({ currentTarget: { dataset: { sort: "price_asc" } } })
+    expect(page.data.sortBy).toBe("price_asc")
+    expect(page.data.filteredCars.map((item) => item.id)).toEqual(["car-low", "car-mid", "car-high"])
+
+    page.handleSortChange({ currentTarget: { dataset: { sort: "price_desc" } } })
+    expect(page.data.sortBy).toBe("price_desc")
+    expect(page.data.filteredCars.map((item) => item.id)).toEqual(["car-high", "car-mid", "car-low"])
+  })
+
+  test("切换排序状态后，数据刷新时 applyCars 仍保持所选排序", () => {
+    const page = createPage(loadPageDefinition())
+    page.data.sortBy = "price_asc"
+    page.applyCars([
+      { id: "car-2", priceDay: 2000, status: "idle" },
+      { id: "car-1", priceDay: 500, status: "idle" }
+    ])
+    expect(page.data.filteredCars.map((item) => item.id)).toEqual(["car-1", "car-2"])
+  })
+
+  test("切换分类、城市与状态可用性时立即向云函数发起携带最新参数的请求（无异步时序竞争）", () => {
+    let lastRequest = null
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn((options) => {
+          lastRequest = options
+        })
+      },
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition())
+    page.onLoad()
+
+    page.handleCategoryTap({ currentTarget: { dataset: { categoryId: "supercar" } } })
+    expect(lastRequest.data.category).toBe("supercar")
+
+    page.handleCityFilterTap({ currentTarget: { dataset: { city: "上海" } } })
+    expect(lastRequest.data.city).toBe("上海")
+
+    page.handleAvailabilityFilterTap({ currentTarget: { dataset: { mode: "available" } } })
+    expect(lastRequest.data.availableOnly).toBe(true)
+
+    page.data.searchKeyword = "保时捷"
+    page.handleClearSearch()
+    expect(lastRequest.data.keyword).toBe("")
+  })
+
+  test("搜索框软键盘确认事件 handleSearchConfirm 立即触发检索并取消防抖", () => {
+    let searchCalled = false
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(({ name }) => {
+          if (name === "garageVehicleList") searchCalled = true
+        })
+      },
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition())
+    page.onLoad()
+    page.handleSearchConfirm({ detail: { value: "迈凯伦" } })
+    expect(page.data.searchKeyword).toBe("迈凯伦")
+    expect(searchCalled).toBe(true)
+  })
 })
 
 

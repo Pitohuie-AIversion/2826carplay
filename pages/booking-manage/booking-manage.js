@@ -14,6 +14,7 @@ const {
   cancelPageNativeActions,
   isPageNativeActionActive
 } = require("../../shared/pageNativeAction")
+const { formatDisplayTime } = require("../../shared/formatTime")
 const STATUS_OPTIONS = [
   { value: "all", label: "全部" },
   { value: "pending", label: "待联系" },
@@ -195,21 +196,7 @@ function buildRecentCreatedViewModel(list) {
     }
   })
 }
-function formatDisplayTime(value) {
-  if (!value) {
-    return ""
-  }
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return ""
-  }
-  const year = date.getFullYear()
-  const month = `${date.getMonth() + 1}`.padStart(2, "0")
-  const day = `${date.getDate()}`.padStart(2, "0")
-  const hour = `${date.getHours()}`.padStart(2, "0")
-  const minute = `${date.getMinutes()}`.padStart(2, "0")
-  return `${year}-${month}-${day} ${hour}:${minute}`
-}
+
 function normalizeRemark(value) {
   return String(value || "").slice(0, 200)
 }
@@ -422,7 +409,7 @@ Page({
       if (listRequestId !== Number(this._bookingListRequestId || 0)) {
         return
       }
-      this.fetchList()
+      this.fetchList({ keyword: "" })
     })
   },
   handleKeywordConfirm() {
@@ -445,7 +432,7 @@ Page({
     this.setData({
       currentStatus: status
     })
-    this.fetchList()
+    this.fetchList({ status })
   },
   handlePriorityTap(event) {
     const value = String(event.currentTarget.dataset.value || "")
@@ -453,7 +440,7 @@ Page({
       return
     }
     this.setData({ currentPriority: value })
-    this.fetchList()
+    this.fetchList({ schedulePriority: value })
   },
   handleCoordinationTap(event) {
     const value = String(event.currentTarget.dataset.value || "")
@@ -461,7 +448,7 @@ Page({
       return
     }
     this.setData({ currentCoordination: value })
-    this.fetchList()
+    this.fetchList({ coordinationStatus: value })
   },
   handleCityTap(event) {
     const value = String(event.currentTarget.dataset.value || "")
@@ -469,7 +456,7 @@ Page({
       return
     }
     this.setData({ currentCity: value })
-    this.fetchList()
+    this.fetchList({ city: value })
   },
   handleReset() {
     if (this.data.loading) {
@@ -482,7 +469,13 @@ Page({
       currentCoordination: "all",
       currentCity: "all"
     })
-    this.fetchList()
+    this.fetchList({
+      keyword: "",
+      status: "all",
+      schedulePriority: "all",
+      coordinationStatus: "all",
+      city: "all"
+    })
   },
   handleLoadMore() {
     if (this.data.loading || !this.data.hasMore) {
@@ -530,10 +523,12 @@ Page({
         return
       }
       this.setData({ loading: false })
-      wx.showToast({
-        title: formatToastTitle(message, fallback),
-        icon: "none"
-      })
+      if (typeof wx !== "undefined" && typeof wx.showToast === "function") {
+        wx.showToast({
+          title: formatToastTitle(message, fallback),
+          icon: "none"
+        })
+      }
     }
     this._bookingExportRequestTimer = setTimeout(() => {
       handleFailure("导出超时，请重试")
@@ -1032,17 +1027,22 @@ Page({
       }
       return
     }
+    const targetStatus = input && typeof input.status === "string" ? input.status : this.data.currentStatus
+    const targetPriority = input && typeof input.schedulePriority === "string" ? input.schedulePriority : this.data.currentPriority
+    const targetCoordination = input && typeof input.coordinationStatus === "string" ? input.coordinationStatus : this.data.currentCoordination
+    const targetKeyword = String(input && typeof input.keyword === "string" ? input.keyword : (this.data.keyword || "")).trim()
+    const targetCity = input && typeof input.city === "string" ? input.city : this.data.currentCity
     const filters = {
-      status: this.data.currentStatus,
-      schedulePriority: this.data.currentPriority,
-      coordinationStatus: this.data.currentCoordination,
-      keyword: String(this.data.keyword || ""),
+      status: targetStatus,
+      schedulePriority: targetPriority,
+      coordinationStatus: targetCoordination,
+      keyword: targetKeyword,
       limit: 2000,
       page: nextPage,
       pageSize
     }
-    if (this.data.currentCity && this.data.currentCity !== "all") {
-      filters.city = this.data.currentCity
+    if (targetCity && targetCity !== "all") {
+      filters.city = targetCity
     }
     this._bookingListRequestDone = typeof done === "function" ? done : null
     this.setData({
@@ -1061,10 +1061,12 @@ Page({
       if (!finishRequest()) {
         return
       }
-      wx.showToast({
-        title: formatToastTitle(message, "加载失败"),
-        icon: "none"
-      })
+      if (typeof wx !== "undefined" && typeof wx.showToast === "function") {
+        wx.showToast({
+          title: formatToastTitle(message, "加载失败"),
+          icon: "none"
+        })
+      }
       this.setData({
         loading: false,
         page: append ? this.data.page : 0,
@@ -1091,10 +1093,12 @@ Page({
         }
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
-          wx.showToast({
-            title: formatToastTitle(result && result.message, "加载失败"),
-            icon: "none"
-          })
+          if (typeof wx !== "undefined" && typeof wx.showToast === "function") {
+            wx.showToast({
+              title: formatToastTitle(result && result.message, "加载失败"),
+              icon: "none"
+            })
+          }
           this.setData({
             loading: false,
             page: append ? this.data.page : 0,

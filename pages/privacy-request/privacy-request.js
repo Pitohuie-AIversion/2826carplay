@@ -6,6 +6,7 @@ const {
   cancelPageNativeActions,
   isPageNativeActionActive
 } = require("../../shared/pageNativeAction")
+const { formatDisplayTime } = require("../../shared/formatTime")
 const PRIVACY_REQUEST_LIST_TIMEOUT_MS = 15 * 1000
 const PRIVACY_REQUEST_MUTATION_TIMEOUT_MS = 12 * 1000
 
@@ -51,21 +52,7 @@ const STATUS_META = {
 
 const ACTIVE_STATUSES = new Set(["pending", "processing"])
 
-function formatDisplayTime(value) {
-  if (!value) {
-    return ""
-  }
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return ""
-  }
-  const year = date.getFullYear()
-  const month = `${date.getMonth() + 1}`.padStart(2, "0")
-  const day = `${date.getDate()}`.padStart(2, "0")
-  const hour = `${date.getHours()}`.padStart(2, "0")
-  const minute = `${date.getMinutes()}`.padStart(2, "0")
-  return `${year}-${month}-${day} ${hour}:${minute}`
-}
+
 
 function buildDescriptionState(value) {
   const text = String(value || "")

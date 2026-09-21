@@ -8,3 +8,5 @@ log/
 *.p12
 *.pfx
 .DS_Store
+backups/
+scratch/

@@ -22,6 +22,8 @@ App({
   onLaunch() {
     this._sharedUnsavedChanges = require("./shared/unsavedChanges")
     this._sharedVehicleFormProgress = require("./shared/vehicleFormProgress")
+    this._sharedOperationAlerts = require("./shared/operationAlerts")
+    this._sharedVehicleMaintenance = require("./shared/vehicleMaintenance")
 
     const { setupUpdateManager, runVersionMigration } = require("./shared/versionMigration")
     this._versionMigrationResult = runVersionMigration()

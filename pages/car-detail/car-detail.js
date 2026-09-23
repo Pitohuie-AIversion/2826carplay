@@ -226,6 +226,65 @@ function formatCarViewModel(car) {
   }
 }
 
+function drawPosterRoundedRect(ctx, x, y, width, height, radius) {
+  const r = Math.min(radius, width / 2, height / 2)
+  ctx.beginPath()
+  ctx.moveTo(x + r, y)
+  ctx.lineTo(x + width - r, y)
+  ctx.arcTo(x + width, y, x + width, y + r, r)
+  ctx.lineTo(x + width, y + height - r)
+  ctx.arcTo(x + width, y + height, x + width - r, y + height, r)
+  ctx.lineTo(x + r, y + height)
+  ctx.arcTo(x, y + height, x, y + height - r, r)
+  ctx.lineTo(x + r, y)
+  ctx.arcTo(x, y, x + r, y, r)
+  ctx.closePath()
+}
+
+function drawPosterAspectFillImage(ctx, img, x, y, width, height, radius) {
+  ctx.save()
+  drawPosterRoundedRect(ctx, x, y, width, height, radius)
+  ctx.clip()
+
+  const imgW = (img && (img.width || img.naturalWidth)) || width
+  const imgH = (img && (img.height || img.naturalHeight)) || height
+  const scale = Math.max(width / imgW, height / imgH)
+  const drawW = imgW * scale
+  const drawH = imgH * scale
+  const drawX = x + (width - drawW) / 2
+  const drawY = y + (height - drawH) / 2
+
+  ctx.drawImage(img, drawX, drawY, drawW, drawH)
+  ctx.restore()
+}
+
+function drawPosterTextEllipsis(ctx, text, x, y, maxWidth) {
+  if (!text) return
+  const str = String(text).trim()
+  if (!str) return
+  try {
+    if (ctx.measureText && ctx.measureText(str).width <= maxWidth) {
+      ctx.fillText(str, x, y)
+      return
+    }
+  } catch (e) {
+    ctx.fillText(str, x, y)
+    return
+  }
+  let truncated = str
+  while (truncated.length > 1) {
+    try {
+      if (ctx.measureText(truncated + "…").width <= maxWidth) {
+        break
+      }
+    } catch (e) {
+      break
+    }
+    truncated = truncated.slice(0, -1)
+  }
+  ctx.fillText(truncated + "…", x, y)
+}
+
 Page({
   data: {
     brandName: "极境车库",
@@ -1117,7 +1176,7 @@ Page({
     this._posterTimer = setTimeout(() => {
       this._posterTimer = null
       this.renderPoster()
-    }, 100)
+    }, 60)
     if (this._posterTimer && typeof this._posterTimer.unref === "function") {
       this._posterTimer.unref()
     }
@@ -1134,6 +1193,32 @@ Page({
     })
   },
 
+  async resolvePosterCover(src) {
+    if (!src || typeof src !== "string") return ""
+    if (src.startsWith("/assets/") || src.startsWith("wxfile://") || src.startsWith("http://tmp/")) {
+      return src
+    }
+    try {
+      const res = await resolveImage(src, { priority: 100 })
+      if (res && res.localPath) {
+        return res.localPath
+      }
+    } catch (e) {}
+
+    if (typeof wx !== "undefined" && typeof wx.getImageInfo === "function") {
+      try {
+        const info = await new Promise((resolve, reject) => {
+          wx.getImageInfo({ src, success: resolve, fail: reject })
+        })
+        if (info && info.path) {
+          return info.path
+        }
+      } catch (e) {}
+    }
+
+    return src
+  },
+
   renderPoster() {
     if (typeof wx === "undefined" || !wx || typeof wx.createSelectorQuery !== "function") {
       this.fallbackRenderPoster()
@@ -1143,75 +1228,221 @@ Page({
     query
       .select("#posterCanvas")
       .fields({ node: true, size: true })
-      .exec((res) => {
+      .exec(async (res) => {
         if (!res || !res[0] || !res[0].node) {
           this.fallbackRenderPoster()
           return
         }
         const canvas = res[0].node
-        const ctx = canvas.getContext("2d")
-        const dpr = (wx.getSystemInfoSync && wx.getSystemInfoSync().pixelRatio) || 2
-        const width = res[0].width || 300
-        const height = res[0].height || 480
+        const ctx = canvas.getContext ? canvas.getContext("2d") : null
+        if (!ctx) {
+          this.fallbackRenderPoster()
+          return
+        }
+
+        const width = 600
+        const height = 960
+        const dpr = Math.min(2, (wx.getSystemInfoSync && wx.getSystemInfoSync().pixelRatio) || 2)
         canvas.width = width * dpr
         canvas.height = height * dpr
-        ctx.scale(dpr, dpr)
+        if (typeof ctx.scale === "function") {
+          ctx.scale(dpr, dpr)
+        }
 
         // Draw background
-        ctx.fillStyle = "#0D1015"
+        const bgGrad = ctx.createLinearGradient ? ctx.createLinearGradient(0, 0, 0, height) : null
+        if (bgGrad) {
+          bgGrad.addColorStop(0, "#131722")
+          bgGrad.addColorStop(0.5, "#0D1016")
+          bgGrad.addColorStop(1, "#080A0E")
+          ctx.fillStyle = bgGrad
+        } else {
+          ctx.fillStyle = "#0D1016"
+        }
         ctx.fillRect(0, 0, width, height)
 
-        // Draw header accent
-        ctx.fillStyle = "#D09E5A"
-        ctx.fillRect(20, 20, 4, 18)
+        // Outer gold frame
+        ctx.strokeStyle = "rgba(208, 158, 90, 0.22)"
+        ctx.lineWidth = 1
+        drawPosterRoundedRect(ctx, 16, 16, width - 32, height - 32, 12)
+        ctx.stroke()
 
+        // Brand accent pillar
+        ctx.fillStyle = "#D09E5A"
+        drawPosterRoundedRect(ctx, 36, 44, 5, 34, 2)
+        ctx.fill()
+
+        // Brand title
         ctx.fillStyle = "#E8C88B"
-        ctx.font = "bold 13px sans-serif"
-        ctx.fillText("极境车库 · 尊享甄选", 30, 34)
+        ctx.font = "bold 22px sans-serif"
+        ctx.fillText("极境车库 · 尊享甄选", 52, 64)
+
+        // Subtitle
+        ctx.fillStyle = "#7E8B9E"
+        ctx.font = "11px sans-serif"
+        ctx.fillText("JIJING GARAGE LUXURY FLEET", 52, 82)
+
+        // Official tag
+        ctx.fillStyle = "rgba(208, 158, 90, 0.12)"
+        drawPosterRoundedRect(ctx, width - 156, 46, 120, 30, 15)
+        ctx.fill()
+        ctx.strokeStyle = "rgba(208, 158, 90, 0.35)"
+        ctx.lineWidth = 1
+        drawPosterRoundedRect(ctx, width - 156, 46, 120, 30, 15)
+        ctx.stroke()
+        ctx.fillStyle = "#E8C88B"
+        ctx.font = "bold 12px sans-serif"
+        ctx.fillText("官方直营 · 实拍", width - 142, 66)
 
         // Car Title
         const car = this.data.car || {}
+        const carFullName = [car.brand, car.name].filter(Boolean).join(" ") || "极境座驾"
         ctx.fillStyle = "#FFFFFF"
-        ctx.font = "bold 18px sans-serif"
-        ctx.fillText((car.brand || "") + " " + (car.name || "极境座驾"), 20, 68)
+        ctx.font = "bold 30px sans-serif"
+        drawPosterTextEllipsis(ctx, carFullName, 36, 136, width - 72)
 
-        ctx.fillStyle = "#8D98AA"
-        ctx.font = "12px sans-serif"
-        ctx.fillText(car.nickname || "车牌尾号保密 · 门店核验", 20, 88)
+        // Car Nickname / Subtitle
+        ctx.fillStyle = "#94A3B8"
+        ctx.font = "14px sans-serif"
+        const subText = car.nickname || "尊享实拍 · 门店核验现车"
+        drawPosterTextEllipsis(ctx, subText, 36, 166, width - 72)
+
+        // Photo viewport specs
+        const photoX = 36
+        const photoY = 190
+        const photoW = width - 72 // 528
+        const photoH = 340
+        const photoRadius = 16
+
+        const drawPlaceholder = () => {
+          ctx.save()
+          drawPosterRoundedRect(ctx, photoX, photoY, photoW, photoH, photoRadius)
+          ctx.clip()
+          ctx.fillStyle = "#151924"
+          ctx.fillRect(photoX, photoY, photoW, photoH)
+          ctx.fillStyle = "#8D98AA"
+          ctx.font = "16px sans-serif"
+          const placeText = "极境座驾实拍"
+          const tw = ctx.measureText ? ctx.measureText(placeText).width : 96
+          ctx.fillText(placeText, photoX + (photoW - tw) / 2, photoY + photoH / 2 + 6)
+          ctx.restore()
+        }
 
         const drawFooterAndExport = () => {
-          // Price badge
-          ctx.fillStyle = "rgba(208, 158, 90, 0.12)"
-          ctx.fillRect(20, 290, width - 40, 52)
-          ctx.strokeStyle = "rgba(208, 158, 90, 0.35)"
+          // Performance specs badges (3 badges)
+          const perf = car.performance || {}
+          const spec1 = perf.acceleration ? `${perf.acceleration} 零百` : (car.fuelTypeText || "燃油动力")
+          const spec2 = perf.horsepower ? `${perf.horsepower} 马力` : (car.transmissionText || "自动挡")
+          const spec3 = perf.drivetrain || (car.seatsText ? `${car.seatsText}` : "尊享现车")
+          const specs = [spec1, spec2, spec3]
+
+          const badgeY = 554
+          const badgeH = 56
+          const badgeW = (photoW - 24) / 3 // 168
+          const badgeGap = 12
+
+          specs.forEach((text, i) => {
+            const bx = photoX + i * (badgeW + badgeGap)
+            ctx.fillStyle = "rgba(255, 255, 255, 0.04)"
+            drawPosterRoundedRect(ctx, bx, badgeY, badgeW, badgeH, 10)
+            ctx.fill()
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.08)"
+            ctx.lineWidth = 1
+            drawPosterRoundedRect(ctx, bx, badgeY, badgeW, badgeH, 10)
+            ctx.stroke()
+
+            ctx.fillStyle = "#D09E5A"
+            ctx.beginPath()
+            ctx.arc(bx + 14, badgeY + badgeH / 2, 3, 0, Math.PI * 2)
+            ctx.fill()
+
+            ctx.fillStyle = "#CBD5E1"
+            ctx.font = "bold 13px sans-serif"
+            drawPosterTextEllipsis(ctx, text, bx + 24, badgeY + badgeH / 2 + 5, badgeW - 30)
+          })
+
+          // Price & privilege card
+          const priceCardY = 630
+          const priceCardH = 112
+          ctx.fillStyle = "rgba(208, 158, 90, 0.09)"
+          drawPosterRoundedRect(ctx, photoX, priceCardY, photoW, priceCardH, 14)
+          ctx.fill()
+
+          ctx.strokeStyle = "rgba(208, 158, 90, 0.32)"
           ctx.lineWidth = 1
-          ctx.strokeRect(20, 290, width - 40, 52)
+          drawPosterRoundedRect(ctx, photoX, priceCardY, photoW, priceCardH, 14)
+          ctx.stroke()
 
           ctx.fillStyle = "#94A3B8"
-          ctx.font = "11px sans-serif"
-          ctx.fillText("今日参考日租", 32, 310)
+          ctx.font = "12px sans-serif"
+          ctx.fillText("今日参考日租", photoX + 22, priceCardY + 36)
 
           ctx.fillStyle = "#E8C88B"
-          ctx.font = "bold 17px sans-serif"
-          ctx.fillText(car.priceText || "价格到店详询", 32, 332)
+          ctx.font = "bold 28px sans-serif"
+          const priceStr = car.priceText || "价格到店详询"
+          ctx.fillText(priceStr, photoX + 20, priceCardY + 78)
 
-          // Tags
-          ctx.fillStyle = "#9CA3AF"
+          ctx.fillStyle = "#CBD5E1"
+          ctx.font = "12px sans-serif"
+          const rText1 = "一车一况 · 到店实拍"
+          const rText1W = ctx.measureText ? ctx.measureText(rText1).width : 110
+          ctx.fillText(rText1, photoX + photoW - 22 - rText1W, priceCardY + 44)
+
+          ctx.fillStyle = "#7E8B9E"
           ctx.font = "11px sans-serif"
-          const tagStr = (car.tags || []).slice(0, 3).join("  ·  ")
+          const rText2 = "支持同城送取 · 专属顾问对接"
+          const rText2W = ctx.measureText ? ctx.measureText(rText2).width : 140
+          ctx.fillText(rText2, photoX + photoW - 22 - rText2W, priceCardY + 76)
+
+          // Tags row
+          const tagStr = (car.tags || []).slice(0, 4).join("   ·   ")
           if (tagStr) {
-            ctx.fillText(tagStr, 20, 368)
+            ctx.fillStyle = "#7E8B9E"
+            ctx.font = "12px sans-serif"
+            drawPosterTextEllipsis(ctx, tagStr, photoX, 772, photoW)
           }
 
-          // Bottom Slogan
-          ctx.fillStyle = "#6B7280"
-          ctx.font = "10px sans-serif"
-          ctx.fillText("甄选座驾 · 为每一次出发预留专属席位", 20, 410)
-          ctx.fillText("微信搜索【极境车库】小程序，查看完整档期与报价", 20, 428)
+          // Divider Line
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.08)"
+          ctx.lineWidth = 1
+          ctx.beginPath()
+          ctx.moveTo(photoX, 804)
+          ctx.lineTo(photoX + photoW, 804)
+          ctx.stroke()
 
-          if (wx.canvasToTempFilePath) {
+          // Footer Left Text
+          ctx.fillStyle = "#8D98AA"
+          ctx.font = "13px sans-serif"
+          ctx.fillText("甄选座驾 · 为每一次出发预留专属席位", photoX, 842)
+
+          ctx.fillStyle = "#D09E5A"
+          ctx.font = "bold 13px sans-serif"
+          ctx.fillText("微信搜索【极境车库】小程序，查看完整档期与报价", photoX, 874)
+
+          // Footer Right Emblem Badge
+          const qrSize = 58
+          const qrX = photoX + photoW - qrSize
+          const qrY = 824
+          ctx.fillStyle = "rgba(208, 158, 90, 0.12)"
+          drawPosterRoundedRect(ctx, qrX, qrY, qrSize, qrSize, 10)
+          ctx.fill()
+          ctx.strokeStyle = "rgba(208, 158, 90, 0.35)"
+          ctx.lineWidth = 1
+          drawPosterRoundedRect(ctx, qrX, qrY, qrSize, qrSize, 10)
+          ctx.stroke()
+
+          ctx.fillStyle = "#E8C88B"
+          ctx.font = "bold 12px sans-serif"
+          const qr1W = ctx.measureText ? ctx.measureText("极境").width : 24
+          const qr2W = ctx.measureText ? ctx.measureText("车库").width : 24
+          ctx.fillText("极境", qrX + (qrSize - qr1W) / 2, qrY + 25)
+          ctx.fillText("车库", qrX + (qrSize - qr2W) / 2, qrY + 45)
+
+          if (typeof wx.canvasToTempFilePath === "function") {
             wx.canvasToTempFilePath({
               canvas,
+              fileType: "png",
+              quality: 1,
               success: (tempRes) => {
                 this.setData({
                   posterImagePath: tempRes.tempFilePath,
@@ -1219,7 +1450,7 @@ Page({
                 })
               },
               fail: () => {
-                this.setData({ posterGenerating: false })
+                this.fallbackRenderPoster()
               }
             })
           } else {
@@ -1227,27 +1458,35 @@ Page({
           }
         }
 
-        const coverSrc = (car.imageItems && car.imageItems[0] && (car.imageItems[0].displaySrc || car.imageItems[0].src)) || car.cover
-        if (coverSrc && typeof canvas.createImage === "function") {
+        const rawCover = (car.imageItems && car.imageItems[0] && (car.imageItems[0].displaySrc || car.imageItems[0].src)) || car.cover || (car.images && car.images[0]) || ""
+        let resolvedCover = ""
+        try {
+          resolvedCover = await this.resolvePosterCover(rawCover)
+        } catch (e) {
+          resolvedCover = rawCover
+        }
+
+        if (resolvedCover && typeof canvas.createImage === "function") {
           const img = canvas.createImage()
           img.onload = () => {
             try {
-              ctx.drawImage(img, 20, 106, width - 40, 168)
-            } catch (e) {}
+              drawPosterAspectFillImage(ctx, img, photoX, photoY, photoW, photoH, photoRadius)
+              ctx.strokeStyle = "rgba(255, 255, 255, 0.08)"
+              ctx.lineWidth = 1
+              drawPosterRoundedRect(ctx, photoX, photoY, photoW, photoH, photoRadius)
+              ctx.stroke()
+            } catch (e) {
+              drawPlaceholder()
+            }
             drawFooterAndExport()
           }
           img.onerror = () => {
-            ctx.fillStyle = "#161B22"
-            ctx.fillRect(20, 106, width - 40, 168)
-            ctx.fillStyle = "#8D98AA"
-            ctx.font = "13px sans-serif"
-            ctx.fillText("极境座驾实拍", width / 2 - 36, 195)
+            drawPlaceholder()
             drawFooterAndExport()
           }
-          img.src = coverSrc
+          img.src = resolvedCover
         } else {
-          ctx.fillStyle = "#161B22"
-          ctx.fillRect(20, 106, width - 40, 168)
+          drawPlaceholder()
           drawFooterAndExport()
         }
       })
@@ -1262,12 +1501,27 @@ Page({
     })
   },
 
-  handleSavePoster() {
-    const filePath = this.data.posterImagePath
+  async handleSavePoster() {
+    let filePath = this.data.posterImagePath
     if (!filePath) {
       wx.showToast({ title: "海报生成中", icon: "none" })
       return
     }
+
+    if (filePath.startsWith("http://") || filePath.startsWith("https://") || filePath.startsWith("cloud://")) {
+      try {
+        if (typeof wx.showLoading === "function") {
+          wx.showLoading({ title: "正在准备保存...", mask: true })
+        }
+        filePath = await this.resolvePosterCover(filePath)
+      } catch (e) {
+      } finally {
+        if (typeof wx.hideLoading === "function") {
+          wx.hideLoading()
+        }
+      }
+    }
+
     const action = beginPageNativeAction(this, { requireCurrent: true })
     if (typeof wx.saveImageToPhotosAlbum === "function") {
       wx.saveImageToPhotosAlbum({

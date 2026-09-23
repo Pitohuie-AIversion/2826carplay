@@ -351,20 +351,30 @@
         <view class="poster-modal-close" bindtap="handleClosePosterModal" hover-class="poster-modal-close-hover" aria-role="button" aria-label="关闭海报弹窗">✕</view>
       </view>
       <view class="poster-canvas-wrap">
-        <canvas type="2d" id="posterCanvas" class="poster-canvas"></canvas>
+        <image
+          wx:if="{{posterImagePath}}"
+          class="poster-preview-image"
+          src="{{posterImagePath}}"
+          mode="aspectFit"
+          show-menu-by-longpress="{{true}}"
+        />
         <view wx:if="{{posterGenerating}}" class="poster-loading-box">
           <view class="poster-spinner"></view>
           <text class="poster-loading-text">正在生成高清海报…</text>
+        </view>
+        <view wx:elif="{{!posterImagePath}}" class="poster-retry-box" bindtap="renderPoster">
+          <text class="poster-retry-text">点击重新生成</text>
         </view>
       </view>
       <view class="poster-modal-footer">
         <button class="ui-btn ui-btn-primary poster-save-action" bindtap="handleSavePoster" disabled="{{posterGenerating}}">
           保存海报到相册
         </button>
-        <view class="poster-modal-subtip">保存后可分享到微信朋友圈或车友群</view>
+        <view class="poster-modal-subtip">长按图片可转发微信好友，或保存至系统相册</view>
       </view>
     </view>
   </view>
+  <canvas type="2d" id="posterCanvas" class="poster-canvas poster-canvas-offscreen"></canvas>
 </view>
 <view class="empty-page ui-card" wx:else>
   <image class="empty-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />

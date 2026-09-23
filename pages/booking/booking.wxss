@@ -78,6 +78,11 @@
 .price-calendar-kicker { color: #607b9e; font-size: 14rpx; letter-spacing: 2rpx; }
 .price-calendar-title { margin-top: 4rpx; color: #cbd6e4; font-size: 22rpx; font-weight: 650; }
 .price-calendar-total { color: #d7a873; font-size: 28rpx; font-weight: 750; }
+.price-discount-row { display: flex; align-items: center; gap: 10rpx; margin-top: 10rpx; }
+.price-discount-badge { padding: 4rpx 10rpx; border-radius: 6rpx; background: rgba(215, 168, 115, 0.15); color: #e8c88b; font-size: 16rpx; font-weight: 600; }
+.price-discount-amount { color: #52d68a; font-size: 16rpx; }
+.price-discounted-total { margin-right: 8rpx; color: #52d68a; }
+.price-original-total { color: #78869a; font-size: 20rpx; text-decoration: line-through; }
 .price-calendar-base,
 .price-calendar-note,
 .price-calendar-more { margin-top: 12rpx; color: #78869a; font-size: 17rpx; line-height: 1.65; }

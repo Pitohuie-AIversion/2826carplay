@@ -114,12 +114,43 @@ function buildPriceSummary(baseDailyRate, dates, rules) {
     return { date, dailyRate: rate, label: matched ? String(matched.label || "特殊日期价") : "基础日租" }
   })
   const known = daily.length > 0 && daily.every((item) => item.dailyRate > 0)
+  const rawTotal = known ? daily.reduce((sum, item) => sum + item.dailyRate, 0) : 0
+  const days = dates.length
+  let discountRate = 1
+  let discountLabel = ""
+  let minDays = 0
+  if (days >= 30) {
+    discountRate = 0.75
+    discountLabel = "月租尊享 75折"
+    minDays = 30
+  } else if (days >= 15) {
+    discountRate = 0.85
+    discountLabel = "半月特惠 85折"
+    minDays = 15
+  } else if (days >= 7) {
+    discountRate = 0.90
+    discountLabel = "周租专享 9折"
+    minDays = 7
+  } else if (days >= 3) {
+    discountRate = 0.95
+    discountLabel = "连租特惠 95折"
+    minDays = 3
+  }
+  const discountedTotal = known && discountRate < 1 ? Math.round(rawTotal * discountRate) : rawTotal
+  const savingsAmount = rawTotal - discountedTotal
+  const hasDiscount = savingsAmount > 0
+
   return {
     baseDailyRate: base,
     baseDailyRateText: base > 0 ? `￥${base}` : "待顾问确认",
     specialDayCount: daily.filter((item) => item.label !== "基础日租").length,
-    estimatedTotal: known ? daily.reduce((sum, item) => sum + item.dailyRate, 0) : 0,
-    estimatedTotalText: known ? `￥${daily.reduce((sum, item) => sum + item.dailyRate, 0)}` : "待顾问报价",
+    estimatedTotal: rawTotal,
+    estimatedTotalText: known ? `￥${rawTotal}` : "待顾问报价",
+    discountedTotal: known ? discountedTotal : 0,
+    discountedTotalText: known ? `￥${discountedTotal}` : "待顾问报价",
+    savingsAmount,
+    discountTier: hasDiscount ? { minDays, days, discountRate, label: discountLabel, savingsAmount } : null,
+    hasDiscount,
     daily
   }
 }

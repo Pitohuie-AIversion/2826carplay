@@ -262,9 +262,16 @@
           <view class="price-calendar-kicker">DAILY PRICE SUMMARY</view>
           <view class="price-calendar-title">每日参考价格</view>
         </view>
-        <view class="price-calendar-total">{{priceCalendarSummary.estimatedTotalText}}</view>
+        <view class="price-calendar-total">
+          <text wx:if="{{priceCalendarSummary.hasDiscount}}" class="price-discounted-total">{{priceCalendarSummary.discountedTotalText}}</text>
+          <text class="{{priceCalendarSummary.hasDiscount ? 'price-original-total' : ''}}">{{priceCalendarSummary.estimatedTotalText}}</text>
+        </view>
       </view>
       <view class="price-calendar-base">基础日租 {{priceCalendarSummary.baseDailyRateText}} · 所选 {{priceCalendarSummary.daily.length}} 个日期</view>
+      <view wx:if="{{priceCalendarSummary.hasDiscount}}" class="price-discount-row">
+        <text class="price-discount-badge">{{priceCalendarSummary.discountTier.label}}</text>
+        <text class="price-discount-amount">连租立省 ￥{{priceCalendarSummary.savingsAmount}}</text>
+      </view>
       <view wx:if="{{priceCalendarSummary.specialDayCount}}" class="price-calendar-specials">
         <view class="price-calendar-special" wx:for="{{priceCalendarSummary.dailyPreview}}" wx:key="date">
           <text>{{item.date}} · {{item.label}}</text><text>￥{{item.dailyRate}}</text>

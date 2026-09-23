@@ -157,7 +157,7 @@ describe("cloudfunctions/vehicleAvailabilityCheck integration", () => {
     expect(res.message).toContain("顾问确认")
   })
 
-  test("已确认按日占用会阻止档期并返回特殊日期价格摘要", async () => {
+  test("已确认按日占用会阻止档期并返回特殊日期价格摘要与阶梯折扣", async () => {
     const { mod } = loadModule({
       vehicle: { _id: "vehicle_1", status: "idle", priceDay: 800 },
       occupiedDates: ["2099-08-02"],
@@ -165,7 +165,44 @@ describe("cloudfunctions/vehicleAvailabilityCheck integration", () => {
     })
     const res = await mod.main({ vehicleId: "vehicle_1", startDate: "2099-08-01", endDate: "2099-08-03" })
     expect(res).toMatchObject({ ok: true, available: false, occupiedDayCount: 1 })
-    expect(res.priceSummary).toMatchObject({ baseDailyRate: 800, specialDayCount: 2, estimatedTotal: 2760 })
+    expect(res.priceSummary).toMatchObject({
+      baseDailyRate: 800,
+      specialDayCount: 2,
+      estimatedTotal: 2760,
+      discountedTotal: 2622,
+      savingsAmount: 138,
+      hasDiscount: true,
+      discountTier: {
+        minDays: 3,
+        days: 3,
+        discountRate: 0.95,
+        label: "连租特惠 95折",
+        savingsAmount: 138
+      }
+    })
+  })
+
+  test("周租与短期租赁阶梯折扣计算验证", async () => {
+    const { mod } = loadModule({
+      vehicle: { _id: "vehicle_1", status: "idle", priceDay: 1000 }
+    })
+    const weekRes = await mod.main({ vehicleId: "vehicle_1", startDate: "2099-08-01", endDate: "2099-08-07" })
+    expect(weekRes.priceSummary).toMatchObject({
+      estimatedTotal: 7000,
+      discountedTotal: 6300,
+      savingsAmount: 700,
+      hasDiscount: true,
+      discountTier: { minDays: 7, days: 7, discountRate: 0.9, label: "周租专享 9折" }
+    })
+
+    const shortRes = await mod.main({ vehicleId: "vehicle_1", startDate: "2099-08-01", endDate: "2099-08-02" })
+    expect(shortRes.priceSummary).toMatchObject({
+      estimatedTotal: 2000,
+      discountedTotal: 2000,
+      savingsAmount: 0,
+      hasDiscount: false,
+      discountTier: null
+    })
   })
 
   test("未登录、非法日期和停用车辆均不可查询", async () => {

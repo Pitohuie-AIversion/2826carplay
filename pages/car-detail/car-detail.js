@@ -1511,7 +1511,7 @@ Page({
     if (filePath.startsWith("http://") || filePath.startsWith("https://") || filePath.startsWith("cloud://")) {
       try {
         if (typeof wx.showLoading === "function") {
-          wx.showLoading({ title: "正在准备保存...", mask: true })
+          wx.showLoading({ title: "保存中…", mask: true })
         }
         filePath = await this.resolvePosterCover(filePath)
       } catch (e) {

@@ -1,3 +1,1 @@
-@import "../../shared/vehicle-form.wxss";
-
-.vehicle-create-page .submit-button { width: 100%; }
+@import "../../shared/vehicle-form.wxss";.vehicle-create-page .submit-button{width:100%;}

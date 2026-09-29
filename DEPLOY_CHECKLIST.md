@@ -16,6 +16,16 @@
 
 以下函数已在 `cloudbaserc.json` 中纳入部署清单，部署时应全部同步：
 
+### 管理员自定义连租折扣
+
+- 新增/编辑车辆的“连租折扣”按车保存至 `vehicles.rentalDiscountTiers`，最多 8 档；最低天数为 2-90 整数，折扣为 0.1-9.9 折（最多一位小数）。
+- 没有该字段或保存空数组均不优惠，不迁移或自动恢复旧的固定折扣。达到多档门槛时选最高天数档，整段基础/特殊日期租金合计打折，不叠加。
+- 详情展示、日期范围试算和管理端优惠推荐使用相同配置。推荐门槛沿用档期试算的首尾日期均计入规则，仅作预估；已保存的正式报价及其计费日不改写。
+- 修改共享计价或车辆校验代码后运行 `node scripts/syncRentalPricing.js` 同步独立云函数副本；测试会检查副本一致性。
+- 本次需同步部署 `vehicleCreate`、`vehicleUpdate`、`vehicleList`、`vehicleDetail`、`vehiclePublicDetail`、`vehicleAvailabilityCheck`、`bookingDetail` 并发布新版小程序，无新增集合或索引。
+- 上线前验证：保存“满 5 天 9.2 折”，重新进入编辑页核对；客户选择 5 天显示对应优惠；删除全部规则后重新查询不再打折。普通用户调用车辆写入接口仍应返回 `FORBIDDEN`。
+- 云函数和小程序需配套发布；旧客户端仍可能显示旧固定标签，不应视为最新优惠承诺。
+
 Phase 15 需要新增部署 `vehicleCalendarManage`，并重新部署 `vehicleAvailabilityCheck`、`bookingQuoteRespond`、`bookingCancel`、`bookingUpdateStatus`、`bookingCalendarList`、`analyticsTrack`、`analyticsOverview` 和 `systemHealthCheck`。
 
 Phase 16 需要新增部署 `contentGuideList`、`contentGuideDetail`、`contentGuideManage`，并重新部署 `analyticsTrack`、`analyticsOverview`、`bookingCreate`、`bookingQuoteRespond`。
@@ -134,6 +144,10 @@ Phase 16 需要新增部署 `contentGuideList`、`contentGuideDetail`、`content
 - `roles.openid`（建议唯一索引，防止并发分配权限时产生重复角色记录）
 - `vehicles.plateNumber`（必须为唯一索引；创建前先清理历史重复车牌和缺失车牌的记录）
 - `vehicles.updatedAt`
+- `app_configs.key`（必须为唯一索引；防止并发更新配置时产生重复键）
+- `app_configs.updatedAt`
+- `pending_file_deletions.status + createdAt`
+- `pending_file_deletions.source + notBeforeAt`
 
 其中 `bookings.openid + createdAt` 仍建议创建，用于提升“我的预约”和预约防刷查询性能。`bookingMyList` 与 `bookingCreate` 已提供缺少复合索引时的分批查询与云函数内排序兜底，但兜底路径会增加数据库读取次数，不应替代正式索引。
 

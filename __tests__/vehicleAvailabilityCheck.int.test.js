@@ -112,7 +112,7 @@ describe("cloudfunctions/vehicleAvailabilityCheck integration", () => {
     expect(res.message).toContain("普通咨询不会锁车")
     expect(JSON.stringify(res)).not.toContain("13800000000")
     expect(JSON.stringify(res)).not.toContain("不应返回")
-    expect(vehicleField).toHaveBeenCalledWith({ status: true, priceDay: true })
+    expect(vehicleField).toHaveBeenCalledWith({ status: true, priceDay: true, rentalDiscountTiers: true })
     expect(bookingWhere).toHaveBeenCalledWith({ vehicleId: "vehicle_1" })
   })
 
@@ -159,7 +159,7 @@ describe("cloudfunctions/vehicleAvailabilityCheck integration", () => {
 
   test("已确认按日占用会阻止档期并返回特殊日期价格摘要与阶梯折扣", async () => {
     const { mod } = loadModule({
-      vehicle: { _id: "vehicle_1", status: "idle", priceDay: 800 },
+      vehicle: { _id: "vehicle_1", status: "idle", priceDay: 800, rentalDiscountTiers: [{ minDays: 3, discountRate: 0.95 }] },
       occupiedDates: ["2099-08-02"],
       priceRules: [{ label: "暑期价", startDate: "2099-08-02", endDate: "2099-08-03", dailyPrice: 980, status: "active" }]
     })
@@ -176,7 +176,7 @@ describe("cloudfunctions/vehicleAvailabilityCheck integration", () => {
         minDays: 3,
         days: 3,
         discountRate: 0.95,
-        label: "连租特惠 95折",
+        label: "连租满3天 9.5折",
         savingsAmount: 138
       }
     })
@@ -184,7 +184,7 @@ describe("cloudfunctions/vehicleAvailabilityCheck integration", () => {
 
   test("周租与短期租赁阶梯折扣计算验证", async () => {
     const { mod } = loadModule({
-      vehicle: { _id: "vehicle_1", status: "idle", priceDay: 1000 }
+      vehicle: { _id: "vehicle_1", status: "idle", priceDay: 1000, rentalDiscountTiers: [{ minDays: 7, discountRate: 0.9 }] }
     })
     const weekRes = await mod.main({ vehicleId: "vehicle_1", startDate: "2099-08-01", endDate: "2099-08-07" })
     expect(weekRes.priceSummary).toMatchObject({
@@ -192,7 +192,7 @@ describe("cloudfunctions/vehicleAvailabilityCheck integration", () => {
       discountedTotal: 6300,
       savingsAmount: 700,
       hasDiscount: true,
-      discountTier: { minDays: 7, days: 7, discountRate: 0.9, label: "周租专享 9折" }
+      discountTier: { minDays: 7, days: 7, discountRate: 0.9, label: "连租满7天 9折" }
     })
 
     const shortRes = await mod.main({ vehicleId: "vehicle_1", startDate: "2099-08-01", endDate: "2099-08-02" })
@@ -203,6 +203,15 @@ describe("cloudfunctions/vehicleAvailabilityCheck integration", () => {
       hasDiscount: false,
       discountTier: null
     })
+  })
+
+  test("未配置不打折，客户端不能注入优惠", async () => {
+    const { mod } = loadModule({ vehicle: { status: "idle", priceDay: 1000 } })
+    const res = await mod.main({
+      vehicleId: "vehicle_1", startDate: "2099-08-01", endDate: "2099-08-30",
+      rentalDiscountTiers: [{ minDays: 2, discountRate: 0.1 }]
+    })
+    expect(res.priceSummary).toMatchObject({ hasDiscount: false, discountedTotal: 30000 })
   })
 
   test("未登录、非法日期和停用车辆均不可查询", async () => {

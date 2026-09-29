@@ -532,6 +532,84 @@
       transform: translateY(-2px);
     }
 
+    /* Filter Tabs & Tier Pills */
+    .filter-tabs {
+      display: flex;
+      gap: 0.45rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .filter-tab {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border-subtle);
+      border-radius: 9999px;
+      padding: 0.3rem 0.75rem;
+      color: var(--text-muted);
+      font-size: 0.76rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: var(--transition-smooth);
+    }
+
+    .filter-tab:hover {
+      border-color: var(--primary);
+      color: var(--text-main);
+    }
+
+    .filter-tab.active {
+      background: rgba(56, 189, 248, 0.18);
+      border-color: var(--primary);
+      color: var(--primary);
+      box-shadow: 0 0 12px var(--primary-glow);
+    }
+
+    .tier-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.18rem 0.5rem;
+      border-radius: 9999px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      background: rgba(245, 158, 11, 0.12);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    .vip-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.18rem 0.55rem;
+      border-radius: 9999px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      box-shadow: 0 0 8px rgba(16, 185, 129, 0.2);
+    }
+
+    .btn-quick-day {
+      background: rgba(30, 41, 59, 0.6);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-muted);
+      border-radius: var(--radius-sm);
+      padding: 0.35rem 0.65rem;
+      font-size: 0.74rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: var(--transition-smooth);
+    }
+
+    .btn-quick-day:hover,
+    .btn-quick-day.active {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+
     /* Modal Component */
     .modal-overlay {
       position: fixed;
@@ -745,6 +823,9 @@
         <span id="cloudStatusText">云端直连: cloud1-d8gtmns36320e045e</span>
       </div>
       <div class="time-clock" id="timeClock">--:--:--</div>
+      <button class="btn-action" style="border-color: rgba(245, 158, 11, 0.4); color: #fbbf24;" onclick="openPricingModal()">
+        <span>💰</span> 阶梯报价测算
+      </button>
       <button class="btn-action primary" onclick="refreshDashboard()">
         <span>🔄</span> 实时刷新
       </button>
@@ -825,6 +906,13 @@
           <div class="panel-title">
             <span>🏁</span> 车辆运行与排期状态矩阵 (Fleet Matrix)
           </div>
+          <div class="filter-tabs">
+            <button class="filter-tab active" data-filter="all" onclick="setFleetFilter('all')">全部 (<span id="countAll">8</span>)</button>
+            <button class="filter-tab" data-filter="longterm" onclick="setFleetFilter('longterm')">⭐ 长租VIP (<span id="countLongTerm">3</span>)</button>
+            <button class="filter-tab" data-filter="rented" onclick="setFleetFilter('rented')">🚗 在租中 (<span id="countRented">2</span>)</button>
+            <button class="filter-tab" data-filter="active" onclick="setFleetFilter('active')">🟢 闲置待租 (<span id="countActive">4</span>)</button>
+            <button class="filter-tab" data-filter="maintenance" onclick="setFleetFilter('maintenance')">🔴 维保整备 (<span id="countMaintenance">1</span>)</button>
+          </div>
           <div class="panel-controls">
             <input type="text" class="search-input" id="vehicleSearch" placeholder="搜索车型 / 车牌号..." oninput="filterVehicles()">
             <button class="btn-action" onclick="syncAllLocks()">
@@ -838,10 +926,11 @@
             <thead>
               <tr>
                 <th>车辆与牌照</th>
-                <th>级别定位</th>
+                <th>级别与日租</th>
+                <th>长租特惠政策</th>
                 <th>运行状态</th>
                 <th>当前/下一排期</th>
-                <th>快捷调度</th>
+                <th>快捷调度与测算</th>
               </tr>
             </thead>
             <tbody id="fleetBody">
@@ -1030,6 +1119,79 @@
     </div>
   </div>
 
+  <!-- Tiered Pricing & Revenue Simulator Modal -->
+  <div class="modal-overlay" id="pricingModal">
+    <div class="modal-box" style="max-width: 680px;">
+      <div class="modal-header">
+        <h3 id="pricingModalTitle"><span>💰</span> 长租收益测算与智能报价器</h3>
+        <button class="btn-close" onclick="closePricingModal()">×</button>
+      </div>
+
+      <div class="modal-field">
+        <label>选择测算车型与基础日租</label>
+        <select class="search-input" id="simVehicleSelect" style="width: 100%; padding: 0.65rem;" onchange="updateSimulation()">
+          <!-- Populated by JS -->
+        </select>
+      </div>
+
+      <div class="modal-field">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <label>租赁周期 (天数)</label>
+          <span id="simDaysDisplay" style="color:var(--primary); font-weight:700; font-family:'Outfit',sans-serif; font-size:1.1rem;">7 天</span>
+        </div>
+        <input type="range" id="simDaysSlider" min="1" max="90" value="7" style="width: 100%; accent-color: var(--primary); cursor: pointer;" oninput="onSliderDaysChange(this.value)">
+        <div class="quick-days-grid" style="display:flex; gap:0.5rem; margin-top:0.6rem; flex-wrap:wrap;">
+          <button type="button" class="btn-quick-day" data-days="3" onclick="setSimDays(3)">3天 (95折)</button>
+          <button type="button" class="btn-quick-day active" data-days="7" onclick="setSimDays(7)">7天周租 (90折)</button>
+          <button type="button" class="btn-quick-day" data-days="15" onclick="setSimDays(15)">15天半月 (85折)</button>
+          <button type="button" class="btn-quick-day" data-days="30" onclick="setSimDays(30)">30天月租 (75折)</button>
+          <button type="button" class="btn-quick-day" data-days="60" onclick="setSimDays(60)">60天双月 (75折)</button>
+        </div>
+      </div>
+
+      <!-- Calculation Summary Card -->
+      <div class="sim-result-card" style="background: rgba(15, 23, 42, 0.85); border: 1px solid var(--border-bright); border-radius: var(--radius-md); padding: 1.25rem; display: flex; flex-direction: column; gap: 0.85rem;">
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; text-align: center;">
+          <div>
+            <div style="font-size: 0.72rem; color: var(--text-dim);">原标准价</div>
+            <div id="simOriginalTotal" style="font-size: 1.15rem; font-weight: 600; color: var(--text-muted); text-decoration: line-through; margin-top: 0.2rem;">￥31,500</div>
+          </div>
+          <div>
+            <div style="font-size: 0.72rem; color: var(--text-dim);">适用阶梯优惠</div>
+            <div id="simTierLabel" style="font-size: 1.05rem; font-weight: 700; color: #fbbf24; margin-top: 0.2rem;">周租专享 90折</div>
+          </div>
+          <div>
+            <div style="font-size: 0.72rem; color: var(--text-dim);">累计让利立省</div>
+            <div id="simSavingsAmount" style="font-size: 1.15rem; font-weight: 700; color: var(--success); margin-top: 0.2rem;">-￥3,150</div>
+          </div>
+        </div>
+        <div style="border-top: 1px solid var(--border-subtle); padding-top: 0.85rem; display: flex; justify-content: space-between; align-items: baseline;">
+          <div>
+            <span style="font-size: 0.85rem; color: var(--text-muted);">折后尊享总额：</span>
+            <span id="simDiscountedTotal" style="font-family:'Outfit',sans-serif; font-size: 1.85rem; font-weight: 800; color: #fbbf24; text-shadow: 0 0 20px rgba(245, 158, 11, 0.35);">￥28,350</span>
+          </div>
+          <div id="simDailyAverage" style="font-size: 0.82rem; color: var(--primary);">折合仅 ￥4,050 / 天</div>
+        </div>
+      </div>
+
+      <!-- One-Click WeChat Quote Template -->
+      <div class="modal-field">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 0.4rem;">
+          <label>专属管家智能微信报价文案</label>
+          <button class="btn-action" style="padding: 0.25rem 0.65rem; font-size: 0.75rem;" onclick="copyQuoteText()">
+            <span>📋</span> 复制客户回复
+          </button>
+        </div>
+        <textarea id="simQuoteText" readonly style="width: 100%; height: 95px; background: rgba(11, 16, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: var(--text-main); font-size: 0.78rem; font-family: monospace; padding: 0.65rem; resize: none;"></textarea>
+      </div>
+
+      <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:0.75rem;">
+        <button class="btn-action" onclick="closePricingModal()">关闭</button>
+        <button class="btn-action primary" onclick="copyQuoteText()">📋 复制报价并关闭</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Element -->
   <div id="toast">
     <span id="toastIcon">ℹ️</span>
@@ -1059,26 +1221,35 @@
       console.warn('CloudBase SDK auto-connect note:', e);
     }
 
-    // Vehicle Mock / Synchronized Matrix
+    // Vehicle Mock / Synchronized Matrix with Pricing & Long-Term Attributes
     const VEHICLES = [
-      { id: 'v1', name: 'Porsche 911 GT3 RS', plate: '浙A·88888', category: '赛道超级跑车', status: 'rented', statusText: '租赁中', schedule: '今日 18:00 归还待检', lockedDays: ['2026-09-22', '2026-09-23'] },
-      { id: 'v2', name: 'Ferrari 488 Pista', plate: '浙A·77777', category: '中置V8跑车', status: 'maintenance', statusText: '整备中', schedule: '今日 16:30 释放 (机油保养)', lockedDays: ['2026-09-21'] },
-      { id: 'v3', name: 'Lamborghini Huracán EVO', plate: '浙A·99999', category: 'V10四驱跑车', status: 'active', statusText: '空闲待租', schedule: '全档期可用', lockedDays: [] },
-      { id: 'v4', name: 'McLaren 720S Performance', plate: '浙A·66666', category: '碳纤维单体壳超跑', status: 'active', statusText: '空闲待租', schedule: '明日 10:00 已有预定', lockedDays: ['2026-09-23'] },
-      { id: 'v5', name: 'Aston Martin DBS Superleggera', plate: '浙A·55555', category: 'GT旗舰跑车', status: 'reserved', statusText: '已确认待取', schedule: '明日 09:00 客户提车', lockedDays: ['2026-09-22'] },
-      { id: 'v6', name: 'Mercedes-AMG G63', plate: '浙A·22222', category: '全地形越野', status: 'rented', statusText: '租赁中', schedule: '后天 14:00 归还', lockedDays: ['2026-09-21', '2026-09-22', '2026-09-23'] },
-      { id: 'v7', name: 'Rolls-Royce Ghost', plate: '浙A·11111', category: '顶级行政座驾', status: 'active', statusText: '空闲待租', schedule: '全档期可用', lockedDays: [] },
-      { id: 'v8', name: 'Bentley Continental GT', plate: '浙A·33333', category: '超豪华运动轿跑', status: 'active', statusText: '空闲待租', schedule: '本周末已预订', lockedDays: ['2026-09-26', '2026-09-27'] }
+      { id: 'v1', name: 'Porsche 911 GT3 RS', plate: '浙A·88888', category: '赛道超级跑车', dailyRate: 4500, hasLongTermInterest: true, longTermDays: 7, status: 'rented', statusText: '租赁中', schedule: '今日 18:00 归还待检', lockedDays: ['2026-09-22', '2026-09-23'] },
+      { id: 'v2', name: 'Ferrari 488 Pista', plate: '浙A·77777', category: '中置V8跑车', dailyRate: 8800, hasLongTermInterest: false, longTermDays: 2, status: 'maintenance', statusText: '整备中', schedule: '今日 16:30 释放 (机油保养)', lockedDays: ['2026-09-21'] },
+      { id: 'v3', name: 'Lamborghini Huracán EVO', plate: '浙A·99999', category: 'V10四驱跑车', dailyRate: 7500, hasLongTermInterest: true, longTermDays: 15, status: 'active', statusText: '空闲待租', schedule: '全档期可用 · 已预约半月试驾', lockedDays: [] },
+      { id: 'v4', name: 'McLaren 720S Performance', plate: '浙A·66666', category: '碳纤维单体壳超跑', dailyRate: 6800, hasLongTermInterest: false, longTermDays: 3, status: 'active', statusText: '空闲待租', schedule: '明日 10:00 已有预订', lockedDays: ['2026-09-23'] },
+      { id: 'v5', name: 'Aston Martin DBS Superleggera', plate: '浙A·55555', category: 'GT旗舰跑车', dailyRate: 5800, hasLongTermInterest: true, longTermDays: 30, status: 'reserved', statusText: '已确认待取', schedule: '明日 09:00 客户提车 (月租专案)', lockedDays: ['2026-09-22'] },
+      { id: 'v6', name: 'Mercedes-AMG G63', plate: '浙A·22222', category: '全地形越野', dailyRate: 4200, hasLongTermInterest: false, longTermDays: 3, status: 'rented', statusText: '租赁中', schedule: '后天 14:00 归还', lockedDays: ['2026-09-21', '2026-09-22', '2026-09-23'] },
+      { id: 'v7', name: 'Rolls-Royce Ghost', plate: '浙A·11111', category: '顶级行政座驾', dailyRate: 9800, hasLongTermInterest: false, longTermDays: 1, status: 'active', statusText: '空闲待租', schedule: '全档期可用', lockedDays: [] },
+      { id: 'v8', name: 'Bentley Continental GT', plate: '浙A·33333', category: '超豪华运动轿跑', dailyRate: 4800, hasLongTermInterest: false, longTermDays: 2, status: 'active', statusText: '空闲待租', schedule: '本周末已预订', lockedDays: ['2026-09-26', '2026-09-27'] }
     ];
 
     let currentEditingVehicle = null;
+    let currentFleetFilter = 'all';
+
+    function setFleetFilter(filter) {
+      currentFleetFilter = filter;
+      document.querySelectorAll('.filter-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.getAttribute('data-filter') === filter);
+      });
+      filterVehicles();
+    }
 
     function renderVehicles(list) {
       const tbody = document.getElementById('fleetBody');
       tbody.innerHTML = '';
 
       if (list.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--text-dim); padding:2rem;">未找到匹配车辆</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-dim); padding:2rem;">未找到匹配车辆</td></tr>';
         return;
       }
 
@@ -1086,6 +1257,12 @@
         const tr = document.createElement('tr');
         const initials = item.name.split(' ').slice(0, 2).map(s => s[0]).join('');
         
+        let tierTagsHtml = '';
+        if (item.hasLongTermInterest) {
+          tierTagsHtml += `<span class="vip-pill">★ 长租VIP</span> `;
+        }
+        tierTagsHtml += `<span class="tier-pill">周租9折</span> <span class="tier-pill">月租75折</span>`;
+
         tr.innerHTML = `
           <td>
             <div class="vehicle-info">
@@ -1096,13 +1273,26 @@
               </div>
             </div>
           </td>
-          <td><span style="color:var(--text-muted); font-size:0.8rem;">${item.category}</span></td>
+          <td>
+            <div style="font-weight:600; color:var(--text-main);">￥${(item.dailyRate || 0).toLocaleString()} <span style="font-size:0.75rem; color:var(--text-dim); font-weight:normal;">/ 天</span></div>
+            <div style="color:var(--text-muted); font-size:0.75rem; margin-top:0.15rem;">${item.category}</div>
+          </td>
+          <td>
+            <div style="display:flex; flex-wrap:wrap; gap:0.35rem; align-items:center;">
+              ${tierTagsHtml}
+            </div>
+          </td>
           <td><span class="status-pill ${item.status}">${item.statusText}</span></td>
           <td><span style="font-size:0.8rem; color:var(--text-dim); font-family:monospace;">${item.schedule}</span></td>
           <td>
-            <button class="btn-action" style="padding:0.25rem 0.65rem; font-size:0.75rem;" onclick="openScheduleModal('${item.id}')">
-              <span>📅</span> 排期调度
-            </button>
+            <div style="display:flex; gap:0.4rem;">
+              <button class="btn-action" style="padding:0.25rem 0.55rem; font-size:0.75rem;" onclick="openScheduleModal('${item.id}')">
+                <span>📅</span> 排期
+              </button>
+              <button class="btn-action" style="padding:0.25rem 0.55rem; font-size:0.75rem; border-color:rgba(245, 158, 11, 0.4); color:#fbbf24;" onclick="openPricingModal('${item.id}')">
+                <span>💰</span> 测算
+              </button>
+            </div>
           </td>
         `;
         tbody.appendChild(tr);
@@ -1115,18 +1305,47 @@
       document.getElementById('totalVehicles').innerText = VEHICLES.length;
       const rented = VEHICLES.filter(v => v.status === 'rented').length;
       const maintenance = VEHICLES.filter(v => v.status === 'maintenance').length;
+      const longTerm = VEHICLES.filter(v => v.hasLongTermInterest).length;
+      const active = VEHICLES.filter(v => v.status === 'active').length;
+
       document.getElementById('activeRentals').innerText = rented;
       document.getElementById('dueToday').innerText = rented > 0 ? 1 : 0;
       const avail = (((VEHICLES.length - rented - maintenance) / VEHICLES.length) * 100).toFixed(1);
       document.getElementById('fleetAvailability').innerText = avail;
+
+      // Update Filter Tab counts
+      const elAll = document.getElementById('countAll');
+      if (elAll) elAll.innerText = VEHICLES.length;
+      const elLong = document.getElementById('countLongTerm');
+      if (elLong) elLong.innerText = longTerm;
+      const elRented = document.getElementById('countRented');
+      if (elRented) elRented.innerText = rented;
+      const elActive = document.getElementById('countActive');
+      if (elActive) elActive.innerText = active;
+      const elMaint = document.getElementById('countMaintenance');
+      if (elMaint) elMaint.innerText = maintenance;
     }
 
     function filterVehicles() {
       const query = document.getElementById('vehicleSearch').value.toLowerCase().trim();
-      const filtered = VEHICLES.filter(v => 
-        v.name.toLowerCase().includes(query) || v.plate.toLowerCase().includes(query) || v.category.toLowerCase().includes(query)
-      );
-      renderVehicles(filtered);
+      let list = VEHICLES;
+
+      if (currentFleetFilter === 'longterm') {
+        list = list.filter(v => v.hasLongTermInterest);
+      } else if (currentFleetFilter === 'rented') {
+        list = list.filter(v => v.status === 'rented');
+      } else if (currentFleetFilter === 'active') {
+        list = list.filter(v => v.status === 'active');
+      } else if (currentFleetFilter === 'maintenance') {
+        list = list.filter(v => v.status === 'maintenance');
+      }
+
+      if (query) {
+        list = list.filter(v => 
+          v.name.toLowerCase().includes(query) || v.plate.toLowerCase().includes(query) || v.category.toLowerCase().includes(query)
+        );
+      }
+      renderVehicles(list);
     }
 
     // Modal Operations
@@ -1319,6 +1538,122 @@
     function updateTime() {
       const now = new Date();
       document.getElementById('timeClock').innerText = now.toLocaleTimeString('zh-CN', { hour12: false });
+    }
+
+    // Pricing Simulator Operations
+    let currentSimVehicle = null;
+    let currentSimDays = 7;
+
+    function populateSimSelect() {
+      const select = document.getElementById('simVehicleSelect');
+      if (!select) return;
+      select.innerHTML = '';
+      VEHICLES.forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v.id;
+        opt.innerText = `${v.name} · ￥${v.dailyRate.toLocaleString()} / 天 (${v.category})`;
+        select.appendChild(opt);
+      });
+    }
+
+    function openPricingModal(vehicleId) {
+      populateSimSelect();
+      const targetId = vehicleId || (currentEditingVehicle ? currentEditingVehicle.id : VEHICLES[0].id);
+      currentSimVehicle = VEHICLES.find(v => v.id === targetId) || VEHICLES[0];
+      
+      const select = document.getElementById('simVehicleSelect');
+      if (select) select.value = currentSimVehicle.id;
+
+      setSimDays(currentSimVehicle.longTermDays || 7);
+      document.getElementById('pricingModal').classList.add('active');
+    }
+
+    function closePricingModal() {
+      document.getElementById('pricingModal').classList.remove('active');
+    }
+
+    function setSimDays(days) {
+      currentSimDays = Number(days) || 1;
+      const slider = document.getElementById('simDaysSlider');
+      if (slider) slider.value = currentSimDays;
+
+      document.querySelectorAll('.btn-quick-day').forEach(btn => {
+        btn.classList.toggle('active', Number(btn.getAttribute('data-days')) === currentSimDays);
+      });
+
+      updateSimulation();
+    }
+
+    function onSliderDaysChange(val) {
+      currentSimDays = Number(val) || 1;
+      document.querySelectorAll('.btn-quick-day').forEach(btn => {
+        btn.classList.toggle('active', Number(btn.getAttribute('data-days')) === currentSimDays);
+      });
+      updateSimulation();
+    }
+
+    function calculateRentalDiscount(originalTotal, days) {
+      if (days >= 30) {
+        return { rate: 0.75, label: '月租尊享 75折' };
+      } else if (days >= 15) {
+        return { rate: 0.85, label: '半月特惠 85折' };
+      } else if (days >= 7) {
+        return { rate: 0.90, label: '周租专享 90折' };
+      } else if (days >= 3) {
+        return { rate: 0.95, label: '连租特惠 95折' };
+      }
+      return { rate: 1.0, label: '标准日租 (无折扣)' };
+    }
+
+    function updateSimulation() {
+      const select = document.getElementById('simVehicleSelect');
+      const vId = select ? select.value : (currentSimVehicle ? currentSimVehicle.id : 'v1');
+      currentSimVehicle = VEHICLES.find(v => v.id === vId) || VEHICLES[0];
+
+      const days = currentSimDays;
+      const dailyRate = currentSimVehicle.dailyRate || 4500;
+      const rawTotal = dailyRate * days;
+      const { rate, label } = calculateRentalDiscount(rawTotal, days);
+      const discountedTotal = Math.round(rawTotal * rate);
+      const savings = rawTotal - discountedTotal;
+      const avgPerDay = Math.round(discountedTotal / days);
+
+      document.getElementById('simDaysDisplay').innerText = `${days} 天`;
+      document.getElementById('simOriginalTotal').innerText = `￥${rawTotal.toLocaleString()}`;
+      document.getElementById('simTierLabel').innerText = label;
+      document.getElementById('simSavingsAmount').innerText = savings > 0 ? `-￥${savings.toLocaleString()}` : '￥0';
+      document.getElementById('simDiscountedTotal').innerText = `￥${discountedTotal.toLocaleString()}`;
+      document.getElementById('simDailyAverage').innerText = `折合仅 ￥${avgPerDay.toLocaleString()} / 天 ${savings > 0 ? `(日均立省 ￥${(dailyRate - avgPerDay).toLocaleString()})` : ''}`;
+
+      const quoteText = `【极境车库 · 专属管家尊享报价】
+尊敬的贵宾客户，为您测算的预约方案如下：
+• 预订车型：${currentSimVehicle.name} (${currentSimVehicle.category})
+• 基础日租：￥${dailyRate.toLocaleString()} / 天
+• 租赁周期：${days} 天 ${rate < 1 ? `(已享【${label}】)` : ''}
+• 原标准价：￥${rawTotal.toLocaleString()}
+• 连租让利：${savings > 0 ? `-￥${savings.toLocaleString()}` : '无'}
+• 折后总价：￥${discountedTotal.toLocaleString()} (折合 ￥${avgPerDay.toLocaleString()}/天)
+包含专业赛道级整备、四角存证验车及高额商业险，已为您预留优先锁排期资格。请回复以确认预订。`;
+
+      const textarea = document.getElementById('simQuoteText');
+      if (textarea) textarea.value = quoteText;
+    }
+
+    function copyQuoteText() {
+      const textarea = document.getElementById('simQuoteText');
+      if (!textarea) return;
+      textarea.select();
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(textarea.value).then(() => {
+          showToast('管家报价回复已复制到剪贴板，可直接发送客户！', '📋');
+        }).catch(() => {
+          document.execCommand('copy');
+          showToast('管家报价回复已复制到剪贴板！', '📋');
+        });
+      } else {
+        document.execCommand('copy');
+        showToast('管家报价回复已复制到剪贴板！', '📋');
+      }
     }
 
     // Initialize

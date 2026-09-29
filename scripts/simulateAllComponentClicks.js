@@ -1394,6 +1394,10 @@ simulateClick("输入报价调整金额 (handleQuoteInput: baseRentalAmount)", (
   if (bmdPage.data.quoteForm.baseRentalAmount !== "5800") throw new Error("报价金额未录入")
 })
 
+simulateClick("一键应用推荐长租阶梯折扣 (handleApplyRecommendedDiscount)", () => {
+  bmdPage.handleApplyRecommendedDiscount()
+})
+
 simulateClick("选择报价截止有效时间 (handleQuoteValidUntilChange)", () => {
   bmdPage.handleQuoteValidUntilChange(makeEvent({}, { value: "2026-10-01 18:00" }))
 })
@@ -1550,6 +1554,17 @@ simulateClick("点击车队列表触底翻页 (handleLoadMore)", () => {
 logSuite("17. 分包页面: pages-admin/vehicle-create/vehicle-create (录入新座驾)")
 const vcPage = loadPage("pages-admin/vehicle-create/vehicle-create")
 vcPage.setData({ isSubmitting: false, pageAuthorized: true })
+simulateClick("新增连租档位并填写自定义天数和折扣", () => {
+  vcPage.handleAddDiscountTier()
+  vcPage.handleDiscountTierInput(makeEvent({ index: 0, field: "minDays" }, { value: "5" }))
+  vcPage.handleDiscountTierInput(makeEvent({ index: 0, field: "discount" }, { value: "9.2" }))
+  const tier = vcPage.buildSubmitPayload().rentalDiscountTiers[0]
+  if (!tier || tier.minDays !== 5 || tier.discountRate !== 0.92) throw new Error("连租配置未进入提交载荷")
+})
+simulateClick("删除新车连租档位，恢复不自动优惠", () => {
+  vcPage.handleRemoveDiscountTier(makeEvent({ index: 0 }))
+  if (vcPage.buildSubmitPayload().rentalDiscountTiers.length) throw new Error("连租配置未清空")
+})
 
 simulateClick("输入车辆品牌与型号 (handleTextInput: brandModel)", () => {
   vcPage.handleTextInput(makeEvent({ field: "brandModel" }, { value: "法拉利 SF90 Stradale" }))
@@ -1588,6 +1603,18 @@ simulateClick("点击确认提交录入车辆 (handleSubmit)", () => {
 logSuite("18. 分包页面: pages-admin/vehicle-edit/vehicle-edit (编辑车辆资料)")
 const vePage = loadPage("pages-admin/vehicle-edit/vehicle-edit", { id: "car-911" })
 vePage.setData({ isSubmitting: false, loading: false, pageAuthorized: true })
+simulateClick("编辑车辆新增连租折扣并修改门槛", () => {
+  vePage.setData({ discountRows: [] })
+  vePage.handleAddDiscountTier()
+  vePage.handleDiscountTierInput(makeEvent({ index: 0, field: "minDays" }, { value: "6" }))
+  vePage.handleDiscountTierInput(makeEvent({ index: 0, field: "discount" }, { value: "8.8" }))
+  const tier = vePage.buildSubmitPayload().rentalDiscountTiers[0]
+  if (!tier || tier.minDays !== 6 || tier.discountRate !== 0.88) throw new Error("连租修改未生效")
+})
+simulateClick("编辑车辆清空全部折扣", () => {
+  vePage.handleRemoveDiscountTier(makeEvent({ index: 0 }))
+  if (vePage.buildSubmitPayload().rentalDiscountTiers.length) throw new Error("未关闭连租折扣")
+})
 
 simulateClick("修改车辆品牌型号 (handleTextInput: brandModel)", () => {
   vePage.handleTextInput(makeEvent({ field: "brandModel" }, { value: "保时捷 911 Carrera S (2026款)" }))

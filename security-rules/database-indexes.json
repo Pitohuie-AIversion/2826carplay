@@ -35,5 +35,35 @@
       "unique": true,
       "fields": [{ "field": "plateNumber", "order": "asc" }]
     }
+  ],
+  "app_configs": [
+    {
+      "name": "app_configs_key_unique",
+      "unique": true,
+      "fields": [{ "field": "key", "order": "asc" }]
+    },
+    {
+      "name": "app_configs_updatedAt",
+      "unique": false,
+      "fields": [{ "field": "updatedAt", "order": "desc" }]
+    }
+  ],
+  "pending_file_deletions": [
+    {
+      "name": "pending_file_deletions_status_createdAt",
+      "unique": false,
+      "fields": [
+        { "field": "status", "order": "asc" },
+        { "field": "createdAt", "order": "asc" }
+      ]
+    },
+    {
+      "name": "pending_file_deletions_source_notBeforeAt",
+      "unique": false,
+      "fields": [
+        { "field": "source", "order": "asc" },
+        { "field": "notBeforeAt", "order": "asc" }
+      ]
+    }
   ]
 }

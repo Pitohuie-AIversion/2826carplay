@@ -1,0 +1,7 @@
+.rental-discount-form { margin: 24rpx 0; padding: 24rpx; border: 1rpx solid #dbe3ef; border-radius: 16rpx; }
+.rental-discount-title { font-size: 28rpx; font-weight: 600; }
+.rental-discount-help { margin: 14rpx 0; font-size: 24rpx; line-height: 1.6; color: #65748a; }
+.rental-discount-row { display: flex; align-items: center; gap: 10rpx; margin: 18rpx 0; font-size: 24rpx; }
+.rental-discount-input { width: 90rpx; min-width: 0; height: 70rpx; text-align: center; border: 1rpx solid #c7d3e3; border-radius: 10rpx; }
+.rental-discount-remove { margin: 0 0 0 auto; padding: 0 14rpx; font-size: 24rpx; color: #b33333; }
+.rental-discount-add { font-size: 26rpx; color: #315dba; }

@@ -1,4 +1,4 @@
-﻿const fs = require("fs")
+const fs = require("fs")
 const path = require("path")
 
 const { buildVehicleFormProgress } = require("../shared/vehicleFormProgress")
@@ -55,6 +55,39 @@ function createPage(definition, overrides = {}) {
 }
 
 describe("车辆新增与编辑表单体验", () => {
+  test("重新进入编辑页回填已保存折扣，不给旧车补默认档位", () => {
+    jest.useFakeTimers()
+    let detail = { ...VALID_FORM, rentalDiscountTiers: [{ minDays: 5, discountRate: 0.92 }] }
+    global.wx = {
+      cloud: { callFunction: jest.fn(({ success }) => success({ result: { ok: true, detail } })) },
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition("../pages-admin/vehicle-edit/vehicle-edit"))
+    page.fetchDetail("car_1")
+    expect(page.data.discountRows).toEqual([{ minDays: "5", discount: "9.2" }])
+    expect(page.buildSubmitPayload().rentalDiscountTiers).toEqual([{ minDays: 5, discountRate: 0.92 }])
+    detail = { ...VALID_FORM }
+    page.fetchDetail("car_1")
+    expect(page.data.discountRows).toEqual([])
+    page.onUnload()
+  })
+
+  test.each(["vehicle-create", "vehicle-edit"])("%s 连租规则输入立即进入提交载荷，删除全部即关闭", (name) => {
+    global.wx = { showToast: jest.fn() }
+    const page = createPage(loadPageDefinition(`../pages-admin/${name}/${name}`), { loading: false, form: VALID_FORM, discountRows: [] })
+    page.handleAddDiscountTier()
+    page.handleDiscountTierInput({ currentTarget: { dataset: { index: 0, field: "minDays" } }, detail: { value: "5" } })
+    page.handleDiscountTierInput({ currentTarget: { dataset: { index: 0, field: "discount" } }, detail: { value: "9.2" } })
+    expect(page.buildSubmitPayload().rentalDiscountTiers).toEqual([{ minDays: 5, discountRate: 0.92 }])
+    page.handleRemoveDiscountTier({ currentTarget: { dataset: { index: 0 } } })
+    expect(page.buildSubmitPayload().rentalDiscountTiers).toEqual([])
+    for (let i = 0; i < 9; i++) page.handleAddDiscountTier()
+    expect(page.data.discountRows).toHaveLength(8)
+    page.data.isSubmitting = true
+    page.handleRemoveDiscountTier({ currentTarget: { dataset: { index: 0 } } })
+    expect(page.data.discountRows).toHaveLength(8)
+  })
+
   afterEach(() => {
     jest.useRealTimers()
     delete global.Page

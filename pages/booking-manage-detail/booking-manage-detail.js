@@ -8,9 +8,17 @@ const {
   isPageNativeActionActive
 } = require("../../shared/pageNativeAction")
 const { formatHandoverCsvContent, getHandoverFileName } = require("../../shared/handoverReport")
-const { PRESET_CUSTOMER_TAGS, normalizeTags } = require("../../shared/bookingTags")
+const { PRESET_CUSTOMER_TAGS, normalizeTags, autoTagBooking } = require("../../shared/bookingTags")
 const { STATUS_TEXT_MAP, STATUS_CLASS_MAP } = require("../../shared/bookingStatus")
 const { formatDisplayTime } = require("../../shared/formatTime")
+const { getRentalDiscountTier } = require("../../shared/rentalPricing")
+function calculateRentalDays(startDate, endDate) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) return 0
+  const start = Date.parse(`${startDate}T00:00:00Z`)
+  const end = Date.parse(`${endDate}T00:00:00Z`)
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return 0
+  return Math.max(1, Math.round((end - start) / 86400000) + 1)
+}
 const BOOKING_DETAIL_LOAD_TIMEOUT_MS = 15 * 1000
 const BOOKING_DETAIL_WRITE_TIMEOUT_MS = 20 * 1000
 const HANDOVER_ANGLES = [
@@ -190,7 +198,7 @@ function normalizeBooking(item) {
     adminRemark: booking.adminRemark || "",
     adminRemarkDraft: booking.adminRemark || "",
     adminRemarkUpdatedAt: booking.adminRemarkUpdatedAt || "",
-    tags: normalizeTags(booking.tags),
+    tags: autoTagBooking(booking),
     schedulePriority: PRIORITY_TEXT_MAP[booking.schedulePriority]
       ? booking.schedulePriority
       : "normal",
@@ -269,6 +277,8 @@ Page({
     quotesUnavailable: false,
     quoteMinDate: getChinaToday(),
     quoteForm: createQuoteForm(),
+    rentalDays: 0,
+    recommendedDiscount: null,
     handoverLoading: false,
     handoverEnergyOptions: ["燃油", "纯电"],
     handoverStage: "pickup",
@@ -409,8 +419,19 @@ Page({
       : []
     const latestPickup = handoverHistory.find((item) => item.id === booking.latestPickupHandoverId)
     const latestReturn = handoverHistory.find((item) => item.id === booking.latestReturnHandoverId)
+    // Match the inclusive calendar-day estimate; saved formal quotes are unchanged.
+    const rentalDays = calculateRentalDays(booking.startDate, booking.endDate)
+    const tier = booking.rentalDiscountUnavailable ? null : getRentalDiscountTier(rentalDays, booking.rentalDiscountTiers)
+    const recommendedDiscount = tier ? {
+      minDays: tier.minDays,
+      discountRate: tier.discountRate,
+      label: tier.label,
+      discountPercent: Math.round((1 - tier.discountRate) * 100)
+    } : null
     this.applyState({
       booking,
+      rentalDays,
+      recommendedDiscount,
       remarkDirty: false,
       initialLoading: false,
       loading: false,
@@ -633,6 +654,28 @@ Page({
   handleQuoteValidUntilChange(event) {
     if (this.isBookingDetailInteractionBusy()) return
     this.setData({ "quoteForm.validUntil": String(event.detail && event.detail.value || ""), quoteDirty: true })
+  },
+  handleApplyRecommendedDiscount() {
+    if (this.isBookingDetailInteractionBusy()) return
+    const tier = this.data.recommendedDiscount
+    if (!tier || !tier.discountRate) return
+    const currentBase = parseFloat(this.data.quoteForm && this.data.quoteForm.baseRentalAmount) || 0
+    if (currentBase <= 0) {
+      wx.showToast({ title: "请先输入基础租金", icon: "none" })
+      return
+    }
+    const discounted = (currentBase * tier.discountRate).toFixed(2)
+    if (this.data.quoteForm) {
+      this.data.quoteForm.baseRentalAmount = discounted
+    }
+    this.setData({
+      "quoteForm.baseRentalAmount": discounted,
+      quoteDirty: true
+    })
+    wx.showToast({
+      title: `已应用${tier.label}`,
+      icon: "none"
+    })
   },
   buildQuotePayload(action) {
     const form = this.data.quoteForm || {}

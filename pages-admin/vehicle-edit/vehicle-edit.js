@@ -1,4 +1,5 @@
-﻿const vehicleUtils = require("../../shared/vehicle")
+const vehicleUtils = require("../../shared/vehicle")
+const { toDiscountRows, toDiscountTiers, discountFormMethods } = require("../rentalDiscountForm")
 const { buildVehicleFormProgress } = require("../../shared/vehicleFormProgress")
 const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
 const { formatToastTitle } = require("../../shared/uiFeedback")
@@ -39,6 +40,20 @@ const ARCHIVE_REVIEW_LABEL_MAP = {
   pending: "待复核",
   reviewed: "已复核"
 }
+const DRIVETRAIN_OPTIONS = [
+  "前置前驱 (FF)",
+  "前置后驱 (FR)",
+  "中置后驱 (MR)",
+  "后置后驱 (RR)",
+  "前置四驱 (4WD)",
+  "全时四驱 (AWD)",
+  "分时四驱 (Part-Time 4WD)",
+  "智能四驱",
+  "后轮驱动 (RWD)",
+  "前轮驱动 (FWD)",
+  "双电机四驱",
+  "三电机四驱"
+]
 const FIELD_LABEL_MAP = {
   id: "车辆ID",
   plateNumber: "车牌号",
@@ -51,6 +66,7 @@ const FIELD_LABEL_MAP = {
   fuelType: "燃油类型",
   seats: "座位数",
   priceDay: "日租金",
+  rentalDiscountTiers: "连租折扣",
   vin: "VIN",
   engineNumber: "发动机号",
   publicDescription: "公开说明",
@@ -65,7 +81,11 @@ const FIELD_LABEL_MAP = {
   internalMaintenanceRecord: "内部保养记录",
   internalInspectionRecord: "内部检查记录",
   internalInsuranceRecord: "内部保险记录",
-  internalArchiveNote: "内部档案说明"
+  internalArchiveNote: "内部档案说明",
+  "performance.acceleration": "百公里加速",
+  "performance.horsepower": "最大马力",
+  "performance.drivetrain": "驱动方式",
+  "performance.torque": "最大扭矩"
 }
 function formatDate(date) {
   const year = date.getFullYear()
@@ -77,7 +97,9 @@ function buildLabels(values, map) {
   return values.map((value) => map[value] || value)
 }
 Page({
+  ...discountFormMethods,
   data: {
+    discountRows: [],
     id: "",
     today: formatDate(new Date()),
     loading: true,
@@ -93,16 +115,19 @@ Page({
     transmissionLabels: buildLabels(vehicleUtils.TRANSMISSION_TYPES, TRANSMISSION_LABEL_MAP),
     fuelTypeLabels: buildLabels(vehicleUtils.FUEL_TYPES, FUEL_TYPE_LABEL_MAP),
     archiveReviewLabels: buildLabels(vehicleUtils.ARCHIVE_REVIEW_STATUSES, ARCHIVE_REVIEW_LABEL_MAP),
+    drivetrainOptions: DRIVETRAIN_OPTIONS,
     vehicleTypeIndex: 0,
     statusIndex: 0,
     transmissionIndex: 0,
     fuelTypeIndex: 0,
     archiveReviewIndex: 0,
+    drivetrainIndex: -1,
     vehicleTypeLabel: "",
     statusLabel: "",
     transmissionLabel: "",
     fuelTypeLabel: "",
     archiveReviewLabel: ARCHIVE_REVIEW_LABEL_MAP.pending,
+    drivetrainLabel: "",
     form: {
       plateNumber: "",
       vehicleType: "",
@@ -128,7 +153,14 @@ Page({
       internalMaintenanceRecord: "",
       internalInspectionRecord: "",
       internalInsuranceRecord: "",
-      internalArchiveNote: ""
+      internalArchiveNote: "",
+      performance: {
+        acceleration: "",
+        horsepower: "",
+        drivetrain: "",
+        torque: "",
+        highlights: ["", "", "", ""]
+      }
     }
   },
   onLoad(options) {
@@ -274,21 +306,32 @@ Page({
           ? current.publicArchiveReviewStatus
           : "pending"
         const archiveReviewIndex = Math.max(vehicleUtils.ARCHIVE_REVIEW_STATUSES.indexOf(archiveReviewStatus), 0)
+        const rawPerf = current.performance && typeof current.performance === "object" ? current.performance : {}
+        const perfDrivetrain = String(rawPerf.drivetrain || "").trim()
+        const drivetrainIndex = DRIVETRAIN_OPTIONS.indexOf(perfDrivetrain)
+        const highlightsRaw = Array.isArray(rawPerf.highlights) ? rawPerf.highlights.slice() : []
+        const highlightsPadded = highlightsRaw.slice()
+        while (highlightsPadded.length < 4) {
+          highlightsPadded.push("")
+        }
         this.setData({
           loading: false,
           loadFailed: false,
           publicDescriptionLength: String(current.publicDescription || "").length,
           noteLength: String(current.note || "").length,
+          discountRows: toDiscountRows(current.rentalDiscountTiers),
           vehicleTypeIndex,
           statusIndex,
           transmissionIndex: transmission ? transmissionIndex : 0,
           fuelTypeIndex: fuelType ? fuelTypeIndex : 0,
           archiveReviewIndex,
+          drivetrainIndex,
           vehicleTypeLabel: VEHICLE_TYPE_LABEL_MAP[vehicleType] || "",
           statusLabel: STATUS_LABEL_MAP[status] || "",
           transmissionLabel: TRANSMISSION_LABEL_MAP[transmission] || "",
           fuelTypeLabel: FUEL_TYPE_LABEL_MAP[fuelType] || "",
           archiveReviewLabel: ARCHIVE_REVIEW_LABEL_MAP[archiveReviewStatus],
+          drivetrainLabel: perfDrivetrain || "",
           formProgress: buildVehicleFormProgress({
             plateNumber: current.plateNumber,
             vehicleType,
@@ -321,7 +364,14 @@ Page({
             internalMaintenanceRecord: current.internalMaintenanceRecord || "",
             internalInspectionRecord: current.internalInspectionRecord || "",
             internalInsuranceRecord: current.internalInsuranceRecord || "",
-            internalArchiveNote: current.internalArchiveNote || ""
+            internalArchiveNote: current.internalArchiveNote || "",
+            performance: {
+              acceleration: String(rawPerf.acceleration || "").trim(),
+              horsepower: String(rawPerf.horsepower || "").trim(),
+              drivetrain: perfDrivetrain,
+              torque: String(rawPerf.torque || "").trim(),
+              highlights: highlightsPadded
+            }
           }
         })
         clearUnsaved(this)
@@ -487,6 +537,128 @@ Page({
     })
     markUnsaved(this, "车辆资料尚未保存，确定离开吗？")
   },
+  handleDrivetrainChange(event) {
+    if (this.data.isSubmitting) {
+      return
+    }
+    const index = Number(event.detail.value)
+    if (!Number.isFinite(index) || index < 0 || index >= DRIVETRAIN_OPTIONS.length) {
+      return
+    }
+    const value = DRIVETRAIN_OPTIONS[index] || ""
+    const next = {
+      drivetrainIndex: index,
+      drivetrainLabel: value,
+      "form.performance.drivetrain": value
+    }
+    this.setData(next)
+    markUnsaved(this, "车辆资料尚未保存，确定离开吗？")
+  },
+  handlePerformanceTextInput(event) {
+    if (this.data.isSubmitting) {
+      return
+    }
+    const { field } = event.currentTarget.dataset
+    if (!field || field.indexOf("performance.") !== 0) {
+      return
+    }
+    const inner = field.slice("performance.".length)
+    let value = event.detail.value
+    if (inner === "acceleration") {
+      value = String(value || "").replace(/[^\d.s秒]/g, "").slice(0, 12)
+    } else if (inner === "horsepower") {
+      value = String(value || "").replace(/[^\d.kwKWpshP匹马力千]/g, "").slice(0, 16)
+    } else if (inner === "torque") {
+      value = String(value || "").replace(/[^\d.nN·mM牛米]/g, "").slice(0, 18)
+    } else {
+      value = String(value || "").slice(0, 30)
+    }
+    const next = { [`form.performance.${inner}`]: value }
+    this.setData(next)
+    markUnsaved(this, "车辆资料尚未保存，确定离开吗？")
+  },
+  handleHighlightInput(event) {
+    if (this.data.isSubmitting) {
+      return
+    }
+    const { index } = event.currentTarget.dataset
+    const idx = Number(index)
+    if (!Number.isInteger(idx) || idx < 0) {
+      return
+    }
+    const highlights = (this.data.form && this.data.form.performance && Array.isArray(this.data.form.performance.highlights))
+      ? this.data.form.performance.highlights.slice()
+      : []
+    while (highlights.length <= idx) {
+      highlights.push("")
+    }
+    highlights[idx] = String(event.detail.value || "").slice(0, 20)
+    this.setData({ "form.performance.highlights": highlights })
+    markUnsaved(this, "车辆资料尚未保存，确定离开吗？")
+  },
+  handleAddHighlight() {
+    if (this.data.isSubmitting) {
+      return
+    }
+    const highlights = (this.data.form && this.data.form.performance && Array.isArray(this.data.form.performance.highlights))
+      ? this.data.form.performance.highlights.slice()
+      : []
+    if (highlights.length >= 8) {
+      wx.showToast({ title: "配置标签最多 8 项", icon: "none" })
+      return
+    }
+    highlights.push("")
+    this.setData({ "form.performance.highlights": highlights })
+    markUnsaved(this, "车辆资料尚未保存，确定离开吗？")
+  },
+  handleRemoveHighlight(event) {
+    if (this.data.isSubmitting) {
+      return
+    }
+    const { index } = event.currentTarget.dataset
+    const idx = Number(index)
+    if (!Number.isInteger(idx) || idx < 0) {
+      return
+    }
+    const highlights = (this.data.form && this.data.form.performance && Array.isArray(this.data.form.performance.highlights))
+      ? this.data.form.performance.highlights.slice()
+      : []
+    if (idx >= highlights.length) {
+      return
+    }
+    highlights.splice(idx, 1)
+    if (highlights.length < 4) {
+      while (highlights.length < 4) {
+        highlights.push("")
+      }
+    }
+    this.setData({ "form.performance.highlights": highlights })
+    markUnsaved(this, "车辆资料尚未保存，确定离开吗？")
+  },
+  buildSubmitPayload() {
+    const form = { ...this.data.form, rentalDiscountTiers: toDiscountTiers(this.data.discountRows) }
+    const perf = form.performance && typeof form.performance === "object" ? form.performance : null
+    if (!perf) {
+      return form
+    }
+    const cleanPerf = {}
+    const acc = String(perf.acceleration || "").trim()
+    const hp = String(perf.horsepower || "").trim()
+    const drive = String(perf.drivetrain || "").trim()
+    const torque = String(perf.torque || "").trim()
+    if (acc) cleanPerf.acceleration = acc
+    if (hp) cleanPerf.horsepower = hp
+    if (drive) cleanPerf.drivetrain = drive
+    if (torque) cleanPerf.torque = torque
+    const rawHL = Array.isArray(perf.highlights) ? perf.highlights : []
+    const highlights = rawHL
+      .map((item) => String(item || "").trim())
+      .filter((item) => item)
+    if (highlights.length) cleanPerf.highlights = highlights
+    const cleanForm = Object.assign({}, form)
+    cleanForm.performance = Object.keys(cleanPerf).length ? cleanPerf : undefined
+    return cleanForm
+  },
   handleManageImages() {
     if (!this.data.id || this.data.loading) {
       return
@@ -585,7 +757,8 @@ Page({
     if (this.data.loading || this.data.isSubmitting) {
       return
     }
-    const check = vehicleUtils.validateVehicle(this.data.form)
+    const normalizedPayload = this.buildSubmitPayload()
+    const check = vehicleUtils.validateVehicle(normalizedPayload)
     if (!check.ok) {
       wx.showToast({
         title: formatToastTitle(this.getValidationMessage(check), "车辆信息有误"),
@@ -600,7 +773,7 @@ Page({
       })
       return
     }
-    const payload = {
+    const submitData = {
       id: String(this.data.id || "").trim(),
       ...check.value
     }
@@ -638,7 +811,7 @@ Page({
     }, VEHICLE_EDIT_SUBMIT_TIMEOUT_MS)
     const requestOptions = {
       name: "vehicleUpdate",
-      data: payload,
+      data: submitData,
       success: (res) => {
         if (!finishRequest()) {
           return

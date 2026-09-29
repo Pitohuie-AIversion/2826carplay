@@ -13,9 +13,9 @@ describe("mini program package budget", () => {
     const result = calculatePackageFootprint(PROJECT_ROOT)
 
     expect(result.status).toBe("pass")
-    expect(result.totalBytes).toBeLessThan(WARNING_LIMIT_BYTES)
-    expect(result.totalBytes).toBeLessThan(HARD_LIMIT_BYTES)
-    expect(result.remainingBytes).toBeGreaterThan(0)
+    expect(result.mainPackageBytes).toBeLessThan(WARNING_LIMIT_BYTES)
+    expect(result.mainPackageBytes).toBeLessThan(HARD_LIMIT_BYTES)
+    expect(result.mainPackageRemainingBytes).toBeGreaterThan(0)
     expect(result.fileCount).toBeGreaterThan(0)
   })
 

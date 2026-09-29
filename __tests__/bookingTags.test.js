@@ -2,7 +2,9 @@ const {
   PRESET_CUSTOMER_TAGS,
   normalizeTags,
   hasMatchingTag,
-  getTagStyle
+  getTagStyle,
+  deriveBookingDurationTags,
+  autoTagBooking
 } = require("../shared/bookingTags")
 
 describe("bookingTags helper", () => {
@@ -47,5 +49,48 @@ describe("bookingTags helper", () => {
 
     const defaultStyle = getTagStyle("自定义标签")
     expect(defaultStyle.text).toBe("#A6B5CC")
+  })
+
+  test("deriveBookingDurationTags 租期大于等于7天自动赋予长租意向标签", () => {
+    // 7天行程 (2026-10-01 到 2026-10-07)
+    expect(deriveBookingDurationTags("2026-10-01", "2026-10-07")).toEqual(["长租意向"])
+    // 30天行程
+    expect(deriveBookingDurationTags("2026-10-01", "2026-10-30")).toEqual(["长租意向"])
+    // 6天行程 (不足7天)
+    expect(deriveBookingDurationTags("2026-10-01", "2026-10-06")).toEqual([])
+    // 1天单日
+    expect(deriveBookingDurationTags("2026-10-01", "2026-10-01")).toEqual([])
+    // 异常或空参数
+    expect(deriveBookingDurationTags("", "")).toEqual([])
+    expect(deriveBookingDurationTags(null, undefined)).toEqual([])
+    expect(deriveBookingDurationTags("2026-10-05", "2026-10-01")).toEqual([])
+  })
+
+  test("autoTagBooking 自动合并现有标签与长租标签并去重", () => {
+    const booking7Days = {
+      startDate: "2026-10-01",
+      endDate: "2026-10-07",
+      tags: ["高意向"]
+    }
+    expect(autoTagBooking(booking7Days)).toEqual(["高意向", "长租意向"])
+
+    // 已有长租意向时不重复添加
+    const alreadyTagged = {
+      startDate: "2026-10-01",
+      endDate: "2026-10-10",
+      tags: ["长租意向", "老客户"]
+    }
+    expect(autoTagBooking(alreadyTagged)).toEqual(["长租意向", "老客户"])
+
+    // 短租不增加长租标签
+    const shortBooking = {
+      startDate: "2026-10-01",
+      endDate: "2026-10-03",
+      tags: ["需要送车"]
+    }
+    expect(autoTagBooking(shortBooking)).toEqual(["需要送车"])
+
+    // 空对象防御
+    expect(autoTagBooking(null)).toEqual([])
   })
 })

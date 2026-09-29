@@ -237,8 +237,8 @@ describe("用户主流程原生图标", () => {
       })
     })
 
-    expect(inputControlCount).toBe(83)
-    expect(singleLineInputCount).toBe(42)
+    expect(inputControlCount).toBe(95)
+    expect(singleLineInputCount).toBe(54)
     expect(textareaCount).toBe(41)
     expect(Object.values(textareaCounterExpressions).flat()).toHaveLength(textareaCount)
     Object.entries(textareaCounterExpressions).forEach(([relativePath, expressions]) => {
@@ -268,7 +268,7 @@ describe("用户主流程原生图标", () => {
     const privacyCheckbox = bookingMarkup.match(/<checkbox\b[^>]*\/>/)[0]
     const bookingStyle = read("pages/booking/booking.wxss")
 
-    expect(pickerCount).toBe(26)
+    expect(pickerCount).toBe(28)
     expect(privacyGroup).toContain("privacy-agreement-complete")
     expect(privacyGroup).toContain('aria-required="{{true}}"')
     expect(privacyCheckbox).toContain('aria-label="同意隐私政策"')
@@ -335,7 +335,7 @@ describe("用户主流程原生图标", () => {
       }
     })
 
-    expect(styleFiles).toHaveLength(31)
+    expect(styleFiles).toHaveLength(32)
     expect(fontSizeDeclarationCount).toBeGreaterThanOrEqual(700)
     expect(undersizedDeclarations).toEqual([])
   })

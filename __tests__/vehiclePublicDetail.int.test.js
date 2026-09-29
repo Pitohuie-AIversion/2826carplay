@@ -40,6 +40,14 @@ async function loadVehiclePublicDetailWith({ mockDb }) {
 }
 
 describe("cloudfunctions/vehiclePublicDetail integration", () => {
+  test("公开详情读取管理员折扣并剔除额外字段", async () => {
+    const mocks = createMockDb({ currentData: { status: "idle", rentalDiscountTiers: [{ minDays: 5, discountRate: 0.92, secret: "hidden" }] } })
+    const mod = await loadVehiclePublicDetailWith({ mockDb: mocks.db })
+    const res = await mod.main({ id: "car_1" })
+    expect(res.car.rentalDiscountTiers).toEqual([{ minDays: 5, discountRate: 0.92, label: "连租满5天 9.2折" }])
+    expect(mocks.vehiclesField).toHaveBeenCalledWith(expect.objectContaining({ rentalDiscountTiers: true }))
+  })
+
   test("正常返回车辆详情（含封面排序）", async () => {
     const mocks = createMockDb({
       currentData: {

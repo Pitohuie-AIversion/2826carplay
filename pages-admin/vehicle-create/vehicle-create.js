@@ -1,4 +1,5 @@
-﻿const vehicleUtils = require("../../shared/vehicle")
+const vehicleUtils = require("../../shared/vehicle")
+const { toDiscountTiers, discountFormMethods } = require("../rentalDiscountForm")
 const { buildVehicleFormProgress } = require("../../shared/vehicleFormProgress")
 const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
 const { formatToastTitle } = require("../../shared/uiFeedback")
@@ -27,6 +28,20 @@ const FUEL_TYPE_LABEL_MAP = {
   electric: "纯电",
   hybrid: "混动"
 }
+const DRIVETRAIN_OPTIONS = [
+  "前置前驱 (FF)",
+  "前置后驱 (FR)",
+  "中置后驱 (MR)",
+  "后置后驱 (RR)",
+  "前置四驱 (4WD)",
+  "全时四驱 (AWD)",
+  "分时四驱 (Part-Time 4WD)",
+  "智能四驱",
+  "后轮驱动 (RWD)",
+  "前轮驱动 (FWD)",
+  "双电机四驱",
+  "三电机四驱"
+]
 const FIELD_LABEL_MAP = {
   plateNumber: "车牌号",
   vehicleType: "车辆类型",
@@ -38,10 +53,15 @@ const FIELD_LABEL_MAP = {
   fuelType: "燃油类型",
   seats: "座位数",
   priceDay: "日租金",
+  rentalDiscountTiers: "连租折扣",
   vin: "VIN",
   engineNumber: "发动机号",
   publicDescription: "公开说明",
-  note: "内部备注"
+  note: "内部备注",
+  "performance.acceleration": "百公里加速",
+  "performance.horsepower": "最大马力",
+  "performance.drivetrain": "驱动方式",
+  "performance.torque": "最大扭矩"
 }
 function formatDate(date) {
   const year = date.getFullYear()
@@ -53,7 +73,9 @@ function buildLabels(values, map) {
   return values.map((value) => map[value] || value)
 }
 Page({
+  ...discountFormMethods,
   data: {
+    discountRows: [],
     today: formatDate(new Date()),
     isSubmitting: false,
     publicDescriptionLength: 0,
@@ -64,14 +86,17 @@ Page({
     statusLabels: buildLabels(vehicleUtils.VEHICLE_STATUSES, STATUS_LABEL_MAP),
     transmissionLabels: buildLabels(vehicleUtils.TRANSMISSION_TYPES, TRANSMISSION_LABEL_MAP),
     fuelTypeLabels: buildLabels(vehicleUtils.FUEL_TYPES, FUEL_TYPE_LABEL_MAP),
+    drivetrainOptions: DRIVETRAIN_OPTIONS,
     vehicleTypeIndex: 0,
     statusIndex: 0,
     transmissionIndex: 0,
     fuelTypeIndex: 0,
+    drivetrainIndex: -1,
     vehicleTypeLabel: "",
     statusLabel: "",
     transmissionLabel: "",
     fuelTypeLabel: "",
+    drivetrainLabel: "",
     form: {
       plateNumber: "",
       vehicleType: "",
@@ -86,7 +111,14 @@ Page({
       vin: "",
       engineNumber: "",
       publicDescription: "",
-      note: ""
+      note: "",
+      performance: {
+        acceleration: "",
+        horsepower: "",
+        drivetrain: "",
+        torque: "",
+        highlights: ["", "", "", ""]
+      }
     }
   },
   navigateToImageManage(id) {
@@ -324,6 +356,104 @@ Page({
     })
     markUnsaved(this, "车辆资料尚未保存，确定离开吗？")
   },
+  handleDrivetrainChange(event) {
+    if (this.data.isSubmitting) {
+      return
+    }
+    const index = Number(event.detail.value)
+    if (!Number.isFinite(index) || index < 0 || index >= DRIVETRAIN_OPTIONS.length) {
+      return
+    }
+    const value = DRIVETRAIN_OPTIONS[index] || ""
+    const next = {
+      drivetrainIndex: index,
+      drivetrainLabel: value,
+      "form.performance.drivetrain": value
+    }
+    this.setData(next)
+    markUnsaved(this, "车辆资料尚未保存，确定离开吗？")
+  },
+  handlePerformanceTextInput(event) {
+    if (this.data.isSubmitting) {
+      return
+    }
+    const { field } = event.currentTarget.dataset
+    if (!field || field.indexOf("performance.") !== 0) {
+      return
+    }
+    const inner = field.slice("performance.".length)
+    let value = event.detail.value
+    if (inner === "acceleration") {
+      value = String(value || "").replace(/[^\d.s秒]/g, "").slice(0, 12)
+    } else if (inner === "horsepower") {
+      value = String(value || "").replace(/[^\d.kwKWpshP匹马力千]/g, "").slice(0, 16)
+    } else if (inner === "torque") {
+      value = String(value || "").replace(/[^\d.nN·mM牛米]/g, "").slice(0, 18)
+    } else {
+      value = String(value || "").slice(0, 30)
+    }
+    const next = { [`form.performance.${inner}`]: value }
+    this.setData(next)
+    markUnsaved(this, "车辆资料尚未保存，确定离开吗？")
+  },
+  handleHighlightInput(event) {
+    if (this.data.isSubmitting) {
+      return
+    }
+    const { index } = event.currentTarget.dataset
+    const idx = Number(index)
+    if (!Number.isInteger(idx) || idx < 0) {
+      return
+    }
+    const highlights = (this.data.form && this.data.form.performance && Array.isArray(this.data.form.performance.highlights))
+      ? this.data.form.performance.highlights.slice()
+      : []
+    while (highlights.length <= idx) {
+      highlights.push("")
+    }
+    highlights[idx] = String(event.detail.value || "").slice(0, 20)
+    this.setData({ "form.performance.highlights": highlights })
+    markUnsaved(this, "车辆资料尚未保存，确定离开吗？")
+  },
+  handleAddHighlight() {
+    if (this.data.isSubmitting) {
+      return
+    }
+    const highlights = (this.data.form && this.data.form.performance && Array.isArray(this.data.form.performance.highlights))
+      ? this.data.form.performance.highlights.slice()
+      : []
+    if (highlights.length >= 8) {
+      wx.showToast({ title: "配置标签最多 8 项", icon: "none" })
+      return
+    }
+    highlights.push("")
+    this.setData({ "form.performance.highlights": highlights })
+    markUnsaved(this, "车辆资料尚未保存，确定离开吗？")
+  },
+  handleRemoveHighlight(event) {
+    if (this.data.isSubmitting) {
+      return
+    }
+    const { index } = event.currentTarget.dataset
+    const idx = Number(index)
+    if (!Number.isInteger(idx) || idx < 0) {
+      return
+    }
+    const highlights = (this.data.form && this.data.form.performance && Array.isArray(this.data.form.performance.highlights))
+      ? this.data.form.performance.highlights.slice()
+      : []
+    if (idx >= highlights.length) {
+      return
+    }
+    highlights.splice(idx, 1)
+    if (highlights.length < 4) {
+      while (highlights.length < 4) {
+        highlights.push("")
+      }
+    }
+    this.setData({ "form.performance.highlights": highlights })
+    markUnsaved(this, "车辆资料尚未保存，确定离开吗？")
+  },
   getValidationMessage(result) {
     const details = result && result.details
     const errors = details && details.errors
@@ -335,11 +465,36 @@ Page({
     const message = first.message ? `${fieldLabel}：${first.message}` : fieldLabel
     return message.length > 30 ? message.slice(0, 30) : message
   },
+  buildSubmitPayload() {
+    const form = { ...this.data.form, rentalDiscountTiers: toDiscountTiers(this.data.discountRows) }
+    const perf = form.performance && typeof form.performance === "object" ? form.performance : null
+    if (!perf) {
+      return form
+    }
+    const cleanPerf = {}
+    const acc = String(perf.acceleration || "").trim()
+    const hp = String(perf.horsepower || "").trim()
+    const drive = String(perf.drivetrain || "").trim()
+    const torque = String(perf.torque || "").trim()
+    if (acc) cleanPerf.acceleration = acc
+    if (hp) cleanPerf.horsepower = hp
+    if (drive) cleanPerf.drivetrain = drive
+    if (torque) cleanPerf.torque = torque
+    const rawHL = Array.isArray(perf.highlights) ? perf.highlights : []
+    const highlights = rawHL
+      .map((item) => String(item || "").trim())
+      .filter((item) => item)
+    if (highlights.length) cleanPerf.highlights = highlights
+    const cleanForm = Object.assign({}, form)
+    cleanForm.performance = Object.keys(cleanPerf).length ? cleanPerf : undefined
+    return cleanForm
+  },
   handleSubmit() {
     if (this.data.isSubmitting) {
       return
     }
-    const check = vehicleUtils.validateVehicle(this.data.form)
+    const payload = this.buildSubmitPayload()
+    const check = vehicleUtils.validateVehicle(payload)
     if (!check.ok) {
       wx.showToast({
         title: formatToastTitle(this.getValidationMessage(check), "车辆信息有误"),

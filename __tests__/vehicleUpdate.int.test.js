@@ -68,6 +68,24 @@ async function loadVehicleUpdateWith({ openid, mockDb }) {
 }
 
 describe("cloudfunctions/vehicleUpdate integration", () => {
+  test("管理员可保存、清空连租规则，非法折扣不会写入", async () => {
+    const mocks = createMockDb({
+      rolesData: [{ role: "admin" }], duplicateData: [],
+      currentData: { _id: "car_1", rentalDiscountTiers: [{ minDays: 7, discountRate: 0.9 }] },
+      updateResult: { stats: { updated: 1 } }
+    })
+    const mod = await loadVehicleUpdateWith({ openid: "admin_openid", mockDb: mocks.db })
+    const base = { id: "car_1", plateNumber: "京A12345", vehicleType: "sedan", brandModel: "BMW", registerDate: "2020-01-01", status: "idle" }
+    const tiers = [{ minDays: 5, discountRate: 0.92 }]
+    expect((await mod.main({ ...base, rentalDiscountTiers: tiers })).ok).toBe(true)
+    expect(mocks.update.mock.calls[0][0].data.rentalDiscountTiers).toEqual([{ ...tiers[0], label: "连租满5天 9.2折" }])
+    expect(mocks.auditAdd.mock.calls[0][0].data.changedKeys).toContain("rentalDiscountTiers")
+    expect((await mod.main({ ...base, rentalDiscountTiers: [] })).ok).toBe(true)
+    expect(mocks.update.mock.calls[1][0].data.rentalDiscountTiers).toEqual([])
+    expect((await mod.main({ ...base, rentalDiscountTiers: [{ minDays: 3, discountRate: 0 }] })).code).toBe("VALIDATION_ERROR")
+    expect(mocks.update).toHaveBeenCalledTimes(2)
+  })
+
   test("admin 合法修改写入 vehicles 并返回 id", async () => {
     const mocks = createMockDb({
       rolesData: [{ role: "admin" }],

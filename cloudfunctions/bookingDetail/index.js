@@ -1,4 +1,5 @@
 const cloud = require("wx-server-sdk")
+const { normalizeRentalDiscountTiers } = require("./rentalPricing")
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
@@ -497,6 +498,17 @@ exports.main = async (event) => {
     const conflictResult = await findBookingConflicts(item, id)
     const quoteResult = await readBookingQuotes(id)
     const handoverHistory = await readBookingHandovers(id)
+    let rentalDiscountTiers = []
+    let rentalDiscountUnavailable = false
+    if (item.vehicleId) {
+      try {
+        const vehicleRes = await db.collection("vehicles").doc(item.vehicleId).field({ rentalDiscountTiers: true }).get()
+        rentalDiscountTiers = normalizeRentalDiscountTiers(vehicleRes && vehicleRes.data && vehicleRes.data.rentalDiscountTiers)
+      } catch (error) {
+        // A missing vehicle or failed lookup must never create a discount recommendation.
+        rentalDiscountUnavailable = true
+      }
+    }
 
     return {
       ok: true,
@@ -504,6 +516,8 @@ exports.main = async (event) => {
         id: item._id || item.id || "",
         openid: item.openid || "",
         vehicleId: item.vehicleId || "",
+        rentalDiscountTiers,
+        rentalDiscountUnavailable,
         vehicleName: item.vehicleName || "",
         userName: item.userName || "",
         phone: item.phone || "",

@@ -65,6 +65,17 @@ async function loadVehicleCreateWith({ openid, mockDb }) {
 }
 
 describe("cloudfunctions/vehicleCreate integration", () => {
+  test("自定义连租规则只允许车辆管理员写入", async () => {
+    const mocks = createMockDb({ rolesData: [{ role: "admin" }], vehiclesData: [], addResult: { _id: "car_1" } })
+    const mod = await loadVehicleCreateWith({ openid: "admin_openid", mockDb: mocks.db })
+    const input = { plateNumber: "京A12345", vehicleType: "sedan", brandModel: "BMW", registerDate: "2020-01-01", status: "idle", rentalDiscountTiers: [{ minDays: 5, discountRate: 0.92 }] }
+    expect((await mod.main(input)).ok).toBe(true)
+    expect(mocks.vehiclesAdd.mock.calls[0][0].data.rentalDiscountTiers[0]).toMatchObject(input.rentalDiscountTiers[0])
+    mocks.rolesGet.mockResolvedValue({ data: [] })
+    expect((await mod.main(input)).code).toBe("FORBIDDEN")
+    expect(mocks.vehiclesAdd).toHaveBeenCalledTimes(1)
+  })
+
   test("admin 合法提交写入 vehicles 并返回 id", async () => {
     const mocks = createMockDb({
       rolesData: [{ role: "admin" }],

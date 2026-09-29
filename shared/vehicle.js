@@ -1,3 +1,4 @@
+const { validateRentalDiscountTiers, normalizeRentalDiscountTiers } = require("./rentalPricing")
 const VEHICLE_TYPES = ["sedan", "suv", "mpv", "sports", "truck", "other"]
 
 const VEHICLE_STATUSES = ["active", "idle", "maintenance", "retired"]
@@ -7,6 +8,27 @@ const TRANSMISSION_TYPES = ["manual", "automatic"]
 const FUEL_TYPES = ["gasoline", "electric", "hybrid"]
 
 const ARCHIVE_REVIEW_STATUSES = ["pending", "reviewed"]
+
+const DRIVETRAIN_OPTIONS = [
+  "前置前驱 (FF)",
+  "前置后驱 (FR)",
+  "中置后驱 (MR)",
+  "后置后驱 (RR)",
+  "前置四驱 (4WD)",
+  "全时四驱 (AWD)",
+  "分时四驱 (Part-Time 4WD)",
+  "智能四驱",
+  "后轮驱动 (RWD)",
+  "前轮驱动 (FWD)",
+  "双电机四驱",
+  "三电机四驱"
+]
+
+const PERFORMANCE_TEXT_FIELDS = ["acceleration", "horsepower", "drivetrain", "torque"]
+
+const PERFORMANCE_ACCELERATION_RE = /^\d+(?:\.\d+)?\s*(?:s|秒)?$/i
+const PERFORMANCE_HORSEPOWER_RE = /^\d+(?:\.\d+)?\s*(?:ps|hp|kw|千瓦|匹|马力)?$/i
+const PERFORMANCE_TORQUE_RE = /^\d+(?:\.\d+)?\s*(?:n·m|nm|牛·米|牛米)?$/i
 
 const PUBLIC_ARCHIVE_TEXT_FIELDS = [
   "publicInspectionSummary",
@@ -104,6 +126,49 @@ function normalizeOptionalIntField(payload, field) {
   }
 
   return normalizeOptionalInt(payload[field])
+}
+
+function normalizePerformanceInput(raw) {
+  if (raw === undefined || raw === null) {
+    return undefined
+  }
+
+  const source = typeof raw === "object" ? raw : {}
+  const result = {}
+
+  PERFORMANCE_TEXT_FIELDS.forEach((field) => {
+    if (!Object.prototype.hasOwnProperty.call(source, field)) {
+      return
+    }
+    const value = String(source[field] || "").trim()
+    result[field] = value || ""
+  })
+
+  if (Object.prototype.hasOwnProperty.call(source, "highlights")) {
+    const rawHighlights = source.highlights
+    if (Array.isArray(rawHighlights)) {
+      const cleaned = rawHighlights
+        .map((item) => String(item || "").trim())
+        .filter((item) => item && item.length <= 20)
+        .slice(0, 8)
+      result.highlights = cleaned
+    } else if (typeof rawHighlights === "string" && rawHighlights) {
+      const cleaned = String(rawHighlights)
+        .split(/[,，、\n;；]/)
+        .map((item) => item.trim())
+        .filter((item) => item && item.length <= 20)
+        .slice(0, 8)
+      result.highlights = cleaned
+    } else {
+      result.highlights = []
+    }
+  }
+
+  if (Object.keys(result).length === 0) {
+    return undefined
+  }
+
+  return result
 }
 
 function isValidPlateNumber(plateNumber) {
@@ -246,6 +311,14 @@ function normalizeVehicleInput(input) {
   if (priceDay !== undefined) {
     normalized.priceDay = priceDay
   }
+  if (payload.rentalDiscountTiers !== undefined) {
+    normalized.rentalDiscountTiers = payload.rentalDiscountTiers
+  }
+
+  const normalizedPerformance = normalizePerformanceInput(payload.performance)
+  if (normalizedPerformance !== undefined) {
+    normalized.performance = normalizedPerformance
+  }
 
   return normalized
 }
@@ -253,6 +326,11 @@ function normalizeVehicleInput(input) {
 function validateVehicle(input) {
   const value = normalizeVehicleInput(input)
   const errors = []
+  if (value.rentalDiscountTiers !== undefined) {
+    const message = validateRentalDiscountTiers(value.rentalDiscountTiers)
+    if (message) errors.push({ field: "rentalDiscountTiers", message })
+    else value.rentalDiscountTiers = normalizeRentalDiscountTiers(value.rentalDiscountTiers)
+  }
 
   REQUIRED_FIELDS.forEach((field) => {
     const v = value[field]
@@ -413,6 +491,41 @@ function validateVehicle(input) {
     }
   }
 
+  if (value.performance !== undefined && value.performance !== null) {
+    const perf = value.performance
+    if (perf.acceleration !== undefined && perf.acceleration !== "") {
+      if (String(perf.acceleration).length > 20 || !PERFORMANCE_ACCELERATION_RE.test(String(perf.acceleration))) {
+        errors.push({ field: "performance.acceleration", message: "百公里加速格式不合法（如 3.4s 或 6.5）", value: perf.acceleration })
+      }
+    }
+    if (perf.horsepower !== undefined && perf.horsepower !== "") {
+      if (String(perf.horsepower).length > 20 || !PERFORMANCE_HORSEPOWER_RE.test(String(perf.horsepower))) {
+        errors.push({ field: "performance.horsepower", message: "马力格式不合法（如 450Ps、300kW、280匹）", value: perf.horsepower })
+      }
+    }
+    if (perf.torque !== undefined && perf.torque !== "") {
+      if (String(perf.torque).length > 20 || !PERFORMANCE_TORQUE_RE.test(String(perf.torque))) {
+        errors.push({ field: "performance.torque", message: "扭矩格式不合法（如 530N·m、380牛米）", value: perf.torque })
+      }
+    }
+    if (perf.drivetrain !== undefined && perf.drivetrain !== "") {
+      const driveStr = String(perf.drivetrain)
+      if (driveStr.length > 30) {
+        errors.push({ field: "performance.drivetrain", message: "驱动方式长度不能超过 30", value: driveStr })
+      }
+    }
+    if (Array.isArray(perf.highlights)) {
+      if (perf.highlights.length > 8) {
+        errors.push({ field: "performance.highlights", message: "配置标签不能超过 8 项", value: perf.highlights.length })
+      }
+      perf.highlights.forEach((tag, idx) => {
+        if (typeof tag !== "string" || tag.length === 0 || tag.length > 20) {
+          errors.push({ field: `performance.highlights[${idx}]`, message: "每项配置标签需为 1-20 字", value: tag })
+        }
+      })
+    }
+  }
+
   if (errors.length) {
     return createError("VALIDATION_ERROR", "参数校验失败", { errors })
   }
@@ -426,12 +539,15 @@ module.exports = {
   TRANSMISSION_TYPES,
   FUEL_TYPES,
   ARCHIVE_REVIEW_STATUSES,
+  DRIVETRAIN_OPTIONS,
+  PERFORMANCE_TEXT_FIELDS,
   PUBLIC_ARCHIVE_TEXT_FIELDS,
   INTERNAL_ARCHIVE_TEXT_FIELDS,
   REQUIRED_FIELDS,
   normalizePlateNumber,
   normalizeOptionalText,
   normalizeOptionalInt,
+  normalizePerformanceInput,
   isValidPlateNumber,
   buildVehicleDisplayIdentity,
   isValidYmdDate,

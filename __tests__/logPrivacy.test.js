@@ -385,6 +385,7 @@ describe("cloud function log privacy", () => {
       "fuelType",
       "seats",
       "priceDay",
+      "rentalDiscountTiers",
       "publicDescription",
       "vin",
       "engineNumber",

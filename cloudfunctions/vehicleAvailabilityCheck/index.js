@@ -1,5 +1,6 @@
 const cloud = require("wx-server-sdk")
 const crypto = require("crypto")
+const { calculateRentalDiscount } = require("./rentalPricing")
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
@@ -8,7 +9,7 @@ const BATCH_SIZE = 100
 const MAX_SCAN_RECORDS = 1000
 const MAX_RANGE_DAYS = 90
 const INQUIRY_STATUSES = ["pending", "contacted", "quoted", "adjustment_requested"]
-const AVAILABILITY_VEHICLE_FIELDS = { status: true, priceDay: true }
+const AVAILABILITY_VEHICLE_FIELDS = { status: true, priceDay: true, rentalDiscountTiers: true }
 
 function createError(code, message, details) {
   const result = { ok: false, code: String(code || "VALIDATION_ERROR"), message: String(message || "参数错误") }
@@ -106,7 +107,7 @@ async function queryPriceRules(vehicleId, input) {
   return list.filter((item) => String(item.startDate || "") <= input.endDate && String(item.endDate || "") >= input.startDate)
 }
 
-function buildPriceSummary(baseDailyRate, dates, rules) {
+function buildPriceSummary(baseDailyRate, dates, rules, rentalDiscountTiers) {
   const base = Number.isInteger(baseDailyRate) && baseDailyRate > 0 ? baseDailyRate : 0
   const daily = dates.map((date) => {
     const matched = rules.filter((item) => item.startDate <= date && item.endDate >= date).sort((a, b) => Number(b.version || 0) - Number(a.version || 0))[0]
@@ -116,29 +117,8 @@ function buildPriceSummary(baseDailyRate, dates, rules) {
   const known = daily.length > 0 && daily.every((item) => item.dailyRate > 0)
   const rawTotal = known ? daily.reduce((sum, item) => sum + item.dailyRate, 0) : 0
   const days = dates.length
-  let discountRate = 1
-  let discountLabel = ""
-  let minDays = 0
-  if (days >= 30) {
-    discountRate = 0.75
-    discountLabel = "月租尊享 75折"
-    minDays = 30
-  } else if (days >= 15) {
-    discountRate = 0.85
-    discountLabel = "半月特惠 85折"
-    minDays = 15
-  } else if (days >= 7) {
-    discountRate = 0.90
-    discountLabel = "周租专享 9折"
-    minDays = 7
-  } else if (days >= 3) {
-    discountRate = 0.95
-    discountLabel = "连租特惠 95折"
-    minDays = 3
-  }
-  const discountedTotal = known && discountRate < 1 ? Math.round(rawTotal * discountRate) : rawTotal
-  const savingsAmount = rawTotal - discountedTotal
-  const hasDiscount = savingsAmount > 0
+  const discount = calculateRentalDiscount(rawTotal, days, rentalDiscountTiers)
+  const { discountedTotal, savingsAmount, hasDiscount } = discount
 
   return {
     baseDailyRate: base,
@@ -149,7 +129,7 @@ function buildPriceSummary(baseDailyRate, dates, rules) {
     discountedTotal: known ? discountedTotal : 0,
     discountedTotalText: known ? `￥${discountedTotal}` : "待顾问报价",
     savingsAmount,
-    discountTier: hasDiscount ? { minDays, days, discountRate, label: discountLabel, savingsAmount } : null,
+    discountTier: hasDiscount ? { ...discount.discountTier, days } : null,
     hasDiscount,
     daily
   }
@@ -191,7 +171,7 @@ exports.main = async (event) => {
       occupiedDayCount: occupiedDays.length,
       inquiryCount,
       truncated: inquiryResult.truncated,
-      priceSummary: buildPriceSummary(vehicle.priceDay, validation.dates, priceRules),
+      priceSummary: buildPriceSummary(vehicle.priceDay, validation.dates, priceRules, vehicle.rentalDiscountTiers),
       message
     }
   } catch (error) {

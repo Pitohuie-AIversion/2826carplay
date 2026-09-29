@@ -154,6 +154,9 @@
       <view class="pricing-base-state">仅基础日租</view>
     </view>
     <view class="pricing-included">{{pricingOverview.includedText}}</view>
+    <view class="pricing-discount-tiers" wx:if="{{pricingOverview.discountTiers.length}}">
+      <view class="pricing-tier-chip" wx:for="{{pricingOverview.discountTiers}}" wx:key="minDays"><text class="pricing-tier-tag">连租满{{item.minDays}}天</text><text class="pricing-tier-rate">{{item.discountText}}</text></view>
+    </view>
     <button class="disclosure-button" bindtap="handleTogglePricing" hover-class="disclosure-button-pressed" aria-expanded="{{pricingExpanded}}">
       <text>{{pricingExpanded ? '收起费用说明' : '查看保障与其他费用'}}</text>
       <view class="disclosure-chevron {{pricingExpanded ? 'disclosure-chevron-open' : ''}}" aria-hidden="true"></view>

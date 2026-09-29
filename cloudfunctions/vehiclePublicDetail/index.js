@@ -1,4 +1,5 @@
 const cloud = require("wx-server-sdk")
+const { normalizeRentalDiscountTiers } = require("./rentalPricing")
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
@@ -15,6 +16,7 @@ const PUBLIC_VEHICLE_FIELDS = {
   fuelType: true,
   seats: true,
   priceDay: true,
+  rentalDiscountTiers: true,
   publicDescription: true,
   publicMaterialsUpdatedDate: true,
   publicInspectionDate: true,
@@ -331,6 +333,7 @@ function mapVehicle(vehicle) {
     brand: getBrand(brandModel),
     category: inferCategory(vehicleType, brandModel, fuelType),
     priceDay,
+    rentalDiscountTiers: normalizeRentalDiscountTiers(vehicle && vehicle.rentalDiscountTiers),
     priceText: buildPriceText(priceDay),
     priceSummary: buildPriceSummary(priceDay),
     status: mappedStatus.status,

@@ -32,6 +32,15 @@ function createPage(definition) {
 }
 
 describe("pages/car-detail 客户侧车辆状态", () => {
+  test("详情只显示管理员配置的连租规则，清空后移除折扣展示", () => {
+    global.wx = { setNavigationBarTitle: jest.fn() }
+    const page = createPage(loadPageDefinition())
+    page.applyCar({ id: "car_1", images: [], rentalDiscountTiers: [{ minDays: 5, discountRate: 0.92 }] })
+    expect(page.data.pricingOverview.discountTiers).toEqual([expect.objectContaining({ minDays: 5, discountText: "9.2折" })])
+    page.applyCar({ id: "car_1", images: [], rentalDiscountTiers: [] })
+    expect(page.data.pricingOverview.discountTiers).toEqual([])
+  })
+
   afterEach(() => {
     jest.useRealTimers()
     delete global.Page
@@ -654,11 +663,12 @@ describe("pages/car-detail 客户侧车辆状态", () => {
     page.onUnload()
   })
 
-  test("详情页展示驾控性能与亮点卡片并自适应豪华车型指标", () => {
+  test("详情页展示驾控性能与亮点卡片，优先使用管理员人工录入，未录入则显示中性占位（零脑补模式）", () => {
     global.wx = { setNavigationBarTitle: jest.fn() }
     const page = createPage(loadPageDefinition())
+    const neutralHighlights = ["具体配置以车辆实车为准", "建议到店体验后确认功能"]
 
-    // 测试保时捷 911 性能与驾控标签
+    // 保时捷 911：未录入 performance → 零脑补，显示占位（不再自动套预设）
     page.applyCar({
       id: "vehicle-porsche-911",
       name: "保时捷 911 Carrera S",
@@ -669,13 +679,13 @@ describe("pages/car-detail 客户侧车辆状态", () => {
     })
 
     expect(page.data.car.performance).toBeDefined()
-    expect(page.data.car.performance.acceleration).toBe("3.4s")
-    expect(page.data.car.performance.horsepower).toBe("450Ps")
-    expect(page.data.car.performance.drivetrain).toBe("后置后驱 (RR)")
-    expect(page.data.car.performance.torque).toBe("530N·m")
-    expect(page.data.car.performance.highlights).toContain("Sport Chrono 弹射起步")
+    expect(page.data.car.performance.acceleration).toBe("—")
+    expect(page.data.car.performance.horsepower).toBe("—")
+    expect(page.data.car.performance.drivetrain).toBe("—")
+    expect(page.data.car.performance.torque).toBe("—")
+    expect(page.data.car.performance.highlights).toEqual(neutralHighlights)
 
-    // 测试法拉利 F8 性能指标
+    // 法拉利 F8：未录入 performance → 零脑补，显示占位
     page.applyCar({
       id: "vehicle-ferrari-f8",
       name: "法拉利 F8 Tributo",
@@ -684,11 +694,11 @@ describe("pages/car-detail 客户侧车辆状态", () => {
       status: "available",
       images: []
     })
-    expect(page.data.car.performance.acceleration).toBe("2.9s")
-    expect(page.data.car.performance.horsepower).toBe("720Ps")
-    expect(page.data.car.performance.drivetrain).toBe("中置后驱 (MR)")
+    expect(page.data.car.performance.acceleration).toBe("—")
+    expect(page.data.car.performance.horsepower).toBe("—")
+    expect(page.data.car.performance.drivetrain).toBe("—")
 
-    // 测试云端自定义性能数据覆盖
+    // 管理员显式录入 performance → 100% 按录入值透传（覆盖正确）
     page.applyCar({
       id: "vehicle-custom",
       name: "极境定制版",
@@ -705,6 +715,8 @@ describe("pages/car-detail 客户侧车辆状态", () => {
     })
     expect(page.data.car.performance.acceleration).toBe("2.5s")
     expect(page.data.car.performance.horsepower).toBe("1000Ps")
+    expect(page.data.car.performance.drivetrain).toBe("三电机四驱")
+    expect(page.data.car.performance.torque).toBe("1200N·m")
     expect(page.data.car.performance.highlights).toEqual(["碳陶刹车", "全碳车身"])
 
     const pageDir = path.resolve(__dirname, "../pages/car-detail")
@@ -772,5 +784,4 @@ describe("pages/car-detail 客户侧车辆状态", () => {
     expect(wxml).toContain("点击重试")
   })
 })
-
 

@@ -137,16 +137,16 @@ function calculatePackageFootprint(projectRoot) {
   return {
     totalBytes,
     fileCount: files.length,
-    remainingBytes: HARD_LIMIT_BYTES - totalBytes,
+    remainingBytes: HARD_LIMIT_BYTES - mainPackageBytes,
     hardLimitBytes: HARD_LIMIT_BYTES,
     warningLimitBytes: WARNING_LIMIT_BYTES,
     mainPackageBytes,
     mainPackageRemainingBytes: HARD_LIMIT_BYTES - mainPackageBytes,
     subPackages,
     status:
-      totalBytes >= HARD_LIMIT_BYTES
+      mainPackageBytes >= HARD_LIMIT_BYTES
         ? "fail"
-        : totalBytes >= WARNING_LIMIT_BYTES
+        : mainPackageBytes >= WARNING_LIMIT_BYTES
           ? "warning"
           : "pass",
     largestFiles: files.slice(0, 10),

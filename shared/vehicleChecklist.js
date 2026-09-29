@@ -17,13 +17,13 @@ const CATEGORY_TIPS_MAP = {
   },
   luxury_sedan: {
     fuelNotice: "建议加注 95# 或以上高标号清洁燃油",
-    suspensionNotice: "配备多腔空气悬架，可在中控调节舒适/运动高度，地库减速慢行",
+    suspensionNotice: "如车辆配备空气悬架，可在中控调节舒适/运动高度，地库及起伏路面请减速慢行",
     drivingNotice: "轴距较长转弯半径较大，狭窄弯道与倒车时建议留意 360° 全景影像与盲区预警",
-    parkingNotice: "配备电吸门系统，车门虚掩即可自动闭锁，无需用力摔关"
+    parkingNotice: "如车辆配备电吸门，车门虚掩即可自动闭锁；未配备电吸门请轻关车门确认锁止"
   },
   suv: {
     fuelNotice: "建议加注 95# 或以上燃油，油箱容积较大请留足续航余量",
-    suspensionNotice: "离地间隙较高，非铺装路面可切换全地形越野模式，限高地库注意顶部距离",
+    suspensionNotice: "如车辆配备底盘升降或全地形模式，非铺装路面可切换对应模式；限高地库注意顶部距离",
     drivingNotice: "车身自重较大制动距离偏长，高速跟车请保持至少 3 秒安全车距",
     parkingNotice: "停车后注意后备箱开启高度，避免在低矮地下车库碰触车顶管道"
   }

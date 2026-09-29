@@ -128,6 +128,20 @@
         <input class="form-input" type="number" placeholder="例如 699" placeholder-class="input-placeholder" value="{{form.priceDay}}" maxlength="5" data-field="priceDay" disabled="{{isSubmitting}}" bindinput="handleTextInput" confirm-type="done" aria-label="日租价格" />
       </view>
     </view>
+    <view class="rental-discount-form">
+      <view class="rental-discount-title">连租折扣（管理员自定义）</view>
+      <view class="rental-discount-help">仅对本车生效。满天数后整段租金打折，多档不叠加，按达到的最高天数档执行。全部删除则不优惠。</view>
+      <view class="rental-discount-row" wx:for="{{discountRows}}" wx:key="index">
+        <text>满</text>
+        <input class="rental-discount-input" type="number" value="{{item.minDays}}" data-index="{{index}}" data-field="minDays" bindinput="handleDiscountTierInput" disabled="{{isSubmitting}}" maxlength="2" confirm-type="done" placeholder="天数" aria-label="连租最低天数" />
+        <text>天，打</text>
+        <input class="rental-discount-input" type="digit" value="{{item.discount}}" data-index="{{index}}" data-field="discount" bindinput="handleDiscountTierInput" disabled="{{isSubmitting}}" maxlength="3" confirm-type="done" placeholder="9.5" aria-label="连租折扣数" />
+        <text>折</text>
+        <button class="rental-discount-remove" data-index="{{index}}" bindtap="handleRemoveDiscountTier" disabled="{{isSubmitting}}" aria-label="删除本档折扣">删除</button>
+      </view>
+      <view class="rental-discount-help">天数 2-90，折扣 0.1-9.9（9.5 折即原价的 95%），最多 8 档。</view>
+      <button class="rental-discount-add" wx:if="{{discountRows.length < 8}}" bindtap="handleAddDiscountTier" disabled="{{isSubmitting}}">添加连租折扣</button>
+    </view>
     <view class="form-row">
       <view class="form-item form-item-half">
         <view class="form-label">变速箱</view>
@@ -171,13 +185,70 @@
   <view class="form-card">
     <view class="section-heading">
       <view class="section-heading-main">
+        <view class="vehicle-section-glyph vehicle-section-glyph-rental" aria-hidden="true"><view class="vehicle-section-glyph-icon"></view></view>
+        <view>
+          <view class="section-kicker">PERFORMANCE</view>
+          <view class="section-title">性能参数与配置</view>
+        </view>
+      </view>
+      <view class="section-index">03</view>
+    </view>
+    <view class="form-divider"></view>
+    <view class="section-helper">选填信息 · 未填写则不展示虚构数据，100% 以人工录入为准</view>
+    <view class="form-row">
+      <view class="form-item form-item-half">
+        <view class="form-label">百公里加速</view>
+        <input class="form-input" placeholder="例如 3.4s" placeholder-class="input-placeholder" value="{{form.performance.acceleration}}" maxlength="12" data-field="performance.acceleration" disabled="{{isSubmitting}}" bindinput="handlePerformanceTextInput" confirm-type="done" aria-label="百公里加速" />
+      </view>
+      <view class="form-item form-item-half">
+        <view class="form-label">最大马力</view>
+        <input class="form-input" placeholder="例如 450Ps" placeholder-class="input-placeholder" value="{{form.performance.horsepower}}" maxlength="16" data-field="performance.horsepower" disabled="{{isSubmitting}}" bindinput="handlePerformanceTextInput" confirm-type="done" aria-label="最大马力" />
+      </view>
+    </view>
+    <view class="form-row">
+      <view class="form-item form-item-half">
+        <view class="form-label">驱动方式</view>
+        <picker mode="selector" range="{{drivetrainOptions}}" value="{{drivetrainIndex}}" disabled="{{isSubmitting}}" bindchange="handleDrivetrainChange" aria-label="选择驱动方式">
+          <view class="form-picker {{form.performance.drivetrain ? 'form-picker-filled' : ''}}" hover-class="vehicle-picker-pressed">
+            <text>{{drivetrainLabel || '选择方式'}}</text>
+            <view class="picker-arrow" aria-hidden="true"><view class="picker-chevron"></view></view>
+          </view>
+        </picker>
+      </view>
+      <view class="form-item form-item-half">
+        <view class="form-label">最大扭矩</view>
+        <input class="form-input" placeholder="例如 530N·m" placeholder-class="input-placeholder" value="{{form.performance.torque}}" maxlength="18" data-field="performance.torque" disabled="{{isSubmitting}}" bindinput="handlePerformanceTextInput" confirm-type="done" aria-label="最大扭矩" />
+      </view>
+    </view>
+    <view class="form-item">
+      <view class="form-label field-label-row"><text>核心配置标签</text><text class="field-counter">{{form.performance.highlights.length}} / 8（留空不保存）</text></view>
+      <view class="highlight-list" aria-role="list" aria-label="核心配置标签输入列表">
+        <view class="highlight-row" wx:for="{{form.performance.highlights}}" wx:key="index" aria-role="listitem">
+          <input class="form-input highlight-input" placeholder="例如 无钥匙进入、空气悬架" placeholder-class="input-placeholder" value="{{item}}" maxlength="20" data-index="{{index}}" disabled="{{isSubmitting}}" bindinput="handleHighlightInput" confirm-type="done" aria-label="核心配置标签第 {{index + 1}} 项" />
+          <view class="highlight-remove" data-index="{{index}}" bindtap="handleRemoveHighlight" hover-class="highlight-remove-pressed" aria-label="删除该配置标签" aria-role="button">
+            <view class="highlight-remove-icon" aria-hidden="true"></view>
+          </view>
+        </view>
+      </view>
+      <view class="highlight-actions" wx:if="{{form.performance.highlights.length < 8}}">
+        <view class="highlight-add" bindtap="handleAddHighlight" hover-class="highlight-add-pressed" aria-role="button" aria-label="新增配置标签">
+          <view class="highlight-add-icon" aria-hidden="true"></view>
+          <text>新增配置标签</text>
+        </view>
+      </view>
+      <view class="section-helper">建议填写车辆实际具备的卖点配置，如「Bose 音响」「全景天窗」「电尾门」等。</view>
+    </view>
+  </view>
+  <view class="form-card">
+    <view class="section-heading">
+      <view class="section-heading-main">
         <view class="vehicle-section-glyph vehicle-section-glyph-archive" aria-hidden="true"><view class="vehicle-section-glyph-icon"></view></view>
         <view>
           <view class="section-kicker">ARCHIVE</view>
           <view class="section-title">档案与备注</view>
         </view>
       </view>
-      <view class="section-index">03</view>
+      <view class="section-index">04</view>
     </view>
     <view class="form-divider"></view>
     <view class="section-helper">选填信息 · 仅用于内部档案，不会在前台展示</view>

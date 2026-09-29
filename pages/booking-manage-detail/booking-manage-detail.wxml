@@ -217,6 +217,13 @@
     <view wx:elif="{{booking.status === 'adjustment_requested'}}" class="quote-guidance quote-guidance-warning">用户已申请调整，请参考历史版本中的调整说明创建新报价。</view>
     <view wx:elif="{{booking.status === 'confirmed'}}" class="quote-guidance quote-guidance-success">用户已确认报价。确认不代表付款，可在实际行程结束后标记完成。</view>
     <view wx:if="{{booking.status === 'pending' || booking.status === 'contacted' || booking.status === 'adjustment_requested'}}" class="quote-form">
+      <view wx:if="{{recommendedDiscount}}" class="quote-recommend-banner">
+        <view class="quote-recommend-content">
+          <text class="quote-recommend-badge">阶梯立减</text>
+          <text class="quote-recommend-text">租期满{{recommendedDiscount.minDays}}天，推荐适用【{{recommendedDiscount.label}}】</text>
+        </view>
+        <button class="quote-recommend-btn" bindtap="handleApplyRecommendedDiscount" disabled="{{quoteLoading || loading}}">一键立减 {{recommendedDiscount.discountPercent}}%</button>
+      </view>
       <view class="quote-form-grid">
         <view class="quote-field"><view class="quote-label">基础租金（元）</view><input class="quote-input" type="digit" maxlength="12" value="{{quoteForm.baseRentalAmount}}" data-field="baseRentalAmount" disabled="{{quoteLoading || loading}}" bindinput="handleQuoteInput" aria-label="基础租金" placeholder="0.00" confirm-type="done" /></view>
         <view class="quote-field"><view class="quote-label">保障/保险（元）</view><input class="quote-input" type="digit" maxlength="12" value="{{quoteForm.protectionAmount}}" data-field="protectionAmount" disabled="{{quoteLoading || loading}}" bindinput="handleQuoteInput" aria-label="保障或保险费用" placeholder="0.00" confirm-type="done" /></view>

@@ -1,83 +1,66 @@
-const {
-  DEFAULT_RENTAL_DISCOUNT_TIERS,
-  getRentalDiscountTier,
-  calculateRentalDiscount
-} = require("../shared/rentalPricing")
+const fs = require("fs")
+const path = require("path")
+const { getRentalDiscountTier, calculateRentalDiscount, validateRentalDiscountTiers } = require("../shared/rentalPricing")
+const { validateVehicle } = require("../shared/vehicle")
+const tiers = [{ minDays: 5, discountRate: 0.92 }, { minDays: 12, discountRate: 0.8 }]
 
-describe("shared/rentalPricing", () => {
-  test("阶梯梯度配置包含 3天、7天、15天与30天阶梯", () => {
-    expect(DEFAULT_RENTAL_DISCOUNT_TIERS).toHaveLength(4)
-    expect(DEFAULT_RENTAL_DISCOUNT_TIERS.map((t) => t.minDays)).toEqual([30, 15, 7, 3])
+describe("管理员定义连租折扣", () => {
+  test("没有配置或清空配置不自动打折", () => {
+    for (const config of [undefined, [], null, "invalid"]) {
+      expect(getRentalDiscountTier(30, config)).toBeNull()
+      expect(calculateRentalDiscount(30000, 30, config)).toMatchObject({ hasDiscount: false, discountedTotal: 30000 })
+    }
   })
 
-  test("1天与2天租期无连租折扣", () => {
-    expect(getRentalDiscountTier(1)).toBeNull()
-    expect(getRentalDiscountTier(2)).toBeNull()
-    const r1 = calculateRentalDiscount(1000, 1)
-    expect(r1.hasDiscount).toBe(false)
-    expect(r1.discountedTotal).toBe(1000)
-    expect(r1.savingsAmount).toBe(0)
-    expect(r1.discountTier).toBeNull()
-
-    const r2 = calculateRentalDiscount(2000, 2)
-    expect(r2.hasDiscount).toBe(false)
-    expect(r2.discountedTotal).toBe(2000)
-    expect(r2.savingsAmount).toBe(0)
+  test("按自定义门槛匹配最高天数档，不叠加且不修改原数组", () => {
+    expect(getRentalDiscountTier(4, tiers)).toBeNull()
+    expect(getRentalDiscountTier(5, tiers)).toMatchObject({ minDays: 5, discountRate: 0.92, label: "连租满5天 9.2折" })
+    expect(getRentalDiscountTier(11, tiers).minDays).toBe(5)
+    expect(getRentalDiscountTier(12, tiers).minDays).toBe(12)
+    expect(calculateRentalDiscount(10000, 30, tiers)).toMatchObject({ discountedTotal: 8000, savingsAmount: 2000 })
+    expect(tiers[0].minDays).toBe(5)
   })
 
-  test("3-6天享受 95 折连租特惠", () => {
-    const tier = getRentalDiscountTier(3)
-    expect(tier).toMatchObject({ minDays: 3, discountRate: 0.95, label: "连租特惠 95折" })
-    expect(getRentalDiscountTier(6)).toMatchObject({ minDays: 3, discountRate: 0.95 })
-
-    const r = calculateRentalDiscount(10000, 3)
-    expect(r.hasDiscount).toBe(true)
-    expect(r.discountRate).toBe(0.95)
-    expect(r.discountedTotal).toBe(9500)
-    expect(r.savingsAmount).toBe(500)
-    expect(r.discountTier).toMatchObject({ minDays: 3, discountRate: 0.95, savingsAmount: 500 })
+  test.each([
+    [{ minDays: 1, discountRate: 0.9 }],
+    [{ minDays: 91, discountRate: 0.9 }],
+    [{ minDays: 3.5, discountRate: 0.9 }],
+    [{ minDays: 3, discountRate: 0 }],
+    [{ minDays: 3, discountRate: 1 }],
+    [{ minDays: 3, discountRate: 0.955 }],
+    [{ minDays: 3, discountRate: NaN }],
+    [{ minDays: 3, discountRate: "0.9" }],
+    [{ minDays: 3, discountRate: 0.9 }, { minDays: 3, discountRate: 0.8 }],
+    Array.from({ length: 9 }, (_, i) => ({ minDays: i + 2, discountRate: 0.9 }))
+  ].map((config) => [config]))("非法配置不能保存或参与计价 %#", (config) => {
+    expect(validateRentalDiscountTiers(config)).not.toBe("")
+    expect(getRentalDiscountTier(90, config)).toBeNull()
   })
 
-  test("7-14天享受 90 折周租专享", () => {
-    const tier = getRentalDiscountTier(7)
-    expect(tier).toMatchObject({ minDays: 7, discountRate: 0.90, label: "周租专享 9折" })
-    expect(getRentalDiscountTier(14)).toMatchObject({ minDays: 7, discountRate: 0.90 })
-
-    const r = calculateRentalDiscount(20000, 7)
-    expect(r.hasDiscount).toBe(true)
-    expect(r.discountRate).toBe(0.90)
-    expect(r.discountedTotal).toBe(18000)
-    expect(r.savingsAmount).toBe(2000)
+  test("边界金额与非法天数安全处理，人民币按元四舍五入", () => {
+    expect(calculateRentalDiscount(101, 5, tiers).discountedTotal).toBe(93)
+    for (const amount of [0, -1, NaN, Infinity]) {
+      expect(calculateRentalDiscount(amount, 5, tiers).hasDiscount).toBe(false)
+    }
+    for (const days of [null, "5", 5.5, -1]) expect(getRentalDiscountTier(days, tiers)).toBeNull()
   })
 
-  test("15-29天享受 85 折半月特惠", () => {
-    const tier = getRentalDiscountTier(15)
-    expect(tier).toMatchObject({ minDays: 15, discountRate: 0.85, label: "半月特惠 85折" })
-    expect(getRentalDiscountTier(29)).toMatchObject({ minDays: 15, discountRate: 0.85 })
-
-    const r = calculateRentalDiscount(30000, 15)
-    expect(r.hasDiscount).toBe(true)
-    expect(r.discountRate).toBe(0.85)
-    expect(r.discountedTotal).toBe(25500)
-    expect(r.savingsAmount).toBe(4500)
+  test("车辆校验保留缺省语义，支持显式清空及自定义规则", () => {
+    const vehicle = { plateNumber: "浙A12345", vehicleType: "sedan", brandModel: "BMW", registerDate: "2020-01-01", status: "idle" }
+    expect(validateVehicle(vehicle).value).not.toHaveProperty("rentalDiscountTiers")
+    expect(validateVehicle({ ...vehicle, rentalDiscountTiers: [] }).value.rentalDiscountTiers).toEqual([])
+    expect(validateVehicle({ ...vehicle, rentalDiscountTiers: tiers }).value.rentalDiscountTiers[0].minDays).toBe(12)
+    expect(validateVehicle({ ...vehicle, rentalDiscountTiers: null }).ok).toBe(false)
   })
 
-  test("30天及以上享受 75 折月租尊享", () => {
-    const tier = getRentalDiscountTier(30)
-    expect(tier).toMatchObject({ minDays: 30, discountRate: 0.75, label: "月租尊享 75折" })
-    expect(getRentalDiscountTier(60)).toMatchObject({ minDays: 30, discountRate: 0.75 })
-
-    const r = calculateRentalDiscount(50000, 30)
-    expect(r.hasDiscount).toBe(true)
-    expect(r.discountRate).toBe(0.75)
-    expect(r.discountedTotal).toBe(37500)
-    expect(r.savingsAmount).toBe(12500)
-  })
-
-  test("异常边界输入安全返回（零金额、负数、非法输入）", () => {
-    expect(calculateRentalDiscount(0, 5)).toMatchObject({ hasDiscount: false, discountedTotal: 0, savingsAmount: 0 })
-    expect(calculateRentalDiscount(-100, 5)).toMatchObject({ hasDiscount: false, discountedTotal: 0, savingsAmount: 0 })
-    expect(calculateRentalDiscount(1000, null)).toMatchObject({ hasDiscount: false, discountedTotal: 1000, savingsAmount: 0 })
-    expect(calculateRentalDiscount(1000, "abc")).toMatchObject({ hasDiscount: false, discountedTotal: 1000, savingsAmount: 0 })
+  test("独立云函数的计价及模型副本与共享代码完全一致", () => {
+    for (const name of ["vehicleCreate", "vehicleUpdate", "vehicleList", "vehicleAvailabilityCheck", "vehiclePublicDetail", "bookingDetail"]) {
+      expect(fs.readFileSync(path.join(__dirname, "../cloudfunctions", name, "rentalPricing.js"), "utf8"))
+        .toBe(fs.readFileSync(path.join(__dirname, "../shared/rentalPricing.js"), "utf8"))
+    }
+    for (const name of ["vehicleCreate", "vehicleUpdate", "vehicleList"]) {
+      expect(fs.readFileSync(path.join(__dirname, "../cloudfunctions", name, "vehicle.js"), "utf8"))
+        .toBe(fs.readFileSync(path.join(__dirname, "../shared/vehicle.js"), "utf8"))
+    }
   })
 })

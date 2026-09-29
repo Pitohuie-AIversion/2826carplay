@@ -11,7 +11,7 @@ const {
   normalizeUsablePhone
 } = require("../../shared/bookingWorkbench")
 const { createPerformanceHelpers } = require('../../shared/performance')
-const { hasMatchingTag, PRESET_CUSTOMER_TAGS } = require("../../shared/bookingTags")
+const { hasMatchingTag, PRESET_CUSTOMER_TAGS, autoTagBooking } = require("../../shared/bookingTags")
 const WORKBENCH_LOAD_TIMEOUT_MS = 15 * 1000
 const WORKBENCH_WRITE_TIMEOUT_MS = 20 * 1000
 const STATUS_LABELS = {
@@ -65,7 +65,7 @@ function formatQueueItem(item) {
     phone: item.phone || "",
     phoneDisplay: normalizedPhone || "手机号待补充",
     phoneAvailable: Boolean(normalizedPhone),
-    tags: Array.isArray(item.tags) ? item.tags : [],
+    tags: autoTagBooking(item),
     city: item.city || "未填写城市",
     startDate: item.startDate || "—",
     endDate: item.endDate || "—",

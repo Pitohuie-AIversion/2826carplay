@@ -1,6 +1,6 @@
 jest.mock("wx-server-sdk")
 
-function createMockDb({ rolesData, bookingData, conflictBookings = [], conflictQueryError = null }) {
+function createMockDb({ rolesData, bookingData, conflictBookings = [], conflictQueryError = null, vehicleData = null, vehicleError = null }) {
   const rolesGet = jest.fn().mockResolvedValue({ data: rolesData })
   const bookingGet = jest.fn().mockResolvedValue({ data: bookingData })
 
@@ -48,6 +48,11 @@ function createMockDb({ rolesData, bookingData, conflictBookings = [], conflictQ
           where: bookingsWhere
         }
       }
+      if (name === "vehicles") {
+        return { doc: jest.fn(() => ({ field: jest.fn(() => ({
+          get: vehicleError ? jest.fn().mockRejectedValue(vehicleError) : jest.fn().mockResolvedValue({ data: vehicleData })
+        })) })) }
+      }
       throw new Error(`Unexpected collection: ${name}`)
     })
   }
@@ -78,6 +83,21 @@ async function loadBookingDetailWith({ openid, mockDb }) {
 }
 
 describe("cloudfunctions/bookingDetail integration", () => {
+  test("报价详情读取当前车辆折扣，查询失败时不推荐", async () => {
+    const tiers = [{ minDays: 5, discountRate: 0.92 }]
+    for (const vehicleError of [null, new Error("network error")]) {
+      const mocks = createMockDb({
+        rolesData: [{ role: "admin" }], bookingData: { _id: "b1", vehicleId: "car_1" },
+        vehicleData: { rentalDiscountTiers: tiers }, vehicleError
+      })
+      const mod = await loadBookingDetailWith({ openid: "admin_openid", mockDb: mocks.db })
+      const res = await mod.main({ id: "b1" })
+      expect(res.ok).toBe(true)
+      expect(res.detail.rentalDiscountUnavailable).toBe(Boolean(vehicleError))
+      expect(res.detail.rentalDiscountTiers).toEqual(vehicleError ? [] : [{ ...tiers[0], label: "连租满5天 9.2折" }])
+    }
+  })
+
   test("admin 可查询单条预约详情", async () => {
     const mocks = createMockDb({
       rolesData: [{ role: "admin" }],
@@ -108,6 +128,8 @@ describe("cloudfunctions/bookingDetail integration", () => {
         id: "booking_1",
         openid: "user_openid",
         vehicleId: "vehicle_1",
+        rentalDiscountTiers: [],
+        rentalDiscountUnavailable: false,
         vehicleName: "BMW M4",
         userName: "张三",
         phone: "13800000000",

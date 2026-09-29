@@ -57,6 +57,10 @@ const RECOMMENDED_INDEXES = [
   { collection: "roles", fields: ["openid"], unique: true, category: "correctness", priority: "blocking" },
   { collection: "vehicles", fields: ["plateNumber"], unique: true, category: "correctness", priority: "blocking" },
   { collection: "vehicles", fields: ["updatedAt"], unique: false, category: "performance", priority: "low" },
+  { collection: "app_configs", fields: ["key"], unique: true, category: "correctness", priority: "blocking" },
+  { collection: "app_configs", fields: ["updatedAt"], unique: false, category: "performance", priority: "low" },
+  { collection: "pending_file_deletions", fields: ["status", "createdAt"], unique: false, category: "performance", priority: "high" },
+  { collection: "pending_file_deletions", fields: ["source", "notBeforeAt"], unique: false, category: "performance", priority: "medium" },
 ]
 
 function indexKey(idx) {

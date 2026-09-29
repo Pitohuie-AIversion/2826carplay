@@ -56,9 +56,35 @@ function getTagStyle(tagName) {
   return TAG_COLOR_MAP[tagName] || DEFAULT_TAG_STYLE
 }
 
+function deriveBookingDurationTags(startDate, endDate) {
+  const startText = String(startDate || "").trim()
+  const endText = String(endDate || "").trim()
+  if (!startText || !endText) return []
+  const start = new Date(`${startText}T00:00:00`)
+  const end = new Date(`${endText}T00:00:00`)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) {
+    return []
+  }
+  const days = Math.round((end.getTime() - start.getTime()) / 86400000) + 1
+  const tags = []
+  if (days >= 7) {
+    tags.push("长租意向")
+  }
+  return tags
+}
+
+function autoTagBooking(booking) {
+  if (!booking || typeof booking !== "object") return []
+  const existing = Array.isArray(booking.tags) ? booking.tags : normalizeTags(booking.tags)
+  const durationTags = deriveBookingDurationTags(booking.startDate, booking.endDate)
+  return normalizeTags([...existing, ...durationTags])
+}
+
 module.exports = {
   PRESET_CUSTOMER_TAGS,
   normalizeTags,
   hasMatchingTag,
-  getTagStyle
+  getTagStyle,
+  deriveBookingDurationTags,
+  autoTagBooking
 }

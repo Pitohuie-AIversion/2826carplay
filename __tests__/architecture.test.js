@@ -339,4 +339,21 @@ describe("Booking Status & Coordination (bookingStatus)", () => {
     expect(bookingStatus.mapCoordinationText("coordinating")).toBe("协调中")
     expect(bookingStatus.mapCoordinationText("resolved")).toBe("已协调")
   })
+
+  test("buildStatusGuidance 与旅程进度步进器方法正确导出", () => {
+    expect(typeof bookingStatus.buildStatusGuidance).toBe("function")
+    expect(typeof bookingStatus.buildJourneyProgress).toBe("function")
+    expect(typeof bookingStatus.buildProgressSteps).toBe("function")
+    expect(typeof bookingStatus.buildListSummary).toBe("function")
+    expect(typeof bookingStatus.filterBookings).toBe("function")
+
+    const guidance = bookingStatus.buildStatusGuidance("pending")
+    expect(guidance.title).toBe("等待顾问联系")
+
+    const journey = bookingStatus.buildJourneyProgress("pending")
+    expect(journey.stageText).toContain("第 1 阶段")
+
+    const steps = bookingStatus.buildProgressSteps("confirmed")
+    expect(steps.length).toBe(5)
+  })
 })

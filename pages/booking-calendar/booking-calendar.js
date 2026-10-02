@@ -43,21 +43,14 @@ const BLOCK_KIND_LABELS = {
   unavailable: "其他不可用"
 }
 
-const STATUS_LABELS = {
-  pending: "待联系",
-  contacted: "已联系",
-  quoted: "已报价",
-  adjustment_requested: "待调整",
-  confirmed: "已确认",
-  completed: "已完成"
-}
+const { STATUS_TEXT_MAP, mapStatusClass } = require("../../shared/bookingStatus")
 
 function formatBooking(item) {
   const status = String(item.status || "pending")
   return {
     ...item,
-    statusLabel: STATUS_LABELS[status] || "待处理",
-    statusClass: `status-${status}`
+    statusLabel: STATUS_TEXT_MAP[status] || "待处理",
+    statusClass: mapStatusClass(status)
   }
 }
 

@@ -57,25 +57,38 @@
 
 在每次功能开发、缺陷修复或架构重构完成后，必须按顺序执行以下命令进行闭环验证：
 
-### 4.1 单元与集成测试 (Jest)
+### 4.1 全链路工程质量总门禁 (Quality Gate & Doctor)
 ```bash
-# 执行全部 154 个测试套件 (1841 个测试用例)
+# 执行全量 8 阶段工业级深度体检（规范、安全、草稿、索引、包体积、单测、点击仿真、业务旅程）
+npm run doctor             # 或 node scripts/qualityGate.js
+
+# 快捷静态质量扫描（前 5 阶段：秒级完成）
+npm run quality:fast       # 或 node scripts/qualityGate.js --static
+```
+
+### 4.2 单元与集成测试 (Jest)
+```bash
+# 执行全部 154 个测试套件 (1855 个测试用例 100% 通过)
 npm test
 
 # 针对特定模块运行单测
 npx jest __tests__/architecture.test.js
+npx jest __tests__/bookingStatus.test.js
 npx jest __tests__/releaseHygiene.test.js
 ```
 
-### 4.2 全页面无头点击仿真 (Headless Simulation)
+### 4.3 全页面无头点击仿真 (Headless Simulation)
 ```bash
 # 模拟执行全量 26 个页面与组件的 333 项真实交互点击断言
 npm run simulate:clicks
+
+# 执行 30 项真实用户端到端核心业务旅程仿真
+node scripts/verifyActualUsage.js
 ```
 
-### 4.3 小程序体积与安全预算审计
+### 4.4 小程序体积与安全预算审计
 ```bash
-# 检查真实主包与分包体积
+# 检查真实主包与分包体积（主包 1.23 MiB，余量 0.77 MiB）
 npm run check:package
 
 # 检查代码库是否误存敏感凭据或密钥
@@ -85,7 +98,7 @@ npm run check:secrets
 npm run check:indexes
 ```
 
-### 4.4 上线前一键全流程综合验收
+### 4.5 上线前一键全流程综合验收
 ```bash
 npm run check:release
 ```

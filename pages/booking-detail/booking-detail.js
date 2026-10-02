@@ -13,79 +13,20 @@ const { triggerHapticFeedback } = require("../../shared/hapticFeedback")
 const { getVehicleReadinessCard } = require("../../shared/vehicleChecklist")
 const { formatLocationDisplay, resolveServiceHub, hasHubCoordinates, normalizeCity } = require("../../shared/locations")
 const { normalizeServiceConfig } = require("../../shared/serviceConfig")
-const { mapStatusText, mapStatusClass, canCancelBooking, canEditBooking } = require("../../shared/bookingStatus")
+const {
+  mapStatusText,
+  mapStatusClass,
+  canCancelBooking,
+  canEditBooking,
+  buildProgressSteps,
+  buildStatusGuidance: getSharedStatusGuidance
+} = require("../../shared/bookingStatus")
 const { formatDisplayTime } = require("../../shared/formatTime")
 const BOOKING_DETAIL_LOAD_TIMEOUT_MS = 15 * 1000
 const BOOKING_DETAIL_MUTATION_TIMEOUT_MS = 12 * 1000
 const SUBSCRIPTION_REQUEST_TIMEOUT_MS = 15 * 1000
 
-function buildStatusGuidance(status) {
-  const value = String(status || "pending").trim() || "pending"
-  const guidanceMap = {
-    pending: {
-      title: "等待顾问联系",
-      desc: "预约已提交，请保持手机畅通；联系前仍可修改本次预约的联系信息。",
-      tone: "pending"
-    },
-    contacted: {
-      title: "正在确认行程",
-      desc: "顾问已联系，请按沟通结果确认车辆档期、价格与取还车安排。",
-      tone: "contacted"
-    },
-    quoted: {
-      title: "报价等待确认",
-      desc: "顾问已发送费用明细，请核对报价后确认或提出调整；确认不代表付款。",
-      tone: "quoted"
-    },
-    adjustment_requested: {
-      title: "顾问正在调整报价",
-      desc: "调整申请已提交，顾问重新发送报价后可再次确认。",
-      tone: "adjustment"
-    },
-    confirmed: {
-      title: "报价已确认",
-      desc: "报价已确认，所选档期已为你保留；尚未付款或签署合同，请与顾问确认后续安排。",
-      tone: "confirmed"
-    },
-    completed: {
-      title: "本次行程已完成",
-      desc: "预约流程已经结束，感谢使用极境车库服务。",
-      tone: "completed"
-    },
-    cancelled: {
-      title: "本次预约已取消",
-      desc: "该预约已结束，如仍有用车需求，可返回车库重新选择车辆。",
-      tone: "cancelled"
-    }
-  }
-  return guidanceMap[value] || guidanceMap.pending
-}
-function buildProgressSteps(status) {
-  const value = String(status || "pending").trim() || "pending"
-  const cancelled = value === "cancelled"
-  const indexMap = { pending: 0, contacted: 1, quoted: 2, adjustment_requested: 2, confirmed: 3, completed: 4 }
-  const activeIndex = cancelled ? 1 : (indexMap[value] === undefined ? 0 : indexMap[value])
-  const labels = cancelled
-    ? ["预约已提交", "预约已取消", "流程已结束"]
-    : ["预约已提交", "顾问联系", "收到报价", "确认方案", "行程完成"]
-  return labels.map((label, index) => {
-    let stateClass = "progress-upcoming"
-    if (index < activeIndex) {
-      stateClass = "progress-done"
-    } else if (index === activeIndex) {
-      stateClass = cancelled ? "progress-cancelled" : "progress-current"
-    }
-    return {
-      key: `${value}-${index}`,
-      label,
-      marker: `${index + 1}`,
-      showCheck: index < activeIndex,
-      showCancelledMark: cancelled && index === activeIndex,
-      stateClass,
-      isLast: index === labels.length - 1
-    }
-  })
-}
+const buildStatusGuidance = (status) => getSharedStatusGuidance(status, { mode: "detail" })
 function formatYuan(cents) {
   return (Math.max(0, Number(cents || 0)) / 100).toFixed(2)
 }

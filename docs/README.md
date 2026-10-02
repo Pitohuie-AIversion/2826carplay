@@ -11,7 +11,8 @@ docs/
 ├── README.md                  # 本文档中心入口与全景导航
 ├── API_REFERENCE.md           # 共享核心架构库 (shared/) 完整 API 规范与使用手册
 ├── DEVELOPMENT_GUIDE.md       # 本地开发、环境搭建、行为守卫与自动化回归指南
-└── DATABASE_AND_SECURITY.md   # 云数据库 16 个核心集合模型、52 项复合索引与安全规则
+├── DATABASE_AND_SECURITY.md   # 云数据库 16 个核心集合模型、52 项复合索引与安全规则
+└── CHECKLIST.md               # 小程序发版上线全要素核对与灰度发布清单
 ```
 
 ### 根目录核心架构与规范文档
@@ -19,6 +20,7 @@ docs/
 | 文档名称 | 核心定位与职责 |
 | :--- | :--- |
 | [ARCHITECTURE.md](file:///g:/Autosave/2826carplay/ARCHITECTURE.md) | **系统架构设计总览**：4 层高内聚分层架构、模块边界、4 项工程守卫与扩展开发范式。 |
+| [CONTRIBUTING.md](file:///g:/Autosave/2826carplay/CONTRIBUTING.md) | **工程贡献与协同准则**：Git Flow 分支策略、Conventional Commits、4 项守卫与门禁评分。 |
 | [AGENTS.md](file:///g:/Autosave/2826carplay/AGENTS.md) | **AI Agent 与团队行为准则**：内存同步优先、生命周期销毁、原生动作保护与包体积预算。 |
 | [DEVELOPMENT_ROADMAP.md](file:///g:/Autosave/2826carplay/DEVELOPMENT_ROADMAP.md) | **阶段演进路线图**：Phase 0 至 Phase 17 详细功能定义、阶段边界与交易能力决策门。 |
 | [DEPLOY_CHECKLIST.md](file:///g:/Autosave/2826carplay/DEPLOY_CHECKLIST.md) | **生产上线部署清单**：56 个云函数、云环境配置、备份、权限初始化与发布前核对。 |
@@ -40,23 +42,24 @@ docs/
 ## 核心开发工作流与常用命令
 
 ```bash
-# 1. 运行完整自动化测试套件 (154 suites / 1841 tests)
+# 1. 运行一键工程质量总门禁 (全 8 阶段体检：规范、密钥、草稿、索引、包体积、Jest、点击仿真、业务仿真)
+npm run doctor             # 或 node scripts/qualityGate.js
+npm run quality:fast       # 快捷静态门禁 (前 5 阶段)
+
+# 2. 运行完整自动化测试套件 (154 suites / 1850+ tests)
 npm test
 
-# 2. 运行上线前全项综合体检 (结构、密钥、草稿、索引、包体积、单线程单元测试)
+# 3. 运行上线前全项综合体检
 npm run check:release
 
-# 3. 运行全页面 333 项无头组件与交互点击仿真
+# 4. 运行全页面 333 项无头组件与交互点击仿真
 npm run simulate:clicks
 
-# 4. 实时校验小程序主包与分包体积预算
+# 5. 实时校验小程序主包与分包体积预算
 npm run check:package
 
-# 5. 校验数据库 52 项复合索引配置
+# 6. 校验数据库 52 项复合索引配置
 npm run check:indexes
-
-# 6. 云函数审计与依赖一致性体检
-npm run cloud:audit
 ```
 
 ---

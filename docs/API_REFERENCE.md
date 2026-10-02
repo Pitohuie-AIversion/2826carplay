@@ -164,12 +164,22 @@ const {
   mapPriorityText,
   mapCoordinationText,
   canCancelBooking,
-  canEditBooking
+  canEditBooking,
+  buildStatusGuidance,
+  buildJourneyProgress,
+  buildProgressSteps,
+  buildListSummary,
+  filterBookings
 } = require("../../shared/bookingStatus")
 ```
 
 - **`canCancelBooking(status)`**：判断当前预约单状态是否允许用户发起取消（`pending`, `contacted`, `quoted`, `adjustment_requested`, `confirmed` 为 true）。
 - **`canEditBooking(status)`**：判断预约单是否允许修改联系信息（仅在 `pending` 与 `contacted` 阶段允许）。
+- **`buildStatusGuidance(status, options)`**：生成统一的用户预约阶段指引（包含 `title`、`desc`、`tone`），支持 `{ mode: "detail" }`。
+- **`buildJourneyProgress(status)`**：生成列表页 3 阶段时间线进度对象（`stageText`、`width`、`tone`、各 step class）。
+- **`buildProgressSteps(status)`**：生成详情页 5 阶段进度步进器数组（正常状态 5 步，取消状态 3 步）。
+- **`buildListSummary(list)`**：快速聚合统计订单列表（`ongoing`, `completed`, `cancelled`）。
+- **`filterBookings(list, filter)`**：按当前激活 tab 纯函数过滤订单列表。
 - **`WORKBENCH_PRIORITY_OPTIONS`**：`[{ key: "priority", label: "优先" }, { key: "normal", label: "常规" }, { key: "standby", label: "候补" }]`。
 
 ---

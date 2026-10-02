@@ -9,139 +9,17 @@ const {
   isPageCurrent
 } = require("../../shared/pageNativeAction")
 const { onNetworkReconnect } = require("../../shared/networkStatus")
-const { mapStatusText, mapStatusClass, canCancelBooking } = require("../../shared/bookingStatus")
+const {
+  mapStatusText,
+  mapStatusClass,
+  canCancelBooking,
+  buildStatusGuidance,
+  buildJourneyProgress,
+  buildListSummary,
+  filterBookings
+} = require("../../shared/bookingStatus")
 const BOOKINGS_LOAD_TIMEOUT_MS = 15 * 1000
 const BOOKING_CANCEL_TIMEOUT_MS = 12 * 1000
-
-
-
-function buildStatusGuidance(status) {
-  const value = String(status || "pending").trim() || "pending"
-  const guidanceMap = {
-    pending: {
-      title: "等待顾问联系",
-      desc: "预约已提交，请保持手机畅通；联系前可修改资料或取消预约。",
-      tone: "pending"
-    },
-    contacted: {
-      title: "正在确认行程",
-      desc: "顾问已联系，请按沟通结果确认档期、价格与取还车安排。",
-      tone: "contacted"
-    },
-    quoted: { title: "报价待确认", desc: "请进入详情核对费用并确认或申请调整。", tone: "quoted" },
-    adjustment_requested: { title: "报价调整中", desc: "顾问正在根据你的说明重新报价。", tone: "adjustment" },
-    confirmed: { title: "报价已确认", desc: "所选档期已保留，尚未付款或签署合同，请关注后续安排。", tone: "confirmed" },
-    completed: {
-      title: "本次行程已完成",
-      desc: "预约流程已结束，可返回车库继续浏览其他车辆。",
-      tone: "completed"
-    },
-    cancelled: {
-      title: "本次预约已取消",
-      desc: "该记录已结束，如仍有用车需求可重新选择车辆提交预约。",
-      tone: "cancelled"
-    }
-  }
-  return guidanceMap[value] || guidanceMap.pending
-}
-
-function buildJourneyProgress(status) {
-  const value = String(status || "pending").trim() || "pending"
-  const progressMap = {
-    pending: {
-      stageText: "第 1 阶段 · 等待联系",
-      width: "4%",
-      tone: "pending",
-      stepOneClass: "journey-step-current",
-      stepTwoClass: "journey-step-upcoming",
-      stepThreeClass: "journey-step-upcoming"
-    },
-    contacted: {
-      stageText: "第 2 阶段 · 行程确认",
-      width: "50%",
-      tone: "contacted",
-      stepOneClass: "journey-step-complete",
-      stepTwoClass: "journey-step-current",
-      stepThreeClass: "journey-step-upcoming"
-    },
-    quoted: {
-      stageText: "第 2 阶段 · 报价确认",
-      width: "67%",
-      tone: "quoted",
-      stepOneClass: "journey-step-complete",
-      stepTwoClass: "journey-step-current",
-      stepThreeClass: "journey-step-upcoming"
-    },
-    adjustment_requested: {
-      stageText: "第 2 阶段 · 报价调整",
-      width: "67%",
-      tone: "adjustment",
-      stepOneClass: "journey-step-complete",
-      stepTwoClass: "journey-step-current",
-      stepThreeClass: "journey-step-upcoming"
-    },
-    confirmed: {
-      stageText: "第 3 阶段 · 方案已确认",
-      width: "90%",
-      tone: "confirmed",
-      stepOneClass: "journey-step-complete",
-      stepTwoClass: "journey-step-complete",
-      stepThreeClass: "journey-step-current"
-    },
-    completed: {
-      stageText: "第 3 阶段 · 行程完成",
-      width: "100%",
-      tone: "completed",
-      stepOneClass: "journey-step-complete",
-      stepTwoClass: "journey-step-complete",
-      stepThreeClass: "journey-step-current"
-    },
-    cancelled: {
-      stageText: "流程已结束",
-      width: "100%",
-      tone: "cancelled",
-      stepOneClass: "journey-step-complete",
-      stepTwoClass: "journey-step-upcoming",
-      stepThreeClass: "journey-step-cancelled"
-    }
-  }
-  return progressMap[value] || progressMap.pending
-}
-
-function buildListSummary(list) {
-  return (Array.isArray(list) ? list : []).reduce(
-    (summary, item) => {
-      const status = String((item && item.status) || "pending").trim()
-      if (status === "completed") {
-        summary.completed += 1
-      } else if (status === "cancelled") {
-        summary.cancelled += 1
-      } else {
-        summary.ongoing += 1
-      }
-      return summary
-    },
-    {
-      ongoing: 0,
-      completed: 0,
-      cancelled: 0
-    }
-  )
-}
-
-function filterBookings(list, filter) {
-  const source = Array.isArray(list) ? list : []
-  if (filter === "ongoing") {
-    return source.filter((item) => !["completed", "cancelled"].includes(item.status))
-  }
-  if (filter === "completed") {
-    return source.filter((item) => item.status === "completed")
-  }
-  if (filter === "cancelled") {
-    return source.filter((item) => item.status === "cancelled")
-  }
-  return source
-}
 
 const FILTER_LABELS = {
   all: "全部预约",

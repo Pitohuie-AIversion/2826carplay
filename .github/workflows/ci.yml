@@ -37,3 +37,9 @@ jobs:
 
       - name: Run release checks
         run: npm run check:release
+
+      - name: Run headless component interaction simulation (333 clicks)
+        run: npm run simulate:clicks
+
+      - name: Run end-to-end real user scenario validation (30 scenarios)
+        run: node scripts/verifyActualUsage.js

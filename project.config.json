@@ -115,6 +115,18 @@
       {
         "type": "folder",
         "value": "backups"
+      },
+      {
+        "type": "folder",
+        "value": "docs"
+      },
+      {
+        "type": "file",
+        "value": "ARCHITECTURE.md"
+      },
+      {
+        "type": "file",
+        "value": "CONTRIBUTING.md"
       }
     ],
     "include": []

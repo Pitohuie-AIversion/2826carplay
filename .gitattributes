@@ -1,0 +1,12 @@
+# 自动规范化跨平台换行符为 LF
+* text=auto eol=lf
+
+# 显式声明二进制格式，防止 Git 误触或损坏
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.zip binary
+*.pdf binary

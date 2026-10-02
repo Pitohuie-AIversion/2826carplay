@@ -43,6 +43,8 @@
       <view>
         <view class="footer-label">取车城市与网点</view>
         <view class="footer-value">{{pickupLocationDisplay || booking.city || "—"}}</view>
+        <view wx:if="{{booking.returnLocation}}" class="footer-label">已保存还车地点</view>
+        <view wx:if="{{booking.returnLocation}}" class="footer-value">{{booking.returnLocation}}</view>
       </view>
       <view class="receipt-code">
         <view class="code-label">BOOKING ID</view>
@@ -88,6 +90,7 @@
       </view>
     </view>
     <view wx:else class="edit-form">
+      <view wx:if="{{contactSaveError}}" class="edit-tip" aria-live="polite">{{contactSaveError}}</view>
       <view class="edit-field">
         <view class="edit-label">联系人</view>
         <input
@@ -149,7 +152,7 @@
         <button class="edit-save-btn ui-btn ui-btn-primary action-with-icon" loading="{{saving}}" disabled="{{loading || saving || subscriptionRequesting || cancelling}}" bindtap="handleSaveEdit"><view wx:if="{{!saving}}" class="save-native-icon" aria-hidden="true"><view class="save-native-line"></view></view><text>{{saving ? '正在保存' : '保存修改'}}</text></button>
         <button class="edit-cancel-btn ui-btn ui-btn-ghost action-with-icon" disabled="{{loading || saving || subscriptionRequesting || cancelling}}" bindtap="handleCancelEdit"><view class="cancel-edit-native-icon" aria-hidden="true"></view><text>取消</text></button>
       </view>
-      <view class="edit-tip tip-with-icon"><view class="tip-info-native-icon" aria-hidden="true"><view class="tip-info-mark"></view></view><view>只修改本次预约的联系信息，不会更改行程日期或车辆。</view></view>
+      <view class="edit-tip tip-with-icon"><view class="tip-info-native-icon" aria-hidden="true"><view class="tip-info-mark"></view></view><view>不会更改行程日期或车辆；变更取车城市后，取车地点需重新确认。</view></view>
     </view>
   </view>
   <view class="info-card ui-card">
@@ -223,14 +226,15 @@
     <view class="quote-rule"><view class="quote-rule-label">押金说明</view><view>{{latestQuote.depositText || '以顾问最终说明为准'}}</view></view>
     <view wx:if="{{latestQuote.customerNote}}" class="quote-rule"><view class="quote-rule-label">报价备注</view><view>{{latestQuote.customerNote}}</view></view>
     <view wx:if="{{latestQuote.adjustmentNote}}" class="quote-adjustment-summary"><view class="quote-rule-label">我的调整说明</view><view>{{latestQuote.adjustmentNote}}</view></view>
-    <view class="quote-boundary">确认报价仅表示认可当前费用方案，不代表已经付款、签署合同或锁定车辆。</view>
+    <view class="quote-boundary">确认有效报价成功后，将为您保留所选档期；不代表已经付款或签署合同。</view>
+    <view wx:if="{{bookingOccupancyTooLong}}" class="quote-boundary">本次行程超过47个占用日期（含取还车当天），请联系顾问分段安排后再确认报价。</view>
     <view wx:if="{{booking.status === 'quoted' && latestQuote.status === 'sent'}}" class="quote-response">
-      <button class="quote-confirm-btn ui-btn ui-btn-primary" loading="{{quoteResponding}}" disabled="{{loading || quoteResponding}}" bindtap="handleConfirmQuote">确认报价（尚未付款）</button>
+      <button class="quote-confirm-btn ui-btn ui-btn-primary" loading="{{quoteResponding}}" disabled="{{loading || quoteResponding || cancelling || saving || editing || subscriptionRequesting || handoverResponding}}" bindtap="handleConfirmQuote">确认报价（尚未付款）</button>
       <view class="quote-adjustment-form">
         <view class="quote-rule-label">需要调整？</view>
         <textarea class="quote-adjustment-input" maxlength="200" value="{{adjustmentNote}}" disabled="{{loading || quoteResponding}}" bindinput="handleAdjustmentInput" placeholder="请说明需要调整的费用或安排" aria-label="报价调整说明" />
         <view class="quote-adjustment-count">{{adjustmentNote.length || 0}} / 200</view>
-        <button class="quote-adjust-btn ui-btn ui-btn-ghost" loading="{{quoteResponding}}" disabled="{{loading || quoteResponding || !adjustmentNote}}" bindtap="handleRequestQuoteAdjustment">申请调整报价</button>
+        <button class="quote-adjust-btn ui-btn ui-btn-ghost" loading="{{quoteResponding}}" disabled="{{loading || quoteResponding || cancelling || saving || editing || subscriptionRequesting || handoverResponding || !adjustmentNote}}" bindtap="handleRequestQuoteAdjustment">申请调整报价</button>
       </view>
     </view>
     <view wx:elif="{{booking.status === 'confirmed'}}" class="quote-response-state quote-response-confirmed">当前报价已确认，尚未付款。</view>
@@ -254,7 +258,7 @@
       <button wx:if="{{item.status === 'submitted'}}" class="ui-btn ui-btn-primary handover-confirm-btn" loading="{{handoverResponding}}" disabled="{{loading || handoverResponding}}" data-stage="{{item.stage}}" bindtap="handleConfirmHandover">我已核对{{item.stageText}}记录</button>
       <view wx:if="{{item.confirmedAtText}}" class="handover-confirmed-time">已于 {{item.confirmedAtText}} 完成内容核对</view>
     </view>
-    <button class="ui-btn ui-btn-danger-ghost emergency-call-btn" bindtap="handleEmergencyCall">一键拨打救援 / 紧急联系电话</button>
+    <button wx:if="{{emergencyPhone}}" class="ui-btn ui-btn-danger-ghost emergency-call-btn" bindtap="handleEmergencyCall">一键拨打救援 / 紧急联系电话</button>
     <view class="emergency-boundary">电话将接通人工服务渠道；本页面不提供实时调度、定位跟踪或到达时间承诺。紧急人身危险请直接拨打 110 / 119 / 120。</view>
   </view>
   <view wx:if="{{booking.note && !editing}}" class="note-card ui-card">
@@ -374,6 +378,7 @@
         aria-label="添加用车行程到系统日历"
       ><view class="calendar-native-icon" aria-hidden="true"></view><text>添加日程</text></button>
       <button
+        wx:if="{{canNavigatePickup}}"
         class="detail-action-btn ui-btn ui-btn-ghost action-with-icon"
         bindtap="handleOpenLocation"
         hover-class="detail-action-btn-pressed"
@@ -385,7 +390,7 @@
   </view>
   <view wx:if="{{canCancel}}" class="actions">
     <view class="action-note tip-with-icon"><view class="tip-info-native-icon tip-info-native-icon-danger" aria-hidden="true"><view class="tip-info-mark"></view></view><view>如行程发生变化，可在顾问确认前取消预约</view></view>
-    <button class="cancel-btn ui-btn ui-btn-danger-ghost action-with-icon" loading="{{cancelling}}" disabled="{{loading || editing || saving || subscriptionRequesting || cancelling}}" bindtap="handleCancel"><view wx:if="{{!cancelling}}" class="cancel-booking-native-icon" aria-hidden="true"></view><text>{{cancelling ? '正在取消' : '取消本次预约'}}</text></button>
+    <button class="cancel-btn ui-btn ui-btn-danger-ghost action-with-icon" loading="{{cancelling}}" disabled="{{loading || editing || saving || subscriptionRequesting || cancelling || quoteResponding || handoverResponding}}" bindtap="handleCancel"><view wx:if="{{!cancelling}}" class="cancel-booking-native-icon" aria-hidden="true"></view><text>{{cancelling ? '正在取消' : '取消本次预约'}}</text></button>
   </view>
   <view wx:if="{{showVoucherModal}}" class="voucher-modal-mask" hover-class="none" aria-role="button" aria-label="关闭出行凭证" bindtap="handleCloseVoucherCard" aria-modal="true">
     <view class="voucher-modal-card ui-card" catchtap="true">
@@ -410,7 +415,7 @@
         </view>
         <view class="voucher-field-row">
           <text class="voucher-field-label">履约网点</text>
-          <text class="voucher-field-val">{{pickupLocationDisplay || booking.city || "极境服务中心"}}</text>
+          <text class="voucher-field-val">{{pickupLocationDisplay || "取车地点待确认"}}</text>
         </view>
         <view class="voucher-field-row">
           <text class="voucher-field-label">出行人</text>

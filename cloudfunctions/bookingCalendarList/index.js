@@ -23,6 +23,7 @@ const PRICE_RULE_FIELDS = { _id: true, vehicleId: true, vehicleName: true, label
 const VEHICLE_FIELDS = { _id: true, brandModel: true, plateNumber: true, status: true, priceDay: true }
 const BOOKING_BATCH_SIZE = 100
 const MAX_BOOKING_RECORDS = 2000
+const MAX_VEHICLE_RECORDS = 500
 
 function createError(code, message) {
   return {
@@ -151,24 +152,39 @@ async function readBookings(monthStart, monthEnd) {
 }
 
 async function readActiveRanges(collectionName, fields, monthStart, monthEnd) {
-  const res = await db.collection(collectionName).where({ status: "active" }).field(fields).limit(MAX_BOOKING_RECORDS).get()
-  const list = res && Array.isArray(res.data) ? res.data : []
-  return list.filter((item) => {
+  const list = []
+  for (let offset = 0; offset <= MAX_BOOKING_RECORDS; offset += BOOKING_BATCH_SIZE) {
+    const batchSize = Math.min(BOOKING_BATCH_SIZE, MAX_BOOKING_RECORDS + 1 - list.length)
+    const res = await db.collection(collectionName).where({ status: "active" }).field(fields)
+      .orderBy("_id", "asc").skip(offset).limit(batchSize).get()
+    const batch = res && Array.isArray(res.data) ? res.data : []
+    list.push(...batch)
+    if (list.length > MAX_BOOKING_RECORDS) return { error: createError("CALENDAR_RANGES_INCOMPLETE", "档期或价格规则过多，请先清理过期记录后重试") }
+    if (batch.length < batchSize) break
+  }
+  return { list: list.filter((item) => {
     const startDate = String(item.startDate || "")
     const endDate = String(item.endDate || item.startDate || "")
     return startDate <= monthEnd && endDate >= monthStart
-  })
+  }) }
 }
 
 async function readVehicles() {
-  const res = await db.collection("vehicles").field(VEHICLE_FIELDS).limit(500).get()
-  const list = res && Array.isArray(res.data) ? res.data : []
-  return list.map((item) => ({
+  const list = []
+  for (let offset = 0; offset <= MAX_VEHICLE_RECORDS; offset += BOOKING_BATCH_SIZE) {
+    const batchSize = Math.min(BOOKING_BATCH_SIZE, MAX_VEHICLE_RECORDS + 1 - list.length)
+    const res = await db.collection("vehicles").field(VEHICLE_FIELDS).orderBy("_id", "asc").skip(offset).limit(batchSize).get()
+    const batch = res && Array.isArray(res.data) ? res.data : []
+    list.push(...batch)
+    if (list.length > MAX_VEHICLE_RECORDS) return { error: createError("CALENDAR_VEHICLES_INCOMPLETE", "车辆数量超过日历可加载范围，请联系管理员处理后重试") }
+    if (batch.length < batchSize) break
+  }
+  return { list: list.map((item) => ({
     id: String(item._id || ""),
     name: String(item.brandModel || item.plateNumber || "车辆"),
     status: String(item.status || ""),
     priceDay: Number.isInteger(item.priceDay) ? item.priceDay : 0
-  })).sort((a, b) => a.name.localeCompare(b.name))
+  })).sort((a, b) => a.name.localeCompare(b.name)) }
 }
 
 async function writeErrorLogBestEffort(payload) {
@@ -196,12 +212,15 @@ exports.main = async (event) => {
     }
 
     const range = getMonthRange(month)
-    const [records, rawBlocks, rawPriceRules, vehicles] = await Promise.all([
+    const [records, blockResult, priceRuleResult, vehicleResult] = await Promise.all([
       readBookings(range.monthStart, range.monthEnd),
       readActiveRanges("vehicle_availability_blocks", BLOCK_FIELDS, range.monthStart, range.monthEnd),
       readActiveRanges("vehicle_price_rules", PRICE_RULE_FIELDS, range.monthStart, range.monthEnd),
       readVehicles()
     ])
+    if (blockResult.error) return blockResult.error
+    if (priceRuleResult.error) return priceRuleResult.error
+    if (vehicleResult.error) return vehicleResult.error
     const list = records.list
       .filter((item) => isActiveInRange(item, range.monthStart, range.monthEnd))
       .map((item) => ({
@@ -217,7 +236,7 @@ exports.main = async (event) => {
         return dateOrder || prev.vehicleName.localeCompare(next.vehicleName)
       })
 
-    const blocks = rawBlocks.map((item) => ({
+    const blocks = blockResult.list.map((item) => ({
       id: String(item._id || ""),
       vehicleId: String(item.vehicleId || ""),
       vehicleName: String(item.vehicleName || "车辆"),
@@ -228,7 +247,7 @@ exports.main = async (event) => {
       reason: String(item.reason || ""),
       version: Number(item.version || 1)
     })).sort((a, b) => a.startDate.localeCompare(b.startDate))
-    const priceRules = rawPriceRules.map((item) => ({
+    const priceRules = priceRuleResult.list.map((item) => ({
       id: String(item._id || ""),
       vehicleId: String(item.vehicleId || ""),
       vehicleName: String(item.vehicleName || "车辆"),
@@ -250,7 +269,7 @@ exports.main = async (event) => {
       list,
       blocks,
       priceRules,
-      vehicles
+      vehicles: vehicleResult.list
     }
   } catch (error) {
     await writeErrorLogBestEffort({

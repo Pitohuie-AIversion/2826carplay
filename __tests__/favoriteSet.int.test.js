@@ -1,19 +1,26 @@
 jest.mock("wx-server-sdk")
 
-function createMockDb({ vehicle, setResult = {}, removeResult = { stats: { removed: 1 } } }) {
+function createMockDb({ vehicle, favorite = null, setResult = {}, removeResult = { stats: { removed: 1 } } }) {
   const vehicleGet = vehicle
     ? jest.fn().mockResolvedValue({ data: vehicle })
     : jest.fn().mockRejectedValue(new Error("document not found"))
   const vehicleField = jest.fn(() => ({ get: vehicleGet }))
   const vehicleDoc = jest.fn(() => ({ field: vehicleField }))
-  const favoriteSet = jest.fn().mockResolvedValue(setResult)
+  let savedFavorite = favorite
+  const favoriteGet = jest.fn(async () => ({ data: savedFavorite }))
+  const favoriteSet = jest.fn(async ({ data }) => {
+    savedFavorite = data
+    return setResult
+  })
   const favoriteRemove = jest.fn().mockResolvedValue(removeResult)
   const favoriteDoc = jest.fn(() => ({
+    get: favoriteGet,
     set: favoriteSet,
     remove: favoriteRemove
   }))
   const serverDateValue = { __type: "serverDate" }
   const db = {
+    runTransaction: jest.fn(async (callback) => callback({ collection: db.collection })),
     collection: jest.fn((name) => {
       if (name === "vehicles") {
         return { doc: vehicleDoc }
@@ -28,9 +35,11 @@ function createMockDb({ vehicle, setResult = {}, removeResult = { stats: { remov
   return {
     db,
     vehicleDoc,
+    vehicleGet,
     vehicleField,
     favoriteDoc,
     favoriteSet,
+    favoriteGet,
     favoriteRemove,
     serverDateValue
   }
@@ -50,6 +59,39 @@ function loadModule(openid, mockDb) {
 }
 
 describe("cloudfunctions/favoriteSet integration", () => {
+  test("重复收藏保留首次时间，避免重试移动分页位置", async () => {
+    const mocks = createMockDb({ vehicle: { status: "idle" } })
+    const mod = loadModule("user_openid", mocks.db)
+    expect((await mod.main({ vehicleId: "vehicle_1", favorited: true })).ok).toBe(true)
+    expect((await mod.main({ vehicleId: "vehicle_1", favorited: true })).ok).toBe(true)
+    expect(mocks.favoriteSet).toHaveBeenCalledTimes(1)
+    expect(mocks.db.runTransaction).toHaveBeenCalledTimes(2)
+  })
+
+  test("车辆数据库暂时失败不会误报车辆不可收藏", async () => {
+    const mocks = createMockDb({ vehicle: { status: "idle" } })
+    mocks.vehicleGet.mockRejectedValue(new Error("database timeout"))
+    const mod = loadModule("user_openid", mocks.db)
+    expect((await mod.main({ vehicleId: "vehicle_1", favorited: true })).code).toBe("INTERNAL_ERROR")
+    expect(mocks.favoriteSet).not.toHaveBeenCalled()
+  })
+
+  test("读取已有收藏失败时不重建记录", async () => {
+    const mocks = createMockDb({ vehicle: { status: "idle" } })
+    mocks.favoriteGet.mockRejectedValue(new Error("database unavailable"))
+    const mod = loadModule("user_openid", mocks.db)
+    expect((await mod.main({ vehicleId: "vehicle_1", favorited: true })).code).toBe("INTERNAL_ERROR")
+    expect(mocks.favoriteSet).not.toHaveBeenCalled()
+  })
+
+  test("取消不存在的收藏仍成功，但数据库故障返回失败", async () => {
+    const mocks = createMockDb({ vehicle: null })
+    const mod = loadModule("user_openid", mocks.db)
+    mocks.favoriteRemove.mockRejectedValueOnce(new Error("document not found"))
+    expect((await mod.main({ vehicleId: "vehicle_1", favorited: false })).ok).toBe(true)
+    mocks.favoriteRemove.mockRejectedValueOnce(new Error("collection does not exist"))
+    expect((await mod.main({ vehicleId: "vehicle_1", favorited: false })).code).toBe("INTERNAL_ERROR")
+  })
   test("用户可收藏公开车辆并使用确定性记录 ID", async () => {
     const mocks = createMockDb({
       vehicle: { _id: "vehicle_1", status: "idle" }

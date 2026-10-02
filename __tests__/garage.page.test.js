@@ -1,5 +1,6 @@
 const fs = require("fs")
 const path = require("path")
+const activePages = []
 
 jest.mock("../shared/analytics", () => ({
   trackEvent: jest.fn()
@@ -31,17 +32,19 @@ function createPage(definition) {
       done()
     }
   })
+  activePages.push(page)
   return page
 }
 
 describe("pages/garage 首页车辆筛选", () => {
   afterEach(() => {
+    activePages.splice(0).forEach((page) => page.onUnload())
     jest.useRealTimers()
     delete global.Page
     delete global.wx
   })
 
-  test("首页将遗留的后台说明升级为一行品牌文案", () => {
+  test("首页忠实展示管理员已保存文案，不因匹配旧文本而替换", () => {
     const page = createPage(loadPageDefinition())
     global.wx = {
       cloud: {
@@ -60,7 +63,7 @@ describe("pages/garage 首页车辆筛选", () => {
 
     page.loadOperationConfig()
 
-    expect(page.data.pageSubtitle).toBe("甄选座驾，为每一次出发预留专属席位")
+    expect(page.data.pageSubtitle).toBe("后台车辆资料已接入首页展示，上传封面后会同步展示到车库首页")
   })
 
   test("availability filter and vehicle list use independent conditional chains", () => {
@@ -573,10 +576,11 @@ describe("pages/garage 首页车辆筛选", () => {
 
   test("冷启动时优先从 storage 恢复 garage_last_snapshot 实现秒开", () => {
     const mockCars = [{ id: "c1", name: "Porsche 911", brand: "保时捷", priceDay: 3000, status: "available" }]
+    const filters = { category: "all", city: "", keyword: "", availableOnly: false, sortBy: "default" }
     global.wx = {
       getStorageSync: jest.fn((key) => {
         if (key === "garage_last_snapshot") {
-          return { cars: mockCars, pagination: { total: 1 } }
+          return { cars: mockCars, pagination: { total: 1 }, filters, savedAt: Date.now() }
         }
         return null
       })
@@ -584,7 +588,7 @@ describe("pages/garage 首页车辆筛选", () => {
     const page = createPage(loadPageDefinition())
     page.applyCars = jest.fn()
     page.onLoad()
-    expect(page.applyCars).toHaveBeenCalledWith(mockCars, { total: 1 })
+    expect(page.applyCars).toHaveBeenCalledWith(mockCars, { total: 1 }, filters, { persist: false, savedAt: expect.any(Number) })
   })
 
   test("服务端 categoryCounts 包含 all 时分类列表不会产生重复 key all", () => {

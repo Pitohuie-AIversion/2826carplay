@@ -15,40 +15,14 @@ const CLOUD_UPLOAD_TIMEOUT_MS = 20 * 1000
 const IMAGE_CHANGE_TIMEOUT_MS = 15 * 1000
 const DETAIL_LOAD_TIMEOUT_MS = 15 * 1000
 const STATUS_ACTION_TIMEOUT_MS = 20 * 1000
-const STATUS_LABEL_MAP = {
-  active: "在用",
-  idle: "闲置",
-  maintenance: "维修",
-  retired: "停用"
-}
-const STATUS_CLASS_MAP = {
-  active: "status-active",
-  idle: "status-idle",
-  maintenance: "status-maintenance",
-  retired: "status-retired"
-}
-const STATUS_OP_OPTIONS = [
-  { value: "idle", label: "设为闲置" },
-  { value: "active", label: "设为在用" },
-  { value: "maintenance", label: "设为维修" }
-]
-const VEHICLE_TYPE_LABEL_MAP = {
-  sedan: "轿车",
-  suv: "SUV",
-  mpv: "MPV",
-  sports: "跑车",
-  truck: "卡车",
-  other: "其他"
-}
-const TRANSMISSION_LABEL_MAP = {
-  manual: "手动挡",
-  automatic: "自动挡"
-}
-const FUEL_TYPE_LABEL_MAP = {
-  gasoline: "燃油",
-  electric: "纯电",
-  hybrid: "混动"
-}
+const {
+  STATUS_LABEL_MAP,
+  STATUS_CLASS_MAP,
+  STATUS_OP_OPTIONS,
+  VEHICLE_TYPE_LABEL_MAP,
+  TRANSMISSION_LABEL_MAP,
+  FUEL_TYPE_LABEL_MAP
+} = require("../../shared/vehicleLabels")
 
 function buildImageItems(detail) {
   const imageList = Array.isArray(detail.imageList) ? detail.imageList : []
@@ -316,6 +290,11 @@ Page({
       wx.hideLoading()
     }
   },
+  onShow() {
+    if (this.data.pageAuthorized && this.data.detail && !this.isVehicleDetailInteractionBusy()) {
+      this.fetchDetail(this.data.id)
+    }
+  },
   onPullDownRefresh() {
     if (!this.data.pageAuthorized || this.isVehicleDetailInteractionBusy()) {
       wx.stopPullDownRefresh()
@@ -423,7 +402,7 @@ Page({
     if (this.isVehicleDetailInteractionBusy() || !this.data.id) {
       return
     }
-    const action = beginPageNativeAction(this)
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.navigateTo({
       url: `/pages-admin/vehicle-edit/vehicle-edit?id=${this.data.id}`,
       fail: () => {
@@ -454,6 +433,7 @@ Page({
     }
     const statusText = STATUS_LABEL_MAP[status] || status
     const action = beginPageNativeAction(this, {
+      requireCurrent: true,
       exclusiveKey: "vehicle-write-confirmation"
     })
     wx.showModal({
@@ -470,7 +450,7 @@ Page({
         ) {
           return
         }
-        this.updateVehicleStatus(id, status)
+        this.updateVehicleStatus(id, status, Number(detail.vehicleVersion) || 0)
       }
     })
   },
@@ -482,6 +462,7 @@ Page({
       return
     }
     const action = beginPageNativeAction(this, {
+      requireCurrent: true,
       exclusiveKey: "vehicle-write-confirmation"
     })
     wx.showModal({
@@ -498,7 +479,7 @@ Page({
         ) {
           return
         }
-        this.retireVehicle(id)
+        this.retireVehicle(id, Number(detail.vehicleVersion) || 0)
       }
     })
   },
@@ -510,6 +491,7 @@ Page({
       return
     }
     const action = beginPageNativeAction(this, {
+      requireCurrent: true,
       exclusiveKey: "vehicle-write-confirmation"
     })
     wx.showModal({
@@ -526,14 +508,14 @@ Page({
         ) {
           return
         }
-        this.restoreVehicle(id)
+        this.restoreVehicle(id, Number(detail.vehicleVersion) || 0)
       }
     })
   },
-  updateVehicleStatus(id, status) {
+  updateVehicleStatus(id, status, expectedVersion = Number(this.data.detail && this.data.detail.vehicleVersion) || 0) {
     this.runVehicleStatusOperation({
       name: "vehicleUpdateStatus",
-      data: { id, status },
+      data: { id, status, expectedVersion },
       id,
       loadingTitle: "更新中…",
       timeoutTitle: "状态更新超时，请重试",
@@ -541,10 +523,10 @@ Page({
       successTitle: "状态已更新"
     })
   },
-  retireVehicle(id) {
+  retireVehicle(id, expectedVersion = Number(this.data.detail && this.data.detail.vehicleVersion) || 0) {
     this.runVehicleStatusOperation({
       name: "vehicleRetire",
-      data: { id },
+      data: { id, expectedVersion },
       id,
       loadingTitle: "停用中…",
       timeoutTitle: "停用超时，请重试",
@@ -552,10 +534,10 @@ Page({
       successTitle: "停用成功"
     })
   },
-  restoreVehicle(id) {
+  restoreVehicle(id, expectedVersion = Number(this.data.detail && this.data.detail.vehicleVersion) || 0) {
     this.runVehicleStatusOperation({
       name: "vehicleRestore",
-      data: { id },
+      data: { id, expectedVersion },
       id,
       loadingTitle: "恢复中…",
       timeoutTitle: "恢复超时，请重试",
@@ -621,6 +603,7 @@ Page({
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
           this.setData({ updatingStatus: false })
+          if (result && result.code === "VERSION_CONFLICT") this.fetchDetail(input.id)
           wx.showToast({
             title: formatToastTitle(
               result && result.message,
@@ -648,7 +631,7 @@ Page({
     }
   },
   handleBackList() {
-    const action = beginPageNativeAction(this)
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.navigateBack({
       delta: 1,
       fail: () => {
@@ -735,12 +718,13 @@ Page({
       })
       return
     }
+    const action = beginPageNativeAction(this, { requireCurrent: true, exclusiveKey: "vehicle-image-selection" })
     wx.chooseImage({
       count: remain,
       sizeType: ["compressed"],
       sourceType: ["album", "camera"],
       success: (chooseRes) => {
-        if (!this.isVehicleDetailActive()) {
+        if (!isPageNativeActionActive(this, action)) {
           return
         }
         const selection = normalizeChosenImages(chooseRes)
@@ -756,7 +740,7 @@ Page({
         this.uploadSelectedFiles(selection.filePaths, selection.rejectedCount)
       },
       fail: (error) => {
-        if (!this.isVehicleDetailActive()) {
+        if (!isPageNativeActionActive(this, action)) {
           return
         }
         if (isUserCancelError(error)) {
@@ -933,6 +917,10 @@ Page({
               handleUploadFailure({ errMsg: "uploadFile:fail invalid response" })
               return
             }
+            if (uploadSettled) {
+              requestUploadedFileCleanup(vehicleId, [uploadRes.fileID])
+              return
+            }
             settleUpload(() => {
               uploadedFileIds.push(uploadRes.fileID)
               updateItem(index, "success", "上传成功")
@@ -992,6 +980,7 @@ Page({
       return
     }
     const action = beginPageNativeAction(this, {
+      requireCurrent: true,
       exclusiveKey: "vehicle-write-confirmation"
     })
     wx.showModal({

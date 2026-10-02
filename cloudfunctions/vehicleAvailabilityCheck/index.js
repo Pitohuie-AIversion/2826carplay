@@ -7,6 +7,7 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
 const BATCH_SIZE = 100
 const MAX_SCAN_RECORDS = 1000
+const MAX_PRICE_RULES = 2000
 const MAX_RANGE_DAYS = 90
 const INQUIRY_STATUSES = ["pending", "contacted", "quoted", "adjustment_requested"]
 const AVAILABILITY_VEHICLE_FIELDS = { status: true, priceDay: true, rentalDiscountTiers: true }
@@ -102,16 +103,31 @@ async function queryVehicleInquiries(vehicleId) {
 }
 
 async function queryPriceRules(vehicleId, input) {
-  const res = await db.collection("vehicle_price_rules").where({ vehicleId, status: "active" }).field({ label: true, startDate: true, endDate: true, dailyPrice: true }).limit(100).get()
-  const list = res && Array.isArray(res.data) ? res.data : []
-  return list.filter((item) => String(item.startDate || "") <= input.endDate && String(item.endDate || "") >= input.startDate)
+  const list = []
+  for (let offset = 0; offset <= MAX_PRICE_RULES; offset += BATCH_SIZE) {
+    const batchSize = Math.min(BATCH_SIZE, MAX_PRICE_RULES + 1 - list.length)
+    const res = await db.collection("vehicle_price_rules").where({ vehicleId, status: "active" })
+      .field({ label: true, startDate: true, endDate: true, dailyPrice: true, version: true })
+      .orderBy("_id", "asc").skip(offset).limit(batchSize).get()
+    const batch = res && Array.isArray(res.data) ? res.data : []
+    list.push(...batch)
+    if (list.length > MAX_PRICE_RULES) return { error: createError("PRICE_RULES_INCOMPLETE", "价格规则较多，暂无法准确估价，请联系顾问") }
+    if (batch.length < batchSize) break
+  }
+  return { list: list.map((item) => ({ ...item, endDate: String(item.endDate || item.startDate || "") }))
+    .filter((item) => String(item.startDate || "") <= input.endDate && item.endDate >= input.startDate) }
 }
 
 function buildPriceSummary(baseDailyRate, dates, rules, rentalDiscountTiers) {
   const base = Number.isInteger(baseDailyRate) && baseDailyRate > 0 ? baseDailyRate : 0
+  let specialDayCount = 0
   const daily = dates.map((date) => {
     const matched = rules.filter((item) => item.startDate <= date && item.endDate >= date).sort((a, b) => Number(b.version || 0) - Number(a.version || 0))[0]
-    const rate = matched && Number.isInteger(matched.dailyPrice) ? matched.dailyPrice : base
+    if (matched) specialDayCount += 1
+    // An applicable rule with a missing/invalid price cannot fall back to a lower base price.
+    const rate = matched
+      ? Number.isInteger(matched.dailyPrice) && matched.dailyPrice >= 0 && matched.dailyPrice <= 99999 ? matched.dailyPrice : 0
+      : base
     return { date, dailyRate: rate, label: matched ? String(matched.label || "特殊日期价") : "基础日租" }
   })
   const known = daily.length > 0 && daily.every((item) => item.dailyRate > 0)
@@ -123,7 +139,7 @@ function buildPriceSummary(baseDailyRate, dates, rules, rentalDiscountTiers) {
   return {
     baseDailyRate: base,
     baseDailyRateText: base > 0 ? `￥${base}` : "待顾问确认",
-    specialDayCount: daily.filter((item) => item.label !== "基础日租").length,
+    specialDayCount,
     estimatedTotal: rawTotal,
     estimatedTotalText: known ? `￥${rawTotal}` : "待顾问报价",
     discountedTotal: known ? discountedTotal : 0,
@@ -146,13 +162,16 @@ exports.main = async (event) => {
     const vehicleRes = await db.collection("vehicles").doc(input.vehicleId).field(AVAILABILITY_VEHICLE_FIELDS).get()
     const vehicle = vehicleRes && vehicleRes.data ? vehicleRes.data : null
     if (!vehicle) return createError("NOT_FOUND", "车辆不存在")
-    if (["maintenance", "retired"].includes(String(vehicle.status || ""))) return createError("NOT_AVAILABLE", "车辆维修或已停用，暂不可预约")
+    const vehicleStatus = String(vehicle.status || "").trim()
+    if (["maintenance", "retired"].includes(vehicleStatus)) return createError("NOT_AVAILABLE", "车辆维修或已停用，暂不可预约")
+    if (!["idle", "active"].includes(vehicleStatus)) return createError("NOT_AVAILABLE", "车辆状态待确认，暂不可预约")
 
-    const [days, inquiryResult, priceRules] = await Promise.all([
+    const [days, inquiryResult, priceRuleResult] = await Promise.all([
       Promise.all(validation.dates.map((date) => getDayOrNull(dayDocumentId(input.vehicleId, date)))),
       queryVehicleInquiries(input.vehicleId),
       queryPriceRules(input.vehicleId, input)
     ])
+    if (priceRuleResult.error) return priceRuleResult.error
     const occupiedDays = days.filter(Boolean)
     const inquiryCount = inquiryResult.list.filter((item) => isOverlappingInquiry(item, input)).length
     const available = occupiedDays.length === 0
@@ -171,7 +190,7 @@ exports.main = async (event) => {
       occupiedDayCount: occupiedDays.length,
       inquiryCount,
       truncated: inquiryResult.truncated,
-      priceSummary: buildPriceSummary(vehicle.priceDay, validation.dates, priceRules, vehicle.rentalDiscountTiers),
+      priceSummary: buildPriceSummary(vehicle.priceDay, validation.dates, priceRuleResult.list, vehicle.rentalDiscountTiers),
       message
     }
   } catch (error) {

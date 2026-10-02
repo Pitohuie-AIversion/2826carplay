@@ -188,12 +188,16 @@ describe("用户主流程原生图标", () => {
         "form.rentalCancellationText.length",
         "form.rentalOvertimeText.length",
         "form.rentalEnergyText.length",
-        "form.rentalEstimateDisclaimer.length"
+        "form.rentalEstimateDisclaimer.length",
+        "form.serviceHoursText.length",
+        "item.address.length",
+        "item.feeText.length"
       ],
       "pages/privacy-request/privacy-request.wxml": ["descriptionLength"],
-      "pages-admin/vehicle-create/vehicle-create.wxml": ["publicDescriptionLength", "noteLength"],
+      "pages-admin/vehicle-create/vehicle-create.wxml": ["publicDescriptionLength", "form.publicDrivingTips.length", "noteLength"],
       "pages-admin/vehicle-edit/vehicle-edit.wxml": [
         "publicDescriptionLength",
+        "form.publicDrivingTips.length",
         "noteLength",
         "form.publicInspectionSummary.length",
         "form.publicExteriorSummary.length",
@@ -237,9 +241,9 @@ describe("用户主流程原生图标", () => {
       })
     })
 
-    expect(inputControlCount).toBe(95)
-    expect(singleLineInputCount).toBe(54)
-    expect(textareaCount).toBe(41)
+    expect(inputControlCount).toBe(105)
+    expect(singleLineInputCount).toBe(59)
+    expect(textareaCount).toBe(46)
     expect(Object.values(textareaCounterExpressions).flat()).toHaveLength(textareaCount)
     Object.entries(textareaCounterExpressions).forEach(([relativePath, expressions]) => {
       const source = read(relativePath)
@@ -268,7 +272,7 @@ describe("用户主流程原生图标", () => {
     const privacyCheckbox = bookingMarkup.match(/<checkbox\b[^>]*\/>/)[0]
     const bookingStyle = read("pages/booking/booking.wxss")
 
-    expect(pickerCount).toBe(28)
+    expect(pickerCount).toBe(33)
     expect(privacyGroup).toContain("privacy-agreement-complete")
     expect(privacyGroup).toContain('aria-required="{{true}}"')
     expect(privacyCheckbox).toContain('aria-label="同意隐私政策"')
@@ -539,7 +543,7 @@ describe("用户主流程原生图标", () => {
       })
     })
 
-    expect(confirmationCount).toBe(35)
+    expect(confirmationCount).toBe(39)
   })
 
   test("原生操作菜单统一使用品牌色与顶部说明", () => {
@@ -675,7 +679,7 @@ describe("用户主流程原生图标", () => {
       })
     })
 
-    expect(clipboardCount).toBe(8)
+    expect(clipboardCount).toBe(7)
   })
 
   test("轻量系统反馈只在操作来源仍是当前页面时展示", () => {
@@ -691,7 +695,7 @@ describe("用户主流程原生图标", () => {
     )
     const bookingDetailSource = read("pages/booking-detail/booking-detail.js")
 
-    expect(currentOnlyActionCount).toBe(20)
+    expect(currentOnlyActionCount).toBe(94)
     expect(bookingDetailSource).toContain("isPageCurrent(this)")
     expect(read("app.js")).toContain("nativeActionAppVisible = false")
     expect(read("app.js")).toContain("nativeActionAppVisible = true")
@@ -754,7 +758,7 @@ describe("用户主流程原生图标", () => {
           expect(body).toMatch(/fail:/)
           if (usesNativeLifecycle) {
             expect(body).toMatch(
-              /isPageNativeActionActive\(this, action\)|isCurrent\(\)|isVehicleEditActive\(\)|fail:\s*fallback/
+              /isPageNativeActionActive\(this, action\)|isPageCurrent\(this\)|isCurrent\(\)|isVehicleEditActive\(\)|fail:\s*fallback/
             )
           }
           if (method === "previewImage") {
@@ -862,7 +866,8 @@ describe("用户主流程原生图标", () => {
     expect(wxml).toContain("empty-emblem")
     expect(wxml).toContain("favoriteLoading ? '正在更新收藏状态'")
     expect(wxml).toContain('wx:if="{{!favoriteLoading}}" class="favorite-button-icon"')
-    expect(wxml).toContain("aria-label=\"{{car.primaryActionText}}，{{car.actionHintText}}\"")
+    expect(wxml).toContain("aria-label=\"{{detailVerified ? car.primaryActionText : '正在核实车辆'}}，{{car.actionHintText}}\"")
+    expect(wxml).toContain('disabled="{{!detailVerified}}" bindtap="handleBookingTap"')
     expect(wxml).not.toContain("⌗")
     expect(wxml).not.toContain("♥ 已收藏")
     expect(wxml).not.toContain("♡ 收藏")

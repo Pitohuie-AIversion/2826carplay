@@ -21,6 +21,9 @@ const BOOKING_MANAGE_DETAIL_FIELDS = {
   startDate: true,
   endDate: true,
   city: true,
+  location: true,
+  pickupLocation: true,
+  returnLocation: true,
   note: true,
   adminRemark: true,
   adminRemarkUpdatedAt: true,
@@ -62,6 +65,7 @@ const BOOKING_QUOTE_DETAIL_FIELDS = {
   customerNote: true,
   adjustmentNote: true,
   version: true,
+  revision: true,
   status: true,
   responseStatus: true,
   createdAt: true,
@@ -227,6 +231,7 @@ function mapQuote(item) {
     customerNote: String((item && item.customerNote) || ""),
     adjustmentNote: String((item && item.adjustmentNote) || ""),
     version: Math.max(0, Number((item && item.version) || 0)),
+    revision: Math.max(0, Number((item && item.revision) || 0)),
     status: String((item && item.status) || "draft"),
     responseStatus: String((item && item.responseStatus) || ""),
     createdAt: formatTime(item && item.createdAt),
@@ -297,16 +302,37 @@ async function addHandoverPhotoUrls(records) {
   }))
 }
 
-async function readBookingHandovers(bookingId) {
+async function readBookingHandovers(bookingId, booking) {
+  let records = []
+  let unavailable = false
   try {
-    const res = await db.collection("booking_handovers").where({ bookingId }).field(BOOKING_HANDOVER_DETAIL_FIELDS).limit(40).get()
-    const list = await addHandoverPhotoUrls(res && Array.isArray(res.data) ? res.data : [])
-    return list.sort((left, right) => right.version - left.version || left.stage.localeCompare(right.stage))
+    const res = await db.collection("booking_handovers").where({ bookingId }).field(BOOKING_HANDOVER_DETAIL_FIELDS).orderBy("submittedAt", "desc").orderBy("_id", "desc").limit(40).get()
+    if (!res || !Array.isArray(res.data)) throw new Error("交接历史查询不完整")
+    records = res.data
   } catch (error) {
     const message = String(error && (error.message || error.errMsg) || error)
-    if (message.includes("Unexpected collection:") || message.includes("not exist")) return []
-    throw error
+    unavailable = !message.includes("Unexpected collection:") && !/COLLECTION_NOT_EXIST|collection.*not exist/i.test(message)
   }
+  const current = []
+  for (const [stage, id] of [["pickup", booking.latestPickupHandoverId], ["return", booking.latestReturnHandoverId]]) {
+    if (!id) continue
+    try {
+      const res = await db.collection("booking_handovers").doc(id).field(BOOKING_HANDOVER_DETAIL_FIELDS).get()
+      const record = res && res.data
+      if (record && record.bookingId === bookingId && record.stage === stage) current.push({ ...record, _id: id })
+    } catch (error) {
+      const message = String(error && (error.code || error.errCode) || "") + " " + String(error && (error.message || error.errMsg) || error)
+      if (!/DOCUMENT_NOT_FOUND|DATABASE_DOCUMENT_NOT_EXIST|document.*(?:not found|not exist)/i.test(message)) throw error
+    }
+  }
+  const byId = new Map(records.map((record) => [String(record._id || record.id || ""), record]))
+  current.forEach((record) => byId.set(record._id, record))
+  const sorted = [...byId.values()].sort((left, right) => {
+    const leftTime = Date.parse(formatTime(left.submittedAt || left.createdAt)) || 0
+    const rightTime = Date.parse(formatTime(right.submittedAt || right.createdAt)) || 0
+    return rightTime - leftTime || String(right._id || "").localeCompare(String(left._id || ""))
+  })
+  return { history: await addHandoverPhotoUrls(sorted), unavailable }
 }
 
 function hasValidDateRange(item) {
@@ -497,7 +523,7 @@ exports.main = async (event) => {
 
     const conflictResult = await findBookingConflicts(item, id)
     const quoteResult = await readBookingQuotes(id)
-    const handoverHistory = await readBookingHandovers(id)
+    const handovers = await readBookingHandovers(id, item)
     let rentalDiscountTiers = []
     let rentalDiscountUnavailable = false
     if (item.vehicleId) {
@@ -524,6 +550,9 @@ exports.main = async (event) => {
         startDate: item.startDate || "",
         endDate: item.endDate || "",
         city: item.city || "",
+        location: item.location || "",
+        pickupLocation: item.pickupLocation || "",
+        returnLocation: item.returnLocation || "",
         note: item.note || "",
         adminRemark: item.adminRemark || "",
         adminRemarkUpdatedAt: formatTime(item.adminRemarkUpdatedAt),
@@ -549,7 +578,7 @@ exports.main = async (event) => {
         pickupHandoverConfirmedAt: formatTime(item.pickupHandoverConfirmedAt),
         returnHandoverConfirmedAt: formatTime(item.returnHandoverConfirmedAt),
         status: item.status || "pending",
-        ...(Array.isArray(item.tags) && item.tags.length ? { tags: item.tags } : {}),
+        ...(Array.isArray(item.tags) ? { tags: item.tags } : {}),
         createdAt: formatTime(item.createdAt),
         updatedAt: formatTime(item.updatedAt)
       },
@@ -561,7 +590,8 @@ exports.main = async (event) => {
       ,quoteDraft: quoteResult.draft
       ,quoteHistory: quoteResult.history
       ,quotesUnavailable: quoteResult.unavailable
-      ,handoverHistory
+      ,handoverHistory: handovers.history
+      ,...(handovers.unavailable ? { handoverHistoryUnavailable: true } : {})
     }
   } catch (error) {
     const errorMessage = String(

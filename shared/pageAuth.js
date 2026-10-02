@@ -57,14 +57,19 @@ function resolveAllowed(result, required) {
 }
 
 const { getCached, setCache, invalidateCache } = require("./cloudDataCache")
+const { isPageCurrent } = require("./pageNativeAction")
 
 const PERMISSION_CHECK_TIMEOUT_MS = 12 * 1000
 const PAGE_PERMISSION_CACHE_KEY = "page_permissions_v1"
 const PAGE_PERMISSION_CACHE_TTL_MS = 3 * 60 * 1000
 
 let lastWxEnv = null
+let permissionCacheRevision = 0
+let permissionRequestSerial = 0
+let lastCompletedRequestSerial = 0
 
 function clearPagePermissionCache() {
+  permissionCacheRevision += 1
   invalidateCache(PAGE_PERMISSION_CACHE_KEY)
 }
 
@@ -97,6 +102,8 @@ function requirePagePermission(page, options) {
   checkWxEnvReset()
 
   cancelPagePermissionCheck(page)
+  const cacheRevision = permissionCacheRevision
+  let requestSerial = 0
   let settled = false
   let cancelled = false
   let timeoutId = null
@@ -117,11 +124,15 @@ function requirePagePermission(page, options) {
   const scheduleRedirect = (delay) => {
     redirectTimerId = setTimeout(() => {
       redirectTimerId = null
-      if (!cancelled) {
-        redirectToMine(() => !cancelled)
+      if (!cancelled && isPageCurrent(page)) {
+        redirectToMine(() => !cancelled && isPageCurrent(page))
       }
     }, delay)
   }
+
+  page.setData({
+    pageAuthorized: false
+  })
 
   if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
     wx.showToast({
@@ -132,12 +143,15 @@ function requirePagePermission(page, options) {
     return cancel
   }
 
-  page.setData({
-    pageAuthorized: false
-  })
-
   const finish = (callback) => {
     if (settled || cancelled) {
+      return false
+    }
+    // A role change or a newer completed check supersedes this response.
+    // Restart the live page's check instead of restoring an old permission snapshot.
+    if (cacheRevision !== permissionCacheRevision ||
+        (requestSerial > 0 && requestSerial < lastCompletedRequestSerial)) {
+      requirePagePermission(page, { ...config, force: cacheRevision !== permissionCacheRevision })
       return false
     }
     settled = true
@@ -186,6 +200,7 @@ function requirePagePermission(page, options) {
   }
 
   timeoutId = setTimeout(handleCheckFailure, PERMISSION_CHECK_TIMEOUT_MS)
+  requestSerial = ++permissionRequestSerial
 
   try {
     wx.cloud.callFunction({
@@ -198,22 +213,18 @@ function requirePagePermission(page, options) {
           return
         }
 
-        setCache(PAGE_PERMISSION_CACHE_KEY, result)
-
         const allowed = resolveAllowed(result, required)
-
-        if (!allowed) {
-          finish(() => {
+        finish(() => {
+          lastCompletedRequestSerial = requestSerial
+          setCache(PAGE_PERMISSION_CACHE_KEY, result)
+          if (!allowed) {
             wx.showToast({
               title: noPermissionMessage,
               icon: "none"
             })
             scheduleRedirect(700)
-          })
-          return
-        }
-
-        finish(() => {
+            return
+          }
           page.setData({
             pageAuthorized: true
           })

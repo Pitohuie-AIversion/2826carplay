@@ -235,7 +235,7 @@ describe("pages/booking-manage-detail conflict handling", () => {
       data: {
         id: "booking_target",
         schedulePriority: "standby",
-        coordinationStatus: "pending"
+        expectedValues: { schedulePriority: "normal" }
       },
       success: expect.any(Function),
       fail: expect.any(Function)
@@ -381,7 +381,8 @@ describe("pages/booking-manage-detail conflict handling", () => {
       name: "bookingUpdateAdminRemark",
       data: {
         id: "booking_dirty_remark",
-        adminRemark: "新的跟进备注"
+        adminRemark: "新的跟进备注",
+        expectedAdminRemark: "原备注"
       },
       success: expect.any(Function),
       fail: expect.any(Function)

@@ -52,6 +52,29 @@ describe("pages/vehicle-manage 车辆管理列表体验", () => {
     jest.useRealTimers()
     delete global.Page
     delete global.wx
+    delete global.getCurrentPages
+  })
+
+  test.each([
+    ["handleUpdateStatus", "vehicleUpdateStatus"],
+    ["handleRetire", "vehicleRetire"],
+    ["handleRestore", "vehicleRestore"]
+  ])("%s提交打开确认时看到的版本，冲突刷新列表", (handler, functionName) => {
+    jest.useFakeTimers()
+    const page = createPage(loadPageDefinition(), { list: [{ id: "car_1", vehicleVersion: 4 }], loading: false })
+    global.getCurrentPages = () => [page]
+    page.fetchList = jest.fn()
+    page[handler]({ currentTarget: { dataset: { id: "car_1", status: "active", currentStatus: "idle" } } })
+    const modal = wx.showModal.mock.calls[0][0]
+    page.data.list = [{ id: "car_1", vehicleVersion: 5 }]
+    modal.success({ confirm: true })
+    const request = wx.cloud.callFunction.mock.calls[0][0]
+    expect(request.name).toBe(functionName)
+    expect(request.data).toMatchObject({ id: "car_1", expectedVersion: 4 })
+    request.success({ result: { ok: false, code: "VERSION_CONFLICT", message: "请刷新重试" } })
+    expect(page.fetchList).toHaveBeenCalledTimes(1)
+    expect(page.data.updatingId).toBe("")
+    expect(jest.getTimerCount()).toBe(0)
   })
 
   test("车辆列表无回调时超时收尾并忽略迟到结果", () => {
@@ -387,5 +410,6 @@ describe("pages/vehicle-manage 车辆管理列表体验", () => {
     expect(listCall).not.toBeNull()
     expect(listCall.data.status).toBe("all")
     expect(listCall.data.keyword).toBe("")
+    page.onUnload()
   })
 })

@@ -36,6 +36,33 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
     jest.useRealTimers()
     delete global.Page
     delete global.wx
+    delete global.getCurrentPages
+  })
+
+  test("图片选择回调在页面被其他页面覆盖后不会上传或弹错", () => {
+    let selection
+    const wxMock = { chooseImage: jest.fn((options) => { selection = options }), showToast: jest.fn() }
+    const page = createVehicleDetailPage(loadVehicleDetailDefinition(wxMock), { id: "car_1", detail: { imageCount: 0 } })
+    page.uploadSelectedFiles = jest.fn()
+    global.getCurrentPages = () => [page]
+    page.handleUploadImages()
+    global.getCurrentPages = () => [page, {}]
+    selection.success({ tempFiles: [{ path: "/tmp/vehicle.jpg", size: 1024 }] })
+    selection.fail({ errMsg: "chooseImage:fail permission denied" })
+    expect(page.uploadSelectedFiles).not.toHaveBeenCalled()
+    expect(wxMock.showToast).not.toHaveBeenCalled()
+  })
+
+  test("卸载取消上传后迟到成功的云文件进入引用核验清理队列", () => {
+    let upload
+    const wxMock = { cloud: { uploadFile: jest.fn((options) => { upload = options; return { abort: jest.fn() } }), callFunction: jest.fn() }, hideLoading: jest.fn(), showToast: jest.fn() }
+    const page = createVehicleDetailPage(loadVehicleDetailDefinition(wxMock), { id: "car_1", detail: { imageCount: 0 } })
+    page.uploadSelectedFiles(["/tmp/vehicle.jpg"], 0)
+    page.onUnload()
+    page.setData.mockClear()
+    upload.success({ fileID: "cloud://env/vehicle-images/car_1/late.jpg" })
+    expect(wxMock.cloud.callFunction).toHaveBeenCalledWith(expect.objectContaining({ name: "vehicleImageUpdate", data: { id: "car_1", action: "cleanupUpload", fileIds: ["cloud://env/vehicle-images/car_1/late.jpg"] } }))
+    expect(page.setData).not.toHaveBeenCalled()
   })
 
   test("档案状态、基础资料与管理信息使用清晰分组和可见性提示", () => {

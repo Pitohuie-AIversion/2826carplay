@@ -13,8 +13,10 @@ const AUTH_ROLE_FIELDS = {
 const BOOKING_COORDINATION_FIELDS = {
   status: true,
   schedulePriority: true,
-  coordinationStatus: true
+  coordinationStatus: true,
+  tags: true
 }
+const CUSTOMER_TAGS = ["老客户", "高意向", "需要送车", "长租意向", "车损敏感", "跨城用车", "待二次回访"]
 const PRIORITY_VALUES = ["priority", "normal", "standby"]
 const COORDINATION_VALUES = ["pending", "coordinating", "resolved"]
 const EDITABLE_BOOKING_STATUSES = [
@@ -79,6 +81,11 @@ function normalizeEvent(event) {
   const payload = event && typeof event === "object" ? event : {}
   return {
     id: String(payload.id || "").trim(),
+    priorityProvided: Object.prototype.hasOwnProperty.call(payload, "schedulePriority"),
+    coordinationProvided: Object.prototype.hasOwnProperty.call(payload, "coordinationStatus"),
+    tagsProvided: Object.prototype.hasOwnProperty.call(payload, "tags"),
+    tags: payload.tags,
+    expectedValues: payload.expectedValues && typeof payload.expectedValues === "object" ? payload.expectedValues : {},
     schedulePriority: String(payload.schedulePriority || "").trim(),
     coordinationStatus: String(payload.coordinationStatus || "").trim()
   }
@@ -130,18 +137,26 @@ exports.main = async (event) => {
         errors: [{ field: "id", message: "预约 ID 不能为空" }]
       })
     }
-    if (!PRIORITY_VALUES.includes(input.schedulePriority)) {
+    if (!input.priorityProvided && !input.coordinationProvided && !input.tagsProvided) {
+      return createError("VALIDATION_ERROR", "请提供要修改的安排")
+    }
+    if (input.tagsProvided && (!Array.isArray(input.tags) || input.tags.length > 5 || input.tags.some((tag) => !CUSTOMER_TAGS.includes(tag)))) {
+      return createError("VALIDATION_ERROR", "客户标签不合法")
+    }
+    if (input.tagsProvided) input.tags = [...new Set(input.tags)]
+    if (input.priorityProvided && !PRIORITY_VALUES.includes(input.schedulePriority)) {
       return createError("VALIDATION_ERROR", "优先级不正确", {
         errors: [{ field: "schedulePriority", message: "请选择有效的预约优先级" }]
       })
     }
-    if (!COORDINATION_VALUES.includes(input.coordinationStatus)) {
+    if (input.coordinationProvided && !COORDINATION_VALUES.includes(input.coordinationStatus)) {
       return createError("VALIDATION_ERROR", "协调状态不正确", {
         errors: [{ field: "coordinationStatus", message: "请选择有效的协调状态" }]
       })
     }
 
-    const bookingRef = db.collection("bookings").doc(input.id)
+    const outcome = await db.runTransaction(async (transaction) => {
+    const bookingRef = transaction.collection("bookings").doc(input.id)
     const currentRes = await bookingRef.field(BOOKING_COORDINATION_FIELDS).get()
     const current = currentRes && currentRes.data ? currentRes.data : null
     if (!current) {
@@ -159,10 +174,22 @@ exports.main = async (event) => {
     const fromCoordinationStatus = COORDINATION_VALUES.includes(current.coordinationStatus)
       ? current.coordinationStatus
       : "pending"
+    const previous = { schedulePriority: fromPriority, coordinationStatus: fromCoordinationStatus }
+    for (const field of ["schedulePriority", "coordinationStatus"]) {
+      const provided = field === "schedulePriority" ? input.priorityProvided : input.coordinationProvided
+      if (provided && Object.prototype.hasOwnProperty.call(input.expectedValues, field) &&
+          previous[field] !== input.expectedValues[field] && previous[field] !== input[field]) {
+        return createError("VERSION_CONFLICT", "协调安排已更新，请刷新")
+      }
+    }
+    if (!input.priorityProvided) input.schedulePriority = fromPriority
+    if (!input.coordinationProvided) input.coordinationStatus = fromCoordinationStatus
+    const tagsChanged = input.tagsProvided && (!Array.isArray(current.tags) || JSON.stringify(current.tags) !== JSON.stringify(input.tags))
 
     if (
       fromPriority === input.schedulePriority &&
-      fromCoordinationStatus === input.coordinationStatus
+      fromCoordinationStatus === input.coordinationStatus &&
+      !tagsChanged
     ) {
       return {
         ok: true,
@@ -170,29 +197,32 @@ exports.main = async (event) => {
         schedulePriority: fromPriority,
         coordinationStatus: fromCoordinationStatus,
         changed: false,
+        ...(input.tagsProvided ? { tags: input.tags } : {}),
         message: "协调安排未发生变化"
       }
     }
 
     await bookingRef.update({
       data: {
-        schedulePriority: input.schedulePriority,
-        coordinationStatus: input.coordinationStatus,
+        ...(input.priorityProvided ? { schedulePriority: input.schedulePriority } : {}),
+        ...(input.coordinationProvided ? { coordinationStatus: input.coordinationStatus } : {}),
+        ...(input.tagsProvided ? { tags: input.tags } : {}),
         coordinationUpdatedAt: db.serverDate(),
         coordinationUpdatedBy: openid,
         updatedAt: db.serverDate()
       }
     })
 
-    await writeAuditLogBestEffort({
+    const audit = {
       openid,
       action: "bookingUpdateCoordination",
       bookingId: input.id,
       fromPriority,
       toPriority: input.schedulePriority,
       fromCoordinationStatus,
-      toCoordinationStatus: input.coordinationStatus
-    })
+      toCoordinationStatus: input.coordinationStatus,
+      ...(input.tagsProvided ? { tagsChanged, tagCount: input.tags.length } : {})
+    }
 
     return {
       ok: true,
@@ -200,8 +230,16 @@ exports.main = async (event) => {
       schedulePriority: input.schedulePriority,
       coordinationStatus: input.coordinationStatus,
       changed: true,
+      audit,
+      ...(input.tagsProvided ? { tags: input.tags } : {}),
       message: "协调安排已更新"
     }
+    })
+    if (outcome.audit) {
+      await writeAuditLogBestEffort(outcome.audit)
+      delete outcome.audit
+    }
+    return outcome
   } catch (error) {
     const errorMessage = String(
       error && (error.message || error.errMsg) ? error.message || error.errMsg : error

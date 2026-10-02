@@ -1,4 +1,5 @@
 const cloud = require("wx-server-sdk")
+const crypto = require("crypto")
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
@@ -13,14 +14,18 @@ const AUTH_ROLE_FIELDS = {
 const BATCH_SIZE = 100
 const MAX_RECORDS = 200
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/
-const MODES = new Set(["inventory", "export"])
+const MODES = new Set(["inventory", "export", "confirmExport"])
+const EXPORTABLE_STATUSES = ["pending", "processing", "completed"]
 const REQUEST_HEADER_FIELDS = {
   _id: true,
   openid: true,
   type: true,
   status: true,
   description: true,
-  createdAt: true
+  createdAt: true,
+  dataExportToken: true,
+  dataExportedToken: true,
+  dataExportedAt: true
 }
 const INVENTORY_FIELDS = {
   bookings: {
@@ -208,7 +213,7 @@ function buildCsvText(subjectOpenid, categories) {
       "",
       "",
       "",
-      limitText([item.customerNote, item.adjustmentNote].filter(Boolean).join("；调整说明："), 500),
+      [item.customerNote, item.adjustmentNote].filter(Boolean).join("；调整说明："),
       trimText(item.startDate, 30),
       trimText(item.endDate, 30),
       trimText(`${item.status} / v${item.version}`, 50),
@@ -222,7 +227,7 @@ function buildCsvText(subjectOpenid, categories) {
   categories.handovers.list.forEach((item) => {
     rows.push([
       "车辆交接记录", safeOpenid, trimText(item.id, 128), "", "", "", "", "",
-      limitText(`已知损伤：${item.damageNote}${item.additionalNote ? `；补充：${item.additionalNote}` : ""}`, 500),
+      `已知损伤：${item.damageNote}${item.additionalNote ? `；补充：${item.additionalNote}` : ""}`,
       "", "", trimText(`${item.stage} / ${item.status} / v${item.version}`, 50), "",
       `里程：${item.mileageKm} km`, `${item.energyType === "electric" ? "电量" : "油量"}：${item.energyLevelPercent}%`,
       trimText(item.createdAt, 50), trimText(item.updatedAt, 50)
@@ -527,18 +532,42 @@ exports.main = async (event) => {
         .get()
       request = requestRes && requestRes.data ? requestRes.data : null
     } catch (error) {
+      const message = String(error && (error.errMsg || error.message || error.code) || error)
+      if (!/not found|not exist|DOCUMENT_NOT_FOUND|DATABASE_DOCUMENT_NOT_EXIST|-502005/i.test(message)) throw error
       request = null
     }
     if (!request) {
       return createError("NOT_FOUND", "隐私申请不存在")
     }
-    if (mode === "export" && String(request.type || "") !== "access") {
+    if (mode !== "inventory" && String(request.type || "") !== "access") {
       return createError("REQUEST_TYPE_NOT_EXPORTABLE", "仅查询信息申请可导出个人数据")
+    }
+    if (mode !== "inventory" && !EXPORTABLE_STATUSES.includes(request.status)) {
+      return createError("STATUS_NOT_ALLOWED", "已撤回或未通过的申请不能导出数据")
     }
 
     const subjectOpenid = String(request.openid || "").trim()
     if (!subjectOpenid) {
       return createError("INVALID_REQUEST_DATA", "该申请缺少用户身份，无法核验")
+    }
+    if (mode === "confirmExport") {
+      const exportToken = String(input.exportToken || "")
+      if (!/^[a-f0-9]{40}$/.test(exportToken)) return createError("VALIDATION_ERROR", "导出确认标识不合法")
+      if (request.dataExportedToken === exportToken && request.dataExportedAt) {
+        return { ok: true, confirmed: true, duplicate: true }
+      }
+      if (request.dataExportToken !== exportToken) return createError("EXPORT_STATE_CONFLICT", "导出记录已变化，请重新导出")
+      const confirmed = await db.collection("privacy_requests").where({
+        _id: requestId, openid: subjectOpenid, type: "access", status: request.status, dataExportToken: exportToken
+      }).update({ data: {
+        dataExportedAt: db.serverDate(), dataExportedBy: adminOpenid,
+        dataExportedToken: exportToken, updatedAt: db.serverDate()
+      } })
+      if (!(Number(confirmed && confirmed.stats && confirmed.stats.updated) > 0)) {
+        return createError("EXPORT_STATE_CONFLICT", "申请状态已变化，请刷新后重试")
+      }
+      await writeAuditLogBestEffort({ openid: adminOpenid, action: "privacyRequestDataExportConfirmed", requestId, requestType: "access" })
+      return { ok: true, confirmed: true }
     }
 
     const [bookingsResult, favoritesResult, requestsResult] = await Promise.all([
@@ -550,6 +579,14 @@ exports.main = async (event) => {
       bookingsResult.list.map((item) => item && item._id)
     )
     const handoversResult = await readHandoversByBookingIds(bookingsResult.list.map((item) => item && item._id))
+    if (!bookingsResult.available) {
+      quotesResult.available = false
+      handoversResult.available = false
+    }
+    if (bookingsResult.truncated) {
+      quotesResult.truncated = true
+      handoversResult.truncated = true
+    }
     const unavailable = []
     if (!bookingsResult.available) {
       unavailable.push("bookings")
@@ -613,12 +650,13 @@ exports.main = async (event) => {
       }
       const csvText = buildCsvText(subjectOpenid, categories)
       const fileName = buildExportFileName(requestId)
-      const exportedAt = db.serverDate()
-      const exportStateRes = await db.collection("privacy_requests").doc(requestId).update({
+      const exportToken = crypto.randomBytes(20).toString("hex")
+      const exportStateRes = await db.collection("privacy_requests").where({
+        _id: requestId, openid: subjectOpenid, type: "access", status: request.status
+      }).update({
         data: {
-          dataExportedAt: exportedAt,
-          dataExportedBy: adminOpenid,
-          updatedAt: exportedAt
+          dataExportToken: exportToken,
+          updatedAt: db.serverDate()
         }
       })
       const exportStateUpdated =
@@ -640,6 +678,7 @@ exports.main = async (event) => {
       })
       return {
         ok: true,
+        exportToken,
         fileName,
         csvText,
         bookingCount: categories.bookings.count,

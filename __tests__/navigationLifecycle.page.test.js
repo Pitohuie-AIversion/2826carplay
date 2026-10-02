@@ -93,6 +93,7 @@ describe("multi-level navigation lifecycle", () => {
       showToast: jest.fn()
     }
     const page = createPage(loadPageDefinition("../pages/booking/booking"))
+    global.getCurrentPages.mockReturnValue([{ route: "from" }, page])
 
     page.handleBackGarage()
     backOptions.fail(new Error("navigateBack failed"))

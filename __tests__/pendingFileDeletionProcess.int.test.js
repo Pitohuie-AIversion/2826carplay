@@ -10,10 +10,11 @@ function createMockDb({ rolesData, queueData, vehicleData = null, vehicleError =
     ? jest.fn().mockRejectedValue(vehicleError)
     : jest.fn().mockResolvedValue({ data: vehicleData })
   const vehicleField = jest.fn(() => ({ get: vehicleGet }))
-  const vehicleDoc = jest.fn(() => ({ field: vehicleField }))
+  const vehicleDoc = jest.fn(() => ({ field: vehicleField, update: jest.fn().mockResolvedValue({ stats: { updated: 1 } }) }))
   const handoverGet = jest.fn().mockResolvedValue({ data: handoverData })
   const handoverLimit = jest.fn(() => ({ get: handoverGet }))
-  const handoverField = jest.fn(() => ({ limit: handoverLimit }))
+  const handoverQuery = { limit: handoverLimit, orderBy: () => handoverQuery, skip: () => handoverQuery }
+  const handoverField = jest.fn(() => handoverQuery)
   const handoverWhere = jest.fn(() => ({ field: handoverField }))
 
   const rolesWhere = jest.fn(() => ({
@@ -21,7 +22,13 @@ function createMockDb({ rolesData, queueData, vehicleData = null, vehicleError =
   }))
   const queueLimit = jest.fn(() => ({ get: queueGet }))
   const queueField = jest.fn(() => ({ limit: queueLimit }))
-  const queueDoc = jest.fn(() => ({
+  const queueDoc = jest.fn((id) => ({
+    get: async () => ({ data: queueData.find((item) => item._id === id) || null }),
+    set: jest.fn(async ({ data }) => {
+      const index = queueData.findIndex((item) => item._id === id)
+      if (index >= 0) queueData[index] = { _id: id, ...data }
+      else queueData.push({ _id: id, ...data })
+    }),
     remove: queueRemove,
     update: queueUpdate
   }))
@@ -29,12 +36,15 @@ function createMockDb({ rolesData, queueData, vehicleData = null, vehicleError =
   const serverDate = jest.fn(() => serverDateValue)
 
   const db = {
+    runTransaction: jest.fn((callback) => callback(require("wx-server-sdk").database())),
+    command: { neq: (value) => ({ $ne: value }) },
     collection: jest.fn((name) => {
       if (name === "roles") {
         return { where: rolesWhere }
       }
       if (name === "pending_file_deletions") {
         return {
+          where: () => ({ field: queueField }),
           field: queueField,
           limit: queueLimit,
           doc: queueDoc
@@ -48,6 +58,9 @@ function createMockDb({ rolesData, queueData, vehicleData = null, vehicleError =
       }
       if (name === "booking_handovers") {
         return { where: handoverWhere }
+      }
+      if (name === "bookings") {
+        return { doc: () => ({ get: async () => ({ data: { handoverImageRevision: 0 } }), update: async () => ({}) }) }
       }
       throw new Error(`Unexpected collection: ${name}`)
     }),
@@ -77,6 +90,7 @@ async function loadFunctionWith({ openid, mockDb }) {
   jest.resetModules()
   const freshCloud = require("wx-server-sdk")
   freshCloud.__reset()
+  freshCloud.deleteFile.mockImplementation(async ({ fileList }) => ({ fileList: fileList.map((fileID) => ({ fileID, status: 0 })) }))
   freshCloud.__setMockContext({ OPENID: openid })
   freshCloud.__setMockDb(mockDb)
 
@@ -98,7 +112,7 @@ describe("cloudfunctions/pendingFileDeletionProcess integration", () => {
     })
     const mod = await loadFunctionWith({ openid: "admin_openid", mockDb: mocks.db })
     const cloud = require("wx-server-sdk")
-    cloud.deleteFile.mockResolvedValue({ fileList: [] })
+    cloud.deleteFile.mockImplementation(async ({ fileList }) => ({ fileList: fileList.map((fileID) => ({ fileID, status: 0 })) }))
 
     const res = await mod.main({ limit: 20 })
 
@@ -120,7 +134,8 @@ describe("cloudfunctions/pendingFileDeletionProcess integration", () => {
       attemptCount: true,
       context: true,
       source: true,
-      notBeforeAt: true
+      notBeforeAt: true,
+      deletionState: true
     })
     const fieldSpec = mocks.queueField.mock.calls[0][0]
     expect(fieldSpec).not.toHaveProperty("lastError")
@@ -278,12 +293,12 @@ describe("cloudfunctions/pendingFileDeletionProcess integration", () => {
       rolesData: [{ role: "admin" }],
       queueData: [
         ...deferredTasks,
-        { _id: "ready_1", fileList: ["cloud://ready.jpg"], source: "vehicleDelete" }
+        { _id: "ready_1", fileList: ["cloud://ready.jpg"], source: "vehicleDelete", context: { vehicleId: "car_1" } }
       ]
     })
     const mod = await loadFunctionWith({ openid: "admin_openid", mockDb: mocks.db })
     const cloud = require("wx-server-sdk")
-    cloud.deleteFile.mockResolvedValue({ fileList: [] })
+    cloud.deleteFile.mockImplementation(async ({ fileList }) => ({ fileList: fileList.map((fileID) => ({ fileID, status: 0 })) }))
 
     const res = await mod.main()
 
@@ -312,12 +327,12 @@ describe("cloudfunctions/pendingFileDeletionProcess integration", () => {
     })
     const mod = await loadFunctionWith({ openid: "admin_openid", mockDb: mocks.db })
     const cloud = require("wx-server-sdk")
-    cloud.deleteFile.mockResolvedValue({ fileList: [] })
+    cloud.deleteFile.mockImplementation(async ({ fileList }) => ({ fileList: fileList.map((fileID) => ({ fileID, status: 0 })) }))
 
     const res = await mod.main()
 
     expect(cloud.deleteFile).toHaveBeenCalledWith({ fileList: [orphan] })
-    expect(mocks.vehicleField).toHaveBeenCalledWith({ imageList: true })
+    expect(mocks.vehicleField).toHaveBeenCalledWith({ imageList: true, coverImage: true })
     expect(mocks.queueRemove).toHaveBeenCalledWith()
     expect(res.deleted).toBe(1)
     expect(res.preserved).toBe(1)
@@ -339,7 +354,7 @@ describe("cloudfunctions/pendingFileDeletionProcess integration", () => {
     })
     const mod = await loadFunctionWith({ openid: "admin_openid", mockDb: mocks.db })
     const cloud = require("wx-server-sdk")
-    cloud.deleteFile.mockResolvedValue({ fileList: [] })
+    cloud.deleteFile.mockImplementation(async ({ fileList }) => ({ fileList: fileList.map((fileID) => ({ fileID, status: 0 })) }))
 
     const res = await mod.main()
 

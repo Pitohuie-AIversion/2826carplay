@@ -1,10 +1,15 @@
 jest.mock("wx-server-sdk")
 
-function createMockDb({ roles = [], bookings = {}, handovers = {}, appConfigs = [{ key: "operation_settings", value: { bookingHandoverTemplateId: "tpl_handover_test_123" } }] } = {}) {
+function createMockDb({ roles = [], bookings = {}, handovers = {}, failQueueWrite = false, appConfigs = [{ key: "operation_settings", value: { bookingHandoverTemplateId: "tpl_handover_test_123" } }] } = {}) {
   const queue = []
   const audits = []
   const errorLogs = []
   const now = new Date("2026-08-10T02:00:00.000Z")
+  const clone = (value) => {
+    if (!value || typeof value !== "object" || value instanceof Date) return value
+    if (Array.isArray(value)) return value.map(clone)
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, clone(item)]))
+  }
 
   function collection(name) {
     if (name === "roles") {
@@ -44,7 +49,19 @@ function createMockDb({ roles = [], bookings = {}, handovers = {}, appConfigs = 
       }
     }
     if (name === "pending_file_deletions") {
-      return { add: jest.fn(async ({ data }) => { queue.push(data); return { _id: `queue_${queue.length}` } }) }
+      return {
+        add: jest.fn(async ({ data }) => { queue.push(data); return { _id: `queue_${queue.length}` } }),
+        doc: (id) => ({
+          field: () => ({ get: async () => ({ data: queue.find((item) => item._id === id) || null }) }),
+          set: jest.fn(async ({ data }) => {
+            if (failQueueWrite) throw new Error("queue unavailable")
+            const index = queue.findIndex((item) => item._id === id)
+            if (index >= 0) queue[index] = { _id: id, ...data }
+            else queue.push({ _id: id, ...data })
+            return { _id: id }
+          })
+        })
+      }
     }
     if (name === "audit_logs") {
       return { add: jest.fn(async ({ data }) => { audits.push(data); return { _id: `audit_${audits.length}` } }) }
@@ -58,9 +75,23 @@ function createMockDb({ roles = [], bookings = {}, handovers = {}, appConfigs = 
   const db = {
     collection,
     serverDate: jest.fn(() => now),
-    runTransaction: jest.fn(async (callback) => callback({ collection }))
+    runTransaction: jest.fn(async (callback) => {
+      const bookingSnapshot = clone(bookings)
+      const handoverSnapshot = clone(handovers)
+      const queueLength = queue.length
+      try {
+        return await callback({ collection: (name) => ({ doc: collection(name).doc }) })
+      } catch (error) {
+        Object.keys(bookings).forEach((key) => delete bookings[key])
+        Object.keys(handovers).forEach((key) => delete handovers[key])
+        Object.assign(bookings, bookingSnapshot)
+        Object.assign(handovers, handoverSnapshot)
+        queue.splice(queueLength)
+        throw error
+      }
+    })
   }
-  return { db, queue, audits, errorLogs, bookings, handovers }
+  return { db, queue, audits, errorLogs, bookings, handovers, allowQueue: () => { failQueueWrite = false } }
 }
 
 async function loadFunction(openid, mocks) {
@@ -96,6 +127,29 @@ function validSubmit(overrides = {}) {
 }
 
 describe("cloudfunctions/bookingHandover integration", () => {
+  test("清理队列失败会回滚归档，重试保留原照片清单且不会重复排队", async () => {
+    const handoverId = "booking_1__pickup__v1"
+    const photos = validSubmit().photos
+    const mocks = createMockDb({
+      roles: [{ openid: "admin", role: "admin" }], failQueueWrite: true,
+      bookings: { booking_1: { openid: "user", status: "confirmed", latestPickupHandoverId: handoverId } },
+      handovers: { [handoverId]: { bookingId: "booking_1", stage: "pickup", status: "confirmed", version: 1, photos } }
+    })
+    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {})
+    const mod = await loadFunction("admin", mocks)
+    const input = { action: "archive", bookingId: "booking_1", handoverId, stage: "pickup" }
+    await expect(mod.main(input)).resolves.toMatchObject({ ok: false, code: "INTERNAL_ERROR" })
+    expect(mocks.handovers[handoverId].photos).toEqual(photos)
+    expect(mocks.handovers[handoverId].status).toBe("confirmed")
+    expect(mocks.queue).toHaveLength(0)
+    mocks.allowQueue()
+    expect(await mod.main(input)).toMatchObject({ ok: true, duplicate: false })
+    expect(await mod.main(input)).toMatchObject({ ok: true, duplicate: true })
+    expect(mocks.queue).toHaveLength(1)
+    expect(mocks.queue[0].fileList).toEqual(photos.map((photo) => photo.fileId))
+    errorSpy.mockRestore()
+  })
+
   test("顾问提交完整四角交接记录并对重复 requestId 幂等", async () => {
     const mocks = createMockDb({
       roles: [{ openid: "admin", permissions: ["booking_manage"] }],
@@ -123,6 +177,21 @@ describe("cloudfunctions/bookingHandover integration", () => {
     expect(result.details.errors.map((item) => item.field)).toEqual(expect.arrayContaining(["mileageKm", "energyLevelPercent", "photos"]))
     const emptyNumbers = await mod.main(validSubmit({ requestId: "request_empty_1", mileageKm: "", energyLevelPercent: "" }))
     expect(emptyNumbers.details.errors.map((item) => item.field)).toEqual(expect.arrayContaining(["mileageKm", "energyLevelPercent"]))
+  })
+
+  test("同版本旧提交不能覆盖新记录，旧成功请求在新版后重试仍幂等", async () => {
+    const mocks = createMockDb({ roles: [{ openid: "admin", role: "admin" }], bookings: { booking_1: { openid: "user", status: "confirmed" } } })
+    const mod = await loadFunction("admin", mocks)
+    const original = validSubmit({ expectedVersion: 0, requestId: "first_request_001" })
+    await mod.main(original)
+    expect(await mod.main(validSubmit({ expectedVersion: 0, requestId: "stale_request_001", mileageKm: 12010 }))).toMatchObject({ ok: false, code: "VERSION_CONFLICT" })
+    const replacement = await mod.main(validSubmit({ expectedVersion: 1, requestId: "newer_request_001", mileageKm: 12100 }))
+    expect(replacement).toMatchObject({ ok: true, version: 2 })
+    expect(await mod.main(original)).toMatchObject({ ok: true, duplicate: true, version: 1 })
+    expect(mocks.bookings.booking_1.latestPickupHandoverId).toBe("booking_1__pickup__v2")
+    expect(mocks.handovers.booking_1__pickup__v2.mileageKm).toBe(12100)
+    expect(mocks.handovers.booking_1__pickup__v3).toBeUndefined()
+    expect(mocks.audits.filter((item) => item.action === "bookingHandoverSubmit")).toHaveLength(2)
   })
 
   test("还车提交前要求用户已核对取车记录", async () => {
@@ -176,8 +245,8 @@ describe("cloudfunctions/bookingHandover integration", () => {
       templateId: "tpl_handover_test_123",
       data: expect.objectContaining({
         thing1: { value: "Porsche 911 GT3" },
-        phrase2: { value: "已提车" },
-        thing3: expect.objectContaining({ value: expect.stringContaining("8880km") })
+        phrase2: { value: "待核对" },
+        thing3: { value: "取车记录已提交，请核对里程与车况" }
       })
     }))
   })
@@ -239,8 +308,8 @@ describe("cloudfunctions/bookingHandover integration", () => {
       templateId: "tpl_handover_test_123",
       data: expect.objectContaining({
         thing1: { value: "McLaren 720S" },
-        phrase2: { value: "已还车" },
-        thing3: expect.objectContaining({ value: expect.stringContaining("还车入库完成") })
+        phrase2: { value: "待核对" },
+        thing3: { value: "还车记录已提交，请核对里程与车况" }
       })
     }))
   })

@@ -65,6 +65,24 @@ async function loadVehicleCreateWith({ openid, mockDb }) {
 }
 
 describe("cloudfunctions/vehicleCreate integration", () => {
+  test("创建时性能数值零与日租金零均不会归为空值", async () => {
+    const mocks = createMockDb({ rolesData: [{ role: "admin" }], vehiclesData: [], addResult: { _id: "car_1" } })
+    const mod = await loadVehicleCreateWith({ openid: "admin_openid", mockDb: mocks.db })
+    expect(await mod.main({ plateNumber: "京A12345", vehicleType: "sedan", brandModel: "BMW", registerDate: "2020-01-01", status: "idle", priceDay: 0, performance: { acceleration: 0, horsepower: 0, torque: 0 } })).toMatchObject({ ok: true })
+    expect(mocks.vehiclesAdd.mock.calls[0][0].data).toMatchObject({ priceDay: 0, performance: { acceleration: "0", horsepower: "0", torque: "0" } })
+  })
+
+  test("创建车辆保存人工提示、性能及未来到期日，普通用户不能写入", async () => {
+    const mocks = createMockDb({ rolesData: [{ role: "admin" }], vehiclesData: [], addResult: { _id: "car_1" } })
+    const mod = await loadVehicleCreateWith({ openid: "admin_openid", mockDb: mocks.db })
+    const input = { plateNumber: "京A12345", vehicleType: "sedan", brandModel: "BMW", registerDate: "2020-01-01", status: "idle", publicDrivingTips: "使用前确认胎压", archiveDate: "2027-01-01", archiveReview: "2027-06-01", performance: { acceleration: "6.5s", horsepower: "300Ps", drivetrain: "后轮驱动", torque: "400N·m", highlights: ["全景天窗"] } }
+    expect((await mod.main(input)).ok).toBe(true)
+    expect(mocks.vehiclesAdd.mock.calls[0][0].data).toMatchObject(input)
+    mocks.rolesGet.mockResolvedValue({ data: [] })
+    expect((await mod.main(input)).code).toBe("FORBIDDEN")
+    expect(mocks.vehiclesAdd).toHaveBeenCalledTimes(1)
+  })
+
   test("自定义连租规则只允许车辆管理员写入", async () => {
     const mocks = createMockDb({ rolesData: [{ role: "admin" }], vehiclesData: [], addResult: { _id: "car_1" } })
     const mod = await loadVehicleCreateWith({ openid: "admin_openid", mockDb: mocks.db })

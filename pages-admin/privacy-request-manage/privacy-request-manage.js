@@ -9,44 +9,12 @@ const {
 const { formatDisplayTime } = require("../../shared/formatTime")
 const PRIVACY_MANAGE_LIST_TIMEOUT_MS = 15 * 1000
 const PRIVACY_MANAGE_WRITE_TIMEOUT_MS = 20 * 1000
-const TYPE_OPTIONS = [
-  { value: "all", label: "全部类型" },
-  { value: "access", label: "查询" },
-  { value: "correction", label: "更正" },
-  { value: "deletion", label: "删除" }
-]
-const STATUS_OPTIONS = [
-  { value: "all", label: "全部状态" },
-  { value: "pending", label: "待处理" },
-  { value: "processing", label: "处理中" },
-  { value: "completed", label: "已完成" },
-  { value: "rejected", label: "未通过" },
-  { value: "cancelled", label: "已撤回" }
-]
-const TYPE_META = {
-  access: {
-    label: "查询信息",
-    className: "request-type-access",
-    iconClass: "request-type-icon-access"
-  },
-  correction: {
-    label: "更正信息",
-    className: "request-type-correction",
-    iconClass: "request-type-icon-correction"
-  },
-  deletion: {
-    label: "删除信息",
-    className: "request-type-deletion",
-    iconClass: "request-type-icon-deletion"
-  }
-}
-const STATUS_META = {
-  pending: { label: "待处理", className: "status-pending" },
-  processing: { label: "处理中", className: "status-processing" },
-  completed: { label: "已完成", className: "status-completed" },
-  rejected: { label: "未通过", className: "status-rejected" },
-  cancelled: { label: "已撤回", className: "status-cancelled" }
-}
+const {
+  TYPE_FILTER_OPTIONS: TYPE_OPTIONS,
+  STATUS_OPTIONS,
+  TYPE_META,
+  STATUS_META
+} = require("../../shared/privacy")
 function getOptionLabel(options, value, fallback) {
   const option = options.find((item) => item.value === value)
   return option ? option.label : fallback
@@ -207,6 +175,12 @@ Page({
     }
     this.fetchList()
   },
+  handleSearchConfirm(event) {
+    if (this.data.updatingId) return
+    const keyword = String(event && event.detail && event.detail.value !== undefined ? event.detail.value : this.data.keyword || "")
+    this.setData({ keyword })
+    this.fetchList({ keyword })
+  },
   handleResetFilters() {
     if (
       this.data.updatingId ||
@@ -275,7 +249,7 @@ Page({
     if (this.data.loading || this.data.updatingId || !id) {
       return
     }
-    const action = beginPageNativeAction(this)
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.navigateTo({
       url: `/pages-admin/privacy-data-inventory/privacy-data-inventory?id=${encodeURIComponent(id)}`,
       fail: () => {
@@ -305,6 +279,7 @@ Page({
     }
     actions.push({ label: "驳回申请", status: "rejected" })
     const nativeAction = beginPageNativeAction(this, {
+      requireCurrent: true,
       exclusiveKey: "privacy-status-confirmation"
     })
     wx.showActionSheet({
@@ -329,6 +304,7 @@ Page({
   },
   promptResolution(item, action) {
     const nativeAction = beginPageNativeAction(this, {
+      requireCurrent: true,
       exclusiveKey: "privacy-status-confirmation"
     })
     wx.showModal({
@@ -488,7 +464,7 @@ Page({
       pageSize: this.data.pageSize,
       type: this.data.currentType === "all" ? "" : this.data.currentType,
       status: this.data.currentStatus === "all" ? "" : this.data.currentStatus,
-      keyword: String(this.data.keyword || "")
+      keyword: String(input.keyword !== undefined ? input.keyword : this.data.keyword || "")
     }
     this.setData({ loading: true })
     let settled = false

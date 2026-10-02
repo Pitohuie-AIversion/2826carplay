@@ -153,11 +153,11 @@
       </view>
       <view class="pricing-base-state">仅基础日租</view>
     </view>
-    <view class="pricing-included">{{pricingOverview.includedText}}</view>
+    <view wx:if="{{pricingOverview.includedText}}" class="pricing-included">{{pricingOverview.includedText}}</view>
     <view class="pricing-discount-tiers" wx:if="{{pricingOverview.discountTiers.length}}">
       <view class="pricing-tier-chip" wx:for="{{pricingOverview.discountTiers}}" wx:key="minDays"><text class="pricing-tier-tag">连租满{{item.minDays}}天</text><text class="pricing-tier-rate">{{item.discountText}}</text></view>
     </view>
-    <button class="disclosure-button" bindtap="handleTogglePricing" hover-class="disclosure-button-pressed" aria-expanded="{{pricingExpanded}}">
+    <button wx:if="{{pricingOverview.feeItems.length}}" class="disclosure-button" bindtap="handleTogglePricing" hover-class="disclosure-button-pressed" aria-expanded="{{pricingExpanded}}">
       <text>{{pricingExpanded ? '收起费用说明' : '查看保障与其他费用'}}</text>
       <view class="disclosure-chevron {{pricingExpanded ? 'disclosure-chevron-open' : ''}}" aria-hidden="true"></view>
     </button>
@@ -167,10 +167,10 @@
         <view class="disclosure-text">{{item.text}}</view>
       </view>
     </view>
-    <view class="estimate-disclaimer"><view class="estimate-disclaimer-mark" aria-hidden="true">i</view><text>{{pricingOverview.disclaimer}}</text></view>
-    <view class="service-hours-hint">
+    <view wx:if="{{pricingOverview.disclaimer}}" class="estimate-disclaimer"><view class="estimate-disclaimer-mark" aria-hidden="true">i</view><text>{{pricingOverview.disclaimer}}</text></view>
+    <view wx:if="{{serviceHoursText}}" class="service-hours-hint">
       <view class="service-hours-dot" aria-hidden="true"></view>
-      <text class="service-hours-text">管家咨询 09:00 - 22:00 · 紧急救援 24H 服务</text>
+      <text class="service-hours-text">{{serviceHoursText}}</text>
     </view>
   </view>
   <view class="notice-card ui-card" wx:if="{{car.statusNoticeText}}">
@@ -205,8 +205,9 @@
         <view class="info-value">{{car.brand}}</view>
       </view>
       <view class="info-item info-item-clickable" bindtap="handleOpenLocation" hover-class="info-item-pressed" aria-role="button" aria-label="查看{{car.location}}位置并导航">
-        <view class="info-label">城市 / 门店 <text class="location-nav-arrow">导航 →</text></view>
-        <view class="info-value location-clickable-value">{{car.location}}</view>
+        <view class="info-label">城市 / 门店 <text wx:if="{{canNavigate}}" class="location-nav-arrow">导航 →</text></view>
+        <view class="info-value location-clickable-value">{{serviceHub ? serviceHub.name : car.location || '地址待确认'}}</view>
+        <view wx:if="{{serviceHub}}" class="section-text">{{serviceHub.address}}</view>
       </view>
       <view class="info-item">
         <view class="info-label">变速箱</view>
@@ -235,7 +236,7 @@
           <view class="section-kicker">PERFORMANCE & HIGHLIGHTS</view>
         </view>
       </view>
-      <view class="perf-top-badge">极境特调</view>
+      <view class="perf-top-badge">车辆参数</view>
     </view>
     <view class="perf-metrics-grid">
       <view class="perf-metric-item">
@@ -265,6 +266,10 @@
       </view>
     </view>
   </view>
+  <view wx:if="{{car.publicDrivingTips}}" class="info-card ui-card">
+    <view class="section-heading"><view class="section-mark"></view><view class="section-title">用车提示</view></view>
+    <view class="section-text">{{car.publicDrivingTips}}</view>
+  </view>
   <view class="info-card trust-profile-card ui-card">
     <view class="section-heading trust-profile-heading">
       <view class="section-heading-copy"><view class="section-mark"></view><view><view class="section-title">车辆可信档案</view><view class="section-kicker">TRUST PROFILE</view></view></view>
@@ -288,7 +293,7 @@
       <view class="trust-channel-card">
         <view class="trust-channel-title">经营与客诉渠道</view>
         <view class="trust-channel-row"><text>服务品牌</text><text>{{brandName}}</text></view>
-        <view class="trust-channel-row"><text>客服、监督与投诉</text><text>{{servicePhone}}</text></view>
+        <view class="trust-channel-row"><text>客服、监督与投诉</text><text>{{servicePhone || '电话暂未提供'}}</text></view>
         <view class="trust-channel-note">经营主体材料可通过该渠道进一步核验；来电由人工登记处理，不承诺实时道路救援调度。</view>
         <button class="trust-channel-call ui-btn ui-btn-ghost" bindtap="handlePhoneCall">电话咨询 / 投诉</button>
       </view>
@@ -312,8 +317,8 @@
       <view class="section-mark"></view>
       <view class="section-title">租赁规则</view>
     </view>
-    <view class="rental-rules-summary">押金、取消改期、超时和油电标准会在确认前明确说明。</view>
-    <button class="disclosure-button rental-disclosure-button" bindtap="handleToggleRentalRules" hover-class="disclosure-button-pressed" aria-expanded="{{rulesExpanded}}">
+    <view class="rental-rules-summary">{{pricingOverview.ruleItems.length ? '已公布的租赁规则' : '租赁规则待确认'}}</view>
+    <button wx:if="{{pricingOverview.ruleItems.length}}" class="disclosure-button rental-disclosure-button" bindtap="handleToggleRentalRules" hover-class="disclosure-button-pressed" aria-expanded="{{rulesExpanded}}">
       <text>{{rulesExpanded ? '收起租赁规则' : '查看完整租赁规则'}}</text>
       <view class="disclosure-chevron {{rulesExpanded ? 'disclosure-chevron-open' : ''}}" aria-hidden="true"></view>
     </button>
@@ -333,8 +338,8 @@
       <view class="bottom-action-hint">{{car.actionHintText}}</view>
     </view>
     <view class="bottom-action-buttons">
-      <button class="action-button ui-btn ui-btn-primary" bindtap="handleBookingTap" aria-label="{{car.primaryActionText}}，{{car.actionHintText}}">
-        <view class="detail-action-content"><view class="detail-action-native-icon booking-action-native-icon" aria-hidden="true"></view><text>{{car.primaryActionText}}</text></view>
+      <button class="action-button ui-btn ui-btn-primary" disabled="{{!detailVerified}}" bindtap="handleBookingTap" aria-label="{{detailVerified ? car.primaryActionText : '正在核实车辆'}}，{{car.actionHintText}}">
+        <view class="detail-action-content"><view class="detail-action-native-icon booking-action-native-icon" aria-hidden="true"></view><text>{{detailVerified ? car.primaryActionText : '正在核实车辆'}}</text></view>
       </button>
       <button class="action-button ui-btn ui-btn-ghost action-button-offset" bindtap="handleOpenCustomerService" hover-class="detail-button-pressed" aria-label="在线咨询极境车库顾问">
         <view class="detail-action-content"><view class="detail-action-native-icon contact-chat-native-icon" aria-hidden="true"></view><text>在线咨询</text></view>
@@ -342,7 +347,7 @@
       <button class="action-button ui-btn ui-btn-ghost action-button-offset" bindtap="handlePhoneCall" aria-label="电话咨询极境车库顾问">
         <view class="detail-action-content"><view class="detail-action-native-icon phone-action-native-icon" aria-hidden="true"></view><text>电话咨询</text></view>
       </button>
-      <button class="action-button ui-btn ui-btn-ghost action-button-offset" bindtap="handleWechatConsult" aria-label="复制微信咨询极境车库顾问">
+      <button class="action-button ui-btn ui-btn-ghost action-button-offset" bindtap="handleWechatConsult" aria-label="打开微信客服咨询">
         <view class="detail-action-content"><view class="detail-action-native-icon wechat-action-native-icon" aria-hidden="true"></view><text>微信咨询</text></view>
       </button>
     </view>

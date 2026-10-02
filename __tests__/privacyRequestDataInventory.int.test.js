@@ -68,9 +68,10 @@ function createMockDb({
     unavailable.includes("privacy_requests") ? new Error("collection not found") : null
   )
   const requestGet = request
-    ? jest.fn().mockResolvedValue({ data: request })
+    ? jest.fn(async () => ({ data: { ...request } }))
     : jest.fn().mockRejectedValue(new Error("document not found"))
-  const exportStateUpdate = jest.fn().mockResolvedValue({ stats: { updated: 1 } })
+  const exportStateUpdate = jest.fn(async ({ data }) => { Object.assign(request, data); return { stats: { updated: 1 } } })
+  const exportWhere = jest.fn(() => ({ update: exportStateUpdate }))
   const requestField = jest.fn(() => ({ get: requestGet }))
   const privacyDoc = jest.fn(() => ({
     get: requestGet,
@@ -99,7 +100,7 @@ function createMockDb({
     if (name === "privacy_requests") {
       return {
         doc: privacyDoc,
-        where: requestsWhere
+        where: (filter) => filter._id ? exportWhere(filter) : requestsWhere(filter)
       }
     }
     if (name === "audit_logs") {
@@ -119,6 +120,7 @@ function createMockDb({
     requestGet,
     requestField,
     exportStateUpdate,
+    exportWhere,
     auditAdd
   }
 }
@@ -138,6 +140,63 @@ async function loadModule(openid, mockDb) {
 }
 
 describe("cloudfunctions/privacyRequestDataInventory integration", () => {
+  test("取消或驳回后不能生成或确认个人数据导出", async () => {
+    for (const status of ["cancelled", "rejected"]) {
+      const mocks = createMockDb({ roles: [{ openid: "admin", role: "admin" }], request: { openid: "user", type: "access", status } })
+      const mod = await loadModule("admin", mocks.db)
+      expect(await mod.main({ requestId: "request_1", mode: "export" })).toMatchObject({ ok: false, code: "STATUS_NOT_ALLOWED" })
+      expect(await mod.main({ requestId: "request_1", mode: "confirmExport", exportToken: "a".repeat(40) })).toMatchObject({ ok: false, code: "STATUS_NOT_ALLOWED" })
+      expect(mocks.exportStateUpdate).not.toHaveBeenCalled()
+    }
+  })
+
+  test("文件生成不标已导出，保存确认可幂等且过期token不能确认", async () => {
+    const request = { openid: "user", type: "access", status: "processing" }
+    const mocks = createMockDb({ roles: [{ openid: "admin", role: "admin" }], request })
+    const mod = await loadModule("admin", mocks.db)
+    const generated = await mod.main({ requestId: "request_1", mode: "export" })
+    expect(generated.ok).toBe(true)
+    expect(request).not.toHaveProperty("dataExportedAt")
+    expect(await mod.main({ requestId: "request_1", mode: "confirmExport", exportToken: "0".repeat(40) })).toMatchObject({ ok: false, code: "EXPORT_STATE_CONFLICT" })
+    const input = { requestId: "request_1", mode: "confirmExport", exportToken: generated.exportToken }
+    expect(await mod.main(input)).toMatchObject({ ok: true, confirmed: true })
+    expect(request.dataExportedAt).toBeTruthy()
+    expect(await mod.main(input)).toMatchObject({ ok: true, confirmed: true, duplicate: true })
+    expect(mocks.exportStateUpdate).toHaveBeenCalledTimes(2)
+    expect(mocks.exportWhere).toHaveBeenLastCalledWith({ _id: "request_1", openid: "user", type: "access", status: "processing", dataExportToken: generated.exportToken })
+  })
+
+  test("生成或保存确认期间发生撤回时，条件写失败不会标记交付完成", async () => {
+    const request = { openid: "user", type: "access", status: "pending", dataExportToken: "a".repeat(40) }
+    const mocks = createMockDb({ roles: [{ openid: "admin", role: "admin" }], request })
+    mocks.exportStateUpdate.mockResolvedValue({ stats: { updated: 0 } })
+    const mod = await loadModule("admin", mocks.db)
+    expect(await mod.main({ requestId: "request_1", mode: "export" })).toMatchObject({ ok: false, code: "EXPORT_STATE_CONFLICT" })
+    expect(await mod.main({ requestId: "request_1", mode: "confirmExport", exportToken: request.dataExportToken })).toMatchObject({ ok: false, code: "EXPORT_STATE_CONFLICT" })
+    expect(request).not.toHaveProperty("dataExportedAt")
+    expect(mocks.auditAdd).not.toHaveBeenCalled()
+  })
+
+  test("CSV保留两段完整说明，不能在合并后截掉交接或报价内容", async () => {
+    const damageNote = "损".repeat(500)
+    const additionalNote = "补".repeat(500)
+    const customerNote = "客".repeat(300)
+    const adjustmentNote = "调".repeat(200)
+    const mocks = createMockDb({
+      roles: [{ openid: "admin", role: "admin" }], request: { openid: "user", type: "access", status: "processing" },
+      bookings: [{ _id: "b1" }],
+      handovers: [{ _id: "h1", bookingId: "b1", damageNote, additionalNote }],
+      quotes: [{ _id: "q1", bookingId: "b1", customerNote, adjustmentNote }]
+    })
+    const mod = await loadModule("admin", mocks.db)
+    const result = await mod.main({ requestId: "request_1", mode: "export" })
+    expect(result.ok).toBe(true)
+    expect(result.csvText).toContain(damageNote)
+    expect(result.csvText).toContain(additionalNote)
+    expect(result.csvText).toContain(customerNote)
+    expect(result.csvText).toContain(adjustmentNote)
+  })
+
   test("管理员可按申请核验用户相关数据且审计日志不记录用户身份", async () => {
     const mocks = createMockDb({
       roles: [{ openid: "admin_openid", role: "admin" }],
@@ -332,11 +391,17 @@ describe("cloudfunctions/privacyRequestDataInventory integration", () => {
     expect(res.csvText).not.toContain("admin_secret")
     expect(mocks.exportStateUpdate).toHaveBeenCalledWith({
       data: {
-        dataExportedAt: { serverDate: true },
-        dataExportedBy: "admin_openid",
+        dataExportToken: res.exportToken,
         updatedAt: { serverDate: true }
       }
     })
+    expect(res.exportToken).toMatch(/^[a-f0-9]{40}$/)
+    expect(mocks.exportStateUpdate.mock.calls[0][0].data).not.toHaveProperty("dataExportedAt")
+    expect(await mod.main({ requestId: "request_export", mode: "confirmExport", exportToken: res.exportToken })).toMatchObject({ ok: true, confirmed: true })
+    expect(mocks.exportStateUpdate).toHaveBeenLastCalledWith({ data: {
+      dataExportedAt: { serverDate: true }, dataExportedBy: "admin_openid",
+      dataExportedToken: res.exportToken, updatedAt: { serverDate: true }
+    } })
 
     const auditData = mocks.auditAdd.mock.calls[0][0].data
     expect(auditData).toMatchObject({
@@ -450,7 +515,7 @@ describe("cloudfunctions/privacyRequestDataInventory integration", () => {
 
     expect(res.ok).toBe(true)
     expect(res.partial).toBe(true)
-    expect(res.truncated).toEqual(["bookings"])
+    expect(res.truncated).toEqual(["bookings", "quotes", "handovers"])
     expect(res.categories.bookings.count).toBe(200)
     expect(res.categories.bookings.truncated).toBe(true)
     expect(mocks.auditAdd.mock.calls[0][0].data.partial).toBe(true)

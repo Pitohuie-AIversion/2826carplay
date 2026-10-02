@@ -1,10 +1,13 @@
+const { activatePageNativeActions, beginPageNativeAction, cancelPageNativeActions, isPageNativeActionActive } = require("../../shared/pageNativeAction")
 const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
 const { formatToastTitle } = require("../../shared/uiFeedback")
 const {
   activatePageCsvFileActions,
+  applyPageCsvFileRemoval,
   beginPageCsvFileAction,
   cancelPageCsvFileActions,
-  isPageCsvFileActionActive
+  isPageCsvFileActionActive,
+  markPageCsvFileRemoved
 } = require("../../shared/pageCsvFileActions")
 const { formatDisplayTime } = require("../../shared/formatTime")
 const {
@@ -149,6 +152,7 @@ Page({
     emptyDesc: "当云函数出现异常时，会在此记录，便于线上排障"
   },
   onLoad() {
+    activatePageNativeActions(this)
     activatePageCsvFileActions(this)
     this.setData({
       canShareExport: canShareCsvFile()
@@ -161,6 +165,13 @@ Page({
       }
     })
   },
+  onShow() {
+    applyPageCsvFileRemoval(this)
+    if (this._exportNeedsReset) {
+      this._exportNeedsReset = false
+      this.setData({ exporting: false })
+    }
+  },
   onPullDownRefresh() {
     if (!this.data.pageAuthorized) {
       wx.stopPullDownRefresh()
@@ -171,6 +182,7 @@ Page({
     })
   },
   onUnload() {
+    cancelPageNativeActions(this)
     cancelPagePermissionCheck(this)
     cancelPageCsvFileActions(this)
     this._errorListRequestId = Number(this._errorListRequestId || 0) + 1
@@ -196,6 +208,11 @@ Page({
   },
   handleSearch() {
     this.fetchList()
+  },
+  handleSearchConfirm(event) {
+    const keyword = String(event && event.detail && event.detail.value !== undefined ? event.detail.value : this.data.keyword || "")
+    this.setData({ keyword })
+    this.fetchList({ keyword })
   },
   handleFuncTap(event) {
     const value = event.currentTarget.dataset.value
@@ -245,6 +262,7 @@ Page({
     const keyword = String(this.data.keyword || "")
     const exportSerial = Number(this._exportRequestSerial || 0) + 1
     this._exportRequestSerial = exportSerial
+    const nativeAction = beginPageNativeAction(this, { requireCurrent: true })
     this.clearExportRequestTimer()
     this.setData({
       exporting: true
@@ -261,6 +279,10 @@ Page({
     }
     const handleFailure = (message, fallback = "导出失败") => {
       if (!finishRequest()) {
+        return
+      }
+      if (!isPageNativeActionActive(this, nativeAction)) {
+        this._exportNeedsReset = true
         return
       }
       this.setData({ exporting: false })
@@ -282,6 +304,11 @@ Page({
       },
       success: (res) => {
         if (!isActive()) {
+          return
+        }
+        if (!isPageNativeActionActive(this, nativeAction)) {
+          finishRequest()
+          this._exportNeedsReset = true
           return
         }
         const result = res && res.result ? res.result : null
@@ -306,6 +333,11 @@ Page({
               if (filePath) {
                 removeCsvFile(filePath).catch(() => {})
               }
+              return
+            }
+            if (!isPageNativeActionActive(this, nativeAction)) {
+              removeCsvFile(filePath).catch(() => {})
+              this._exportNeedsReset = true
               return
             }
             const previousFilePath = this.data.exportFilePath
@@ -355,8 +387,9 @@ Page({
     }
     const filePath = this.data.exportFilePath
     const action = beginPageCsvFileAction(this, filePath)
+    const nativeAction = beginPageNativeAction(this, { requireCurrent: true })
     shareCsvFile(filePath, this.data.exportFileName).catch((error) => {
-      if (!isPageCsvFileActionActive(this, action)) {
+      if ((!isPageCsvFileActionActive(this, action) || !isPageNativeActionActive(this, nativeAction))) {
         return
       }
       if (isUserCancelError(error)) {
@@ -371,12 +404,13 @@ Page({
     }
     const filePath = this.data.exportFilePath
     const action = beginPageCsvFileAction(this, filePath)
+    const nativeAction = beginPageNativeAction(this, { requireCurrent: true })
     openCsvFile(filePath).catch(() => {
-      if (!isPageCsvFileActionActive(this, action)) {
+      if ((!isPageCsvFileActionActive(this, action) || !isPageNativeActionActive(this, nativeAction))) {
         return
       }
       wx.showToast({
-        title: "文件已生成",
+        title: "文件打开失败",
         icon: "none"
       })
     })
@@ -387,6 +421,7 @@ Page({
       return
     }
     const action = beginPageCsvFileAction(this, filePath)
+    const nativeAction = beginPageNativeAction(this, { requireCurrent: true })
     wx.showModal({
       title: "删除本地 CSV",
       content: "将从当前设备删除这份导出文件，删除后无法恢复。云端错误日志不会受到影响。",
@@ -395,27 +430,24 @@ Page({
       success: (res) => {
         if (
           this.data.exporting ||
-          !isPageCsvFileActionActive(this, action) ||
+          (!isPageCsvFileActionActive(this, action) || !isPageNativeActionActive(this, nativeAction)) ||
           !res.confirm
         ) {
           return
         }
         removeCsvFile(filePath)
           .then(() => {
-            if (!isPageCsvFileActionActive(this, action)) {
+            if (!markPageCsvFileRemoved(this, action) || !isPageNativeActionActive(this, nativeAction)) {
               return
             }
-            this.setData({
-              exportFilePath: "",
-              exportFileName: ""
-            })
+            applyPageCsvFileRemoval(this)
             wx.showToast({
               title: "本地文件已删除",
               icon: "none"
             })
           })
           .catch((error) => {
-            if (!isPageCsvFileActionActive(this, action)) {
+            if ((!isPageCsvFileActionActive(this, action) || !isPageNativeActionActive(this, nativeAction))) {
               return
             }
             wx.showToast({
@@ -430,8 +462,9 @@ Page({
     const done = typeof input === "function" ? input : input && input.done
     const append = Boolean(input && typeof input === "object" && input.append)
     const nextPage = append ? this.data.page + 1 : 0
-    const func = this.data.currentFunc === "all" ? "" : this.data.currentFunc
-    const keyword = String(this.data.keyword || "")
+    const selectedFilter = input && input.func !== undefined ? input.func : this.data.currentFunc
+    const func = selectedFilter === "all" ? "" : selectedFilter
+    const keyword = String(input && input.keyword !== undefined ? input.keyword : this.data.keyword || "")
     const requestId = Number(this._errorListRequestId || 0) + 1
     this._errorListRequestId = requestId
     this.finishErrorListRequestEffects()

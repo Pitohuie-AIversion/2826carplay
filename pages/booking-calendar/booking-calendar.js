@@ -1,6 +1,7 @@
 const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
 const { buildMonthView, normalizeMonthKey, shiftMonth } = require("../../shared/bookingCalendar")
 const { clearUnsaved, markUnsaved } = require("../../shared/unsavedChanges")
+const { formatToastTitle } = require("../../shared/uiFeedback")
 const {
   activatePageNativeActions,
   beginPageNativeAction,
@@ -14,6 +15,22 @@ function getCalendarSnapshotKey(monthKey) {
 }
 const BOOKING_CALENDAR_LOAD_TIMEOUT_MS = 15 * 1000
 const CALENDAR_SAVE_TIMEOUT_MS = 15 * 1000
+
+function creationSnapshotKey(action, payload) {
+  const fields = action === "createBlock"
+    ? ["vehicleId", "kind", "startDate", "endDate", "reason"]
+    : ["vehicleId", "label", "startDate", "endDate", "reason"]
+  const normalized = Object.fromEntries(fields.map((field) => {
+    const text = String(payload[field] || "").trim()
+    return [field, field === "reason" ? text.slice(0, 200) : field === "label" ? text.slice(0, 40) : text]
+  }))
+  if (action === "createPriceRule") normalized.dailyPrice = String(payload.dailyPrice === undefined || payload.dailyPrice === null ? "" : payload.dailyPrice).trim() === "" ? null : Number(payload.dailyPrice)
+  return JSON.stringify(normalized)
+}
+
+function createCalendarRequestId() {
+  return `calendar_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}_${Math.random().toString(36).slice(2, 12)}`
+}
 const BLOCK_KIND_OPTIONS = [
   { value: "maintenance", label: "维修保养" },
   { value: "hold", label: "人工保留" },
@@ -50,7 +67,17 @@ function isInDate(item, date) {
 
 function formatBlock(item) {
   const kind = String(item.kind || "unavailable")
-  return { ...item, kindLabel: BLOCK_KIND_LABELS[kind] || "不可用", canEdit: true }
+  return { ...item, kindLabel: BLOCK_KIND_LABELS[kind] || "不可用", canEdit: kind !== "booking" && !item.bookingId }
+}
+
+function vehicleSelectionState(vehicles, blockForm, priceForm) {
+  const result = {}
+  for (const [formKey, indexKey, form] of [["blockForm", "blockVehicleIndex", blockForm], ["priceForm", "priceVehicleIndex", priceForm]]) {
+    const vehicleId = String(form && form.vehicleId || vehicles[0] && vehicles[0].id || "")
+    result[formKey] = { ...form, vehicleId }
+    result[indexKey] = vehicles.findIndex((vehicle) => vehicle.id === vehicleId)
+  }
+  return result
 }
 
 Page({
@@ -80,6 +107,9 @@ Page({
     priceVehicleIndex: 0,
     editingBlockId: "",
     editingRuleId: "",
+    editingBlockVersion: null,
+    editingRuleVersion: null,
+    calendarSaveError: "",
     isSavingCalendar: false,
     blockForm: { vehicleId: "", kind: "maintenance", startDate: "", endDate: "", reason: "" },
     priceForm: { vehicleId: "", label: "", startDate: "", endDate: "", dailyPrice: "", reason: "" },
@@ -137,6 +167,7 @@ Page({
         allPriceRules,
         vehicles,
         vehicleOptions,
+        ...vehicleSelectionState(vehicles, this.data.blockForm, this.data.priceForm),
         truncated: Boolean(cached.truncated),
         loading: false
       })
@@ -162,6 +193,7 @@ Page({
     clearUnsaved(this)
     this._bookingCalendarRequestId =
       Number(this._bookingCalendarRequestId || 0) + 1
+    this._calendarSaveRequestId = Number(this._calendarSaveRequestId || 0) + 1
     this.finishBookingCalendarRequestEffects()
     if (this._calendarSaveTimer) {
       clearTimeout(this._calendarSaveTimer)
@@ -203,6 +235,7 @@ Page({
   },
 
   handleDateTap(event) {
+    if (this.data.isSavingCalendar) return
     const date = String(event.currentTarget.dataset.date || "")
     if (!date) {
       return
@@ -222,7 +255,7 @@ Page({
     if (!id) {
       return
     }
-    const action = beginPageNativeAction(this)
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.navigateTo({
       url: `/pages/booking-manage-detail/booking-manage-detail?id=${id}`,
       fail: () => {
@@ -358,14 +391,7 @@ Page({
           allPriceRules: Array.isArray(result.priceRules) ? result.priceRules : [],
           vehicles: Array.isArray(result.vehicles) ? result.vehicles : [],
           vehicleOptions: Array.isArray(result.vehicles) ? result.vehicles.map((item) => `${item.name} · 日租${item.priceDay ? `￥${item.priceDay}` : "待定"}`) : [],
-          blockForm: {
-            ...this.data.blockForm,
-            vehicleId: this.data.blockForm.vehicleId || String(result.vehicles && result.vehicles[0] && result.vehicles[0].id || "")
-          },
-          priceForm: {
-            ...this.data.priceForm,
-            vehicleId: this.data.priceForm.vehicleId || String(result.vehicles && result.vehicles[0] && result.vehicles[0].id || "")
-          },
+          ...vehicleSelectionState(Array.isArray(result.vehicles) ? result.vehicles : [], this.data.blockForm, this.data.priceForm),
           truncated: Boolean(result.truncated)
         })
         this.applyCalendar()
@@ -396,40 +422,60 @@ Page({
   },
 
   handleBlockVehicleChange(event) {
+    if (this.data.isSavingCalendar) return
     const index = Number(event.detail && event.detail.value)
     const vehicle = this.data.vehicles[index]
-    if (vehicle) this.setData({ blockVehicleIndex: index, blockForm: { ...this.data.blockForm, vehicleId: vehicle.id } })
+    if (vehicle) {
+      this.setData({ blockVehicleIndex: index, blockForm: { ...this.data.blockForm, vehicleId: vehicle.id } })
+      this.markCalendarFormDirty("blockForm")
+    }
   },
 
   handlePriceVehicleChange(event) {
+    if (this.data.isSavingCalendar) return
     const index = Number(event.detail && event.detail.value)
     const vehicle = this.data.vehicles[index]
-    if (vehicle) this.setData({ priceVehicleIndex: index, priceForm: { ...this.data.priceForm, vehicleId: vehicle.id } })
+    if (vehicle) {
+      this.setData({ priceVehicleIndex: index, priceForm: { ...this.data.priceForm, vehicleId: vehicle.id } })
+      this.markCalendarFormDirty("priceForm")
+    }
   },
 
   handleBlockKindChange(event) {
+    if (this.data.isSavingCalendar || this.data.editingBlockId) return
     const index = Number(event.detail && event.detail.value)
     const option = BLOCK_KIND_OPTIONS[index]
-    if (option) this.setData({ blockKindIndex: index, blockForm: { ...this.data.blockForm, kind: option.value } })
+    if (option) {
+      this.setData({ blockKindIndex: index, blockForm: { ...this.data.blockForm, kind: option.value } })
+      this.markCalendarFormDirty("blockForm")
+    }
   },
 
   handleCalendarFormInput(event) {
+    if (this.data.isSavingCalendar) return
     const form = String(event.currentTarget.dataset.form || "")
     const field = String(event.currentTarget.dataset.field || "")
     if (!["blockForm", "priceForm"].includes(form) || !field) return
     const value = event.detail && event.detail.value !== undefined ? String(event.detail.value) : ""
     this.setData({ [form]: { ...this.data[form], [field]: value } })
-    markUnsaved(this)
+    this.markCalendarFormDirty(form)
+  },
+
+  markCalendarFormDirty(form, dirty = true) {
+    this._calendarDirtyForms = { ...this._calendarDirtyForms, [form]: dirty }
+    if (Object.values(this._calendarDirtyForms).some(Boolean)) markUnsaved(this)
+    else clearUnsaved(this)
   },
 
   handleEditBlock(event) {
     const id = String(event.currentTarget.dataset.id || "")
     const item = this.data.allBlocks.find((block) => block.id === id)
-    if (!item) return
-    const vehicleIndex = Math.max(0, this.data.vehicles.findIndex((vehicle) => vehicle.id === item.vehicleId))
+    if (!item || this.data.isSavingCalendar || item.kind === "booking" || item.bookingId) return
+    const vehicleIndex = this.data.vehicles.findIndex((vehicle) => vehicle.id === item.vehicleId)
     const kindIndex = Math.max(0, BLOCK_KIND_OPTIONS.findIndex((option) => option.value === item.kind))
     this.setData({
       editingBlockId: id,
+      editingBlockVersion: Number(item.version || 1),
       blockVehicleIndex: vehicleIndex,
       blockKindIndex: kindIndex,
       blockForm: { vehicleId: item.vehicleId, kind: item.kind, startDate: item.startDate, endDate: item.endDate, reason: "" }
@@ -437,39 +483,58 @@ Page({
   },
 
   handleEditPriceRule(event) {
+    if (this.data.isSavingCalendar) return
     const id = String(event.currentTarget.dataset.id || "")
     const item = this.data.allPriceRules.find((rule) => rule.id === id)
     if (!item) return
-    const vehicleIndex = Math.max(0, this.data.vehicles.findIndex((vehicle) => vehicle.id === item.vehicleId))
+    const vehicleIndex = this.data.vehicles.findIndex((vehicle) => vehicle.id === item.vehicleId)
     this.setData({
       editingRuleId: id,
+      editingRuleVersion: Number(item.version || 1),
       priceVehicleIndex: vehicleIndex,
       priceForm: { vehicleId: item.vehicleId, label: item.label, startDate: item.startDate, endDate: item.endDate, dailyPrice: String(item.dailyPrice), reason: "" }
     })
   },
 
   handleResetBlockForm() {
-    clearUnsaved(this)
+    if (this.data.isSavingCalendar) return
+    if (this._calendarCreateSnapshots) delete this._calendarCreateSnapshots.createBlock
+    this.markCalendarFormDirty("blockForm", false)
     const vehicle = this.data.vehicles[this.data.blockVehicleIndex]
-    this.setData({ editingBlockId: "", blockKindIndex: 0, blockForm: { vehicleId: vehicle ? vehicle.id : "", kind: "maintenance", startDate: this.data.selectedDate, endDate: this.data.selectedDate, reason: "" } })
+    this.setData({ editingBlockId: "", editingBlockVersion: null, blockKindIndex: 0, blockForm: { vehicleId: vehicle ? vehicle.id : "", kind: "maintenance", startDate: this.data.selectedDate, endDate: this.data.selectedDate, reason: "" } })
   },
 
   handleResetPriceForm() {
-    clearUnsaved(this)
+    if (this.data.isSavingCalendar) return
+    if (this._calendarCreateSnapshots) delete this._calendarCreateSnapshots.createPriceRule
+    this.markCalendarFormDirty("priceForm", false)
     const vehicle = this.data.vehicles[this.data.priceVehicleIndex]
-    this.setData({ editingRuleId: "", priceForm: { vehicleId: vehicle ? vehicle.id : "", label: "", startDate: this.data.selectedDate, endDate: this.data.selectedDate, dailyPrice: "", reason: "" } })
+    this.setData({ editingRuleId: "", editingRuleVersion: null, priceForm: { vehicleId: vehicle ? vehicle.id : "", label: "", startDate: this.data.selectedDate, endDate: this.data.selectedDate, dailyPrice: "", reason: "" } })
   },
 
   handleSaveBlock() {
-    this.saveCalendarChange(this.data.editingBlockId ? "updateBlock" : "createBlock", { ...this.data.blockForm, id: this.data.editingBlockId })
+    if (!this.validateSelectedVehicle(this.data.blockForm)) return
+    this.saveCalendarChange(this.data.editingBlockId ? "updateBlock" : "createBlock", { ...this.data.blockForm, id: this.data.editingBlockId, ...(this.data.editingBlockId ? { expectedVersion: this.data.editingBlockVersion } : {}) })
   },
 
   handleSavePriceRule() {
-    this.saveCalendarChange(this.data.editingRuleId ? "updatePriceRule" : "createPriceRule", { ...this.data.priceForm, id: this.data.editingRuleId, dailyPrice: Number(this.data.priceForm.dailyPrice) })
+    if (!this.validateSelectedVehicle(this.data.priceForm)) return
+    this.saveCalendarChange(this.data.editingRuleId ? "updatePriceRule" : "createPriceRule", { ...this.data.priceForm, id: this.data.editingRuleId, ...(this.data.editingRuleId ? { expectedVersion: this.data.editingRuleVersion } : {}) })
+  },
+
+  validateSelectedVehicle(form) {
+    if (form.vehicleId && !this.data.vehicles.some((vehicle) => vehicle.id === form.vehicleId)) {
+      this.setData({ calendarSaveError: "原车辆不在当前列表中，请重新选择车辆后保存。" })
+      return false
+    }
+    return true
   },
 
   handleReleaseBlock(event) {
-    this.confirmRelease("releaseBlock", String(event.currentTarget.dataset.id || ""), "释放档期占用")
+    const id = String(event.currentTarget.dataset.id || "")
+    const item = this.data.allBlocks.find((block) => block.id === id)
+    if (!item || item.kind === "booking" || item.bookingId) return
+    this.confirmRelease("releaseBlock", id, "释放档期占用")
   },
 
   handleReleasePriceRule(event) {
@@ -478,7 +543,11 @@ Page({
 
   confirmRelease(action, id, title) {
     if (!id || this.data.isSavingCalendar) return
-    const nativeAction = beginPageNativeAction(this)
+    const records = action === "releaseBlock" ? this.data.allBlocks : this.data.allPriceRules
+    const record = records.find((item) => item.id === id)
+    if (!record) return
+    const expectedVersion = Number(record.version || 1)
+    const nativeAction = beginPageNativeAction(this, { requireCurrent: true, exclusiveKey: "calendar-release" })
     wx.showModal({
       title,
       content: "请填写本次操作原因",
@@ -494,17 +563,34 @@ Page({
           wx.showToast({ title: "请填写操作原因", icon: "none" })
           return
         }
-        this.saveCalendarChange(action, { id, reason })
+        this.saveCalendarChange(action, { id, reason, expectedVersion })
       }
     })
   },
 
   saveCalendarChange(action, payload) {
     if (this.data.isSavingCalendar || !wx.cloud || typeof wx.cloud.callFunction !== "function") return
-    this.setData({ isSavingCalendar: true })
+    let requestPayload = { ...payload }
+    if (["createBlock", "createPriceRule"].includes(action)) {
+      const key = creationSnapshotKey(action, payload)
+      this._calendarCreateSnapshots = this._calendarCreateSnapshots || {}
+      let snapshot = this._calendarCreateSnapshots[action]
+      if (!snapshot || snapshot.key !== key) {
+        snapshot = { key, requestId: createCalendarRequestId(), payload: { ...payload } }
+        this._calendarCreateSnapshots[action] = snapshot
+      }
+      requestPayload = { ...snapshot.payload, requestId: snapshot.requestId }
+    }
+    const requestId = Number(this._calendarSaveRequestId || 0) + 1
+    this._calendarSaveRequestId = requestId
+    const nativeAction = beginPageNativeAction(this, { requireCurrent: true })
+    const showToast = (options) => {
+      if (isPageNativeActionActive(this, nativeAction)) wx.showToast(options)
+    }
+    this.setData({ isSavingCalendar: true, calendarSaveError: "" })
     let settled = false
     const finish = () => {
-      if (settled) return false
+      if (settled || this._calendarSaveRequestId !== requestId) return false
       settled = true
       if (this._calendarSaveTimer) clearTimeout(this._calendarSaveTimer)
       this._calendarSaveTimer = null
@@ -512,26 +598,33 @@ Page({
       return true
     }
     this._calendarSaveTimer = setTimeout(() => {
-      if (finish()) wx.showToast({ title: "保存超时，请重试", icon: "none" })
+      if (finish()) showToast({ title: "保存超时，请重试", icon: "none" })
     }, CALENDAR_SAVE_TIMEOUT_MS)
-    wx.cloud.callFunction({
+    const options = {
       name: "vehicleCalendarManage",
-      data: { action, ...payload },
+      data: { action, ...requestPayload },
       success: (res) => {
         if (!finish()) return
         const result = res && res.result
         if (!result || !result.ok) {
-          wx.showToast({ title: result && result.message || "保存失败", icon: "none" })
+          this.setData({ calendarSaveError: result && result.message || "保存失败，请重试" })
+          showToast({ title: formatToastTitle(result && result.message, "保存失败"), icon: "none" })
+          if (result && result.code === "CALENDAR_VERSION_CONFLICT") this.fetchBookings()
           return
         }
-        wx.showToast({ title: "车辆日历已更新", icon: "success" })
-        this.handleResetBlockForm()
-        this.handleResetPriceForm()
+        showToast({ title: result.duplicate ? "已确认保存结果" : "车辆日历已更新", icon: "success" })
+        if (["createBlock", "updateBlock"].includes(action) || (action === "releaseBlock" && this.data.editingBlockId === payload.id)) this.handleResetBlockForm()
+        if (["createPriceRule", "updatePriceRule"].includes(action) || (action === "releasePriceRule" && this.data.editingRuleId === payload.id)) this.handleResetPriceForm()
         this.fetchBookings()
       },
       fail: () => {
-        if (finish()) wx.showToast({ title: "保存失败，请重试", icon: "none" })
+        if (finish()) showToast({ title: "保存失败，请重试", icon: "none" })
       }
-    })
+    }
+    try {
+      wx.cloud.callFunction(options)
+    } catch (error) {
+      options.fail(error)
+    }
   }
 })

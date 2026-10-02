@@ -35,7 +35,8 @@ function normalizeEvent(event) {
     userName: String(payload.userName || "").trim(),
     phone: String(payload.phone || "").trim(),
     city: String(payload.city || "").trim(),
-    note: String(payload.note || "").trim()
+    note: String(payload.note || "").trim(),
+    expectedValues: payload.expectedValues
   }
 }
 
@@ -67,6 +68,11 @@ function validateInput(input) {
 
 function getChangedKeys(current, input) {
   return EDITABLE_FIELDS.filter((key) => String((current && current[key]) || "").trim() !== input[key])
+}
+
+function contactResult(current) {
+  return Object.fromEntries(EDITABLE_FIELDS.concat(["pickupLocation", "returnLocation", "location"])
+    .map((key) => [key, String(current[key] || "").trim()]))
 }
 
 async function writeAuditLogBestEffort(payload) {
@@ -143,53 +149,53 @@ exports.main = async (event) => {
 
     const currentStatus = String(current.status || "pending").trim() || "pending"
     if (!EDITABLE_STATUSES.includes(currentStatus)) {
-      return createError("STATUS_NOT_ALLOWED", "已完成或已取消的预约不能修改联系信息")
+      return createError("STATUS_NOT_ALLOWED", "当前预约状态不能修改联系信息")
     }
 
-    const changedKeys = getChangedKeys(current, input)
-    if (!changedKeys.length) {
-      return {
-        ok: true,
-        id: input.id,
-        status: currentStatus,
-        updated: false,
-        changedKeys: [],
-        message: "联系信息未发生变化"
+    const outcome = await db.runTransaction(async (transaction) => {
+      const ref = transaction.collection("bookings").doc(input.id)
+      const res = await ref.get()
+      const latest = res && res.data
+      if (!latest) return { error: createError("NOT_FOUND", "预约不存在") }
+      if (String(latest.openid || "").trim() !== openid) return { error: createError("FORBIDDEN", "只能修改自己的预约") }
+      const status = String(latest.status || "pending").trim() || "pending"
+      if (!EDITABLE_STATUSES.includes(status)) return { error: createError("STATUS_CONFLICT", "预约状态已发生变化，请刷新后重试") }
+      const changedKeys = getChangedKeys(latest, input)
+      if (!changedKeys.length) return { status, updated: false, changedKeys, contact: contactResult(latest) }
+      const baseline = input.expectedValues
+      if (!baseline || EDITABLE_FIELDS.some((key) => typeof baseline[key] !== "string")) {
+        return { error: createError("CONTACT_VERSION_REQUIRED", "请更新小程序并重新加载预约后修改；当前草稿已保留") }
       }
-    }
-
-    const updateRes = await db.collection("bookings").where({
-      _id: input.id,
-      openid,
-      status: currentStatus
-    }).update({
-      data: {
+      if (EDITABLE_FIELDS.some((key) => String(latest[key] || "").trim() !== baseline[key].trim())) {
+        return { error: createError("CONTACT_CONFLICT", "联系信息已被修改，当前草稿已保留；请先记录草稿，再取消编辑并下拉刷新核对") }
+      }
+      const data = {
         userName: input.userName,
         phone: input.phone,
         city: input.city,
+        ...(String(latest.city || "").trim().replace(/市$/, "") !== input.city.replace(/市$/, "")
+          ? { pickupLocation: "", location: "" }
+          : {}),
         note: input.note,
         updatedAt: db.serverDate()
       }
+      await ref.update({ data })
+      return { status, updated: true, changedKeys, contact: contactResult({ ...latest, ...data }) }
     })
-    const updatedCount = Number(updateRes && updateRes.stats && updateRes.stats.updated) || 0
-    if (updatedCount < 1) {
-      return createError("STATUS_CONFLICT", "预约状态已发生变化，请刷新后重试")
-    }
+    if (outcome.error) return outcome.error
 
-    await writeAuditLogBestEffort({
+    if (outcome.updated) await writeAuditLogBestEffort({
       openid,
       action: "bookingUpdateMyContact",
       bookingId: input.id,
-      changedKeys
+      changedKeys: outcome.changedKeys
     })
 
     return {
       ok: true,
       id: input.id,
-      status: currentStatus,
-      updated: true,
-      changedKeys,
-      message: "联系信息已更新"
+      ...outcome,
+      message: outcome.updated ? "联系信息已更新" : "联系信息未发生变化"
     }
   } catch (error) {
     const errorMessage = String(

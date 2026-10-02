@@ -1,6 +1,7 @@
 jest.mock("wx-server-sdk")
 
 function createMockDb({ roles, records }) {
+  let privacyFilter = {}
   const rolesWhere = jest.fn((filter) => ({
     limit: jest.fn((limit) => ({
       get: jest.fn().mockResolvedValue({
@@ -10,7 +11,7 @@ function createMockDb({ roles, records }) {
   }))
   const privacySkip = jest.fn((offset) => ({
     limit: jest.fn((limit) => ({
-      get: jest.fn().mockResolvedValue({ data: records.slice(offset, offset + limit) })
+      get: jest.fn().mockResolvedValue({ data: records.filter((item) => Object.entries(privacyFilter).every(([key, value]) => value.in ? value.in.includes(item[key]) : item[key] === value)).slice(offset, offset + limit) })
     }))
   }))
   const privacyOrderBy = jest.fn(() => ({ skip: privacySkip }))
@@ -18,15 +19,18 @@ function createMockDb({ roles, records }) {
     orderBy: privacyOrderBy,
     skip: privacySkip
   }))
+  const privacyWhere = jest.fn((filter) => { privacyFilter = filter; return { field: privacyField } })
 
   return {
     db: {
+      command: { in: (values) => ({ in: values }) },
       collection: jest.fn((name) => {
         if (name === "roles") {
           return { where: rolesWhere }
         }
         if (name === "privacy_requests") {
           return {
+            where: privacyWhere,
             field: privacyField
           }
         }
@@ -34,6 +38,7 @@ function createMockDb({ roles, records }) {
       })
     },
     privacyOrderBy,
+    privacyWhere,
     privacyField
   }
 }
@@ -53,6 +58,21 @@ async function loadModule(openid, mockDb) {
 }
 
 describe("cloudfunctions/privacyRequestList integration", () => {
+  test("内部并发守卫不会进入管理列表或消耗分页记录上限", async () => {
+    const mocks = createMockDb({
+      roles: [{ openid: "admin_openid", role: "admin" }],
+      records: [
+        ...Array.from({ length: 501 }, (_, index) => ({ _id: `submission_${index}`, recordKind: "submission_guard" })),
+        { _id: "p1", openid: "user_1", type: "access", status: "pending" }
+      ]
+    })
+    const mod = await loadModule("admin_openid", mocks.db)
+    const result = await mod.main({})
+    expect(result).toMatchObject({ ok: true, total: 1, truncated: false })
+    expect(result.list.map((item) => item.id)).toEqual(["p1"])
+    expect(mocks.privacyWhere).toHaveBeenCalledWith({ type: { in: ["access", "correction", "deletion"] } })
+  })
+
   test("管理员可按状态和类型筛选", async () => {
     const mocks = createMockDb({
       roles: [{ openid: "admin_openid", role: "admin" }],

@@ -32,6 +32,22 @@ function createPage(definition) {
 }
 
 describe("pages/privacy-request 用户申请流程", () => {
+  test("提交超时后同内容重试复用请求号，修改内容会生成新请求号", () => {
+    jest.useFakeTimers()
+    global.wx = { cloud: { callFunction: jest.fn() }, showToast: jest.fn() }
+    const page = createPage(loadPageDefinition())
+    page.data.description = "查询个人信息"
+    page.handleSubmit()
+    const first = wx.cloud.callFunction.mock.calls[0][0].data
+    jest.advanceTimersByTime(12000)
+    page.handleSubmit()
+    expect(wx.cloud.callFunction.mock.calls[1][0].data.requestId).toBe(first.requestId)
+    jest.advanceTimersByTime(12000)
+    page.data.description = "查询更新后的个人信息"
+    page.handleSubmit()
+    expect(wx.cloud.callFunction.mock.calls[2][0].data.requestId).not.toBe(first.requestId)
+    page.onUnload()
+  })
   afterEach(() => {
     jest.useRealTimers()
     delete global.Page
@@ -405,5 +421,6 @@ describe("pages/privacy-request 用户申请流程", () => {
     page2.onLoad()
     expect(page2.applyRequestList).toHaveBeenCalledWith(mockSnapshot, expect.objectContaining({ page: 0, hasMore: true }))
     expect(page2.data.initialLoading).toBe(false)
+    page2.onUnload()
   })
 })

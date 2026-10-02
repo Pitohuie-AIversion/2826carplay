@@ -40,6 +40,8 @@ const QUOTE_FIELDS = {
   validUntil: true,
   customerNote: true,
   version: true,
+  revision: true,
+  saveRequestId: true,
   status: true,
   sendRequestId: true,
   createdAt: true,
@@ -105,6 +107,29 @@ function calculateRentalDays(startDate, endDate) {
   return Math.max(1, Math.round((end - start) / 86400000))
 }
 
+function isRealDate(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  const timestamp = Date.parse(`${value}T00:00:00Z`)
+  return Number.isFinite(timestamp) && new Date(timestamp).toISOString().slice(0, 10) === value
+}
+
+function validateBookingDates(booking) {
+  const startDate = String(booking.startDate || "")
+  const endDate = String(booking.endDate || "")
+  const start = Date.parse(`${startDate}T00:00:00Z`)
+  const end = Date.parse(`${endDate}T00:00:00Z`)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate) ||
+    !Number.isFinite(start) || !Number.isFinite(end) || end < start ||
+    new Date(start).toISOString().slice(0, 10) !== startDate || new Date(end).toISOString().slice(0, 10) !== endDate) {
+    return createError("VALIDATION_ERROR", "预约租期不合法，无法报价")
+  }
+  // Quote confirmation reserves both the pickup and return dates in one transaction.
+  if ((end - start) / 86400000 + 1 > 47) {
+    return createError("DATE_RANGE_TOO_LONG", "在线报价最多支持含起止日47天，请先调整预约日期")
+  }
+  return null
+}
+
 function normalizeInput(event) {
   const payload = event && typeof event === "object" ? event : {}
   return {
@@ -112,6 +137,8 @@ function normalizeInput(event) {
     bookingId: String(payload.bookingId || payload.id || "").trim(),
     quoteId: String(payload.quoteId || "").trim(),
     requestId: String(payload.requestId || "").trim(),
+    expectedQuoteVersion: Number(payload.expectedQuoteVersion || 0),
+    expectedDraftRevision: Number(payload.expectedDraftRevision || 0),
     amounts: {
       baseRentalCents: parseAmountToCents(payload.baseRentalAmount),
       protectionCents: parseAmountToCents(payload.protectionAmount),
@@ -131,7 +158,7 @@ function validateDraftInput(input) {
   AMOUNT_KEYS.forEach((key) => {
     if (input.amounts[key] === null) errors.push({ field: key, message: "金额应为不超过两位小数的非负数" })
   })
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.validUntil)) errors.push({ field: "validUntil", message: "报价有效期格式不正确" })
+  if (!isRealDate(input.validUntil)) errors.push({ field: "validUntil", message: "报价有效期必须为真实有效日期" })
   if (!input.depositText) errors.push({ field: "depositText", message: "押金说明不能为空" })
   return errors
 }
@@ -188,6 +215,7 @@ function mapQuote(item) {
     validUntil: String(item.validUntil || ""),
     customerNote: String(item.customerNote || ""),
     version: Number(item.version || 0),
+    revision: Number(item.revision || 0),
     status: String(item.status || "draft"),
     createdAt: formatTime(item.createdAt),
     updatedAt: formatTime(item.updatedAt),
@@ -273,28 +301,42 @@ async function sendQuoteNotificationBestEffort(booking, quote) {
 }
 
 async function saveDraft(input, openid) {
-  const currentRes = await db.collection("bookings").doc(input.bookingId).field(BOOKING_FIELDS).get()
-  const booking = currentRes && currentRes.data ? currentRes.data : null
-  if (!booking) return createError("NOT_FOUND", "预约不存在")
-  const status = String(booking.status || "pending")
-  if (!DRAFTABLE_STATUSES.includes(status)) return createError("STATUS_NOT_ALLOWED", "当前预约状态不能编辑报价")
-  const rentalDays = calculateRentalDays(String(booking.startDate || ""), String(booking.endDate || ""))
-  if (!rentalDays || rentalDays > 365) return createError("VALIDATION_ERROR", "预约租期不合法，无法报价")
-  const version = Math.max(0, Number(booking.latestQuoteVersion || 0)) + 1
-  const quoteData = buildQuoteData(input, booking, version, "draft")
-  const draftId = `${input.bookingId}__draft`
-  const existing = await getDocOrNull(db.collection("booking_quotes"), draftId)
-  await db.collection("booking_quotes").doc(draftId).set({
-    data: {
-      ...quoteData,
-      createdBy: openid,
-      createdAt: existing && existing.createdAt ? existing.createdAt : db.serverDate(),
-      updatedBy: openid,
-      updatedAt: db.serverDate()
+  const outcome = await db.runTransaction(async (transaction) => {
+    const currentRes = await transaction.collection("bookings").doc(input.bookingId).field(BOOKING_FIELDS).get()
+    const booking = currentRes && currentRes.data ? currentRes.data : null
+    if (!booking) return createError("NOT_FOUND", "预约不存在")
+    const status = String(booking.status || "pending")
+    if (!DRAFTABLE_STATUSES.includes(status)) return createError("STATUS_NOT_ALLOWED", "当前预约状态不能编辑报价")
+    const dateError = validateBookingDates(booking)
+    if (dateError) return dateError
+    const version = Math.max(0, Number(booking.latestQuoteVersion || 0)) + 1
+    const quoteData = buildQuoteData(input, booking, version, "draft")
+    const draftId = `${input.bookingId}__draft`
+    const existing = await getDocOrNull(transaction.collection("booking_quotes"), draftId)
+    if (input.requestId && existing && existing.saveRequestId === input.requestId) {
+      return { ok: true, duplicate: true, existing: true, draftId, version: existing.version, quoteData: existing }
     }
+    if (Number(booking.latestQuoteVersion || 0) !== input.expectedQuoteVersion ||
+        Number(existing && existing.revision || 0) !== input.expectedDraftRevision) {
+      return createError("VERSION_CONFLICT", "报价草稿已更新，请刷新")
+    }
+    quoteData.revision = Number(existing && existing.revision || 0) + 1
+    await transaction.collection("booking_quotes").doc(draftId).set({
+      data: {
+        ...quoteData,
+        saveRequestId: input.requestId,
+        createdBy: openid,
+        createdAt: existing && existing.createdAt ? existing.createdAt : db.serverDate(),
+        updatedBy: openid,
+        updatedAt: db.serverDate()
+      }
+    })
+    return { ok: true, existing: Boolean(existing), draftId, version, quoteData }
   })
-  await writeAuditLogBestEffort({ openid, action: existing ? "bookingQuoteDraftUpdate" : "bookingQuoteDraftCreate", bookingId: input.bookingId, quoteId: draftId, version, totalCents: quoteData.totalCents })
-  return { ok: true, action: "saveDraft", updated: true, quote: mapQuote({ _id: draftId, ...quoteData }), message: "报价草稿已保存" }
+  if (!outcome.ok) return outcome
+  const { existing, draftId, version, quoteData } = outcome
+  if (!outcome.duplicate) await writeAuditLogBestEffort({ openid, action: existing ? "bookingQuoteDraftUpdate" : "bookingQuoteDraftCreate", bookingId: input.bookingId, quoteId: draftId, version, totalCents: quoteData.totalCents })
+  return { ok: true, action: "saveDraft", updated: !outcome.duplicate, quote: mapQuote({ _id: draftId, ...quoteData }), message: "报价草稿已保存" }
 }
 
 async function sendQuote(input, openid) {
@@ -304,21 +346,23 @@ async function sendQuote(input, openid) {
     const booking = bookingRes && bookingRes.data ? bookingRes.data : null
     if (!booking) return { error: createError("NOT_FOUND", "预约不存在") }
     const status = String(booking.status || "pending")
-    if (status === "quoted" && booking.latestQuoteId) {
-      const latest = await getDocOrNull(transaction.collection("booking_quotes"), String(booking.latestQuoteId))
-      if (latest && String(latest.sendRequestId || "") === input.requestId) {
-        return { duplicate: true, booking, quote: mapQuote(latest) }
-      }
+    const quoteId = `${input.bookingId}__v${input.expectedQuoteVersion + 1}`
+    const existing = await getDocOrNull(transaction.collection("booking_quotes"), quoteId)
+    if (existing && String(existing.sendRequestId || "") === input.requestId) {
+      return { duplicate: true, booking, quote: mapQuote(existing) }
     }
     if (!SENDABLE_STATUSES.includes(status)) return { error: createError("STATUS_NOT_ALLOWED", "请先完成联系，或等待用户提出调整后再发送报价") }
+    if (Number(booking.latestQuoteVersion || 0) !== input.expectedQuoteVersion) return { error: createError("VERSION_CONFLICT", "报价版本已变化，请刷新") }
+    const dateError = validateBookingDates(booking)
+    if (dateError) return { error: dateError }
     const draftId = `${input.bookingId}__draft`
     const draft = await getDocOrNull(transaction.collection("booking_quotes"), draftId)
     if (!draft || String(draft.status || "") !== "draft") return { error: createError("DRAFT_NOT_FOUND", "请先保存报价草稿") }
+    if (!isRealDate(String(draft.validUntil || ""))) return { error: createError("VALIDATION_ERROR", "报价有效期必须为真实有效日期，请重新保存草稿") }
     const version = Math.max(0, Number(booking.latestQuoteVersion || 0)) + 1
     if (Number(draft.version || 0) !== version) return { error: createError("VERSION_CONFLICT", "报价版本已变化，请刷新后重新保存") }
+    if (Number(draft.revision || 0) !== input.expectedDraftRevision) return { error: createError("VERSION_CONFLICT", "报价草稿已更新，请核对") }
     if (String(draft.validUntil || "") < todayInChina()) return { error: createError("QUOTE_EXPIRED", "报价有效期不能早于今天") }
-    const quoteId = `${input.bookingId}__v${version}`
-    const existing = await getDocOrNull(transaction.collection("booking_quotes"), quoteId)
     if (existing) {
       if (String(existing.sendRequestId || "") === input.requestId) return { duplicate: true, booking, quote: mapQuote(existing) }
       return { error: createError("VERSION_CONFLICT", "该报价版本已经存在") }
@@ -350,7 +394,7 @@ async function sendQuote(input, openid) {
   if (outcome.error) return outcome.error
   if (!outcome.duplicate) await writeAuditLogBestEffort({ openid, action: "bookingQuoteSend", bookingId: input.bookingId, quoteId: outcome.quote.id, version: outcome.quote.version, totalCents: outcome.quote.totalCents, fromStatus: String(outcome.booking.status || ""), toStatus: "quoted" })
   const notification = outcome.duplicate ? { status: "skipped", reason: "duplicate_request" } : await sendQuoteNotificationBestEffort(outcome.booking, outcome.quote)
-  return { ok: true, action: "send", updated: !outcome.duplicate, quote: outcome.quote, bookingStatus: "quoted", notificationStatus: notification.status, notificationReason: notification.reason, message: outcome.duplicate ? "该报价已发送" : "报价已发送" }
+  return { ok: true, action: "send", updated: !outcome.duplicate, quote: outcome.quote, bookingStatus: outcome.duplicate ? outcome.booking.status : "quoted", notificationStatus: notification.status, notificationReason: notification.reason, message: outcome.duplicate ? "该报价已发送" : "报价已发送" }
 }
 
 async function expireQuote(input, openid) {
@@ -380,13 +424,15 @@ exports.main = async (event) => {
     if (!(await canManage(openid))) return createError("FORBIDDEN", "权限不足")
     if (!input.bookingId) return createError("VALIDATION_ERROR", "预约 ID 不能为空")
     if (!["saveDraft", "send", "expire"].includes(input.action)) return createError("VALIDATION_ERROR", "报价操作不合法")
-    if (input.action === "expire") return expireQuote(input, openid)
+    if (input.action === "expire") return await expireQuote(input, openid)
+    if (![input.expectedQuoteVersion, input.expectedDraftRevision].every((value) => Number.isSafeInteger(value) && value >= 0)) return createError("VALIDATION_ERROR", "报价版本不合法")
+    if (input.requestId && !/^[A-Za-z0-9_-]{8,80}$/.test(input.requestId)) return createError("VALIDATION_ERROR", "请求标识不合法")
     if (input.action === "saveDraft") {
       const errors = validateDraftInput(input)
       if (errors.length) return createError("VALIDATION_ERROR", "报价信息校验失败", { errors })
-      return saveDraft(input, openid)
+      return await saveDraft(input, openid)
     }
-    return sendQuote(input, openid)
+    return await sendQuote(input, openid)
   } catch (error) {
     const errorMessage = String(error && (error.message || error.errMsg) || error).slice(0, 300)
     await writeErrorLogBestEffort({ function: "bookingQuoteManage", bookingId: input.bookingId, quoteId: input.quoteId, action: input.action, authenticated: Boolean(openid), errorMessage })

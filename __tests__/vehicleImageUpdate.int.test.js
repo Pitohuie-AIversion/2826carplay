@@ -6,7 +6,8 @@ function createMockDb({ rolesData, currentData, updateResult }) {
   const update = jest.fn().mockResolvedValue(updateResult)
   const queueAdd = jest.fn().mockResolvedValue({ _id: "queue_1" })
   const queueSet = jest.fn().mockResolvedValue({ stats: { created: 1, updated: 1 } })
-  const queueDoc = jest.fn(() => ({ set: queueSet }))
+  const queueUpdate = jest.fn().mockResolvedValue({ stats: { updated: 1 } })
+  const queueDoc = jest.fn(() => ({ get: async () => ({ data: null }), set: queueSet, update: queueUpdate }))
   const auditAdd = jest.fn().mockResolvedValue({ _id: "audit_1" })
 
   const rolesLimit = jest.fn(() => ({ get: rolesGet }))
@@ -21,6 +22,8 @@ function createMockDb({ rolesData, currentData, updateResult }) {
   const serverDate = jest.fn(() => serverDateValue)
 
   const db = {
+    runTransaction: jest.fn((callback) => callback(require("wx-server-sdk").database())),
+    command: { neq: (value) => ({ $ne: value }) },
     collection: jest.fn((name) => {
       if (name === "roles") {
         return { where: rolesWhere }
@@ -58,6 +61,7 @@ async function loadVehicleImageUpdateWith({ openid, mockDb }) {
   jest.resetModules()
   const freshCloud = require("wx-server-sdk")
   freshCloud.__reset()
+  freshCloud.deleteFile.mockImplementation(async ({ fileList }) => ({ fileList: fileList.map((fileID) => ({ fileID, status: 0 })) }))
   freshCloud.__setMockContext({ OPENID: openid })
   freshCloud.__setMockDb(mockDb)
 
@@ -352,6 +356,7 @@ describe("cloudfunctions/vehicleImageUpdate integration", () => {
           action: "cleanupUpload"
         },
         source: "vehicleImageUploadCleanup",
+        deletionState: "pending",
         notBeforeAt: expect.any(Date),
         createdAt: mocks.serverDateValue
       }
@@ -417,7 +422,7 @@ describe("cloudfunctions/vehicleImageUpdate integration", () => {
     await vehicleImageUpdate.main(event)
 
     const taskIds = mocks.queueDoc.mock.calls.map((call) => call[0])
-    expect(taskIds).toHaveLength(2)
+    expect(taskIds).toHaveLength(4)
     expect(new Set(taskIds).size).toBe(1)
     expect(mocks.queueSet).toHaveBeenCalledTimes(2)
     const notBeforeTimes = mocks.queueSet.mock.calls.map(

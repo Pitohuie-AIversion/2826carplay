@@ -5,14 +5,14 @@
       <view class="hero-copy">
         <view class="page-kicker">OPERATIONS SETTINGS</view>
         <view class="hero-title">运营配置</view>
-        <view class="hero-desc">管理品牌、首页内容与预约服务文案</view>
+        <view class="hero-desc">管理品牌、服务网点、首页内容与预约说明</view>
       </view>
       <image class="hero-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
     </view>
     <view class="hero-status">
       <view class="hero-status-dot"></view>
       <text>保存后将同步首页、我的页面与预约服务</text>
-      <view class="hero-status-count">5 GROUPS</view>
+      <view class="hero-status-count">6 GROUPS</view>
     </view>
   </view>
   <view wx:if="{{loading && !hasLoadedConfig}}" class="config-skeleton" aria-hidden="true">
@@ -62,6 +62,11 @@
     </button>
   </view>
   <block wx:else>
+  <view wx:if="{{saveConflict}}" class="config-state ui-card">
+    <view class="config-state-title">线上配置已变化</view>
+    <view class="config-state-desc">当前修改已保留，请先核对其他管理员保存的内容。重新加载会放弃本页未保存的修改。</view>
+    <button class="config-state-button ui-btn ui-btn-primary" disabled="{{loading || saving}}" bindtap="handleRetryLoad">放弃修改并重新加载</button>
+  </view>
   <view class="form-card ui-card">
     <view class="section-heading">
       <view class="section-heading-main">
@@ -80,7 +85,7 @@
     <view class="form-item">
       <view class="form-label">客服电话</view>
       <input class="form-input ui-input" maxlength="20" value="{{form.servicePhone}}" data-field="servicePhone" disabled="{{loading || saving}}" bindinput="handleInput" confirm-type="done" placeholder="请输入客服电话" aria-label="客服电话" />
-      <view class="form-tip">支持手机号、带区号座机或以 + 开头的国际号码。</view>
+      <view class="form-tip">支持手机号、带区号座机或以 + 开头的国际号码。留空后不提供电话拨打入口。</view>
     </view>
     <view class="form-divider"></view>
     <view class="form-item">
@@ -89,9 +94,9 @@
       <view class="form-tip">企业微信后台「我的企业」→企业信息」中可查看，以 ww 开头。</view>
     </view>
     <view class="form-item">
-      <view class="form-label">微信客服链接参数（extInfo）</view>
-      <textarea class="form-textarea ui-input" value="{{form.wxKfExtInfo}}" data-field="wxKfExtInfo" disabled="{{loading || saving}}" bindinput="handleInput" maxlength="512" placeholder="企业微信客服接入页打开小程序场景值参数（Base64 字符串）" aria-label="微信客服 extInfo 参数" />
-      <view class="field-meta"><view class="form-tip">企业微信「微信客服 → 客服账号 → 获取链接 → 小程序」场景值参数（Base64 字符串）。留空则降级使用原生轻量客服按钮。</view><view class="field-counter">{{form.wxKfExtInfo.length}} / 512</view></view>
+      <view class="form-label">微信客服链接</view>
+      <textarea class="form-textarea ui-input" value="{{form.wxKfExtInfo}}" data-field="wxKfExtInfo" disabled="{{loading || saving}}" bindinput="handleInput" maxlength="512" placeholder="https://work.weixin.qq.com/kfid/…" aria-label="微信客服链接" />
+      <view class="field-meta"><view class="form-tip">填写企业微信「微信客服 → 客服账号 → 获取链接」生成的 HTTPS 链接。与企业 ID 一起填写或一起清空。</view><view class="field-counter">{{form.wxKfExtInfo.length}} / 512</view></view>
     </view>
     <view class="form-item">
       <view class="form-label">我的页简介</view>
@@ -122,7 +127,7 @@
     <view class="form-item">
       <view class="form-label">城市列表</view>
       <textarea class="form-textarea ui-input" value="{{form.cityOptionsText}}" data-field="cityOptionsText" disabled="{{loading || saving}}" bindinput="handleInput" maxlength="300" placeholder="每行填写一个城市" aria-label="城市列表" />
-      <view class="field-meta"><view class="form-tip">每行一个城市，预约页会展示为可选列表。</view><view class="field-counter">{{form.cityOptionsText.length}} / 300</view></view>
+      <view class="field-meta"><view class="form-tip">每行一个城市，最多20个，每项限20字；留空可清除城市列表。</view><view class="field-counter">{{form.cityOptionsText.length}} / 300</view></view>
     </view>
   </view>
   <view class="form-card ui-card">
@@ -164,7 +169,7 @@
       <view class="field-meta"><view class="form-tip">提交前展示，请清晰说明联系用途与用户权利。</view><view class="field-counter">{{form.bookingPrivacyTip.length}} / 300</view></view>
     </view>
     <view class="form-item">
-      <view class="form-label">预约状态订阅模板 ID</view>
+      <view class="form-label">订阅提示模板</view>
       <input
         class="form-input ui-input"
         value="{{form.bookingStatusTemplateId}}"
@@ -173,14 +178,14 @@
         bindinput="handleInput"
         maxlength="128"
         confirm-type="done"
-        placeholder="留空时关闭状态订阅通知"
-        aria-label="预约状态订阅模板 ID"
+        placeholder="填写模板 ID，可留空"
+        aria-label="订阅提示模板 ID"
       />
       <view class="template-state {{form.bookingStatusTemplateId ? 'template-state-active' : ''}}">
         <view class="template-state-icon" aria-hidden="true"><view class="template-state-check"></view></view>
-        <view>{{form.bookingStatusTemplateId ? '已填写订阅模板 ID' : '当前未启用状态订阅通知'}}</view>
+        <view>{{form.bookingStatusTemplateId ? '已填写订阅提示模板' : '未配置订阅提示模板'}}</view>
       </view>
-      <view class="form-tip">模板需包含：车辆名称 thing1、预约状态 phrase2、服务说明 thing3、更新时间 time4。未配置时预约仍可提交，但用户收不到状态变更提醒。</view>
+      <view class="form-tip">留空后不再弹出新的订阅授权提示；这不会撤回用户此前的通知授权。模板需包含：车辆名称 thing1、预约状态 phrase2、服务说明 thing3、更新时间 time4。</view>
     </view>
   </view>
   <view class="form-card ui-card">
@@ -239,6 +244,74 @@
       <view class="form-label">预估价格边界说明</view>
       <textarea class="form-textarea ui-input" value="{{form.rentalEstimateDisclaimer}}" data-field="rentalEstimateDisclaimer" disabled="{{loading || saving}}" bindinput="handleInput" maxlength="200" placeholder="明确页面价格、正式报价和车辆锁定的边界" aria-label="预估价格边界说明" />
       <view class="field-counter field-counter-standalone">{{form.rentalEstimateDisclaimer.length}} / 200</view>
+    </view>
+  </view>
+  <view class="form-card ui-card">
+    <view class="section-heading">
+      <view class="section-heading-main">
+        <view class="section-glyph section-glyph-home" aria-hidden="true"><view class="section-glyph-icon"></view></view>
+        <view>
+          <view class="section-eyebrow">SERVICE LOCATIONS</view>
+          <view class="section-heading-title">服务与网点</view>
+        </view>
+      </view>
+      <view class="section-index">06</view>
+    </view>
+    <view class="form-item">
+      <view class="form-label">服务时间</view>
+      <textarea class="form-textarea ui-input" value="{{form.serviceHoursText}}" data-field="serviceHoursText" disabled="{{loading || saving}}" bindinput="handleInput" maxlength="120" placeholder="填写实际服务时间，可留空" aria-label="服务时间" />
+      <view class="field-counter field-counter-standalone">{{form.serviceHoursText.length}} / 120</view>
+    </view>
+    <view class="form-item">
+      <view class="form-label">救援电话</view>
+      <input class="form-input ui-input" value="{{form.emergencyPhone}}" data-field="emergencyPhone" disabled="{{loading || saving}}" bindinput="handleInput" maxlength="20" confirm-type="done" placeholder="填写实际救援电话，可留空" aria-label="救援电话" />
+      <view class="form-tip">服务时间和救援电话留空后，前台不再展示原内容。</view>
+    </view>
+    <view class="service-hubs-heading">
+      <view class="form-label">网点列表（{{form.serviceHubs.length}} / 30）</view>
+      <button class="hub-add-btn ui-btn ui-btn-ghost" disabled="{{loading || saving || form.serviceHubs.length >= 30}}" bindtap="handleAddServiceHub">添加网点</button>
+    </view>
+    <view wx:if="{{!form.serviceHubs.length}}" class="form-tip">暂未设置网点。添加并保存后，前台才会展示网点地址。</view>
+    <view wx:for="{{form.serviceHubs}}" wx:key="id" class="service-hub-card">
+      <view class="service-hub-heading">
+        <view class="service-hub-title">网点 {{index + 1}}</view>
+        <button class="hub-remove-btn" data-id="{{item.id}}" disabled="{{loading || saving}}" bindtap="handleRemoveServiceHub" aria-label="删除网点 {{index + 1}}">删除</button>
+      </view>
+      <view class="form-item">
+        <view class="form-label">网点类型</view>
+        <picker range="{{hubTypeOptions}}" value="{{item.type === 'hub' ? 1 : item.type === 'delivery' ? 2 : 0}}" data-id="{{item.id}}" disabled="{{loading || saving}}" bindchange="handleServiceHubTypeChange" aria-label="选择网点 {{index + 1}} 的类型">
+          <view class="form-input ui-input hub-type-picker" hover-class="control-hover"><text>{{item.type === 'hub' ? '接送网点' : item.type === 'delivery' ? '送车地点' : '门店'}}</text><view class="hub-picker-chevron" aria-hidden="true"></view></view>
+        </picker>
+      </view>
+      <view class="form-item">
+        <view class="form-label">城市</view>
+        <input class="form-input ui-input" value="{{item.city}}" data-id="{{item.id}}" data-field="city" disabled="{{loading || saving}}" bindinput="handleServiceHubInput" maxlength="20" confirm-type="done" placeholder="填写所在城市" aria-label="网点城市" />
+      </view>
+      <view class="form-item">
+        <view class="form-label">网点名称</view>
+        <input class="form-input ui-input" value="{{item.name}}" data-id="{{item.id}}" data-field="name" disabled="{{loading || saving}}" bindinput="handleServiceHubInput" maxlength="60" confirm-type="done" placeholder="填写网点名称" aria-label="网点名称" />
+      </view>
+      <view class="form-item">
+        <view class="form-label">详细地址</view>
+        <textarea class="form-textarea ui-input" value="{{item.address}}" data-id="{{item.id}}" data-field="address" disabled="{{loading || saving}}" bindinput="handleServiceHubInput" maxlength="200" placeholder="填写真实地址" aria-label="网点详细地址" />
+        <view class="field-counter field-counter-standalone">{{item.address.length}} / 200</view>
+      </view>
+      <view class="form-item">
+        <view class="form-label">费用说明（选填）</view>
+        <textarea class="form-textarea ui-input" value="{{item.feeText}}" data-id="{{item.id}}" data-field="feeText" disabled="{{loading || saving}}" bindinput="handleServiceHubInput" maxlength="100" placeholder="按实际情况填写收费或免费条件" aria-label="网点费用说明" />
+        <view class="field-counter field-counter-standalone">{{item.feeText.length}} / 100</view>
+      </view>
+      <view class="hub-coordinate-row">
+        <view class="form-item hub-coordinate-field">
+          <view class="form-label">纬度（选填）</view>
+          <input class="form-input ui-input" value="{{item.latitude}}" data-id="{{item.id}}" data-field="latitude" disabled="{{loading || saving}}" bindinput="handleServiceHubInput" maxlength="24" confirm-type="done" placeholder="-90 至 90" aria-label="网点纬度" />
+        </view>
+        <view class="form-item hub-coordinate-field">
+          <view class="form-label">经度（选填）</view>
+          <input class="form-input ui-input" value="{{item.longitude}}" data-id="{{item.id}}" data-field="longitude" disabled="{{loading || saving}}" bindinput="handleServiceHubInput" maxlength="24" confirm-type="done" placeholder="-180 至 180" aria-label="网点经度" />
+        </view>
+      </view>
+      <view class="form-tip">经纬度须成对填写，使用腾讯地图的 GCJ-02 国测局坐标；留空后仅展示地址，不提供导航。</view>
     </view>
   </view>
   <view class="action-dock ui-card">

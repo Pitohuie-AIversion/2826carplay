@@ -66,6 +66,9 @@ exports.main = async (event) => {
     }
 
     const currentStatus = String(current.status || "pending").trim() || "pending"
+    if (currentStatus === "cancelled") {
+      return { ok: true, id, status: "cancelled", updated: false, message: "隐私申请已撤回" }
+    }
     if (currentStatus !== "pending") {
       return createError("STATUS_NOT_ALLOWED", "申请已开始处理或已结束，不能撤回")
     }
@@ -83,6 +86,11 @@ exports.main = async (event) => {
     })
     const updatedCount = Number(updateRes && updateRes.stats && updateRes.stats.updated) || 0
     if (updatedCount < 1) {
+      const latestRes = await db.collection("privacy_requests").doc(id).field(PRIVACY_REQUEST_CANCEL_FIELDS).get()
+      const latest = latestRes && latestRes.data
+      if (latest && latest.openid === openid && latest.status === "cancelled") {
+        return { ok: true, id, status: "cancelled", updated: false, message: "隐私申请已撤回" }
+      }
       return createError("STATUS_CONFLICT", "申请状态已发生变化，请刷新后重试")
     }
 

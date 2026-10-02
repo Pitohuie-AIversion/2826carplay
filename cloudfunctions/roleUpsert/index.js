@@ -41,6 +41,11 @@ function normalizeRoleTokens(value) {
   return normalizeStringArray(value)
 }
 
+function extractPermissions(record) {
+  const tokens = normalizeRoleTokens([record && record.role].concat((record && record.roles) || [], (record && record.permissions) || []))
+  return ALLOWED_PERMISSIONS.filter((permission) => tokens.includes(permission) || tokens.includes(`${permission}r`))
+}
+
 function buildRoleDocumentId(openid) {
   return `role_${crypto.createHash("sha256").update(openid).digest("hex").slice(0, 27)}`
 }
@@ -216,6 +221,7 @@ exports.main = async (event) => {
     const payload = {
       openid: input.openid,
       role: input.permissions.length ? "operator" : "member",
+      roles: [],
       permissions: input.permissions,
       updatedAt: now,
       updatedByOpenid: operatorOpenid
@@ -224,7 +230,7 @@ exports.main = async (event) => {
     if (existedList.length) {
       const fromPermissions = []
       existedList.forEach((record) => {
-        normalizeRoleTokens(record && record.permissions ? record.permissions : []).forEach((permission) => {
+        extractPermissions(record).forEach((permission) => {
           if (!fromPermissions.includes(permission)) {
             fromPermissions.push(permission)
           }

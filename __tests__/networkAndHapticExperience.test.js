@@ -199,7 +199,7 @@ describe("网络重连与触感反馈全链路体验优化", () => {
       })
     })
 
-    test("预约列表页 bookings 在 loadError 状态下收到重连通知自动重试", () => {
+    test("预约列表页 bookings 在 loadFailed 状态下收到重连通知自动重试", () => {
       jest.isolateModules(() => {
         let definition
         global.Page = jest.fn((def) => {
@@ -213,7 +213,7 @@ describe("网络重连与触感反馈全链路体验优化", () => {
         }
 
         require("../pages/bookings/bookings")
-        const page = createMockPage(definition, { loadError: true })
+        const page = createMockPage(definition, { loadFailed: true })
         page.loadList = jest.fn()
 
         page.onLoad()
@@ -229,7 +229,7 @@ describe("网络重连与触感反馈全链路体验优化", () => {
   })
 
   describe("4. 预选城市无缝传递与租期/预估租金实时联动", () => {
-    test("车辆详情页将选定城市传递到预约跳转 URL", () => {
+    test("车辆详情页将当前保存地点传递到预约，旧入口城市不能覆盖它", () => {
       jest.isolateModules(() => {
         let definition
         global.Page = jest.fn((def) => {
@@ -253,12 +253,14 @@ describe("网络重连与触感反馈全链路体验优化", () => {
         page.loadFavoriteStatus = jest.fn()
 
         page.onLoad({ carId: "car_999", city: "杭州" })
+        page.setData({ detailVerified: true })
         page.handleBookingTap()
 
         expect(navigateToMock).toHaveBeenCalledTimes(1)
         const url = navigateToMock.mock.calls[0][0].url
         expect(url).toContain("vehicleId=car_999")
-        expect(url).toContain("city=%E6%9D%AD%E5%B7%9E") // encodeURIComponent("杭州")
+        expect(new URL(url, "https://local.test").searchParams.get("city")).toBe("上海")
+        page.onUnload()
       })
     })
 
@@ -351,21 +353,29 @@ describe("网络重连与触感反馈全链路体验优化", () => {
         })
 
         require("../pages/booking-detail/booking-detail")
-        const page = createMockPage(definition, { servicePhone: "400-888-2826" })
+        const page = createMockPage(definition, { servicePhone: "400-321-7654", emergencyPhone: "400-123-4567" })
 
         page.handleEmergencyCall()
         expect(vibrateMock).toHaveBeenCalledWith(expect.objectContaining({ style: "medium" }))
-        expect(makePhoneCallMock).toHaveBeenCalledWith(expect.objectContaining({ phoneNumber: "400-888-2826" }))
+        expect(makePhoneCallMock).toHaveBeenCalledWith(expect.objectContaining({ phoneNumber: "400-123-4567" }))
       })
     })
 
-    test("car-detail 顾问微信复制与海报保存触发 medium 触感反馈", () => {
+    test("car-detail 微信咨询打开已保存客服链接，海报保存保留 medium 触感反馈", () => {
       jest.isolateModules(() => {
         const vibrateMock = jest.fn()
         const setClipboardMock = jest.fn(({ success }) => success && success())
         const saveImageMock = jest.fn(({ success }) => success && success())
+        const openCustomerServiceMock = jest.fn()
+        const serviceConfig = { wxKfCorpId: "ww_saved_corp", wxKfExtInfo: "https://work.weixin.qq.com/kfid/saved_service" }
         global.wx = {
+          cloud: {
+            callFunction: jest.fn(({ name, success }) => {
+              if (name === "operationConfigGet") success({ result: { ok: true, config: serviceConfig } })
+            })
+          },
           vibrateShort: vibrateMock,
+          openCustomerServiceChat: openCustomerServiceMock,
           setClipboardData: setClipboardMock,
           saveImageToPhotosAlbum: saveImageMock,
           showToast: jest.fn()
@@ -377,14 +387,22 @@ describe("网络重连与触感反馈全链路体验优化", () => {
         })
 
         require("../pages/car-detail/car-detail")
-        const page = createMockPage(definition, { posterImagePath: "/tmp/poster.png" })
+        const page = createMockPage(definition, {
+          carId: "car_poster", car: { id: "car_poster" },
+          posterModalVisible: true, posterImagePath: "/tmp/poster.png"
+        })
         page.handleClosePosterModal = jest.fn()
 
         page.handleWechatConsult()
-        expect(vibrateMock).toHaveBeenCalledWith(expect.objectContaining({ style: "medium" }))
+        expect(openCustomerServiceMock).toHaveBeenCalledWith(expect.objectContaining({
+          corpId: serviceConfig.wxKfCorpId,
+          extInfo: { url: serviceConfig.wxKfExtInfo }
+        }))
+        expect(setClipboardMock).not.toHaveBeenCalled()
 
         vibrateMock.mockClear()
         page.handleSavePoster()
+        expect(saveImageMock).toHaveBeenCalledWith(expect.objectContaining({ filePath: "/tmp/poster.png" }))
         expect(vibrateMock).toHaveBeenCalledWith(expect.objectContaining({ style: "medium" }))
       })
     })

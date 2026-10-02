@@ -187,8 +187,8 @@ describe("pages/booking availability advisory", () => {
     })
     expect(page.data.formProgress).toMatchObject({
       completed: 1,
-      total: 5,
-      percent: 20,
+      total: 6,
+      percent: 17,
       nextLabel: "填写正确手机号",
       submitHint: "还需完成：填写正确手机号",
       contactStepClass: "form-step-current",
@@ -208,9 +208,14 @@ describe("pages/booking availability advisory", () => {
       }
     })
 
+    expect(page.data.formProgress.ready).toBe(false)
+    expect(page.data.formProgress.nextLabel).toBe("填写或选择取车城市")
+    page.data.cityOptions = ["杭州"]
+    page.handleCityChange({ detail: { value: 0 } })
+
     expect(page.data.formProgress).toEqual({
-      completed: 5,
-      total: 5,
+      completed: 6,
+      total: 6,
       percent: 100,
       ready: true,
       userNameComplete: true,
@@ -324,7 +329,7 @@ describe("pages/booking availability advisory", () => {
     expect(wxml).toContain('loading="{{isSubmitting}}"')
     expect(wxml).toContain('wx:if="{{!isSubmitting}}" class="submit-native-icon"')
     expect(wxml).toContain('wx:if="{{!isSubmitting}}" class="submit-arrow"')
-    expect(wxml).toContain('aria-label="填写取车城市，选填"')
+    expect(wxml).toContain('aria-label="填写取车城市，必填"')
     expect(wxml).toContain('aria-label="填写预约备注，选填，最多二百字"')
     expect(wxml).toContain("success-next-phone")
     expect(wxml).toContain("success-action-document")

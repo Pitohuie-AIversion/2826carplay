@@ -61,6 +61,11 @@ function toTimestamp(value) {
   return Number.isFinite(parsed) ? parsed : 0
 }
 
+function isMissingDocument(error) {
+  const message = String(error && (error.errMsg || error.message || error.code) || "").toLowerCase()
+  return /document_not_found|document.*(?:not found|not exist)/.test(message)
+}
+
 function buildVehicleCard(vehicle) {
   if (!vehicle || String(vehicle.status || "") === "retired") {
     return null
@@ -83,7 +88,9 @@ function buildVehicleCard(vehicle) {
   const coverImage = String(vehicle.coverImage || "").trim()
   const cover = coverImage || images[0] || ""
   const priceDay = Number.isInteger(vehicle.priceDay) && vehicle.priceDay > 0 ? vehicle.priceDay : 0
-  const statusMeta = STATUS_MAP[vehicle.status] || STATUS_MAP.idle
+  const statusMeta = Object.prototype.hasOwnProperty.call(STATUS_MAP, vehicle.status)
+    ? STATUS_MAP[vehicle.status]
+    : { status: "unknown", statusText: "状态待确认" }
   const tags = [vehicleTypeText]
 
   if (vehicle.transmission) {
@@ -109,7 +116,7 @@ function buildVehicleCard(vehicle) {
     priceText: priceDay ? `今日 ￥${priceDay} / 24小时` : "价格到店详询",
     status: statusMeta.status,
     statusText: statusMeta.statusText,
-    statusClass: `status-${statusMeta.status}`,
+    statusClass: statusMeta.status === "unknown" ? "status-pending" : `status-${statusMeta.status}`,
     tags: tags.filter(Boolean).slice(0, 3)
   }
 }
@@ -123,7 +130,8 @@ async function readVehicle(vehicleId) {
       .get()
     return res && res.data ? res.data : null
   } catch (error) {
-    return null
+    if (isMissingDocument(error)) return null
+    throw error
   }
 }
 
@@ -152,20 +160,26 @@ async function readFavoritePage(openid, page, pageSize) {
           : String(indexError),
       createdAt: new Date().toISOString()
     })
-    const res = await db
-      .collection("favorites")
-      .where({ openid })
-      .field(FAVORITE_RECORD_FIELDS)
-      .limit(FALLBACK_MAX_RECORDS + 1)
-      .get()
-    const rawList = res && Array.isArray(res.data) ? res.data : []
-    const records = rawList
-      .slice(0, FALLBACK_MAX_RECORDS)
-      .sort((prev, next) => toTimestamp(next.createdAt) - toTimestamp(prev.createdAt))
+    const records = []
+    while (records.length <= FALLBACK_MAX_RECORDS) {
+      const limit = Math.min(100, FALLBACK_MAX_RECORDS + 1 - records.length)
+      const res = await db.collection("favorites").where({ openid })
+        .field(FAVORITE_RECORD_FIELDS).skip(records.length).limit(limit).get()
+      const batch = res && Array.isArray(res.data) ? res.data : []
+      records.push(...batch)
+      if (batch.length < limit) break
+    }
+    if (records.length > FALLBACK_MAX_RECORDS) {
+      const error = new Error("收藏数量超过降级读取上限，请配置收藏查询索引")
+      error.code = "INDEX_REQUIRED"
+      throw error
+    }
+    records.sort((prev, next) => toTimestamp(next.createdAt) - toTimestamp(prev.createdAt) ||
+      String(prev._id || "").localeCompare(String(next._id || "")))
     const start = page * pageSize
     return {
       records: records.slice(start, start + pageSize),
-      hasMore: start + pageSize < records.length || rawList.length > FALLBACK_MAX_RECORDS
+      hasMore: start + pageSize < records.length
     }
   }
 }
@@ -224,7 +238,7 @@ exports.main = async (event) => {
     })
     return {
       ok: false,
-      code: "INTERNAL_ERROR",
+      code: error && error.code === "INDEX_REQUIRED" ? "INDEX_REQUIRED" : "INTERNAL_ERROR",
       message: "收藏列表加载失败，请稍后重试"
     }
   }

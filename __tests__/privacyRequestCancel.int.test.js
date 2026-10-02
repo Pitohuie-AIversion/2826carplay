@@ -51,6 +51,13 @@ async function loadModule(openid, mockDb) {
 }
 
 describe("cloudfunctions/privacyRequestCancel integration", () => {
+  test("撤回成功后的重试返回成功而不重复修改或审计", async () => {
+    const mocks = createMockDb({ current: { openid: "user_openid", type: "access", status: "cancelled" } })
+    const mod = await loadModule("user_openid", mocks.db)
+    expect(await mod.main({ id: "privacy_1" })).toMatchObject({ ok: true, status: "cancelled", updated: false })
+    expect(mocks.requestUpdate).not.toHaveBeenCalled()
+    expect(mocks.auditAdd).not.toHaveBeenCalled()
+  })
   test("用户可撤回自己的待处理申请", async () => {
     const mocks = createMockDb({
       current: {

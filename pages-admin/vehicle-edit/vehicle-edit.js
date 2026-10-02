@@ -13,33 +13,13 @@ const {
 } = require("../../shared/pageNativeAction")
 const VEHICLE_EDIT_LOAD_TIMEOUT_MS = 15 * 1000
 const VEHICLE_EDIT_SUBMIT_TIMEOUT_MS = 20 * 1000
-const VEHICLE_TYPE_LABEL_MAP = {
-  sedan: "轿车",
-  suv: "SUV",
-  mpv: "MPV",
-  sports: "跑车",
-  truck: "卡车",
-  other: "其他"
-}
-const STATUS_LABEL_MAP = {
-  active: "在用",
-  idle: "闲置",
-  maintenance: "维修",
-  retired: "停用"
-}
-const TRANSMISSION_LABEL_MAP = {
-  manual: "手动挡",
-  automatic: "自动挡"
-}
-const FUEL_TYPE_LABEL_MAP = {
-  gasoline: "燃油",
-  electric: "纯电",
-  hybrid: "混动"
-}
-const ARCHIVE_REVIEW_LABEL_MAP = {
-  pending: "待复核",
-  reviewed: "已复核"
-}
+const {
+  VEHICLE_TYPE_LABEL_MAP,
+  STATUS_LABEL_MAP,
+  TRANSMISSION_LABEL_MAP,
+  FUEL_TYPE_LABEL_MAP,
+  ARCHIVE_REVIEW_LABEL_MAP
+} = require("../../shared/vehicleLabels")
 const DRIVETRAIN_OPTIONS = [
   "前置前驱 (FF)",
   "前置后驱 (FR)",
@@ -70,6 +50,9 @@ const FIELD_LABEL_MAP = {
   vin: "VIN",
   engineNumber: "发动机号",
   publicDescription: "公开说明",
+  publicDrivingTips: "人工用车提示",
+  archiveDate: "保养到期日",
+  archiveReview: "年检到期日",
   note: "内部备注",
   publicMaterialsUpdatedDate: "实拍/资料更新日期",
   publicInspectionDate: "最近保养/检查日期",
@@ -142,6 +125,9 @@ Page({
       vin: "",
       engineNumber: "",
       publicDescription: "",
+      publicDrivingTips: "",
+      archiveDate: "",
+      archiveReview: "",
       note: "",
       publicMaterialsUpdatedDate: "",
       publicInspectionDate: "",
@@ -294,19 +280,20 @@ Page({
           return
         }
         const current = result.detail
+        this._vehicleVersion = Number(current.vehicleVersion) || 0
         const vehicleTypeIndex = Math.max(vehicleUtils.VEHICLE_TYPES.indexOf(current.vehicleType), 0)
         const statusIndex = Math.max(vehicleUtils.VEHICLE_STATUSES.indexOf(current.status), 0)
         const transmissionIndex = Math.max(vehicleUtils.TRANSMISSION_TYPES.indexOf(current.transmission), 0)
         const fuelTypeIndex = Math.max(vehicleUtils.FUEL_TYPES.indexOf(current.fuelType), 0)
-        const vehicleType = vehicleUtils.VEHICLE_TYPES[vehicleTypeIndex] || ""
-        const status = vehicleUtils.VEHICLE_STATUSES[statusIndex] || ""
+        const vehicleType = String(current.vehicleType || "").trim()
+        const status = String(current.status || "").trim()
         const transmission = current.transmission || ""
         const fuelType = current.fuelType || ""
         const archiveReviewStatus = vehicleUtils.ARCHIVE_REVIEW_STATUSES.includes(current.publicArchiveReviewStatus)
           ? current.publicArchiveReviewStatus
           : "pending"
         const archiveReviewIndex = Math.max(vehicleUtils.ARCHIVE_REVIEW_STATUSES.indexOf(archiveReviewStatus), 0)
-        const rawPerf = current.performance && typeof current.performance === "object" ? current.performance : {}
+        const rawPerf = vehicleUtils.normalizePerformanceInput(current.performance) || {}
         const perfDrivetrain = String(rawPerf.drivetrain || "").trim()
         const drivetrainIndex = DRIVETRAIN_OPTIONS.indexOf(perfDrivetrain)
         const highlightsRaw = Array.isArray(rawPerf.highlights) ? rawPerf.highlights.slice() : []
@@ -326,8 +313,8 @@ Page({
           fuelTypeIndex: fuelType ? fuelTypeIndex : 0,
           archiveReviewIndex,
           drivetrainIndex,
-          vehicleTypeLabel: VEHICLE_TYPE_LABEL_MAP[vehicleType] || "",
-          statusLabel: STATUS_LABEL_MAP[status] || "",
+          vehicleTypeLabel: VEHICLE_TYPE_LABEL_MAP[vehicleType] || vehicleType,
+          statusLabel: STATUS_LABEL_MAP[status] || status,
           transmissionLabel: TRANSMISSION_LABEL_MAP[transmission] || "",
           fuelTypeLabel: FUEL_TYPE_LABEL_MAP[fuelType] || "",
           archiveReviewLabel: ARCHIVE_REVIEW_LABEL_MAP[archiveReviewStatus],
@@ -353,6 +340,9 @@ Page({
             vin: current.vin || "",
             engineNumber: current.engineNumber || "",
             publicDescription: current.publicDescription || "",
+            publicDrivingTips: current.publicDrivingTips || "",
+            archiveDate: current.archiveDate || "",
+            archiveReview: current.archiveReview || "",
             note: current.note || "",
             publicMaterialsUpdatedDate: current.publicMaterialsUpdatedDate || "",
             publicInspectionDate: current.publicInspectionDate || "",
@@ -416,6 +406,9 @@ Page({
     }
     if (field === "vin" || field === "engineNumber") {
       value = String(value || "").slice(0, 32)
+    }
+    if (field === "publicDrivingTips") {
+      value = String(value || "").slice(0, 500)
     }
     if (field === "publicDescription" || field === "note") {
       value = String(value || "").slice(0, 200)
@@ -537,6 +530,29 @@ Page({
     })
     markUnsaved(this, "车辆资料尚未保存，确定离开吗？")
   },
+  handleDueDateChange(event) {
+    if (this.data.isSubmitting) return
+    const field = String(event.currentTarget.dataset.field || "")
+    if (!["archiveDate", "archiveReview"].includes(field)) return
+    this.setData({ [`form.${field}`]: event.detail.value })
+    markUnsaved(this, "车辆资料尚未保存，确定离开吗？")
+  },
+  handleClearOptionalField(event) {
+    if (this.data.isSubmitting) return
+    const field = String(event.currentTarget.dataset.field || "")
+    if (!["archiveDate", "archiveReview", "publicMaterialsUpdatedDate", "publicInspectionDate", "performance.drivetrain", "transmission", "fuelType"].includes(field)) return
+    const patch = { [`form.${field}`]: "" }
+    if (field === "performance.drivetrain") {
+      patch.drivetrainIndex = -1
+      patch.drivetrainLabel = ""
+    }
+    if (field === "transmission" || field === "fuelType") {
+      patch[`${field}Index`] = 0
+      patch[`${field}Label`] = ""
+    }
+    this.setData(patch)
+    markUnsaved(this, "车辆资料尚未保存，确定离开吗？")
+  },
   handleDrivetrainChange(event) {
     if (this.data.isSubmitting) {
       return
@@ -567,7 +583,7 @@ Page({
     if (inner === "acceleration") {
       value = String(value || "").replace(/[^\d.s秒]/g, "").slice(0, 12)
     } else if (inner === "horsepower") {
-      value = String(value || "").replace(/[^\d.kwKWpshP匹马力千]/g, "").slice(0, 16)
+      value = String(value || "").replace(/[^\d.kKwWpPsShH匹马力千瓦]/g, "").slice(0, 16)
     } else if (inner === "torque") {
       value = String(value || "").replace(/[^\d.nN·mM牛米]/g, "").slice(0, 18)
     } else {
@@ -641,29 +657,16 @@ Page({
     if (!perf) {
       return form
     }
-    const cleanPerf = {}
-    const acc = String(perf.acceleration || "").trim()
-    const hp = String(perf.horsepower || "").trim()
-    const drive = String(perf.drivetrain || "").trim()
-    const torque = String(perf.torque || "").trim()
-    if (acc) cleanPerf.acceleration = acc
-    if (hp) cleanPerf.horsepower = hp
-    if (drive) cleanPerf.drivetrain = drive
-    if (torque) cleanPerf.torque = torque
-    const rawHL = Array.isArray(perf.highlights) ? perf.highlights : []
-    const highlights = rawHL
-      .map((item) => String(item || "").trim())
-      .filter((item) => item)
-    if (highlights.length) cleanPerf.highlights = highlights
+    const cleanPerf = vehicleUtils.normalizePerformanceInput(perf)
     const cleanForm = Object.assign({}, form)
-    cleanForm.performance = Object.keys(cleanPerf).length ? cleanPerf : undefined
+    cleanForm.performance = cleanPerf
     return cleanForm
   },
   handleManageImages() {
     if (!this.data.id || this.data.loading) {
       return
     }
-    const action = beginPageNativeAction(this)
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.navigateTo({
       url: `/pages-admin/vehicle-detail-manage/vehicle-detail-manage?id=${this.data.id}`,
       fail: () => {
@@ -688,7 +691,7 @@ Page({
     this.fetchDetail(this.data.id)
   },
   handleBackList() {
-    const action = beginPageNativeAction(this)
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     const pages = getCurrentPages()
     if (pages.length > 1) {
       wx.navigateBack({
@@ -775,6 +778,7 @@ Page({
     }
     const submitData = {
       id: String(this.data.id || "").trim(),
+      expectedVersion: Number(this._vehicleVersion) || 0,
       ...check.value
     }
     const requestId = Number(this._vehicleEditSubmitRequestId || 0) + 1
@@ -818,6 +822,9 @@ Page({
         }
         const result = res && res.result ? res.result : null
         if (result && result.ok) {
+          if (Number.isSafeInteger(result.vehicleVersion) && result.vehicleVersion >= 0) {
+            this._vehicleVersion = result.vehicleVersion
+          }
           clearUnsaved(this)
           wx.showToast({
             title: "保存成功",
@@ -825,6 +832,11 @@ Page({
             duration: 1200
           })
           this.scheduleVehicleEditNavigation(requestId)
+          return
+        }
+        if (result && result.code === "VERSION_CONFLICT") {
+          this.setData({ isSubmitting: false })
+          this.confirmReloadVehicle()
           return
         }
         const title =
@@ -857,6 +869,20 @@ Page({
       clearTimeout(this._vehicleEditLoadTimer)
       this._vehicleEditLoadTimer = null
     }
+  },
+  confirmReloadVehicle() {
+    const action = beginPageNativeAction(this, { requireCurrent: true })
+    wx.showModal({
+      title: "车辆资料已更新",
+      confirmColor: "#528fff",
+      content: "其他管理员已修改此车。重新加载会替换当前未保存的内容，请先记录需要保留的修改。",
+      confirmText: "重新加载",
+      cancelText: "保留修改",
+      success: (res) => {
+        if (!isPageNativeActionActive(this, action) || !res.confirm) return
+        this.fetchDetail(this.data.id)
+      }
+    })
   },
   clearVehicleEditSubmitTimer() {
     if (this._vehicleEditSubmitTimer) {

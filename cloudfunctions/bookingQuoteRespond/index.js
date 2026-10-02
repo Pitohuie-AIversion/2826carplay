@@ -7,7 +7,8 @@ const db = cloud.database()
 const BOOKING_FIELDS = { _id: true, openid: true, status: true, latestQuoteId: true, vehicleId: true, vehicleName: true, startDate: true, endDate: true, attribution: true }
 const QUOTE_FIELDS = { _id: true, bookingId: true, status: true, validUntil: true, version: true, sentAt: true, confirmedAt: true, adjustmentRequestedAt: true }
 const VEHICLE_FIELDS = { status: true, brandModel: true, plateNumber: true }
-const MAX_OCCUPANCY_DAYS = 90
+// Six fixed document operations plus one read and one write per occupied date.
+const MAX_OCCUPANCY_DAYS = 47
 const ATTRIBUTION_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/
 const ATTRIBUTION_CHANNELS = ["direct", "wechat_share", "moments", "qr", "official_account", "campaign"]
 const ATTRIBUTION_SCENES = ["weekend_trip", "business_reception", "group_travel", "ev_experience"]
@@ -32,8 +33,14 @@ function todayInChina() {
   return new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10)
 }
 
+function isValidDateOnly(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value || ""))) return false
+  const time = Date.parse(`${value}T00:00:00.000Z`)
+  return Number.isFinite(time) && new Date(time).toISOString().slice(0, 10) === value
+}
+
 function enumerateDates(startDate, endDate) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(startDate || "")) || !/^\d{4}-\d{2}-\d{2}$/.test(String(endDate || "")) || endDate < startDate) return []
+  if (!isValidDateOnly(startDate) || !isValidDateOnly(endDate) || endDate < startDate) return []
   const dates = []
   const end = Date.parse(`${endDate}T00:00:00.000Z`)
   for (let time = Date.parse(`${startDate}T00:00:00.000Z`); time <= end && dates.length <= MAX_OCCUPANCY_DAYS; time += 86400000) {
@@ -123,9 +130,10 @@ exports.main = async (event) => {
       if (!quote || String(quote.bookingId || "") !== input.bookingId) return { error: createError("NOT_FOUND", "报价不存在") }
 
       const targetStatus = input.action === "confirm" ? "confirmed" : "adjustment_requested"
-      if (booking.status === targetStatus && quote.status === targetStatus) return { duplicate: true, targetStatus, quote, attribution: booking.attribution, vehicleId: booking.vehicleId }
+      if (booking.latestQuoteId === input.quoteId && booking.status === targetStatus && quote.status === targetStatus) return { duplicate: true, targetStatus, quote, attribution: booking.attribution, vehicleId: booking.vehicleId }
       if (booking.status !== "quoted" || booking.latestQuoteId !== input.quoteId || quote.status !== "sent") return { error: createError("STATUS_NOT_ALLOWED", "当前报价状态已变化，请刷新后重试") }
 
+      if (!isValidDateOnly(quote.validUntil)) return { error: createError("QUOTE_INVALID", "报价有效期无效，请联系顾问重新报价") }
       if (String(quote.validUntil || "") < todayInChina()) {
         await transaction.collection("booking_quotes").doc(input.quoteId).update({ data: { status: "expired", responseStatus: "expired", expiredAt: db.serverDate(), updatedAt: db.serverDate() } })
         await transaction.collection("bookings").doc(input.bookingId).update({ data: { status: "contacted", updatedAt: db.serverDate() } })
@@ -136,13 +144,20 @@ exports.main = async (event) => {
       if (input.action === "confirm") {
         const vehicleId = String(booking.vehicleId || "").trim()
         const dates = enumerateDates(String(booking.startDate || ""), String(booking.endDate || booking.startDate || ""))
-        if (!vehicleId || !dates.length || dates.length > MAX_OCCUPANCY_DAYS) {
+        if (!vehicleId || !dates.length) {
           return { error: createError("BOOKING_DATES_INVALID", "预约车辆或日期无效，请联系顾问调整后重试") }
+        }
+        if (dates.length > MAX_OCCUPANCY_DAYS) {
+          return { error: createError("BOOKING_RANGE_TOO_LONG", "一次最多确认47个占用日期，请联系顾问分段安排", { maxOccupancyDays: MAX_OCCUPANCY_DAYS }) }
         }
         const vehicle = await getDocOrNull(transaction.collection("vehicles"), vehicleId, VEHICLE_FIELDS)
         if (!vehicle) return { error: createError("VEHICLE_NOT_FOUND", "预约车辆已删除，不能确认档期") }
-        if (["maintenance", "retired"].includes(String(vehicle.status || ""))) {
+        const vehicleStatus = String(vehicle.status || "").trim()
+        if (["maintenance", "retired"].includes(vehicleStatus)) {
           return { error: createError("VEHICLE_NOT_OCCUPIABLE", "车辆维修或已停用，不能确认档期") }
+        }
+        if (!["idle", "active"].includes(vehicleStatus)) {
+          return { error: createError("VEHICLE_NOT_OCCUPIABLE", "车辆状态待核对，请联系顾问后再确认档期") }
         }
         for (const date of dates) {
           const occupied = await getDocOrNull(transaction.collection("vehicle_calendar_days"), dayDocumentId(vehicleId, date), { blockId: true, bookingId: true, kind: true })
@@ -204,7 +219,7 @@ exports.main = async (event) => {
     }
     if (!outcome.duplicate) await writeAuditLogBestEffort({ openid, action: input.action === "confirm" ? "bookingQuoteConfirm" : "bookingQuoteAdjustmentRequest", bookingId: input.bookingId, quoteId: input.quoteId, version: Number(outcome.quote.version || 0), fromStatus: "quoted", toStatus: outcome.targetStatus })
     if (!outcome.duplicate && input.action === "confirm") await writeContentConfirmationBestEffort(outcome.attribution, outcome.vehicleId)
-    return { ok: true, action: input.action, updated: !outcome.duplicate, bookingStatus: outcome.targetStatus, quoteId: input.quoteId, message: input.action === "confirm" ? "报价已确认（尚未付款）" : "调整申请已提交" }
+    return { ok: true, action: input.action, updated: !outcome.duplicate, bookingStatus: outcome.targetStatus, quoteId: input.quoteId, message: input.action === "confirm" ? "报价已确认，所选档期已保留（尚未付款）" : "调整申请已提交" }
   } catch (error) {
     const errorMessage = String(error && (error.message || error.errMsg) || error).slice(0, 300)
     await writeErrorLogBestEffort({ function: "bookingQuoteRespond", bookingId: input.bookingId, quoteId: input.quoteId, action: input.action, authenticated: Boolean(openid), errorMessage })

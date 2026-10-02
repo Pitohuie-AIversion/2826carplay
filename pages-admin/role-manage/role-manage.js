@@ -1,4 +1,4 @@
-const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
+const { cancelPagePermissionCheck, clearPagePermissionCache, requirePagePermission } = require("../../shared/pageAuth")
 const { formatToastTitle } = require("../../shared/uiFeedback")
 const { clearUnsaved, markUnsaved } = require("../../shared/unsavedChanges")
 const PERMISSION_OPTIONS = [
@@ -353,6 +353,7 @@ Page({
           this.setData({ saving: false })
           return
         }
+        clearPagePermissionCache()
         wx.showToast({
         title: formatToastTitle(result.message, "保存成功"),
           icon: "success"

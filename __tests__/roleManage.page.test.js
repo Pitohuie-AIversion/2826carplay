@@ -3,6 +3,7 @@ const path = require("path")
 
 jest.mock("../shared/pageAuth", () => ({
   cancelPagePermissionCheck: jest.fn(),
+  clearPagePermissionCache: jest.fn(),
   requirePagePermission: jest.fn()
 }))
 
@@ -195,6 +196,18 @@ describe("pages/role-manage 权限视觉与选择", () => {
       title: "cloud down",
       icon: "none"
     })
+  })
+
+  test("权限保存成功后清除页面权限缓存", () => {
+    let request
+    global.wx = { showLoading: jest.fn(), hideLoading: jest.fn(), showToast: jest.fn(), cloud: { callFunction: jest.fn((options) => { request = options }) } }
+    const page = createPage(loadPageDefinition(), { initialLoading: false, formOpenid: "member_1" })
+    const { clearPagePermissionCache } = require("../shared/pageAuth")
+    page.fetchRoleList = jest.fn()
+    page.handleSubmit()
+    request.success({ result: { ok: true } })
+    expect(clearPagePermissionCache).toHaveBeenCalledTimes(1)
+    expect(page.fetchRoleList).toHaveBeenCalledTimes(1)
   })
 
   test("成员列表使用盾牌和成员图标而非字母头像", () => {

@@ -1,5 +1,6 @@
 const cloud = require("wx-server-sdk")
 const vehicleUtils = require("./vehicle")
+const { updateVehicle } = require("./vehicleRevision")
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
@@ -23,6 +24,10 @@ const VEHICLE_UPDATE_FIELD_NAMES = [
   "seats",
   "priceDay",
   "rentalDiscountTiers",
+  "performance",
+  "publicDrivingTips",
+  "archiveDate",
+  "archiveReview",
   "publicDescription",
   "vin",
   "engineNumber",
@@ -170,6 +175,7 @@ async function writeAuditLogBestEffort(payload) {
 function normalizeUpdateInput(event) {
   const payload = event && typeof event === "object" ? event : {}
   const input = {
+    expectedVersion: payload.expectedVersion,
     id: String(payload.id || "").trim(),
     plateNumber: payload.plateNumber,
     vehicleType: payload.vehicleType,
@@ -185,6 +191,10 @@ function normalizeUpdateInput(event) {
     "seats",
     "priceDay",
     "rentalDiscountTiers",
+    "performance",
+    "publicDrivingTips",
+    "archiveDate",
+    "archiveReview",
     "publicDescription",
     "vin",
     "engineNumber",
@@ -267,23 +277,19 @@ exports.main = async (event) => {
       return vehicleUtils.createError("DUPLICATE_PLATE", "车牌号已存在", { plateNumber })
     }
 
-    await db.collection("vehicles").doc(input.id).update({
-      data: {
-        ...payload,
-        updatedAt: db.serverDate()
-      }
-    })
+    const mutation = await updateVehicle(db, input.id, payload, input.expectedVersion, current.status)
 
     const changedKeys = buildVehicleDiff(current, payload)
-    await writeAuditLogBestEffort({
+    if (mutation.updated) await writeAuditLogBestEffort({
       openid,
       action: "vehicleUpdate",
       vehicleId: input.id,
       changedKeys
     })
 
-    return { ok: true, id: input.id }
+    return { ok: true, id: input.id, vehicleVersion: mutation.vehicleVersion }
   } catch (error) {
+    if (error && error.vehicleRevisionError) return vehicleUtils.createError(error.code, error.message)
     if (isDuplicateKeyError(error)) {
       return vehicleUtils.createError("DUPLICATE_PLATE", "车牌号已存在", { plateNumber })
     }

@@ -1,74 +1,34 @@
 const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
-const { isUserCancelError, removeCsvFile } = require("../../shared/csvFile")
+const { isUserCancelError, removeCsvFile, saveCsvFile } = require("../../shared/csvFile")
 const { formatToastTitle } = require("../../shared/uiFeedback")
 const { requestOperationConfig } = require("../../shared/operationConfigRequest")
 const {
   activatePageCsvFileActions,
+  applyPageCsvFileRemoval,
   beginPageCsvFileAction,
   cancelPageCsvFileActions,
-  isPageCsvFileActionActive
+  isPageCsvFileActionActive,
+  markPageCsvFileRemoved
 } = require("../../shared/pageCsvFileActions")
 const {
   activatePageNativeActions,
   beginPageNativeAction,
   cancelPageNativeActions,
-  isPageNativeActionActive
+  isPageNativeActionActive,
+  isPageCurrent
 } = require("../../shared/pageNativeAction")
 const { formatDisplayTime } = require("../../shared/formatTime")
-const STATUS_OPTIONS = [
-  { value: "all", label: "全部" },
-  { value: "pending", label: "待联系" },
-  { value: "contacted", label: "已联系" },
-  { value: "quoted", label: "已报价" },
-  { value: "adjustment_requested", label: "待调整" },
-  { value: "confirmed", label: "已确认" },
-  { value: "completed", label: "已完成" },
-  { value: "cancelled", label: "已取消" }
-]
-const STATUS_TEXT_MAP = {
-  pending: "待联系",
-  contacted: "已联系",
-  quoted: "已报价",
-  adjustment_requested: "待调整",
-  confirmed: "已确认",
-  completed: "已完成",
-  cancelled: "已取消"
-}
-const STATUS_CLASS_MAP = {
-  pending: "status-pending",
-  contacted: "status-contacted",
-  quoted: "status-quoted",
-  adjustment_requested: "status-adjustment-requested",
-  confirmed: "status-confirmed",
-  completed: "status-completed",
-  cancelled: "status-cancelled"
-}
-const PRIORITY_TEXT_MAP = {
-  priority: "优先",
-  normal: "常规",
-  standby: "候补"
-}
-const COORDINATION_TEXT_MAP = {
-  pending: "待协调",
-  coordinating: "协调中",
-  resolved: "已协调"
-}
-const PRIORITY_OPTIONS = [
-  { value: "all", label: "全部级别" },
-  { value: "priority", label: "优先" },
-  { value: "normal", label: "常规" },
-  { value: "standby", label: "候补" }
-]
-const COORDINATION_OPTIONS = [
-  { value: "all", label: "全部进度" },
-  { value: "pending", label: "待协调" },
-  { value: "coordinating", label: "协调中" },
-  { value: "resolved", label: "已协调" }
-]
+const {
+  STATUS_OPTIONS,
+  STATUS_TEXT_MAP,
+  STATUS_CLASS_MAP,
+  PRIORITY_TEXT_MAP,
+  COORDINATION_TEXT_MAP,
+  PRIORITY_OPTIONS,
+  COORDINATION_OPTIONS
+} = require("../../shared/bookingStatus")
 const CITY_OPTIONS = [
-  { value: "all", label: "全部城市" },
-  { value: "杭州", label: "杭州" },
-  { value: "上海", label: "上海" }
+  { value: "all", label: "全部城市" }
 ]
 const DEFAULT_PAGE_SIZE = 20
 const BOOKING_MANAGE_LIST_TIMEOUT_MS = 15 * 1000
@@ -344,11 +304,19 @@ Page({
     this.cancelOperationConfigRequest()
     this._cancelOperationConfigRequest = requestOperationConfig({
       onSuccess: (config) => {
-        if (Array.isArray(config.cityOptions) && config.cityOptions.length) {
+        if (Array.isArray(config.cityOptions)) {
           const dynamicCityOptions = [
             { value: "all", label: "全部城市" }
           ].concat(config.cityOptions.map((c) => ({ value: c, label: c })))
-          this.setData({ cityOptions: dynamicCityOptions })
+          const resetCity = this.data.currentCity !== "all" &&
+            !config.cityOptions.includes(this.data.currentCity)
+          this.setData({
+            cityOptions: dynamicCityOptions,
+            ...(resetCity ? { currentCity: "all" } : {})
+          })
+          if (resetCity && this.data.pageAuthorized) {
+            this.fetchList({ city: "" })
+          }
         }
       }
     })
@@ -362,6 +330,13 @@ Page({
         this.fetchList()
       }
     })
+  },
+  onShow() {
+    applyPageCsvFileRemoval(this)
+    if (this._bookingExportNeedsReset) {
+      this._bookingExportNeedsReset = false
+      this.setData({ loading: false })
+    }
   },
   onPullDownRefresh() {
     if (!this.data.pageAuthorized || this.data.loading) {
@@ -404,19 +379,21 @@ Page({
     if (!this.data.keyword || this.data.loading) {
       return
     }
-    const listRequestId = Number(this._bookingListRequestId || 0)
-    this.setData({ keyword: "" }, () => {
-      if (listRequestId !== Number(this._bookingListRequestId || 0)) {
-        return
-      }
-      this.fetchList({ keyword: "" })
-    })
+    this.setData({ keyword: "" })
+    this.fetchList({ keyword: "" })
   },
-  handleKeywordConfirm() {
+  handleSearchConfirm(event) {
     if (this.data.loading) {
       return
     }
-    this.fetchList()
+    const keyword = event && event.detail && typeof event.detail.value === "string"
+      ? event.detail.value
+      : String(this.data.keyword || "")
+    this.setData({ keyword })
+    this.fetchList({ keyword })
+  },
+  handleKeywordConfirm(event) {
+    this.handleSearchConfirm(event)
   },
   handleSearch() {
     if (this.data.loading) {
@@ -506,6 +483,7 @@ Page({
     }
     const requestId = Number(this._bookingExportRequestId || 0) + 1
     this._bookingExportRequestId = requestId
+    const nativeAction = beginPageNativeAction(this, { requireCurrent: true })
     this.clearBookingExportTimer()
     this.setData({ loading: true })
     let settled = false
@@ -520,6 +498,10 @@ Page({
     }
     const handleFailure = (message, fallback = "导出失败") => {
       if (!finishRequest()) {
+        return
+      }
+      if (!isPageNativeActionActive(this, nativeAction)) {
+        this._bookingExportNeedsReset = true
         return
       }
       this.setData({ loading: false })
@@ -540,6 +522,11 @@ Page({
         if (!isActive()) {
           return
         }
+        if (!isPageNativeActionActive(this, nativeAction)) {
+          finishRequest()
+          this._bookingExportNeedsReset = true
+          return
+        }
         const result = res && res.result ? res.result : null
         if (!result || !result.ok || !result.csvText) {
           handleFailure(result && result.message)
@@ -552,6 +539,7 @@ Page({
           matchedTotal: Number(result.matchedTotal) || 0,
           sourceTruncated: Boolean(result.sourceTruncated),
           truncated: Boolean(result.truncated),
+          nativeAction,
           finishRequest,
           handleFailure
         })
@@ -573,29 +561,19 @@ Page({
     matchedTotal,
     sourceTruncated,
     truncated,
+    nativeAction,
     finishRequest,
     handleFailure
   }) {
-    let fs
-    try {
-      fs = wx.getFileSystemManager && wx.getFileSystemManager()
-    } catch (error) {
-      handleFailure(error && (error.errMsg || error.message), "保存失败")
-      return
-    }
-    if (!fs) {
-      handleFailure("文件系统不可用", "保存失败")
-      return
-    }
-    const basePath = wx.env && wx.env.USER_DATA_PATH ? wx.env.USER_DATA_PATH : ""
-    const filePath = basePath ? `${basePath}/${fileName}` : fileName
-    const writeOptions = {
-      filePath,
-      data: csvText,
-      encoding: "utf8",
-      success: () => {
+    saveCsvFile({ fileName, fallbackFileName: "bookings.csv", csvText })
+      .then(({ filePath, fileName }) => {
         if (!finishRequest()) {
           removeCsvFile(filePath).catch(() => {})
+          return
+        }
+        if (!isPageNativeActionActive(this, nativeAction)) {
+          removeCsvFile(filePath).catch(() => {})
+          this._bookingExportNeedsReset = true
           return
         }
         const previousFilePath = this.data.exportFilePath
@@ -623,16 +601,10 @@ Page({
             icon: "none"
           })
         }
-      },
-      fail: (error) => {
+      })
+      .catch((error) => {
         handleFailure(error && (error.errMsg || error.message), "保存失败")
-      }
-    }
-    try {
-      fs.writeFile(writeOptions)
-    } catch (error) {
-      handleFailure(error && (error.errMsg || error.message), "保存失败")
-    }
+      })
   },
   handleShareExportedFile() {
     if (this.data.loading) {
@@ -666,6 +638,7 @@ Page({
       return
     }
     const action = beginPageCsvFileAction(this, filePath)
+    const nativeAction = beginPageNativeAction(this, { requireCurrent: true })
     wx.showModal({
       title: "删除本地 CSV",
       content: "将从当前设备删除这份导出文件，删除后无法恢复。云端预约数据不会受到影响。",
@@ -675,26 +648,24 @@ Page({
         if (
           this.data.loading ||
           !isPageCsvFileActionActive(this, action) ||
+          !isPageNativeActionActive(this, nativeAction) ||
           !res.confirm
         ) {
           return
         }
         removeCsvFile(filePath)
           .then(() => {
-            if (!isPageCsvFileActionActive(this, action)) {
+            if (!markPageCsvFileRemoved(this, action) || !isPageNativeActionActive(this, nativeAction)) {
               return
             }
-            this.setData({
-              exportFilePath: "",
-              exportFileName: ""
-            })
+            applyPageCsvFileRemoval(this)
             wx.showToast({
               title: "本地文件已删除",
               icon: "none"
             })
           })
           .catch((error) => {
-            if (!isPageCsvFileActionActive(this, action)) {
+            if (!isPageCsvFileActionActive(this, action) || !isPageNativeActionActive(this, nativeAction)) {
               return
             }
             wx.showToast({
@@ -707,6 +678,7 @@ Page({
   },
   shareCsvFile(filePath, fileName) {
     const action = beginPageCsvFileAction(this, filePath)
+    const nativeAction = beginPageNativeAction(this, { requireCurrent: true })
     const share = wx.shareFileMessage
     if (isDevtoolsEnv()) {
       wx.showToast({
@@ -717,11 +689,11 @@ Page({
       return
     }
     if (typeof share === "function") {
-      share({
+      const shareOptions = {
         filePath,
         fileName,
         success: () => {
-          if (!isPageCsvFileActionActive(this, action)) {
+          if (!isPageCsvFileActionActive(this, action) || !isPageNativeActionActive(this, nativeAction)) {
             return
           }
           wx.showToast({
@@ -730,7 +702,7 @@ Page({
           })
         },
         fail: (error) => {
-          if (!isPageCsvFileActionActive(this, action)) {
+          if (!isPageCsvFileActionActive(this, action) || !isPageNativeActionActive(this, nativeAction)) {
             return
           }
           if (isUserCancelError(error)) {
@@ -757,22 +729,28 @@ Page({
             icon: "none"
           })
         }
-      })
+      }
+      try {
+        share(shareOptions)
+      } catch (error) {
+        shareOptions.fail(error)
+      }
       return
     }
     this.openCsvFile(filePath)
   },
   openCsvFile(filePath) {
     const action = beginPageCsvFileAction(this, filePath)
+    const nativeAction = beginPageNativeAction(this, { requireCurrent: true })
     const open = wx.openDocument
     if (typeof open === "function") {
-      open({
+      const openOptions = {
         filePath,
         fileType: "csv",
         showMenu: true,
         success: () => {},
         fail: () => {
-          if (!isPageCsvFileActionActive(this, action)) {
+          if (!isPageCsvFileActionActive(this, action) || !isPageNativeActionActive(this, nativeAction)) {
             return
           }
           wx.showToast({
@@ -780,10 +758,15 @@ Page({
             icon: "none"
           })
         }
-      })
+      }
+      try {
+        open(openOptions)
+      } catch (error) {
+        openOptions.fail(error)
+      }
       return
     }
-    if (!isPageCsvFileActionActive(this, action)) {
+    if (!isPageCsvFileActionActive(this, action) || !isPageNativeActionActive(this, nativeAction)) {
       return
     }
     wx.showToast({
@@ -821,7 +804,7 @@ Page({
         }
       },
       fail: () => {
-        if (!isPageNativeActionActive(this, action)) {
+        if (!isPageNativeActionActive(this, action) || !isPageCurrent(this)) {
           return
         }
         wx.showToast({
@@ -926,9 +909,10 @@ Page({
     })
   },
   saveRemark(id, adminRemark) {
+    const current = this.data.list.find((item) => String(item.id || item._id || "") === id)
     this.runBookingMutation({
       name: "bookingUpdateAdminRemark",
-      data: { id, adminRemark },
+      data: { id, adminRemark, expectedAdminRemark: normalizeRemark(current && current.adminRemark) },
       timeoutTitle: "保存超时，请重试",
       failureFallback: "保存失败",
       onResult: (result) => {

@@ -28,6 +28,30 @@ function createPage(definition) {
 }
 
 describe("我的预约旅程状态", () => {
+  test("详情返回后在缓存新鲜期内也刷新列表状态", () => {
+    global.wx = { navigateTo: jest.fn() }
+    const page = createPage(loadPageDefinition("../pages/bookings/bookings"))
+    page.data.list = [{ id: "b1", status: "pending" }]
+    page._lastBookingsLoadedAt = Date.now()
+    page.loadList = jest.fn()
+    page.handleViewDetail({ currentTarget: { dataset: { id: "b1" } } })
+    page.onShow()
+    expect(page.loadList).toHaveBeenCalledTimes(1)
+  })
+
+  test("列表预览事件不能清掉已加载详情的报价和真实网点", () => {
+    let accept
+    global.wx = { cloud: { callFunction: jest.fn() } }
+    const page = createPage(loadPageDefinition("../pages/booking-detail/booking-detail"))
+    page.getOpenerEventChannel = () => ({ on: (name, callback) => { accept = callback }, off: jest.fn() })
+    page.onLoad({ id: "b1" })
+    page.applyBooking({ id: "b1", status: "quoted", pickupLocation: "已核对取车点" }, { id: "q1", status: "sent" })
+    accept({ booking: { id: "b1", status: "pending" } })
+    expect(page.data.booking.status).toBe("quoted")
+    expect(page.data.booking.pickupLocation).toBe("已核对取车点")
+    expect(page.data.latestQuote.id).toBe("q1")
+    page.onUnload()
+  })
   afterEach(() => {
     jest.useRealTimers()
     delete global.Page
@@ -346,6 +370,7 @@ describe("我的预约旅程状态", () => {
     })
     expect(global.wx.stopPullDownRefresh).toHaveBeenCalledTimes(2)
     expect(page.data.booking.id).toBe("detail-refresh-1")
+    page.onUnload()
   })
 
   test("预约详情调用同步异常时安全进入重试状态", () => {
@@ -682,7 +707,7 @@ describe("我的预约旅程状态", () => {
     expect(wxml).toContain("{{saving ? '正在保存' : '保存修改'}}")
     expect(wxml).toContain("{{subscriptionRequesting ? '正在订阅' : '立即订阅'}}")
     expect(wxml).toContain("{{cancelling ? '正在取消' : '取消本次预约'}}")
-    expect(wxml).toContain('loading="{{cancelling}}" disabled="{{loading || editing || saving || subscriptionRequesting || cancelling}}"')
+    expect(wxml).toContain('loading="{{cancelling}}" disabled="{{loading || editing || saving || subscriptionRequesting || cancelling || quoteResponding || handoverResponding}}"')
     expect(wxml).toContain("copy-native-icon")
     expect(wxml).toContain('aria-label="复制预约编号 {{bookingReference}}"')
     expect(wxml).toContain('class="brand-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true"')
@@ -714,6 +739,7 @@ describe("我的预约旅程状态", () => {
       showToast: jest.fn()
     }
     const page = createPage(loadPageDefinition("../pages/booking-detail/booking-detail"))
+    page.data.serviceHubs = [{ id: "sh-store", city: "上海", name: "已配置上海门店", type: "store", address: "已保存的门店地址", latitude: 31.23, longitude: 121.47 }]
     page.applyBooking({
       id: "booking-cal-12345",
       vehicleId: "car-911",
@@ -721,14 +747,15 @@ describe("我的预约旅程状态", () => {
       status: "confirmed",
       startDate: "2026-10-01",
       endDate: "2026-10-05",
-      city: "上海"
+      city: "上海",
+      pickupLocation: "已配置上海门店"
     })
 
     page.handleAddToCalendar()
     expect(global.wx.addPhoneCalendar).toHaveBeenCalledWith(
       expect.objectContaining({
         title: "极境车库用车 · 保时捷 911 Carrera",
-        location: "上海 极境车库交付中心",
+        location: "已保存的门店地址",
         alarm: true
       })
     )
@@ -740,9 +767,9 @@ describe("我的预约旅程状态", () => {
     page.handleOpenLocation()
     expect(global.wx.openLocation).toHaveBeenCalledWith(
       expect.objectContaining({
-        latitude: 31.2304,
-        longitude: 121.4737,
-        name: "极境车库 · 上海交付中心"
+        latitude: 31.23,
+        longitude: 121.47,
+        name: "已配置上海门店"
       })
     )
 
@@ -796,6 +823,7 @@ describe("我的预约旅程状态", () => {
     page.applyBooking = jest.fn()
     page.onLoad({ id: "b-swr-1" })
     expect(page.applyBooking).toHaveBeenCalledWith(cachedDetail.booking, cachedDetail.latestQuote, cachedDetail.handovers)
+    page.onUnload()
   })
 })
 

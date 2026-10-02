@@ -13,6 +13,7 @@ const AUTH_ROLE_FIELDS = {
 const PRIVACY_REQUEST_STATUS_FIELDS = {
   type: true,
   status: true,
+  resolutionNote: true,
   dataExportedAt: true
 }
 const STATUS_TRANSITIONS = {
@@ -117,12 +118,15 @@ exports.main = async (event) => {
       .field(PRIVACY_REQUEST_STATUS_FIELDS)
       .get()
     const current = currentRes && currentRes.data ? currentRes.data : null
-    if (!current) {
+    if (!current || !["access", "correction", "deletion"].includes(current.type)) {
       return createError("NOT_FOUND", "隐私申请不存在")
     }
 
     const currentStatus = String(current.status || "pending")
     if (currentStatus === input.status) {
+      if (String(current.resolutionNote || "").trim() !== input.resolutionNote) {
+        return createError("STATUS_CONFLICT", "处理结果已发生变化，请刷新后核对")
+      }
       return {
         ok: true,
         id: input.id,

@@ -212,6 +212,7 @@ Page({
     exporting: false,
     exportFilePath: "",
     exportFileName: "",
+    exportConfirmationPending: false,
     canShareExport: true,
     partial: false,
     unavailable: [],
@@ -261,6 +262,12 @@ Page({
     this._exportRequestSerial = Number(this._exportRequestSerial || 0) + 1
     this.finishInventoryRequestEffects()
     this.clearExportRequestTimer()
+  },
+  onShow() {
+    if (this._exportNeedsReset) {
+      this._exportNeedsReset = false
+      this.setData({ exporting: false })
+    }
   },
   onPullDownRefresh() {
     if (!this.data.pageAuthorized || !this.data.requestId) {
@@ -317,7 +324,7 @@ Page({
     if (this.data.loading || this.data.refreshing || this.data.exporting || !id) {
       return
     }
-    const action = beginPageNativeAction(this)
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.navigateTo({
       url: `/pages/booking-manage-detail/booking-manage-detail?id=${encodeURIComponent(id)}`,
       fail: () => {
@@ -342,6 +349,10 @@ Page({
       })
       return
     }
+    if (["cancelled", "rejected"].includes(this.data.request.status)) {
+      wx.showToast({ title: "当前申请不可导出", icon: "none" })
+      return
+    }
     if (this.data.partial) {
       wx.showToast({
         title: "数据未就绪",
@@ -357,6 +368,7 @@ Page({
       return
     }
     const action = beginPageNativeAction(this, {
+      requireCurrent: true,
       exclusiveKey: "privacy-inventory-export-confirmation"
     })
     wx.showModal({
@@ -394,6 +406,7 @@ Page({
           if (!finishRequest()) {
             return
           }
+          if (!isPageNativeActionActive(this, action)) { this._exportNeedsReset = true; return }
           this.setData({ exporting: false })
           wx.showToast({
             title: formatToastTitle(message, fallback),
@@ -413,8 +426,13 @@ Page({
             if (!isActive()) {
               return
             }
+            if (!isPageNativeActionActive(this, action)) {
+              finishRequest()
+              this._exportNeedsReset = true
+              return
+            }
             const result = res && res.result ? res.result : null
-            if (!result || !result.ok || !result.csvText) {
+            if (!result || !result.ok || !result.csvText || !result.exportToken) {
               handleFailure(result && result.message)
               return
             }
@@ -424,7 +442,8 @@ Page({
               csvText: result.csvText
             })
               .then(({ filePath, fileName }) => {
-                if (!finishRequest()) {
+                if (!isActive() || !isPageNativeActionActive(this, action)) {
+                  if (isActive()) { finishRequest(); this._exportNeedsReset = true }
                   if (filePath) {
                     removeCsvFile(filePath).catch(() => {})
                   }
@@ -432,16 +451,25 @@ Page({
                 }
                 const previousFilePath = this.data.exportFilePath
                 this.setData({
-                  exporting: false,
                   exportFilePath: filePath,
-                  exportFileName: fileName
+                  exportFileName: fileName,
+                  exportConfirmationPending: true
                 })
                 if (previousFilePath && previousFilePath !== filePath) {
                   removeCsvFile(previousFilePath).catch(() => {})
                 }
-                wx.showToast({
-                title: "个人数据已生成",
-                  icon: "none"
+                wx.cloud.callFunction({
+                  name: "privacyRequestDataInventory",
+                  data: { requestId: inventoryRequestId, mode: "confirmExport", exportToken: result.exportToken },
+                  success: (confirmation) => {
+                    const confirmed = confirmation && confirmation.result
+                    if (!confirmed || !confirmed.ok) { handleFailure(confirmed && confirmed.message, "导出确认失败"); return }
+                    if (!finishRequest()) return
+                    if (!isPageNativeActionActive(this, action)) { this._exportNeedsReset = true; return }
+                    this.setData({ exporting: false, exportConfirmationPending: false })
+                    wx.showToast({ title: "个人数据已生成", icon: "none" })
+                  },
+                  fail: () => handleFailure("导出确认失败")
                 })
               })
               .catch((error) => {
@@ -466,8 +494,9 @@ Page({
     }
     const filePath = this.data.exportFilePath
     const action = beginPageCsvFileAction(this, filePath)
+    const nativeAction = beginPageNativeAction(this, { requireCurrent: true })
     shareCsvFile(filePath, this.data.exportFileName).catch((error) => {
-      if (!isPageCsvFileActionActive(this, action)) {
+      if ((!isPageCsvFileActionActive(this, action) || !isPageNativeActionActive(this, nativeAction))) {
         return
       }
       if (isUserCancelError(error)) {
@@ -482,8 +511,9 @@ Page({
     }
     const filePath = this.data.exportFilePath
     const action = beginPageCsvFileAction(this, filePath)
+    const nativeAction = beginPageNativeAction(this, { requireCurrent: true })
     openCsvFile(filePath).catch(() => {
-      if (!isPageCsvFileActionActive(this, action)) {
+      if ((!isPageCsvFileActionActive(this, action) || !isPageNativeActionActive(this, nativeAction))) {
         return
       }
       wx.showToast({
@@ -498,6 +528,7 @@ Page({
       return
     }
     const action = beginPageCsvFileAction(this, filePath)
+    const nativeAction = beginPageNativeAction(this, { requireCurrent: true })
     wx.showModal({
       title: "删除本地个人数据",
       content: "将从当前设备删除这份 CSV，删除后无法恢复。云端用户数据和隐私申请不会受到影响。",
@@ -506,19 +537,20 @@ Page({
       success: (res) => {
         if (
           this.data.exporting ||
-          !isPageCsvFileActionActive(this, action) ||
+          (!isPageCsvFileActionActive(this, action) || !isPageNativeActionActive(this, nativeAction)) ||
           !res.confirm
         ) {
           return
         }
         removeCsvFile(filePath)
           .then(() => {
-            if (!isPageCsvFileActionActive(this, action)) {
+            if ((!isPageCsvFileActionActive(this, action) || !isPageNativeActionActive(this, nativeAction))) {
               return
             }
             this.setData({
               exportFilePath: "",
-              exportFileName: ""
+              exportFileName: "",
+              exportConfirmationPending: false
             })
             wx.showToast({
               title: "本地文件已删除",
@@ -526,7 +558,7 @@ Page({
             })
           })
           .catch((error) => {
-            if (!isPageCsvFileActionActive(this, action)) {
+            if ((!isPageCsvFileActionActive(this, action) || !isPageNativeActionActive(this, nativeAction))) {
               return
             }
             wx.showToast({

@@ -73,17 +73,20 @@
         <view class="export-security"><view class="lock-native-icon" aria-hidden="true"></view>敏感文件</view>
       </view>
       <view class="export-desc"><view class="shield-native-icon" aria-hidden="true"></view><view>生成包含预约、报价、收藏和隐私申请的 CSV。匿名分析数据不保存身份信息，不包含在导出文件中。</view></view>
+      <view wx:if="{{request.status === 'cancelled' || request.status === 'rejected'}}" class="export-blocked"><view class="blocked-native-icon" aria-hidden="true"></view><view>当前申请已撤回或未通过，不能继续导出。</view></view>
       <view wx:if="{{partial}}" class="export-blocked"><view class="blocked-native-icon" aria-hidden="true"></view><view>当前清单不完整，已禁止导出残缺文件。</view></view>
       <button
         wx:elif="{{!exportFilePath}}"
         class="export-primary ui-btn ui-btn-primary"
         loading="{{exporting}}"
-        disabled="{{exporting}}"
+        disabled="{{exporting || request.status === 'cancelled' || request.status === 'rejected'}}"
         bindtap="handleExport"
       >
         <view wx:if="{{!exporting}}" class="export-native-icon" aria-hidden="true"></view>{{exporting ? '正在生成…' : '导出个人数据 CSV'}}
       </button>
       <view wx:else class="export-result">
+        <view wx:if="{{exportConfirmationPending}}" class="export-blocked"><view class="blocked-native-icon" aria-hidden="true"></view><view>文件已保存在当前设备，云端确认尚未完成。请重试后再完成申请处理。</view></view>
+        <button wx:if="{{exportConfirmationPending}}" class="export-primary ui-btn ui-btn-primary" loading="{{exporting}}" disabled="{{exporting || request.status === 'cancelled' || request.status === 'rejected'}}" bindtap="handleExport">重试生成并确认</button>
         <view class="export-file-state"><view class="file-native-icon" aria-hidden="true"></view><view class="export-file-copy"><view class="export-file-label">个人数据文件已就绪</view><view class="export-file-name">{{exportFileName}}</view></view></view>
         <view class="export-actions">
           <button

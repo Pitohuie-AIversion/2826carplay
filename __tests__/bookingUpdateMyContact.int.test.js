@@ -1,15 +1,25 @@
 jest.mock("wx-server-sdk")
 
-function createMockDb({ current, updateResult = { stats: { updated: 1 } } }) {
-  const bookingGet = jest.fn().mockResolvedValue({ data: current })
+function createMockDb({ current, beforeTransaction }) {
+  let stored = current && { ...current }
+  const bookingGet = jest.fn(async () => ({ data: stored && { ...stored } }))
   const bookingDoc = jest.fn(() => ({ get: bookingGet }))
-  const bookingUpdate = jest.fn().mockResolvedValue(updateResult)
+  const bookingUpdate = jest.fn(async ({ data }) => { stored = { ...stored, ...data }; return { stats: { updated: 1 } } })
   const bookingWhere = jest.fn(() => ({ update: bookingUpdate }))
   const auditAdd = jest.fn().mockResolvedValue({ _id: "audit_1" })
   const serverDateValue = { __type: "serverDate" }
   const serverDate = jest.fn(() => serverDateValue)
 
+  let queue = Promise.resolve()
   const db = {
+    runTransaction: jest.fn((callback) => {
+      const result = queue.then(() => {
+        if (beforeTransaction) stored = beforeTransaction(stored)
+        return callback({ collection: () => ({ doc: () => ({ get: bookingGet, update: bookingUpdate }) }) })
+      })
+      queue = result.catch(() => {})
+      return result
+    }),
     collection: jest.fn((name) => {
       if (name === "bookings") {
         return {
@@ -53,6 +63,61 @@ async function loadModule(openid, mockDb) {
 }
 
 describe("cloudfunctions/bookingUpdateMyContact integration", () => {
+  const contact = { userName: "张三", phone: "13800000000", city: "杭州", note: "原备注" }
+  const initial = { _id: "booking_1", openid: "user_openid", status: "pending", ...contact, pickupLocation: "原取车点", location: "原地址", returnLocation: "还车点" }
+
+  test("相同编辑基线同时改城市和电话仅允许一份写入，旧草稿不会覆盖新内容", async () => {
+    const mocks = createMockDb({ current: initial })
+    const mod = await loadModule("user_openid", mocks.db)
+    const payload = { id: "booking_1", ...contact, expectedValues: contact }
+    const results = await Promise.all([
+      mod.main({ ...payload, city: "上海", note: "新的约定" }),
+      mod.main({ ...payload, phone: "13900000000" })
+    ])
+    expect(results[0]).toMatchObject({ ok: true, contact: { city: "上海", note: "新的约定", pickupLocation: "", location: "", returnLocation: "还车点" } })
+    expect(results[1]).toMatchObject({ ok: false, code: "CONTACT_CONFLICT" })
+    expect(mocks.bookingUpdate).toHaveBeenCalledTimes(1)
+    expect(mocks.auditAdd).toHaveBeenCalledTimes(1)
+  })
+
+  test("预查后联系信息或还车地址被更新，事务读取最新值再校验和回填", async () => {
+    const mocks = createMockDb({ current: initial, beforeTransaction: (record) => ({ ...record, returnLocation: "新还车点" }) })
+    const mod = await loadModule("user_openid", mocks.db)
+    const result = await mod.main({ id: "booking_1", ...contact, phone: "13900000000", note: "", expectedValues: contact })
+    expect(result).toMatchObject({ ok: true, contact: { phone: "13900000000", note: "", pickupLocation: "原取车点", returnLocation: "新还车点" } })
+    expect(mocks.bookingUpdate.mock.calls[0][0].data).not.toHaveProperty("returnLocation")
+  })
+
+  test("保存回执丢失的同内容重试不重复审计，旧基线改内容拒绝", async () => {
+    const mocks = createMockDb({ current: initial })
+    const mod = await loadModule("user_openid", mocks.db)
+    const input = { id: "booking_1", ...contact, city: "上海", expectedValues: contact }
+    expect(await mod.main(input)).toMatchObject({ ok: true, updated: true })
+    expect(await mod.main(input)).toMatchObject({ ok: true, updated: false, contact: { city: "上海", pickupLocation: "" } })
+    expect(await mod.main({ ...input, note: "新内容" })).toMatchObject({ ok: false, code: "CONTACT_CONFLICT" })
+    expect(mocks.bookingUpdate).toHaveBeenCalledTimes(1)
+    expect(mocks.auditAdd).toHaveBeenCalledTimes(1)
+  })
+
+  test.each([undefined, {}, { ...contact, note: null }])("缺失或不完整基线 %p 不允许覆盖联系信息", async (expectedValues) => {
+    const mocks = createMockDb({ current: initial })
+    const mod = await loadModule("user_openid", mocks.db)
+    expect(await mod.main({ id: "booking_1", ...contact, city: "上海", expectedValues })).toMatchObject({ ok: false, code: "CONTACT_VERSION_REQUIRED" })
+    expect(mocks.bookingUpdate).not.toHaveBeenCalled()
+  })
+
+  test("更换取车城市清除旧城市网点，单独修改联系人保留地点", async () => {
+    for (const city of ["上海", "杭州市"]) {
+      const mocks = createMockDb({ current: { _id: "booking_1", openid: "user_openid", status: "pending", userName: "张三", phone: "13800000000", city: "杭州", note: "", pickupLocation: "杭州已约定门店", location: "杭州历史取车地址", returnLocation: "杭州约定还车点" } })
+      const mod = await loadModule("user_openid", mocks.db)
+      const res = await mod.main({ id: "booking_1", userName: "张三", phone: "13800000000", city, note: "", expectedValues: { userName: "张三", phone: "13800000000", city: "杭州", note: "" } })
+      expect(res.ok).toBe(true)
+      const data = mocks.bookingUpdate.mock.calls[0][0].data
+      if (city === "上海") expect(data).toMatchObject({ pickupLocation: "", location: "" })
+      else expect(data).not.toHaveProperty("pickupLocation")
+      expect(data).not.toHaveProperty("returnLocation")
+    }
+  })
   test("用户可修改自己进行中预约的联系信息", async () => {
     const mocks = createMockDb({
       current: {
@@ -72,10 +137,11 @@ describe("cloudfunctions/bookingUpdateMyContact integration", () => {
       userName: "张三",
       phone: "13900000000",
       city: "杭州",
-      note: "下午联系"
+      note: "下午联系",
+      expectedValues: { userName: "张三", phone: "13800000000", city: "杭州", note: "" }
     })
 
-    expect(res).toEqual({
+    expect(res).toMatchObject({
       ok: true,
       id: "booking_1",
       status: "pending",
@@ -83,11 +149,8 @@ describe("cloudfunctions/bookingUpdateMyContact integration", () => {
       changedKeys: ["phone", "note"],
       message: "联系信息已更新"
     })
-    expect(mocks.bookingWhere).toHaveBeenCalledWith({
-      _id: "booking_1",
-      openid: "user_openid",
-      status: "pending"
-    })
+    expect(mocks.db.runTransaction).toHaveBeenCalledTimes(1)
+    expect(res.contact).toEqual({ userName: "张三", phone: "13900000000", city: "杭州", note: "下午联系", pickupLocation: "", returnLocation: "", location: "" })
     expect(mocks.bookingUpdate).toHaveBeenCalledWith({
       data: {
         userName: "张三",
@@ -215,7 +278,7 @@ describe("cloudfunctions/bookingUpdateMyContact integration", () => {
         city: "杭州",
         note: ""
       },
-      updateResult: { stats: { updated: 0 } }
+      beforeTransaction: (record) => ({ ...record, status: "confirmed" })
     })
     const mod = await loadModule("user_openid", mocks.db)
 

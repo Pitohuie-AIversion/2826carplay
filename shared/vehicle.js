@@ -129,43 +129,35 @@ function normalizeOptionalIntField(payload, field) {
 }
 
 function normalizePerformanceInput(raw) {
-  if (raw === undefined || raw === null) {
+  if (raw === undefined) {
     return undefined
   }
 
-  const source = typeof raw === "object" ? raw : {}
+  const source = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {}
   const result = {}
 
   PERFORMANCE_TEXT_FIELDS.forEach((field) => {
-    if (!Object.prototype.hasOwnProperty.call(source, field)) {
-      return
-    }
-    const value = String(source[field] || "").trim()
+    const value = String(source[field] == null ? "" : source[field]).trim()
     result[field] = value || ""
   })
 
+  result.highlights = []
   if (Object.prototype.hasOwnProperty.call(source, "highlights")) {
     const rawHighlights = source.highlights
     if (Array.isArray(rawHighlights)) {
       const cleaned = rawHighlights
         .map((item) => String(item || "").trim())
-        .filter((item) => item && item.length <= 20)
-        .slice(0, 8)
+        .filter(Boolean)
       result.highlights = cleaned
     } else if (typeof rawHighlights === "string" && rawHighlights) {
       const cleaned = String(rawHighlights)
         .split(/[,，、\n;；]/)
         .map((item) => item.trim())
-        .filter((item) => item && item.length <= 20)
-        .slice(0, 8)
+        .filter(Boolean)
       result.highlights = cleaned
     } else {
       result.highlights = []
     }
-  }
-
-  if (Object.keys(result).length === 0) {
-    return undefined
   }
 
   return result
@@ -201,7 +193,7 @@ function buildVehicleDisplayIdentity(value) {
   }
 }
 
-function isValidYmdDate(dateStr) {
+function isValidYmdDate(dateStr, options = {}) {
   const str = String(dateStr || "")
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(str)) {
@@ -233,7 +225,7 @@ function isValidYmdDate(dateStr) {
   const now = new Date()
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
 
-  if (date.getTime() > today.getTime()) {
+  if (!options.allowFuture && date.getTime() > today.getTime()) {
     return { ok: false, reason: "FUTURE" }
   }
 
@@ -296,6 +288,10 @@ function normalizeVehicleInput(input) {
       normalized[field] = value
     }
   })
+  ;["publicDrivingTips", "archiveDate", "archiveReview"].forEach((field) => {
+    const value = normalizeOptionalTextField(payload, field)
+    if (value !== undefined) normalized[field] = value
+  })
   if (location !== undefined) {
     normalized.location = location
   }
@@ -326,6 +322,9 @@ function normalizeVehicleInput(input) {
 function validateVehicle(input) {
   const value = normalizeVehicleInput(input)
   const errors = []
+  if (input && input.performance != null && (typeof input.performance !== "object" || Array.isArray(input.performance))) {
+    errors.push({ field: "performance", message: "性能参数格式不合法" })
+  }
   if (value.rentalDiscountTiers !== undefined) {
     const message = validateRentalDiscountTiers(value.rentalDiscountTiers)
     if (message) errors.push({ field: "rentalDiscountTiers", message })
@@ -433,6 +432,18 @@ function validateVehicle(input) {
       value: value.publicDescription
     })
   }
+
+  if (value.publicDrivingTips !== undefined && value.publicDrivingTips.length > 500) {
+    errors.push({ field: "publicDrivingTips", message: "用车提示长度不能超过 500", value: value.publicDrivingTips })
+  }
+
+  ;["archiveDate", "archiveReview"].forEach((field) => {
+    if (!value[field]) return
+    const dateCheck = isValidYmdDate(value[field], { allowFuture: true })
+    if (!dateCheck.ok) {
+      errors.push({ field, message: "到期日期格式不合法（YYYY-MM-DD）", value: value[field], reason: dateCheck.reason })
+    }
+  })
 
   ;["publicMaterialsUpdatedDate", "publicInspectionDate"].forEach((field) => {
     if (!value[field]) {

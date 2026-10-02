@@ -35,10 +35,14 @@
       </button>
     </view>
   </view>
-  <view wx:if="{{guideLoading}}" class="content-card ui-card guide-state">内容加载中…</view>
+  <view wx:if="{{guideLoading || contentLoading}}" class="content-card ui-card guide-state">内容加载中…</view>
   <view wx:elif="{{guideError}}" class="content-card ui-card guide-state">
     <view>{{guideError}}</view>
     <button class="ui-btn ui-btn-ghost guide-retry" bindtap="handleGuideRetry">重新加载</button>
+  </view>
+  <view wx:elif="{{!guideMode && (contentError || !content)}}" class="content-card ui-card guide-state">
+    <view>{{contentError || '内容暂未提供'}}</view>
+    <button class="ui-btn ui-btn-ghost guide-retry" bindtap="handleContentRetry" hover-class="content-control-pressed" aria-label="重新加载服务内容">{{contentError ? '重新加载' : '刷新内容'}}</button>
   </view>
   <view wx:else class="content-card ui-card">
     <view class="document-head">
@@ -90,13 +94,17 @@
         </view>
       </view>
     </view>
-    <view wx:else class="content-text">{{content}}</view>
+    <view wx:elif="{{!intro}}" class="content-text">{{content}}</view>
+  </view>
+  <view wx:if="{{guideMode && guideNotice}}" class="content-card ui-card guide-state">
+    <view>{{guideNotice}}</view>
+    <button class="ui-btn ui-btn-ghost guide-retry" bindtap="handleGuideRetry" hover-class="content-control-pressed" aria-label="刷新场景指南">刷新内容</button>
   </view>
   <view wx:if="{{guideMode && relatedVehicles.length}}" class="content-card ui-card guide-vehicles">
     <view class="document-label">RELATED VEHICLES</view>
     <view class="guide-vehicle" wx:for="{{relatedVehicles}}" wx:key="id">
       <image wx:if="{{item.cover}}" class="guide-vehicle-cover" src="{{item.cover}}" mode="aspectFill" lazy-load="{{true}}" fade-in="{{true}}" data-id="{{item.id}}" binderror="handleGuideVehicleImageError" />
-      <view class="guide-vehicle-copy"><view class="guide-vehicle-name">{{item.name}}</view><view class="guide-vehicle-status">{{item.status}}</view></view>
+      <view class="guide-vehicle-copy"><view class="guide-vehicle-name">{{item.name}}</view><view class="guide-vehicle-status">{{item.statusText}}</view></view>
       <view class="guide-vehicle-actions">
         <button class="ui-btn ui-btn-ghost" data-id="{{item.id}}" bindtap="handleGuideVehicleTap">查看车辆</button>
         <button class="ui-btn ui-btn-primary" data-id="{{item.id}}" bindtap="handleGuideBookingTap">开始预约</button>

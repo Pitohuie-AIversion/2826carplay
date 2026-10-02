@@ -3,6 +3,7 @@ function activatePageCsvFileActions(page) {
     return
   }
   page._csvFileActionsUnloaded = false
+  page._removedCsvFileAction = null
   page._csvFileLifecycleSerial = Number(page._csvFileLifecycleSerial || 0) + 1
 }
 
@@ -32,12 +33,34 @@ function cancelPageCsvFileActions(page) {
     return
   }
   page._csvFileActionsUnloaded = true
+  page._removedCsvFileAction = null
   page._csvFileLifecycleSerial = Number(page._csvFileLifecycleSerial || 0) + 1
+}
+
+function markPageCsvFileRemoved(page, action) {
+  if (!isPageCsvFileActionActive(page, action)) {
+    return false
+  }
+  page._removedCsvFileAction = action
+  return true
+}
+
+function applyPageCsvFileRemoval(page) {
+  const action = page && page._removedCsvFileAction
+  if (!action) {
+    return
+  }
+  page._removedCsvFileAction = null
+  if (isPageCsvFileActionActive(page, action)) {
+    page.setData({ exportFilePath: "", exportFileName: "" })
+  }
 }
 
 module.exports = {
   activatePageCsvFileActions,
+  applyPageCsvFileRemoval,
   beginPageCsvFileAction,
   cancelPageCsvFileActions,
-  isPageCsvFileActionActive
+  isPageCsvFileActionActive,
+  markPageCsvFileRemoved
 }

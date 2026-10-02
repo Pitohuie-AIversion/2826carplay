@@ -9,16 +9,15 @@ const {
 } = require("../../shared/pageNativeAction")
 const { formatHandoverCsvContent, getHandoverFileName } = require("../../shared/handoverReport")
 const { PRESET_CUSTOMER_TAGS, normalizeTags, autoTagBooking } = require("../../shared/bookingTags")
-const { STATUS_TEXT_MAP, STATUS_CLASS_MAP } = require("../../shared/bookingStatus")
+const {
+  STATUS_TEXT_MAP,
+  STATUS_CLASS_MAP,
+  PRIORITY_TEXT_MAP,
+  COORDINATION_TEXT_MAP
+} = require("../../shared/bookingStatus")
 const { formatDisplayTime } = require("../../shared/formatTime")
 const { getRentalDiscountTier } = require("../../shared/rentalPricing")
-function calculateRentalDays(startDate, endDate) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) return 0
-  const start = Date.parse(`${startDate}T00:00:00Z`)
-  const end = Date.parse(`${endDate}T00:00:00Z`)
-  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return 0
-  return Math.max(1, Math.round((end - start) / 86400000) + 1)
-}
+const { calculateRentalDays } = require("../../shared/dateUtils")
 const BOOKING_DETAIL_LOAD_TIMEOUT_MS = 15 * 1000
 const BOOKING_DETAIL_WRITE_TIMEOUT_MS = 20 * 1000
 const HANDOVER_ANGLES = [
@@ -28,17 +27,6 @@ const HANDOVER_ANGLES = [
   { angle: "right", label: "右侧" }
 ]
 const HANDOVER_MAX_IMAGE_BYTES = 10 * 1024 * 1024
-
-const PRIORITY_TEXT_MAP = {
-  priority: "优先",
-  normal: "常规",
-  standby: "候补"
-}
-const COORDINATION_TEXT_MAP = {
-  pending: "待协调",
-  coordinating: "协调中",
-  resolved: "已协调"
-}
 function showStatusUpdateFeedback(result, done) {
   const next = typeof done === "function" ? done : () => {}
   let settled = false
@@ -120,6 +108,7 @@ function normalizeQuote(item) {
     customerNote: quote.customerNote || "",
     adjustmentNote: quote.adjustmentNote || "",
     version: Math.max(0, Number(quote.version || 0)),
+    revision: Math.max(0, Number(quote.revision || 0)),
     status: quote.status || "",
     statusText: {
       sent: "已发送",
@@ -151,6 +140,7 @@ function getChinaToday() {
 }
 function createHandoverForm() {
   return {
+    expectedVersion: null,
     mileageKm: "",
     energyType: "fuel",
     energyLevelPercent: "",
@@ -192,13 +182,14 @@ function normalizeBooking(item) {
     startDate: booking.startDate || "",
     endDate: booking.endDate || "",
     city: booking.city || "",
+    location: booking.location || "",
     pickupLocation: booking.pickupLocation || "",
     returnLocation: booking.returnLocation || "",
     note: booking.note || "",
     adminRemark: booking.adminRemark || "",
     adminRemarkDraft: booking.adminRemark || "",
     adminRemarkUpdatedAt: booking.adminRemarkUpdatedAt || "",
-    tags: autoTagBooking(booking),
+    tags: Array.isArray(booking.tags) ? normalizeTags(booking.tags) : autoTagBooking(booking),
     schedulePriority: PRIORITY_TEXT_MAP[booking.schedulePriority]
       ? booking.schedulePriority
       : "normal",
@@ -284,6 +275,7 @@ Page({
     handoverStage: "pickup",
     handoverForm: createHandoverForm(),
     handoverHistory: [],
+    handoverHistoryUnavailable: false,
     handoverReadyForCompletion: false,
     presetTags: PRESET_CUSTOMER_TAGS,
     exportedHandoverPath: "",
@@ -339,10 +331,20 @@ Page({
     })
   },
   onShow() {
+    if (this._handoverExportNeedsReset) {
+      this._handoverExportNeedsReset = false
+      this.applyState({ exportingHandover: false })
+    }
+    if (this._handoverPhotoNeedsReset) {
+      this._handoverPhotoNeedsReset = false
+      this.applyState({ handoverLoading: false })
+    }
     if (
       this.data.pageAuthorized &&
       this.data.id &&
       !this.data.remarkDirty &&
+      !this.data.quoteDirty &&
+      !this.data.handoverLoading &&
       !this._bookingDetailMutationActive &&
       !this._bookingDetailStatusFeedbackPending
     ) {
@@ -402,10 +404,14 @@ Page({
     this._bookingDetailMutationActive = false
     this._bookingDetailStatusFeedbackPending = false
     this._handoverRequestId = Number(this._handoverRequestId || 0) + 1
+    if (this._handoverPhotoTimer) clearTimeout(this._handoverPhotoTimer)
+    this._handoverPhotoTimer = null
+    if (this._handoverExportTimer) clearTimeout(this._handoverExportTimer)
+    this._handoverExportTimer = null
     this.cleanupPendingHandoverUploads()
     if (this._perf && typeof this._perf.dispose === 'function') try { this._perf.dispose(); } catch(e) {}
   },
-  applyBooking(booking, conflictResult, quoteResult, handoverResult) {
+  applyBooking(booking, conflictResult, quoteResult, handoverResult, handoverHistoryUnavailable = false) {
     const conflictData = conflictResult && typeof conflictResult === "object"
       ? conflictResult
       : {}
@@ -431,6 +437,7 @@ Page({
     this.applyState({
       booking,
       rentalDays,
+      quoteDateRangeTooLong: rentalDays > 47,
       recommendedDiscount,
       remarkDirty: false,
       initialLoading: false,
@@ -452,6 +459,7 @@ Page({
       quoteForm: createQuoteForm(quoteDraft),
       handoverLoading: false,
       handoverHistory,
+      handoverHistoryUnavailable: Boolean(handoverHistoryUnavailable),
       handoverReadyForCompletion: Boolean(latestPickup && latestPickup.status === "confirmed" && latestReturn && latestReturn.status === "confirmed"),
       conflicts: Array.isArray(conflictData.list)
         ? conflictData.list.map(normalizeConflictBooking)
@@ -488,6 +496,8 @@ Page({
     if (
       this.data.coordinationLoading ||
       this.data.remarkDirty ||
+      this.data.quoteDirty ||
+      this.data.handoverLoading ||
       this._bookingDetailMutationActive ||
       this._bookingDetailStatusFeedbackPending
     ) {
@@ -577,7 +587,7 @@ Page({
           draft: result.quoteDraft,
           history: result.quoteHistory,
           unavailable: result.quotesUnavailable
-        }, result.handoverHistory)
+        }, result.handoverHistory, result.handoverHistoryUnavailable)
       },
       fail: (error) => {
         handleFailure(error && (error.errMsg || error.message))
@@ -617,7 +627,8 @@ Page({
       name: "bookingUpdateAdminRemark",
       data: {
         id,
-        adminRemark
+        adminRemark,
+        expectedAdminRemark: normalizeRemark(this.data.booking.adminRemark)
       },
       startState: { loading: true },
       endState: { loading: false },
@@ -625,6 +636,11 @@ Page({
       failureFallback: "保存失败",
       onResult: (result, isCurrent) => {
         if (!result || !result.ok) {
+          if (result && result.code === "VERSION_CONFLICT") {
+            this.applyState({ loading: false })
+            this.promptReloadRemark()
+            return
+          }
           wx.showToast({
             title: formatToastTitle(result && result.message, "保存失败"),
             icon: "none"
@@ -650,6 +666,21 @@ Page({
     if (!allowed.includes(field)) return
     const maxLength = field === "customerNote" ? 300 : field === "depositText" ? 200 : 20
     this.setData({ [`quoteForm.${field}`]: String(event.detail && event.detail.value || "").slice(0, maxLength), quoteDirty: true })
+  },
+  promptReloadRemark() {
+    const action = beginPageNativeAction(this, { requireCurrent: true })
+    wx.showModal({
+      title: "备注已更新",
+      confirmColor: "#528fff",
+      content: "其他操作已修改备注。重新加载会替换本次输入，请核对最新内容后再修改。",
+      confirmText: "重新加载",
+      cancelText: "保留输入",
+      success: (choice) => {
+        if (!isPageNativeActionActive(this, action) || !choice || !choice.confirm) return
+        this.applyState({ remarkDirty: false })
+        this.loadDetail()
+      }
+    })
   },
   handleQuoteValidUntilChange(event) {
     if (this.isBookingDetailInteractionBusy()) return
@@ -682,6 +713,8 @@ Page({
     return {
       action,
       bookingId: String(this.data.id || ""),
+      expectedQuoteVersion: Number(this.data.booking.latestQuoteVersion || 0),
+      expectedDraftRevision: Number(this.data.quoteDraft.revision || 0),
       baseRentalAmount: form.baseRentalAmount,
       protectionAmount: form.protectionAmount,
       serviceFeeAmount: form.serviceFeeAmount,
@@ -694,28 +727,47 @@ Page({
   },
   handleSaveQuoteDraft() {
     if (this.isBookingDetailInteractionBusy() || !this.data.id) return
+    if (this.data.quoteDateRangeTooLong) { wx.showToast({ title: "用车日期超过47天", icon: "none" }); return }
+    const payload = this.buildQuotePayload("saveDraft")
+    const key = JSON.stringify(payload)
+    if (!this._quoteDraftSnapshot || this._quoteDraftSnapshot.key !== key) {
+      this._quoteDraftSnapshot = { key, requestId: `draft_${Date.now()}_${Math.random().toString(36).slice(2, 10)}` }
+    }
     this.runBookingDetailMutation({
       name: "bookingQuoteManage",
-      data: this.buildQuotePayload("saveDraft"),
+      data: { ...payload, requestId: this._quoteDraftSnapshot.requestId },
       startState: { quoteLoading: true },
       endState: { quoteLoading: false },
       timeoutTitle: "报价保存超时，请重试",
       failureFallback: "报价保存失败",
       onResult: (result, isCurrent) => {
         if (!result || !result.ok) {
-          wx.showToast({ title: formatToastTitle(result && result.message, "报价保存失败"), icon: "none" })
           this.applyState({ quoteLoading: false })
+          if (result && result.code === "VERSION_CONFLICT") { this.promptReloadQuote(); return }
+          wx.showToast({ title: formatToastTitle(result && result.message, "报价保存失败"), icon: "none" })
           return
         }
         wx.showToast({ title: "报价草稿已保存", icon: "none" })
-        this.applyState({ quoteLoading: false, quoteDirty: false })
+        this._quoteDraftSnapshot = null
+        this.applyState({ quoteLoading: false, quoteDirty: false, ...(result.quote ? { quoteDraft: normalizeQuote(result.quote) } : {}) })
         if (isCurrent()) this.loadDetail()
       }
     })
   },
   handleSendQuote() {
     if (this.isBookingDetailInteractionBusy() || this.data.quoteDirty || !this.data.quoteDraft.id) return
-    const action = beginPageNativeAction(this, { exclusiveKey: "quote-send-confirmation" })
+    if (this.data.quoteDateRangeTooLong) { wx.showToast({ title: "用车日期超过47天", icon: "none" }); return }
+    const payload = {
+      action: "send", bookingId: this.data.id,
+      expectedQuoteVersion: Number(this.data.booking.latestQuoteVersion || 0),
+      expectedDraftRevision: Number(this.data.quoteDraft.revision || 0)
+    }
+    const snapshotKey = JSON.stringify(payload)
+    if (!this._quoteSendSnapshot || this._quoteSendSnapshot.key !== snapshotKey) {
+      this._quoteSendSnapshot = { key: snapshotKey, requestId: `quote_${Date.now()}_${Math.random().toString(36).slice(2, 10)}` }
+    }
+    const requestId = this._quoteSendSnapshot.requestId
+    const action = beginPageNativeAction(this, { exclusiveKey: "quote-send-confirmation", requireCurrent: true })
     wx.showModal({
       title: "发送报价",
       content: `确认发送报价 v${this.data.quoteDraft.version}？发送后该版本不可修改。`,
@@ -723,18 +775,24 @@ Page({
       confirmColor: "#528fff",
       success: (res) => {
         if (!isPageNativeActionActive(this, action) || !res || !res.confirm) return
-        const requestId = `quote_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+        if (this.data.id !== payload.bookingId || this.data.quoteDirty ||
+            Number(this.data.booking.latestQuoteVersion || 0) !== payload.expectedQuoteVersion ||
+            Number(this.data.quoteDraft.revision || 0) !== payload.expectedDraftRevision) {
+          wx.showToast({ title: "报价已更新，请核对", icon: "none" })
+          return
+        }
         this.runBookingDetailMutation({
           name: "bookingQuoteManage",
-          data: { action: "send", bookingId: this.data.id, requestId },
+          data: { ...payload, requestId },
           startState: { quoteLoading: true },
           endState: { quoteLoading: false },
           timeoutTitle: "报价发送超时，请重试",
           failureFallback: "报价发送失败",
           onResult: (result, isCurrent) => {
             if (!result || !result.ok) {
-              wx.showToast({ title: formatToastTitle(result && result.message, "报价发送失败"), icon: "none" })
               this.applyState({ quoteLoading: false })
+              if (result && result.code === "VERSION_CONFLICT") { this.promptReloadQuote(); return }
+              wx.showToast({ title: formatToastTitle(result && result.message, "报价发送失败"), icon: "none" })
               return
             }
             showStatusUpdateFeedback(result, () => {
@@ -743,6 +801,21 @@ Page({
             })
           }
         })
+      }
+    })
+  },
+  promptReloadQuote() {
+    const action = beginPageNativeAction(this, { requireCurrent: true })
+    wx.showModal({
+      title: "报价已更新",
+      confirmColor: "#528fff",
+      content: "其他操作已更新报价。重新加载会替换当前填写内容，请核对最新金额后再保存或发送。",
+      confirmText: "重新加载",
+      cancelText: "保留输入",
+      success: (choice) => {
+        if (!isPageNativeActionActive(this, action) || !choice || !choice.confirm) return
+        this.applyState({ quoteDirty: false })
+        this.loadDetail()
       }
     })
   },
@@ -800,8 +873,8 @@ Page({
       name: "bookingUpdateCoordination",
       data: {
         id,
-        schedulePriority,
-        coordinationStatus
+        [field]: value,
+        expectedValues: { [field]: this.data.booking[field] }
       },
       startState: { coordinationLoading: true },
       endState: { coordinationLoading: false },
@@ -868,7 +941,7 @@ Page({
     if (this.isBookingDetailInteractionBusy() || !id || id === this.data.id) {
       return
     }
-    const action = beginPageNativeAction(this)
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.navigateTo({
       url: `/pages/booking-manage-detail/booking-manage-detail?id=${id}`,
       fail: () => {
@@ -936,41 +1009,68 @@ Page({
     if (this.data.handoverLoading) return
     const field = String(event.currentTarget.dataset.field || "")
     if (!["mileageKm", "energyLevelPercent", "damageNote", "additionalNote"].includes(field)) return
+    this.captureHandoverVersion()
     const maxLength = field.includes("Note") ? 500 : 8
     this.setData({ [`handoverForm.${field}`]: String(event.detail && event.detail.value || "").slice(0, maxLength) })
   },
   handleHandoverEnergyType(event) {
     if (this.data.handoverLoading) return
+    this.captureHandoverVersion()
     const values = ["fuel", "electric"]
     this.setData({ "handoverForm.energyType": values[Number(event.detail && event.detail.value)] || "fuel" })
   },
   handleChooseHandoverPhoto(event) {
-    if (this.data.handoverLoading || !wx.chooseImage || !wx.cloud || !wx.cloud.uploadFile) return
+    if (this.isBookingDetailInteractionBusy() || !wx.chooseImage || !wx.cloud || !wx.cloud.uploadFile) return
     const angle = String(event.currentTarget.dataset.angle || "")
     const index = this.data.handoverForm.photos.findIndex((item) => item.angle === angle)
     if (index < 0) return
-    wx.chooseImage({
+    const bookingId = this.data.id
+    const stage = this.data.handoverStage
+    this.captureHandoverVersion()
+    const action = beginPageNativeAction(this, { exclusiveKey: "handover-photo", requireCurrent: true })
+    let settled = false
+    const isActive = () => !settled && isPageNativeActionActive(this, action) && this.data.id === bookingId && this.data.handoverStage === stage
+    const finish = (message) => {
+      if (settled) return
+      const active = isActive()
+      settled = true
+      if (this._handoverPhotoTimer) clearTimeout(this._handoverPhotoTimer)
+      this._handoverPhotoTimer = null
+      if (!active) {
+        this._handoverPhotoNeedsReset = true
+        return
+      }
+      this.applyState({ handoverLoading: false })
+      if (message) wx.showToast({ title: message, icon: "none" })
+    }
+    this.applyState({ handoverLoading: true })
+    const chooseOptions = {
       count: 1,
       sizeType: ["compressed", "original"],
       sourceType: ["camera", "album"],
       success: (selection) => {
+        if (!isActive()) { finish(); return }
         const path = selection && selection.tempFilePaths && selection.tempFilePaths[0]
         const file = selection && selection.tempFiles && selection.tempFiles[0]
         const extension = String(path || "").split(".").pop().toLowerCase()
         if (!path || !["jpg", "jpeg", "png", "webp"].includes(extension) || Number(file && file.size || 0) > HANDOVER_MAX_IMAGE_BYTES) {
-          wx.showToast({ title: "图片格式或大小有误", icon: "none" })
+          finish("图片格式或大小有误")
           return
         }
-        const stage = this.data.handoverStage
-        const cloudPath = `handover-images/${this.data.id}/${stage}/${Date.now()}_${angle}.${extension}`
-        this.applyState({ handoverLoading: true })
-        wx.cloud.uploadFile({
+        const cloudPath = `handover-images/${bookingId}/${stage}/${Date.now()}_${Math.random().toString(36).slice(2, 10)}_${angle}.${extension}`
+        this._handoverPhotoTimer = setTimeout(() => finish("图片上传超时"), BOOKING_DETAIL_WRITE_TIMEOUT_MS)
+        const uploadOptions = {
           cloudPath,
           filePath: path,
           success: (upload) => {
             const fileId = String(upload && upload.fileID || "")
+            if (!isActive()) {
+              if (fileId) this.queueHandoverUploadCleanup([fileId], stage, bookingId)
+              finish()
+              return
+            }
             if (!fileId) {
-              wx.showToast({ title: "图片上传失败", icon: "none" })
+              finish("图片上传失败")
               return
             }
             const oldFileId = this.data.handoverForm.photos[index].fileId
@@ -979,32 +1079,39 @@ Page({
               [`handoverForm.photos[${index}].fileId`]: fileId,
               [`handoverForm.photos[${index}].url`]: path
             })
+            finish()
           },
-          fail: () => wx.showToast({ title: "图片上传失败，请重试", icon: "none" }),
-          complete: () => this.applyState({ handoverLoading: false })
-        })
+          fail: () => finish("图片上传失败，请重试")
+        }
+        try { wx.cloud.uploadFile(uploadOptions) } catch (error) { finish("图片上传失败，请重试") }
       },
       fail: (error) => {
-        if (!String(error && error.errMsg || "").includes("cancel")) wx.showToast({ title: "选择图片失败，请重试", icon: "none" })
+        finish(String(error && error.errMsg || "").includes("cancel") ? "" : "选择图片失败，请重试")
       }
-    })
+    }
+    try { wx.chooseImage(chooseOptions) } catch (error) { finish("选择图片失败，请重试") }
   },
-  queueHandoverUploadCleanup(fileList, stage) {
+  queueHandoverUploadCleanup(fileList, stage, bookingId) {
     const files = (Array.isArray(fileList) ? fileList : []).filter(Boolean)
     if (!files.length || !wx.cloud || !wx.cloud.callFunction) return
-    wx.cloud.callFunction({
+    try { wx.cloud.callFunction({
       name: "bookingHandover",
-      data: { action: "cleanupUpload", bookingId: this.data.id, stage: stage || this.data.handoverStage, fileList: files },
+      data: { action: "cleanupUpload", bookingId: bookingId || this.data.id, stage: stage || this.data.handoverStage, fileList: files },
       fail: () => {}
-    })
+    }) } catch (error) {}
   },
   cleanupPendingHandoverUploads() {
     const form = this.data && this.data.handoverForm
     const fileList = form && Array.isArray(form.photos) ? form.photos.map((item) => item.fileId).filter(Boolean) : []
     if (fileList.length) this.queueHandoverUploadCleanup(fileList, this.data.handoverStage)
   },
+  captureHandoverVersion() {
+    if (this.data.handoverForm.expectedVersion !== null && this.data.handoverForm.expectedVersion !== undefined) return
+    const field = this.data.handoverStage === "pickup" ? "latestPickupHandoverVersion" : "latestReturnHandoverVersion"
+    this.setData({ "handoverForm.expectedVersion": Number(this.data.booking[field] || 0) })
+  },
   handleSubmitHandover() {
-    if (this.data.handoverLoading || this.data.booking.status !== "confirmed") return
+    if (this.isBookingDetailInteractionBusy() || this.data.booking.status !== "confirmed") return
     const form = this.data.handoverForm
     const mileageKm = Number(form.mileageKm)
     const energyLevelPercent = Number(form.energyLevelPercent)
@@ -1013,45 +1120,61 @@ Page({
       return
     }
     const stage = this.data.handoverStage
-    const requestId = `handover_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
-    const requestSerial = Number(this._handoverRequestId || 0) + 1
-    this._handoverRequestId = requestSerial
-    this.applyState({ handoverLoading: true })
-    wx.cloud.callFunction({
+    this.captureHandoverVersion()
+    const payload = {
+      action: "submit", bookingId: this.data.id, stage,
+      expectedVersion: Number(this.data.handoverForm.expectedVersion || 0),
+      mileageKm, energyType: form.energyType, energyLevelPercent,
+      damageNote: String(form.damageNote).trim(), additionalNote: String(form.additionalNote).trim(),
+      photos: form.photos.map((item) => ({ angle: item.angle, fileId: item.fileId }))
+    }
+    const snapshotKey = JSON.stringify(payload)
+    if (!this._handoverSubmitSnapshot || this._handoverSubmitSnapshot.key !== snapshotKey) {
+      this._handoverSubmitSnapshot = { key: snapshotKey, requestId: `handover_${Date.now()}_${Math.random().toString(36).slice(2, 10)}` }
+    }
+    this.runBookingDetailMutation({
       name: "bookingHandover",
-      data: {
-        action: "submit", bookingId: this.data.id, stage, requestId,
-        mileageKm, energyType: form.energyType, energyLevelPercent,
-        damageNote: String(form.damageNote).trim(), additionalNote: String(form.additionalNote).trim(),
-        photos: form.photos.map((item) => ({ angle: item.angle, fileId: item.fileId }))
-      },
-      success: (res) => {
-        if (this._handoverRequestId !== requestSerial) return
-        const result = res && res.result
+      data: { ...payload, requestId: this._handoverSubmitSnapshot.requestId },
+      startState: { handoverLoading: true },
+      endState: { handoverLoading: false },
+      timeoutTitle: "交接提交超时",
+      failureFallback: "提交失败，请重试",
+      onResult: (result, isCurrent) => {
+        this.applyState({ handoverLoading: false })
         if (!result || !result.ok) {
+          if (result && result.code === "VERSION_CONFLICT") { this.promptReloadHandover(); return }
+          if (result && result.code === "IMAGE_DELETION_CONFLICT") { wx.showToast({ title: "请重新上传交接图片", icon: "none" }); return }
           wx.showToast({ title: formatToastTitle(result && result.message, "提交失败"), icon: "none" })
           return
         }
+        this._handoverSubmitSnapshot = null
         this.setData({ handoverForm: createHandoverForm() })
         wx.showToast({ title: result.duplicate ? "记录已提交" : "交接记录已提交", icon: "none" })
-        this._reloadHandoverAfterMutation = true
-      },
-      fail: () => wx.showToast({ title: "提交失败，请重试", icon: "none" }),
-      complete: () => {
-        if (this._handoverRequestId === requestSerial) {
-          this.applyState({ handoverLoading: false })
-          if (this._reloadHandoverAfterMutation) {
-            this._reloadHandoverAfterMutation = false
-            this.loadDetail()
-          }
-        }
+        if (isCurrent()) this.loadDetail()
+      }
+    })
+  },
+  promptReloadHandover() {
+    const action = beginPageNativeAction(this, { requireCurrent: true })
+    wx.showModal({
+      title: "交接记录已更新",
+      confirmColor: "#528fff",
+      content: "请先核对最新交接记录。重新加载会清空本次未提交内容和照片。",
+      confirmText: "重新加载",
+      cancelText: "保留输入",
+      success: (choice) => {
+        if (!isPageNativeActionActive(this, action) || !choice || !choice.confirm) return
+        this.cleanupPendingHandoverUploads()
+        this._handoverSubmitSnapshot = null
+        this.setData({ handoverForm: createHandoverForm() })
+        this.loadDetail()
       }
     })
   },
   handlePreviewHandoverPhoto(event) {
     const url = String(event.currentTarget.dataset.url || "")
     const urls = (event.currentTarget.dataset.urls || []).filter(Boolean)
-    const action = beginPageNativeAction(this)
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     if (url && wx.previewImage) wx.previewImage({
       current: url,
       urls: urls.length ? urls : [url],
@@ -1062,10 +1185,10 @@ Page({
   },
   handleHandoverImageError() {},
   handleArchiveHandover(event) {
-    if (this.data.handoverLoading) return
+    if (this.isBookingDetailInteractionBusy()) return
     const handoverId = String(event.currentTarget.dataset.id || "")
     const stage = String(event.currentTarget.dataset.stage || "")
-    const action = beginPageNativeAction(this, { exclusiveKey: "handover-archive-confirmation" })
+    const action = beginPageNativeAction(this, { exclusiveKey: "handover-archive-confirmation", requireCurrent: true })
     wx.showModal({
       title: "归档交接记录",
       content: "归档会清除该版本的交接照片，文字审计信息会保留。确认继续？",
@@ -1073,22 +1196,17 @@ Page({
       confirmColor: "#d46868",
       success: (choice) => {
         if (!isPageNativeActionActive(this, action) || !choice || !choice.confirm) return
-        this.applyState({ handoverLoading: true })
-        wx.cloud.callFunction({
+        this.runBookingDetailMutation({
           name: "bookingHandover",
           data: { action: "archive", bookingId: this.data.id, handoverId, stage },
-          success: (res) => {
-            const result = res && res.result
-            wx.showToast({ title: result && result.ok ? "已归档并进入清理队列" : formatToastTitle(result && result.message, "归档失败"), icon: "none" })
-            if (result && result.ok) this._reloadHandoverAfterMutation = true
-          },
-          fail: () => wx.showToast({ title: "归档失败，请重试", icon: "none" }),
-          complete: () => {
+          startState: { handoverLoading: true },
+          endState: { handoverLoading: false },
+          timeoutTitle: "交接归档超时",
+          failureFallback: "归档失败，请重试",
+          onResult: (result, isCurrent) => {
             this.applyState({ handoverLoading: false })
-            if (this._reloadHandoverAfterMutation) {
-              this._reloadHandoverAfterMutation = false
-              this.loadDetail()
-            }
+            wx.showToast({ title: result && result.ok ? "已归档并进入清理队列" : formatToastTitle(result && result.message, "归档失败"), icon: "none" })
+            if (result && result.ok && isCurrent()) this.loadDetail()
           }
         })
       }
@@ -1096,63 +1214,91 @@ Page({
   },
   handleExportHandoverReport(event) {
     if (this.data.exportingHandover) return
+    const action = beginPageNativeAction(this, { exclusiveKey: "handover-export", requireCurrent: true })
     const handoverId = event && event.currentTarget && event.currentTarget.dataset && event.currentTarget.dataset.id
     const history = Array.isArray(this.data.handoverHistory) ? this.data.handoverHistory : []
     const target = (handoverId && history.find((h) => h.id === handoverId)) || history[0] || this.data.handoverForm || {}
     this.setData({ exportingHandover: true })
     const csvContent = formatHandoverCsvContent(this.data.booking, target)
     const fileName = getHandoverFileName(this.data.booking, target)
-    const fs = typeof wx !== "undefined" && wx.getFileSystemManager ? wx.getFileSystemManager() : null
+    let fs
+    try { fs = wx.getFileSystemManager && wx.getFileSystemManager() } catch (error) {}
     if (!fs || !wx.env || !wx.env.USER_DATA_PATH) {
       this.setData({ exportingHandover: false })
       if (typeof wx !== "undefined" && wx.showToast) wx.showToast({ title: "系统暂不支持文件导出", icon: "none" })
       return
     }
     const filePath = `${wx.env.USER_DATA_PATH}/${fileName}`
-    fs.writeFile({
+    let settled = false
+    const finish = () => {
+      if (settled) return false
+      settled = true
+      if (this._handoverExportTimer) clearTimeout(this._handoverExportTimer)
+      this._handoverExportTimer = null
+      if (!isPageNativeActionActive(this, action)) { this._handoverExportNeedsReset = true; return false }
+      return true
+    }
+    const fail = () => {
+      if (!finish()) return
+      this.setData({ exportingHandover: false })
+      wx.showToast({ title: "留证单导出失败", icon: "none" })
+    }
+    this._handoverExportTimer = setTimeout(fail, BOOKING_DETAIL_WRITE_TIMEOUT_MS)
+    const writeOptions = {
       filePath,
       data: csvContent,
       encoding: "utf8",
       success: () => {
+        if (!finish()) {
+          if (typeof fs.unlink === "function") fs.unlink({ filePath, fail: () => {} })
+          return
+        }
         this.setData({ exportedHandoverPath: filePath, exportingHandover: false })
         if (typeof wx !== "undefined" && wx.showToast) wx.showToast({ title: "留证单已导出", icon: "success" })
       },
-      fail: () => {
-        this.setData({ exportingHandover: false })
-        if (typeof wx !== "undefined" && wx.showToast) wx.showToast({ title: "留证单导出失败", icon: "none" })
-      }
-    })
+      fail
+    }
+    try { fs.writeFile(writeOptions) } catch (error) { fail() }
   },
   handleOpenExportedHandover() {
     const filePath = this.data.exportedHandoverPath
     if (!filePath || typeof wx === "undefined" || typeof wx.openDocument !== "function") return
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.openDocument({
       filePath,
       fileType: "csv",
-      fail: () => wx.showToast({ title: "打开文件失败", icon: "none" })
+      fail: () => {
+        if (isPageNativeActionActive(this, action)) wx.showToast({ title: "打开文件失败", icon: "none" })
+      }
     })
   },
   handleShareExportedHandover() {
     const filePath = this.data.exportedHandoverPath
     if (!filePath || typeof wx === "undefined" || typeof wx.shareFileMessage !== "function") return
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.shareFileMessage({
       filePath,
-      fail: () => wx.showToast({ title: "分享文件取消或失败", icon: "none" })
+      fail: (error) => {
+        if (isPageNativeActionActive(this, action) && !String(error && error.errMsg || "").toLowerCase().includes("cancel")) wx.showToast({ title: "分享文件失败", icon: "none" })
+      }
     })
   },
   handleDeleteExportedHandover() {
     const filePath = this.data.exportedHandoverPath
     if (!filePath) return
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     const fs = typeof wx !== "undefined" && wx.getFileSystemManager ? wx.getFileSystemManager() : null
     if (fs && typeof fs.unlink === "function") {
       fs.unlink({
         filePath,
         success: () => {
+          if (!isPageNativeActionActive(this, action) || this.data.exportedHandoverPath !== filePath) return
           this.setData({ exportedHandoverPath: "" })
           if (typeof wx !== "undefined" && wx.showToast) wx.showToast({ title: "缓存已清理", icon: "none" })
         },
-        complete: () => {
-          this.setData({ exportedHandoverPath: "" })
+        fail: () => {
+          if (!isPageNativeActionActive(this, action) || this.data.exportedHandoverPath !== filePath) return
+          wx.showToast({ title: "清理失败", icon: "none" })
         }
       })
     } else {
@@ -1175,24 +1321,30 @@ Page({
       }
       nextTags = [...currentTags, tag]
     }
-    const updatedBooking = { ...booking, tags: nextTags }
-    this.setData({
-      booking: updatedBooking,
-      "booking.tags": nextTags
+    if (!this.data.id) return
+    this.runBookingDetailMutation({
+      name: "bookingUpdateCoordination",
+      data: { id: this.data.id, tags: nextTags },
+      startState: { coordinationLoading: true },
+      endState: { coordinationLoading: false },
+      timeoutTitle: "标签保存超时",
+      failureFallback: "标签保存失败",
+      onResult: (result) => {
+        this.applyState({ coordinationLoading: false })
+        if (!result || !result.ok) {
+          wx.showToast({ title: formatToastTitle(result && result.message, "标签保存失败"), icon: "none" })
+          return
+        }
+        this.setData({ "booking.tags": normalizeTags(result.tags || nextTags) })
+      }
     })
-    if (this.data.id && typeof wx !== "undefined" && wx.cloud && typeof wx.cloud.callFunction === "function") {
-      wx.cloud.callFunction({
-        name: "bookingUpdateCoordination",
-        data: { id: this.data.id, tags: nextTags },
-        fail: () => {}
-      })
-    }
   },
   handleUpdateStatus(event) {
     if (
       this.data.loading ||
       this.data.coordinationLoading ||
       this.data.quoteLoading ||
+      this.data.handoverLoading ||
       this._bookingDetailMutationActive ||
       this.data.remarkDirty ||
       !this.data.id
@@ -1205,7 +1357,8 @@ Page({
     }
     const statusText = STATUS_TEXT_MAP[status] || status
     const action = beginPageNativeAction(this, {
-      exclusiveKey: "booking-status-confirmation"
+      exclusiveKey: "booking-status-confirmation",
+      requireCurrent: true
     })
     wx.showModal({
       title: "更新状态",
@@ -1224,6 +1377,8 @@ Page({
     if (
       this.data.loading ||
       this.data.coordinationLoading ||
+      this.data.quoteLoading ||
+      this.data.handoverLoading ||
       this._bookingDetailMutationActive ||
       this._bookingDetailStatusFeedbackPending ||
       this.data.remarkDirty
@@ -1359,7 +1514,7 @@ Page({
     this.loadDetail()
   },
   handleBackManage() {
-    const action = beginPageNativeAction(this)
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     const pages = getCurrentPages()
     if (pages.length > 1) {
       wx.navigateBack({

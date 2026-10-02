@@ -9,47 +9,15 @@ const {
 } = require("../../shared/pageNativeAction")
 const { calculateMaintenanceHealth, buildFleetMaintenanceSummary } = require("../../shared/vehicleMaintenance")
 const { formatDisplayTime } = require("../../shared/formatTime")
-const STATUS_OPTIONS = [
-  { value: "all", label: "全部" },
-  { value: "active", label: "在用" },
-  { value: "idle", label: "闲置" },
-  { value: "maintenance", label: "维修" },
-  { value: "retired", label: "停用" }
-]
-const STATUS_LABEL_MAP = {
-  active: "在用",
-  idle: "闲置",
-  maintenance: "维修",
-  retired: "停用"
-}
-const STATUS_CLASS_MAP = {
-  active: "status-active",
-  idle: "status-idle",
-  maintenance: "status-maintenance",
-  retired: "status-retired"
-}
-const STATUS_OP_OPTIONS = [
-  { value: "idle", label: "设为闲置" },
-  { value: "active", label: "设为在用" },
-  { value: "maintenance", label: "设为维修" }
-]
-const VEHICLE_TYPE_LABEL_MAP = {
-  sedan: "轿车",
-  suv: "SUV",
-  mpv: "MPV",
-  sports: "跑车",
-  truck: "卡车",
-  other: "其他"
-}
-const TRANSMISSION_LABEL_MAP = {
-  manual: "手动挡",
-  automatic: "自动挡"
-}
-const FUEL_TYPE_LABEL_MAP = {
-  gasoline: "燃油",
-  electric: "纯电",
-  hybrid: "混动"
-}
+const {
+  STATUS_OPTIONS,
+  STATUS_LABEL_MAP,
+  STATUS_CLASS_MAP,
+  STATUS_OP_OPTIONS,
+  VEHICLE_TYPE_LABEL_MAP,
+  TRANSMISSION_LABEL_MAP,
+  FUEL_TYPE_LABEL_MAP
+} = require("../../shared/vehicleLabels")
 const DEFAULT_PAGE_SIZE = 20
 const VEHICLE_LIST_TIMEOUT_MS = 15 * 1000
 const VEHICLE_MUTATION_TIMEOUT_MS = 20 * 1000
@@ -277,11 +245,16 @@ Page({
       this.fetchList({ keyword: "" })
     })
   },
-  handleKeywordConfirm() {
-    if (this.data.loading || this.isVehicleMutationBusy()) {
+  handleKeywordConfirm(event) {
+    this.handleSearchConfirm(event)
+  },
+  handleSearchConfirm(event) {
+    if (this.isVehicleMutationBusy()) {
       return
     }
-    this.fetchList()
+    const keyword = String(event && event.detail && event.detail.value !== undefined ? event.detail.value : this.data.keyword || "")
+    this.setData({ keyword })
+    this.fetchList({ keyword })
   },
   handleStatusTap(event) {
     const status = event.currentTarget.dataset.status
@@ -318,7 +291,7 @@ Page({
     if (this.data.loading || this.isVehicleMutationBusy()) {
       return
     }
-    const action = beginPageNativeAction(this)
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.navigateTo({
       url: "/pages-admin/vehicle-create/vehicle-create",
       fail: () => {
@@ -344,7 +317,7 @@ Page({
       })
       return
     }
-    const action = beginPageNativeAction(this)
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.navigateTo({
       url: `/pages-admin/vehicle-edit/vehicle-edit?id=${id}`,
       fail: () => {
@@ -361,7 +334,7 @@ Page({
   handleScheduleMaintenance(event) {
     const id = String((event && event.currentTarget && event.currentTarget.dataset && event.currentTarget.dataset.id) || "").trim()
     if (!id) return
-    const action = beginPageNativeAction(this)
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.navigateTo({
       url: `/pages/booking-calendar/booking-calendar?vehicleId=${id}&kind=maintenance`,
       fail: () => {
@@ -386,7 +359,7 @@ Page({
       })
       return
     }
-    const action = beginPageNativeAction(this)
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.navigateTo({
       url: `/pages-admin/vehicle-detail-manage/vehicle-detail-manage?id=${id}`,
       fail: () => {
@@ -433,7 +406,9 @@ Page({
       return
     }
     const statusText = STATUS_LABEL_MAP[status] || status
+    const expectedVersion = this.getVehicleVersion(id)
     const action = beginPageNativeAction(this, {
+      requireCurrent: true,
       exclusiveKey: "vehicle-write-confirmation"
     })
     wx.showModal({
@@ -445,7 +420,7 @@ Page({
         if (!isPageNativeActionActive(this, action) || !modalRes || !modalRes.confirm) {
           return
         }
-        this.updateVehicleStatus(id, status)
+        this.updateVehicleStatus(id, status, expectedVersion)
       }
     })
   },
@@ -462,7 +437,9 @@ Page({
     if (this.data.updatingId || this.data.deletingId) {
       return
     }
+    const expectedVersion = this.getVehicleVersion(id)
     const action = beginPageNativeAction(this, {
+      requireCurrent: true,
       exclusiveKey: "vehicle-write-confirmation"
     })
     wx.showModal({
@@ -474,7 +451,7 @@ Page({
         if (!isPageNativeActionActive(this, action) || !modalRes || !modalRes.confirm) {
           return
         }
-        this.retireVehicle(id)
+        this.retireVehicle(id, expectedVersion)
       }
     })
   },
@@ -491,7 +468,9 @@ Page({
     if (this.data.updatingId || this.data.deletingId) {
       return
     }
+    const expectedVersion = this.getVehicleVersion(id)
     const action = beginPageNativeAction(this, {
+      requireCurrent: true,
       exclusiveKey: "vehicle-write-confirmation"
     })
     wx.showModal({
@@ -503,7 +482,7 @@ Page({
         if (!isPageNativeActionActive(this, action) || !modalRes || !modalRes.confirm) {
           return
         }
-        this.restoreVehicle(id)
+        this.restoreVehicle(id, expectedVersion)
       }
     })
   },
@@ -521,6 +500,7 @@ Page({
       return
     }
     const action = beginPageNativeAction(this, {
+      requireCurrent: true,
       exclusiveKey: "vehicle-write-confirmation"
     })
     wx.showModal({
@@ -536,17 +516,22 @@ Page({
       }
     })
   },
-  updateVehicleStatus(id, status) {
+  getVehicleVersion(id) {
+    const item = (this.data.list || []).find((vehicle) => vehicle.id === id)
+    return Math.max(0, Math.floor(Number(item && item.vehicleVersion) || 0))
+  },
+  updateVehicleStatus(id, status, expectedVersion = this.getVehicleVersion(id)) {
     this.runVehicleMutation({
       id,
       stateField: "updatingId",
       name: "vehicleUpdateStatus",
-      data: { id, status },
+      data: { id, status, expectedVersion },
       loadingTitle: "更新中…",
       timeoutTitle: "更新超时，请重试",
       failureFallback: "更新失败",
       onResult: (result) => {
         if (!result || !result.ok) {
+          if (result && result.code === "VERSION_CONFLICT") this.fetchList()
           wx.showToast({
             title: formatToastTitle(result && result.message, "更新失败"),
             icon: "none"
@@ -561,17 +546,18 @@ Page({
       }
     })
   },
-  retireVehicle(id) {
+  retireVehicle(id, expectedVersion = this.getVehicleVersion(id)) {
     this.runVehicleMutation({
       id,
       stateField: "updatingId",
       name: "vehicleRetire",
-      data: { id },
+      data: { id, expectedVersion },
       loadingTitle: "停用中…",
       timeoutTitle: "停用超时，请重试",
       failureFallback: "停用失败",
       onResult: (result) => {
         if (!result || !result.ok) {
+          if (result && result.code === "VERSION_CONFLICT") this.fetchList()
           wx.showToast({
             title: formatToastTitle(result && result.message, "停用失败"),
             icon: "none"
@@ -586,17 +572,18 @@ Page({
       }
     })
   },
-  restoreVehicle(id) {
+  restoreVehicle(id, expectedVersion = this.getVehicleVersion(id)) {
     this.runVehicleMutation({
       id,
       stateField: "updatingId",
       name: "vehicleRestore",
-      data: { id },
+      data: { id, expectedVersion },
       loadingTitle: "恢复中…",
       timeoutTitle: "恢复超时，请重试",
       failureFallback: "恢复失败",
       onResult: (result) => {
         if (!result || !result.ok) {
+          if (result && result.code === "VERSION_CONFLICT") this.fetchList()
           wx.showToast({
             title: formatToastTitle(result && result.message, "恢复失败"),
             icon: "none"
@@ -716,7 +703,7 @@ Page({
     const code = String((result && result.code) || "").trim()
     const message = String((result && result.message) || "").trim()
     if (code === "VEHICLE_HAS_BOOKINGS") {
-      const action = beginPageNativeAction(this)
+      const action = beginPageNativeAction(this, { requireCurrent: true })
       wx.showModal({
         title: "无法彻底删除",
         content: message || "该车辆存在预约记录。为保留历史记录，可以将车辆改为停用，停用后用户端不再展示。",
@@ -732,7 +719,7 @@ Page({
       return
     }
     if (code === "NOT_FOUND") {
-      const action = beginPageNativeAction(this)
+      const action = beginPageNativeAction(this, { requireCurrent: true })
       wx.showModal({
         title: "车辆已不存在",
         content: message || "该车辆可能已被其他管理员删除，列表将自动刷新。",
@@ -750,7 +737,7 @@ Page({
     const content = code === "FORBIDDEN"
       ? "当前账号没有删除车辆的权限，请重新进入小程序刷新权限，或检查管理员配置。"
       : message || "云端删除请求未完成，请检查网络后重试。"
-    const action = beginPageNativeAction(this)
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.showModal({
       title: code === "FORBIDDEN" ? "无删除权限" : "删除未完成",
       content,

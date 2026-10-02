@@ -7,10 +7,12 @@ function createMockDb({ records, orderedError = null }) {
   const orderedLimit = jest.fn(() => ({ get: orderedGet }))
   const orderedSkip = jest.fn(() => ({ limit: orderedLimit }))
   const orderBy = jest.fn(() => ({ skip: orderedSkip }))
-  const fallbackGet = jest.fn().mockResolvedValue({ data: records })
-  const fallbackLimit = jest.fn(() => ({ get: fallbackGet }))
+  let fallbackOffset = 0
+  const fallbackLimit = jest.fn((limit) => ({ get: jest.fn().mockResolvedValue({ data: records.slice(fallbackOffset, fallbackOffset + limit) }) }))
+  const fallbackSkip = jest.fn((offset) => { fallbackOffset = offset; return { limit: fallbackLimit } })
   const field = jest.fn(() => ({
     orderBy,
+    skip: fallbackSkip,
     limit: fallbackLimit
   }))
   const where = jest.fn(() => ({
@@ -48,6 +50,22 @@ async function loadModule(openid, mockDb) {
 }
 
 describe("cloudfunctions/privacyRequestMyList integration", () => {
+  test("降级读取用100条分批扫描，500条可完整翻页，501条明确失败", async () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {})
+    const error = jest.spyOn(console, "error").mockImplementation(() => {})
+    const records = Array.from({ length: 500 }, (_, index) => ({ _id: `p_${index}`, createdAt: `2020-01-01T00:00:00.000Z` }))
+    const complete = createMockDb({ records, orderedError: new Error("missing index") })
+    let mod = await loadModule("user_openid", complete.db)
+    expect(await mod.main({ page: 24, pageSize: 20 })).toMatchObject({ ok: true, hasMore: false, truncated: false, list: expect.any(Array) })
+    expect(complete.fallbackLimit.mock.calls.every(([limit]) => limit <= 100)).toBe(true)
+    const tooLarge = createMockDb({ records: [...records, { _id: "overflow" }], orderedError: new Error("missing index") })
+    mod = await loadModule("user_openid", tooLarge.db)
+    const result = await mod.main({ page: 25, pageSize: 20 })
+    expect(result).toMatchObject({ ok: false, code: "INDEX_REQUIRED" })
+    expect(result).not.toHaveProperty("hasMore")
+    warn.mockRestore()
+    error.mockRestore()
+  })
   test("只按当前 OpenID 查询并返回用户可见字段", async () => {
     const mocks = createMockDb({
       records: [
@@ -112,7 +130,7 @@ describe("cloudfunctions/privacyRequestMyList integration", () => {
 
     expect(res.ok).toBe(true)
     expect(res.list[0].id).toBe("new")
-    expect(mocks.fallbackLimit).toHaveBeenCalledWith(501)
+    expect(mocks.fallbackLimit).toHaveBeenCalledWith(100)
     expect(warnSpy).toHaveBeenCalled()
     warnSpy.mockRestore()
   })

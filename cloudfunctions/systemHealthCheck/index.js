@@ -182,7 +182,11 @@ async function inspectVolume(item, collectionAvailable) {
   }
 
   try {
-    const countResult = await db.collection(item.key).count()
+    const collection = db.collection(item.key)
+    const countQuery = item.key === "privacy_requests"
+      ? collection.where({ type: db.command.in(["access", "correction", "deletion"]) })
+      : collection
+    const countResult = await countQuery.count()
     const count = normalizeCount(countResult)
     const nearLimit = count >= item.warningAt
     return {

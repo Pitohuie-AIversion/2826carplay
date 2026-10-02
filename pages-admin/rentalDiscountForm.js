@@ -2,10 +2,13 @@ const { markUnsaved } = require("../shared/unsavedChanges")
 const { MAX_RENTAL_DISCOUNT_TIERS } = require("../shared/rentalPricing")
 
 function toDiscountRows(tiers) {
-  return (Array.isArray(tiers) ? tiers : []).map((tier) => ({
-    minDays: String(tier.minDays),
-    discount: String(Number((tier.discountRate * 10).toFixed(1)))
-  }))
+  return (Array.isArray(tiers) ? tiers : []).map((tier) => {
+    const value = tier && typeof tier === "object" ? tier : {}
+    return {
+      minDays: value.minDays == null ? "" : String(value.minDays),
+      discount: value.discountRate == null ? "" : String(Number((Number(value.discountRate) * 10).toFixed(10)))
+    }
+  })
 }
 
 function toDiscountTiers(rows) {

@@ -1,37 +1,37 @@
 const cloud = require("wx-server-sdk")
+const { normalizeServiceConfig, validateServiceConfig, validateCityOptions } = require("./serviceConfig")
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
 const OPERATION_CONFIG_FIELDS = {
-  value: true
+  value: true,
+  revision: true
 }
 const CONFIG_KEY = "operation_settings"
-const LEGACY_GARAGE_SUBTITLE = "后台车辆资料已接入首页展示，上传封面后会同步展示到车库首页"
 const DEFAULT_RENTAL_TERMS = {
-  includedText: "基础日租仅包含车辆使用费，其他项目会在正式报价前单独列明。",
-  protectionText: "基础保障内容根据车型与租期确认，不默认包含额外保障服务。",
-  serviceFeeText: "如有车辆整备或门店服务费，将在报价明细中单独列示。",
-  deliveryFeeText: "取送车服务及费用按城市、距离和时段确认，无该服务时不收费。",
-  depositText: "车辆押金与违章押金的金额、支付方式和退还时间会在确认前明确告知。",
-  cancellationText: "预约提交后可取消；顾问确认后的取消或改期规则以有效报价说明为准。",
-  overtimeText: "超时用车费用按最终确认的计费规则执行，产生前由顾问说明。",
-  energyText: "取还车油量或电量标准会在交付前确认，并以交接记录为准。",
-  estimateDisclaimer: "页面价格为基础日租参考，不是正式报价，提交预约也不会自动锁定车辆。"
+  includedText: "",
+  protectionText: "",
+  serviceFeeText: "",
+  deliveryFeeText: "",
+  depositText: "",
+  cancellationText: "",
+  overtimeText: "",
+  energyText: "",
+  estimateDisclaimer: ""
 }
 const DEFAULT_CONFIG = {
+  ...normalizeServiceConfig({}),
   brandName: "极境车库",
-  servicePhone: "15715710090",
+  servicePhone: "",
   wxKfCorpId: "",
   wxKfExtInfo: "",
   mineUserDesc: "查看预约、个人信息申请与车库服务",
   garagePageTitle: "极境车库",
   garagePageSubtitle: "甄选座驾，为每一次出发预留专属席位",
   cityOptions: ["杭州", "上海"],
-  faqContent:
-    "1. 预约提交后，客服会尽快联系您确认档期与细节。\n2. 车辆价格、押金与取还车规则以最终沟通结果为准。\n3. 如需取消预约，可前往【我的预约】操作。",
-  rulesContent:
-    "1. 车辆展示信息仅供参考，具体以客服最终确认为准。\n2. 预约不代表最终成交，需以档期、资质与规则审核结果为准。\n3. 平台保留对异常预约、恶意占用档期等行为的处理权利。",
+  faqContent: "",
+  rulesContent: "",
   bookingStatusTemplateId: "",
   rentalTerms: DEFAULT_RENTAL_TERMS,
   bookingPrivacyTip:
@@ -64,50 +64,55 @@ function normalizeConfig(raw) {
     ? input.cityOptions
         .map((item) => normalizeText(item, 20))
         .filter(Boolean)
+        .filter((item, index, list) => list.indexOf(item) === index)
         .slice(0, 20)
     : DEFAULT_CONFIG.cityOptions.slice()
 
   return {
+    ...normalizeServiceConfig(input),
     brandName: normalizeText(input.brandName, 20) || DEFAULT_CONFIG.brandName,
-    servicePhone: normalizeText(input.servicePhone, 20) || DEFAULT_CONFIG.servicePhone,
+    servicePhone: normalizeText(input.servicePhone, 20),
     wxKfCorpId: normalizeText(input.wxKfCorpId, 64),
     wxKfExtInfo: normalizeText(input.wxKfExtInfo, 512),
-    mineUserDesc:
-      !mineUserDesc || mineUserDesc === "静态展示页，更多个人功能将在后续版本完善"
-        ? DEFAULT_CONFIG.mineUserDesc
-        : mineUserDesc,
+    mineUserDesc: mineUserDesc || DEFAULT_CONFIG.mineUserDesc,
     garagePageTitle: normalizeText(input.garagePageTitle, 20) || DEFAULT_CONFIG.garagePageTitle,
     garagePageSubtitle:
-      !garagePageSubtitle || garagePageSubtitle === LEGACY_GARAGE_SUBTITLE
+      !garagePageSubtitle
         ? DEFAULT_CONFIG.garagePageSubtitle
         : garagePageSubtitle,
-    cityOptions: cityOptions.length ? cityOptions : DEFAULT_CONFIG.cityOptions.slice(),
+    cityOptions,
     faqContent: normalizeText(input.faqContent, 1000) || DEFAULT_CONFIG.faqContent,
     rulesContent: normalizeText(input.rulesContent, 1000) || DEFAULT_CONFIG.rulesContent,
     bookingStatusTemplateId: normalizeText(input.bookingStatusTemplateId, 128),
     rentalTerms: normalizeRentalTerms(input.rentalTerms),
-    bookingPrivacyTip:
-      !bookingPrivacyTip ||
-      bookingPrivacyTip ===
-        "提交预约即表示您同意我们仅将所填信息用于本次车辆预约沟通与联系确认。您可在【我的预约】查看与取消；如需删除预约记录或个人信息，请联系管理员处理。车辆档期、价格、押金及取还车规则以客服最终确认为准。"
-        ? DEFAULT_CONFIG.bookingPrivacyTip
-        : bookingPrivacyTip
+    bookingPrivacyTip: bookingPrivacyTip || DEFAULT_CONFIG.bookingPrivacyTip
   }
 }
 
-exports.main = async () => {
+exports.main = async (event) => {
   try {
     const res = await db
       .collection("app_configs")
       .where({ key: CONFIG_KEY })
       .field(OPERATION_CONFIG_FIELDS)
-      .limit(1)
+      .limit(2)
       .get()
     const list = res && Array.isArray(res.data) ? res.data : []
+    if (list.length > 1) {
+      return { ok: false, code: "CONFIG_CONFLICT", message: "存在重复运营配置，请管理员核对后重试" }
+    }
     const current = list.length ? list[0] : null
+    if (current && event && event.requireStoredConfig) {
+      const stored = current.value || {}
+      const error = validateServiceConfig(stored) || validateCityOptions(stored.cityOptions)
+      if (error) {
+        return { ok: false, code: "STORED_CONFIG_INVALID", message: "已保存配置存在无效字段，请核对后再编辑", details: { errors: [error] } }
+      }
+    }
 
     return {
       ok: true,
+      revision: Number.isSafeInteger(current && current.revision) ? current.revision : 0,
       config: normalizeConfig(current && current.value)
     }
   } catch (error) {
@@ -118,6 +123,9 @@ exports.main = async () => {
       createdAt: new Date().toISOString()
     })
 
+    if (event && event.requireStoredConfig) {
+      return { ok: false, code: "CONFIG_UNAVAILABLE", message: "线上配置读取失败，请重试" }
+    }
     return {
       ok: true,
       config: { ...DEFAULT_CONFIG }

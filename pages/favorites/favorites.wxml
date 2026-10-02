@@ -54,7 +54,14 @@
       <view class="favorite-action-content"><view class="favorite-action-native-icon favorite-retry-native-icon" aria-hidden="true"></view><text>重新加载</text></view>
     </button>
   </view>
-  <view wx:elif="{{list.length}}" class="favorite-content">
+  <view wx:elif="{{list.length || hasMore}}" class="favorite-content">
+    <view wx:if="{{loadError}}" class="favorite-load-error ui-card" aria-live="polite">
+      <view>收藏未能更新，以下为上次加载的内容。</view>
+      <view class="favorite-load-error-detail">{{loadError}}</view>
+      <button class="ui-btn ui-btn-ghost" loading="{{loading}}" disabled="{{loading || removingId || undoingFavorite}}" bindtap="handleRetry">
+        <view class="favorite-action-content"><view class="favorite-action-native-icon favorite-retry-native-icon" aria-hidden="true"></view><text>重试加载</text></view>
+      </button>
+    </view>
     <view class="collection-overview ui-card">
       <view class="collection-summary">
         <view>
@@ -103,9 +110,9 @@
             class="remove-button"
             data-id="{{item.id}}"
             loading="{{removingId === item.id}}"
-            disabled="{{removingId}}"
+            disabled="{{loading || removingId || undoingFavorite}}"
             catchtap="handleRemove"
-            hover-class="{{removingId ? 'none' : 'remove-button-pressed'}}"
+            hover-class="{{loading || removingId || undoingFavorite ? 'none' : 'remove-button-pressed'}}"
             aria-label="{{removingId === item.id ? '正在取消收藏车辆 ' + item.name : '取消收藏车辆 ' + item.name}}"
           >
             <view class="favorite-action-content"><view wx:if="{{removingId !== item.id}}" class="favorite-action-native-icon remove-favorite-native-icon" aria-hidden="true"><view class="remove-favorite-heart"></view><view class="remove-favorite-minus"></view></view><text>{{removingId === item.id ? '正在取消' : '取消收藏'}}</text></view>
@@ -118,8 +125,8 @@
         <view class="filter-empty-line filter-empty-line-top"></view>
         <view class="filter-empty-line filter-empty-line-bottom"></view>
       </view>
-      <view class="filter-empty-title">收藏中暂无可预约车辆</view>
-      <view class="filter-empty-desc">其他收藏仍会保留，车辆恢复可预约后会自动出现在这里。</view>
+      <view class="filter-empty-title">{{availableOnly ? '当前已加载收藏中暂无可预约车辆' : '当前这批收藏已下架'}}</view>
+      <view class="filter-empty-desc">{{hasMore ? '可继续加载更多收藏，查看其他车辆。' : '其他收藏仍会保留，车辆恢复可预约后会自动出现在这里。'}}</view>
       <button class="filter-empty-button ui-btn ui-btn-ghost" bindtap="handleShowAll">
         <view class="favorite-action-content"><view class="favorite-action-native-icon favorite-list-native-icon" aria-hidden="true"></view><text>查看全部收藏</text></view>
       </button>
@@ -129,12 +136,12 @@
         wx:if="{{hasMore}}"
         class="load-more-button ui-btn ui-btn-ghost"
         loading="{{loading}}"
-        disabled="{{loading}}"
+        disabled="{{loading || removingId || undoingFavorite}}"
         bindtap="handleLoadMore"
       >
         <view class="favorite-action-content"><view wx:if="{{!loading}}" class="favorite-action-native-icon favorite-more-native-icon" aria-hidden="true"></view><text>{{loading ? '正在加载' : '加载更多收藏'}}</text></view>
       </button>
-      <view wx:else class="list-end"><view class="favorite-complete-native-icon" aria-hidden="true"></view><text>已加载全部收藏</text></view>
+      <view wx:elif="{{!loadError}}" class="list-end"><view class="favorite-complete-native-icon" aria-hidden="true"></view><text>已加载全部收藏</text></view>
     </view>
   </view>
   <view wx:else class="empty-card ui-card">
@@ -148,7 +155,7 @@
   </view>
   <view wx:if="{{undoFavorite}}" class="favorite-undo-bar" aria-live="polite">
     <text>已取消收藏“{{undoFavorite.car.name || '车辆'}}”</text>
-    <button class="favorite-undo-button" loading="{{undoingFavorite}}" disabled="{{undoingFavorite}}" bindtap="handleUndoRemove">撤销</button>
+    <button class="favorite-undo-button" loading="{{undoingFavorite}}" disabled="{{undoingFavorite || removingId || loading}}" bindtap="handleUndoRemove">撤销</button>
   </view>
   <core-nav active-key="favorites" />
 </view>

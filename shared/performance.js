@@ -1,5 +1,4 @@
 const APPLY_STATE_FLUSH_MS = 16
-const IN_WX_ENV = typeof wx === "object" && wx !== null && typeof wx.nextTick === "function"
 
 function isPlainObject(value) {
   if (value === null || typeof value !== "object") {
@@ -38,26 +37,40 @@ function applyPatchToTarget(target, patch) {
   const keys = Object.keys(patch)
   for (let i = 0; i < keys.length; i++) {
     const key = keys[i]
-    const value = patch[key]
-    if (
-      Object.prototype.hasOwnProperty.call(target, key) &&
-      isPlainObject(value) &&
-      isPlainObject(target[key])
-    ) {
-      applyPatchToTarget(target[key], value)
-    } else {
-      target[key] = value
+    const parts = statePath(key)
+    if (!parts.length || patch[key] === undefined) continue
+    let current = target
+    for (let j = 0; j < parts.length - 1; j++) {
+      const part = parts[j]
+      if (!current[part] || typeof current[part] !== "object") {
+        current[part] = /^\d+$/.test(parts[j + 1]) ? [] : {}
+      }
+      current = current[part]
     }
+    current[parts[parts.length - 1]] = patch[key]
   }
+}
+
+function statePath(key) {
+  const parts = String(key).replace(/\[(\d+)\]/g, ".$1").split(".")
+  return parts.some((part) => !part || ["__proto__", "prototype", "constructor"].includes(part)) ? [] : parts
+}
+
+function isAncestorPath(parent, child) {
+  return parent.length <= child.length && parent.every((part, index) => part === child[index])
 }
 
 function createPerformanceHelpers(context) {
   let pendingPatch = null
   let flushTimer = null
   let destroyed = false
+  let flushScheduled = false
+  let flushSerial = 0
   const debounceHandles = []
 
   const cancelScheduledFlush = () => {
+    flushScheduled = false
+    flushSerial += 1
     if (flushTimer !== null) {
       clearTimeout(flushTimer)
       flushTimer = null
@@ -69,10 +82,18 @@ function createPerformanceHelpers(context) {
       cancelScheduledFlush()
       return
     }
-    const patch = pendingPatch
+    const patch = {}
+    Object.keys(pendingPatch).forEach((key) => {
+      // Read the latest logical state so a direct setData between batching and
+      // rendering cannot be overwritten by an older queued value.
+      const value = context && context.data
+        ? statePath(key).reduce((current, part) => current == null ? undefined : current[part], context.data)
+        : pendingPatch[key]
+      if (value !== undefined) patch[key] = value
+    })
     pendingPatch = null
     cancelScheduledFlush()
-    if (!context || typeof context.setData !== "function") {
+    if (!context || typeof context.setData !== "function" || !Object.keys(patch).length) {
       return
     }
     try {
@@ -84,29 +105,25 @@ function createPerformanceHelpers(context) {
 
   const scheduleFlush = () => {
     if (destroyed) return
-    if (!IN_WX_ENV) {
+    if (typeof wx !== "object" || !wx || typeof wx.nextTick !== "function") {
       flushPending()
       return
     }
-    if (flushTimer !== null) {
+    if (flushScheduled) {
       return
     }
+    flushScheduled = true
+    const serial = ++flushSerial
+    const flushIfCurrent = () => {
+      if (serial === flushSerial && !destroyed) flushPending()
+    }
     try {
-      wx.nextTick(() => {
-        if (flushTimer !== null) {
-          clearTimeout(flushTimer)
-          flushTimer = null
-        }
-        flushPending()
-      })
+      wx.nextTick(flushIfCurrent)
     } catch (e) {
       // Fall through to setTimeout
     }
-    if (flushTimer === null) {
-      flushTimer = setTimeout(() => {
-        flushTimer = null
-        flushPending()
-      }, APPLY_STATE_FLUSH_MS)
+    if (flushScheduled && flushTimer === null) {
+      flushTimer = setTimeout(flushIfCurrent, APPLY_STATE_FLUSH_MS)
       if (flushTimer && typeof flushTimer.unref === "function") {
         flushTimer.unref()
       }
@@ -120,11 +137,17 @@ function createPerformanceHelpers(context) {
     if (context && typeof context.data === "object" && context.data !== null) {
       applyPatchToTarget(context.data, patch)
     }
-    if (pendingPatch === null) {
-      pendingPatch = Object.assign({}, patch)
-    } else {
-      pendingPatch = deepMergePatch(pendingPatch, patch)
-    }
+    if (pendingPatch === null) pendingPatch = {}
+    Object.keys(patch).forEach((key) => {
+      const parts = statePath(key)
+      if (!parts.length || patch[key] === undefined) return
+      const pendingKeys = Object.keys(pendingPatch)
+      if (pendingKeys.some((existing) => isAncestorPath(statePath(existing), parts))) return
+      pendingKeys.forEach((existing) => {
+        if (isAncestorPath(parts, statePath(existing))) delete pendingPatch[existing]
+      })
+      pendingPatch[key] = patch[key]
+    })
     scheduleFlush()
   }
 
@@ -140,15 +163,16 @@ function createPerformanceHelpers(context) {
     let timer = null
     let lastResult
     const wrapped = function () {
+      if (destroyed) return lastResult
       const self = this
       const args = new Array(arguments.length)
       for (let i = 0; i < args.length; i++) args[i] = arguments[i]
+      const shouldCallNow = immediate && timer === null
       if (timer !== null) {
         clearTimeout(timer)
         timer = null
       }
       if (immediate) {
-        const shouldCallNow = timer === null
         timer = setTimeout(() => {
           timer = null
         }, ms)

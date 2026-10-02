@@ -7,7 +7,7 @@ const {
   isPageNativeActionActive
 } = require("../../shared/pageNativeAction")
 const { CURRENT_VERSION, showReleaseNotesModal } = require("../../shared/versionMigration")
-const { openCustomerService, hasWxKfConfig } = require("../../shared/customerService")
+const { openCustomerService, hasWxKfConfig, cancelCustomerServiceRequest } = require("../../shared/customerService")
 
 const MENU_ITEMS = [
   { key: "bookings", title: "我的预约", desc: "查看已提交的预约咨询", section: "会员服务", sectionKicker: "MEMBER", icon: "calendar" },
@@ -306,7 +306,7 @@ const MINE_TOOL_TIMEOUT_MS = 20 * 1000
 Page({
   data: {
     brandName: "极境车库",
-    servicePhone: "15715710090",
+    servicePhone: "",
     wxKfReady: false,
     userName: "车库来访者",
     userDesc: "查看预约、个人信息申请与车库服务",
@@ -398,6 +398,7 @@ Page({
   },
 
   onShow() {
+    this.loadOperationConfig()
     if (
       this.data.permissionsReady &&
       !this.data.summaryLoading &&
@@ -414,7 +415,7 @@ Page({
       }
       return
     }
-    this.loadOperationConfig()
+    this.loadOperationConfig({ force: true })
     this.loadMyPermissions({
       done: () => {
         if (typeof wx.stopPullDownRefresh === "function") {
@@ -425,6 +426,7 @@ Page({
   },
 
   onUnload() {
+    cancelCustomerServiceRequest(this)
     cancelPageNativeActions(this)
     this.cancelOperationConfigRequest()
     this._permissionRequestId = Number(this._permissionRequestId || 0) + 1
@@ -436,16 +438,20 @@ Page({
     this.finishMineToolEffects()
   },
 
-  loadOperationConfig() {
+  loadOperationConfig(options) {
     this.cancelOperationConfigRequest()
     this._cancelOperationConfigRequest = requestOperationConfig({
+      force: Boolean(options && options.force),
       onSuccess: (config) => {
         this.setData({
           brandName: config.brandName || this.data.brandName,
-          servicePhone: config.servicePhone || this.data.servicePhone,
+          servicePhone: String(config.servicePhone || "").trim(),
           userDesc: config.mineUserDesc || this.data.userDesc,
           wxKfReady: hasWxKfConfig(config)
         })
+      },
+      onFailure: () => {
+        this.setData({ servicePhone: "", wxKfReady: false })
       }
     })
   },
@@ -748,7 +754,7 @@ Page({
     if (!target) {
       return
     }
-    const action = beginPageNativeAction(this)
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.navigateTo({
       url: target,
       fail: () => {
@@ -1018,24 +1024,23 @@ Page({
     openCustomerService({
       page: this,
       source: "mine",
-      onLegacyFallback: () => {
-        if (this.data.wxKfReady) {
-          return
-        }
+      onLegacyFallback: (config) => {
         if (!isPageNativeActionActive(this, pageAction)) {
           return
         }
+        this.setData({ wxKfReady: false, servicePhone: String(config && config.servicePhone || "").trim() })
         wx.showModal({
-          title: "在线客服未启用",
-          content: "管理员尚未配置微信客服，您可以先通过电话联系我们。",
-          confirmText: "拨打客服电话",
+          title: "在线客服暂不可用",
+          content: this.data.servicePhone ? "您可以先通过电话联系我们。" : "客服联系方式暂未提供，请稍后重试。",
+          showCancel: Boolean(this.data.servicePhone),
+          confirmText: this.data.servicePhone ? "电话咨询" : "知道了",
           cancelText: "知道了",
           confirmColor: "#528fff",
           success: (res) => {
             if (!isPageNativeActionActive(this, pageAction)) {
               return
             }
-            if (res && res.confirm) {
+            if (res && res.confirm && this.data.servicePhone) {
               this.handlePhoneCall()
             }
           }

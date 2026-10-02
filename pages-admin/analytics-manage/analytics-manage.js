@@ -213,6 +213,14 @@ Page({
     this._cleanupRequestId = Number(this._cleanupRequestId || 0) + 1
     this.finishOverviewRequestEffects()
     this.finishCleanupRequestEffects()
+    this._finishCleanupResultOnShow = null
+  },
+  onShow() {
+    if (typeof this._finishCleanupResultOnShow === "function") {
+      const finish = this._finishCleanupResultOnShow
+      this._finishCleanupResultOnShow = null
+      finish()
+    }
   },
   handlePeriodTap(event) {
     const days = Number(event.currentTarget.dataset.days)
@@ -251,6 +259,7 @@ Page({
       return
     }
     const action = beginPageNativeAction(this, {
+      requireCurrent: true,
       exclusiveKey: "analytics-cleanup-confirmation"
     })
     wx.showModal({
@@ -323,15 +332,20 @@ Page({
           return
         }
         let cleanupResultSettled = false
+        const resultAction = beginPageNativeAction(this, { requireCurrent: true })
         const finishCleanupResult = () => {
           if (cleanupResultSettled || !isCurrent()) {
+            return
+          }
+          if (!isPageNativeActionActive(this, resultAction)) {
+            this._finishCleanupResultOnShow = finishCleanupResult
             return
           }
           cleanupResultSettled = true
           this.setData({ cleanupLoading: false })
           this.fetchOverview()
         }
-        if (typeof wx.showModal !== "function") {
+        if (typeof wx.showModal !== "function" || !isPageNativeActionActive(this, resultAction)) {
           finishCleanupResult()
           return
         }

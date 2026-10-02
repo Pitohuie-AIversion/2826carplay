@@ -32,6 +32,70 @@ function createPage(definition) {
 }
 
 describe("pages/car-detail 客户侧车辆状态", () => {
+  test("租赁条款只显示已保存内容，清空、缺字段与读取失败均撤销旧文案", () => {
+    let request
+    global.wx = { setNavigationBarTitle: jest.fn(), cloud: { callFunction: jest.fn((options) => { request = options }) } }
+    const page = createPage(loadPageDefinition())
+    page.applyCar({ id: "car", images: [], priceDay: 500 })
+    expect(Object.values(page.data.rentalTerms).every((value) => value === "")).toBe(true)
+    const saved = { includedText: "已登记的计费说明", protectionText: "已登记保障说明", depositText: "已登记押金说明", estimateDisclaimer: "已登记价格说明" }
+    for (const result of [{ rentalTerms: Object.fromEntries(Object.keys(saved).map((key) => [key, ""])) }, {}, null]) {
+      page.loadOperationConfig({ force: true })
+      request.success({ result: { ok: true, config: { rentalTerms: saved } } })
+      expect(page.data.pricingOverview.includedText).toBe(saved.includedText)
+      expect(page.data.pricingOverview.feeItems).toHaveLength(1)
+      expect(page.data.pricingOverview.ruleItems).toHaveLength(1)
+      page.loadOperationConfig({ force: true })
+      if (result) request.success({ result: { ok: true, config: result } })
+      else request.fail({ errMsg: "network failed" })
+      expect(Object.values(page.data.rentalTerms).every((value) => value === "")).toBe(true)
+      expect(page.data.pricingOverview).toMatchObject({ includedText: "", disclaimer: "", feeItems: [], ruleItems: [], baseDailyRateText: "￥500" })
+    }
+    page.onUnload()
+  })
+
+  test("显式清空的性能字段不回填旧扁平字段，数值零保持可见", () => {
+    global.wx = { setNavigationBarTitle: jest.fn() }
+    const page = createPage(loadPageDefinition())
+    page.applyCar({ id: "car", images: [], horsepower: "历史300Ps", performance: { horsepower: "", acceleration: 0, torque: 0 } })
+    expect(page.data.car.performance).toMatchObject({ horsepower: "—", acceleration: "0", torque: "0" })
+  })
+
+  test("服务配置清空后移除旧电话、服务时间与导航，人工提示来自车辆数据", () => {
+    let config = { servicePhone: "18800001111", serviceHoursText: "周一至周五 10:00–18:00", serviceHubs: [
+      { id: "store", city: "杭州", type: "store", name: "湖畔门店", address: "已登记地址", latitude: 30.2, longitude: 120.1 }
+    ] }
+    global.wx = { setNavigationBarTitle: jest.fn(), openLocation: jest.fn(), showToast: jest.fn(),
+      cloud: { callFunction: jest.fn(({ success }) => success({ result: { ok: true, config } })) } }
+    const page = createPage(loadPageDefinition())
+    page.applyCar({ id: "car", images: [], location: "杭州", publicDrivingTips: "停车后请检查车窗" })
+    page.loadOperationConfig({ force: true })
+    expect(page.data.serviceHoursText).toBe(config.serviceHoursText)
+    expect(page.data.car.publicDrivingTips).toBe("停车后请检查车窗")
+    expect(page.data.canNavigate).toBe(true)
+    config = { servicePhone: "", serviceHoursText: "", serviceHubs: [] }
+    page.loadOperationConfig({ force: true })
+    expect(page.data.servicePhone).toBe("")
+    expect(page.data.serviceHoursText).toBe("")
+    expect(page.data.canNavigate).toBe(false)
+    page.handleOpenLocation()
+    expect(wx.openLocation).not.toHaveBeenCalled()
+    page.onUnload()
+  })
+
+  test("导航失败回调在详情页卸载后不会提示", () => {
+    global.wx = { setNavigationBarTitle: jest.fn(), openLocation: jest.fn(), showToast: jest.fn() }
+    const page = createPage(loadPageDefinition())
+    page.data.serviceHubs = [{ id: "store", city: "杭州", type: "store", name: "门店", address: "地址", latitude: 0, longitude: 0 }]
+    page.applyCar({ id: "car", images: [], location: "门店" })
+    page.handleOpenLocation()
+    const options = wx.openLocation.mock.calls[0][0]
+    expect(options.latitude).toBe(0)
+    page.onUnload()
+    options.fail({ errMsg: "fail" })
+    expect(wx.showToast).not.toHaveBeenCalled()
+  })
+
   test("详情只显示管理员配置的连租规则，清空后移除折扣展示", () => {
     global.wx = { setNavigationBarTitle: jest.fn() }
     const page = createPage(loadPageDefinition())
@@ -86,6 +150,7 @@ describe("pages/car-detail 客户侧车辆状态", () => {
     const { trackEvent } = require("../shared/analytics")
     trackEvent.mockClear()
     page.data.carId = "vehicle-pricing"
+    page.data.rentalTerms = { estimateDisclaimer: "本报价仅供参考，不会自动锁定车辆" }
     page.applyCar({
       id: "vehicle-pricing",
       name: "Porsche 911",
@@ -275,7 +340,7 @@ describe("pages/car-detail 客户侧车辆状态", () => {
 
     page.loadOperationConfig()
 
-    expect(page.data.servicePhone).toBe("15715710090")
+    expect(page.data.servicePhone).toBe("")
   })
 
   test("车辆详情无响应时退出骨架屏并忽略迟到结果", () => {
@@ -506,13 +571,17 @@ describe("pages/car-detail 客户侧车辆状态", () => {
     expect(wxss).toContain(".hero-pagination-segment-active")
   })
 
-  test("支持生成车型海报、门店地图导航与微信咨询快捷复制", () => {
+  test("支持车型海报、已保存网点导航与已保存微信客服", () => {
     global.wx = {
       setNavigationBarTitle: jest.fn(),
       openLocation: jest.fn(),
       setClipboardData: jest.fn(),
       showModal: jest.fn(),
-      showToast: jest.fn()
+      showToast: jest.fn(),
+      openCustomerServiceChat: jest.fn(),
+      cloud: { callFunction: jest.fn(({ success }) => success({ result: { ok: true, config: {
+        wxKfCorpId: "ww123456", wxKfExtInfo: "https://work.weixin.qq.com/kfid/test-link"
+      } } })) }
     }
     const page = createPage(loadPageDefinition())
     page.data.car = {
@@ -521,6 +590,10 @@ describe("pages/car-detail 客户侧车辆状态", () => {
       location: "杭州市西湖区西溪路极境车库"
     }
     page.data.carId = "car_911"
+    page.data.serviceHubs = [{
+      id: "hz-store", city: "杭州", type: "store", name: "已保存门店",
+      address: "杭州市西湖区西溪路极境车库", latitude: 30.2741, longitude: 120.1551
+    }]
 
     page.handleOpenPosterModal()
     expect(page.data.posterModalVisible).toBe(true)
@@ -537,11 +610,10 @@ describe("pages/car-detail 客户侧车辆状态", () => {
     )
 
     page.handleWechatConsult()
-    expect(global.wx.setClipboardData).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: "jijing_garage"
-      })
-    )
+    expect(global.wx.openCustomerServiceChat).toHaveBeenCalledWith(expect.objectContaining({
+      corpId: "ww123456", extInfo: { url: "https://work.weixin.qq.com/kfid/test-link" }
+    }))
+    expect(global.wx.setClipboardData).not.toHaveBeenCalled()
 
     const pageDir = path.resolve(__dirname, "../pages/car-detail")
     const wxml = fs.readFileSync(path.join(pageDir, "car-detail.wxml"), "utf8")
@@ -757,6 +829,7 @@ describe("pages/car-detail 客户侧车辆状态", () => {
     page.loadCarDetail("car-swr-1")
     expect(page.data.car).not.toBeNull()
     expect(page.data.car.name).toBe("保时捷 911 GT3")
+    page.onUnload()
   })
 
   test("handleRetryHeroImage 允许重试失败的主图并恢复加载状态", () => {

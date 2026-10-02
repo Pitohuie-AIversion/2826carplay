@@ -136,7 +136,7 @@
           aria-label="待协调预约搜索关键词"
           placeholder-class="search-placeholder"
           bindinput="handleKeywordInput"
-          bindconfirm="handleKeywordConfirm"
+          bindconfirm="handleSearchConfirm"
         />
         <button
           wx:if="{{keyword}}"

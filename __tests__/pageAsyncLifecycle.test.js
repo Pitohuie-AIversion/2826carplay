@@ -35,10 +35,9 @@ describe("页面异步生命周期覆盖", () => {
     expect(missingUnload).toEqual([])
   })
 
-  test("列表搜索清空后的渲染回调会校验当前请求序号", () => {
+  test("仍使用渲染回调的四个列表在清空搜索后校验当前请求序号", () => {
     const guardedPages = [
       ["pages-admin/vehicle-manage/vehicle-manage.js", "_vehicleListRequestId", 1],
-      ["pages/booking-manage/booking-manage.js", "_bookingListRequestId", 1],
       ["pages-admin/audit-log-manage/audit-log-manage.js", "_auditListRequestId", 2],
       ["pages-admin/error-log-manage/error-log-manage.js", "_errorListRequestId", 2],
       ["pages-admin/privacy-request-manage/privacy-request-manage.js", "_privacyManageListRequestId", 2]
@@ -50,6 +49,14 @@ describe("页面异步生命周期覆盖", () => {
       expect(source.split(declaration).length - 1).toBeGreaterThanOrEqual(minimumCount)
       expect(source).toContain(`listRequestId !== Number(this.${requestField} || 0)`)
     })
+  })
+
+  test("预约列表清空搜索直接显式传空关键词，不依赖渲染回调", () => {
+    const source = read("pages/booking-manage/booking-manage.js")
+    const handler = source.match(/handleClearKeyword\(\)\s*\{([\s\S]*?)\n  \},/)
+    expect(handler).not.toBeNull()
+    expect(handler[1]).toMatch(/this\.setData\(\{\s*keyword:\s*""\s*\}\)\s*this\.fetchList\(\{\s*keyword:\s*""\s*\}\)/)
+    expect(handler[1]).not.toMatch(/=>|listRequestId/)
   })
 
   test("页面实例上的超时句柄均提供离页入口与对应清理", () => {

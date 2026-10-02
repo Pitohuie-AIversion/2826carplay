@@ -74,6 +74,23 @@ async function loadVehicleListWith({ openid, mockDb }) {
 }
 
 describe("cloudfunctions/vehicleList integration", () => {
+  test("管理列表返回车辆修改版本，旧记录默认零", async () => {
+    const mocks = createMockDb({ rolesData: [{ role: "admin" }], vehiclesData: [{ _id: "v1", vehicleVersion: 7 }, { _id: "v2" }] })
+    const mod = await loadVehicleListWith({ openid: "admin_openid", mockDb: mocks.db })
+    const result = await mod.main({})
+    expect(result.ok).toBe(true)
+    expect(result.list.find((item) => item.id === "v1").vehicleVersion).toBe(7)
+    expect(result.list.find((item) => item.id === "v2").vehicleVersion).toBe(0)
+  })
+
+  test("管理列表带回已保存的保养及年检到期日供维保看板使用", async () => {
+    const mocks = createMockDb({ rolesData: [{ role: "admin" }], vehiclesData: [{ _id: "v1", status: "idle", archiveDate: "2027-01-01", archiveReview: "2027-06-01" }] })
+    const mod = await loadVehicleListWith({ openid: "admin_openid", mockDb: mocks.db })
+    const result = await mod.main({})
+    expect(result.ok).toBe(true)
+    expect(result.list[0]).toMatchObject({ archiveDate: "2027-01-01", archiveReview: "2027-06-01" })
+  })
+
   test("admin 查询全部车辆列表成功", async () => {
     const now = Date.now()
     const mocks = createMockDb({
@@ -187,11 +204,14 @@ describe("cloudfunctions/vehicleList integration", () => {
       brandModel: true,
       registerDate: true,
       status: true,
+      vehicleVersion: true,
       location: true,
       transmission: true,
       fuelType: true,
       seats: true,
       priceDay: true,
+      archiveDate: true,
+      archiveReview: true,
       imageList: true,
       coverImage: true,
       publicMaterialsUpdatedDate: true,

@@ -52,6 +52,7 @@ function createMockDb({
     limit: jest.fn(() => ({ get: configGet }))
   }))
   const collectionCounts = {}
+  const privacyVolumeWhere = jest.fn(() => ({ count: collectionCounts.privacy_requests }))
   const collectionFields = {}
   REQUIRED_COLLECTIONS.forEach((name) => {
     collectionCounts[name] = countErrors.includes(name)
@@ -82,6 +83,7 @@ function createMockDb({
       })),
       field: collectionFields[name]
     }
+    if (name === "privacy_requests") base.where = privacyVolumeWhere
     if (name === "roles") {
       base.where = rolesWhere
     }
@@ -92,10 +94,11 @@ function createMockDb({
   })
 
   return {
-    db: { collection },
+    db: { collection, command: { in: (values) => ({ in: values }) } },
     collection,
     collectionReads,
     collectionCounts,
+    privacyVolumeWhere,
     collectionFields,
     configWhere,
     configField
@@ -117,6 +120,12 @@ async function loadModule(openid, mockDb) {
 }
 
 describe("cloudfunctions/systemHealthCheck integration", () => {
+  test("隐私申请容量只统计真实申请类型，排除内部提交守卫", async () => {
+    const mocks = createMockDb({ roles: [{ openid: "admin", role: "admin" }] })
+    const mod = await loadModule("admin", mocks.db)
+    await mod.main({})
+    expect(mocks.privacyVolumeWhere).toHaveBeenCalledWith({ type: { in: ["access", "correction", "deletion"] } })
+  })
   const originalTemplateId = process.env.BOOKING_STATUS_TEMPLATE_ID
 
   afterEach(() => {

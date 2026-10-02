@@ -16,6 +16,7 @@ const BOOKING_STATUS_UPDATE_FIELDS = {
   openid: true,
   vehicleName: true,
   status: true,
+  calendarSyncVersion: true,
   latestPickupHandoverId: true,
   latestReturnHandoverId: true,
   pickupHandoverConfirmedAt: true,
@@ -59,12 +60,33 @@ function bookingBlockId(bookingId) {
   return `booking_${digest}`
 }
 
-async function releaseBookingOccupancy(bookingId, openid, targetStatus) {
+async function finishConfirmedBooking(bookingId, openid, targetStatus, expectedCalendarVersion) {
+  // Transactions support document operations only. Discover candidate IDs first,
+  // then recheck their ownership inside the same transaction as the status write.
+  // 1 booking read + 2 operations per day + 1 block update + 1 booking update.
+  const maxReleaseDays = 48
+  const dayRes = await db.collection("vehicle_calendar_days").where({ bookingId }).field({ _id: true }).limit(maxReleaseDays + 1).get()
+  const days = dayRes && Array.isArray(dayRes.data) ? dayRes.data : []
+  if (days.length > maxReleaseDays) {
+    return { error: createError("OCCUPANCY_REQUIRES_REVIEW", "该预约历史占用超过可自动处理范围，请联系管理员核对档期后处理") }
+  }
   return db.runTransaction(async (transaction) => {
-    const dayRes = await transaction.collection("vehicle_calendar_days").where({ bookingId }).limit(91).get()
-    const days = dayRes && Array.isArray(dayRes.data) ? dayRes.data : []
+    const currentRes = await transaction.collection("bookings").doc(bookingId).field(BOOKING_STATUS_UPDATE_FIELDS).get()
+    const current = currentRes && currentRes.data
+    if (!current || current.status !== "confirmed") {
+      return { error: createError("STATUS_CONFLICT", "预约状态已发生变化，请刷新后重试") }
+    }
+    if ((Number(current.calendarSyncVersion) || 0) !== (Number(expectedCalendarVersion) || 0)) {
+      return { error: createError("STATUS_CONFLICT", "预约档期已发生变化，请刷新后重试") }
+    }
+    if (targetStatus === "completed" && !isHandoverComplete(current)) {
+      return { error: createError("HANDOVER_NOT_CONFIRMED", "请先完成取车和还车交接记录，并由用户核对后再结束预约") }
+    }
     for (const day of days) {
-      if (day && day._id) await transaction.collection("vehicle_calendar_days").doc(day._id).remove()
+      if (!day || !day._id) continue
+      const ref = transaction.collection("vehicle_calendar_days").doc(day._id)
+      const stored = await getDocumentOrNull(ref)
+      if (stored && stored.bookingId === bookingId) await ref.remove()
     }
     try {
       await transaction.collection("vehicle_availability_blocks").doc(bookingBlockId(bookingId)).update({ data: {
@@ -78,8 +100,29 @@ async function releaseBookingOccupancy(bookingId, openid, targetStatus) {
       const message = String(error && (error.message || error.errMsg) || error).toLowerCase()
       if (!message.includes("not exist") && !message.includes("not found") && !message.includes("-502005")) throw error
     }
-    return days.length
+    await transaction.collection("bookings").doc(bookingId).update({ data: {
+      status: targetStatus,
+      updatedAt: db.serverDate()
+    } })
+    return { current }
   })
+}
+
+async function getDocumentOrNull(reference) {
+  try {
+    const result = await reference.get()
+    return result && result.data || null
+  } catch (error) {
+    const message = String(error && (error.message || error.errMsg || error.code) || error)
+    if (/not exist|not found|DOCUMENT_NOT_FOUND|DATABASE_DOCUMENT_NOT_EXIST|-502005/i.test(message)) return null
+    throw error
+  }
+}
+
+function isHandoverComplete(booking) {
+  return Boolean(String(booking.latestPickupHandoverId || "").trim() &&
+    String(booking.latestReturnHandoverId || "").trim() &&
+    booking.pickupHandoverConfirmedAt && booking.returnHandoverConfirmedAt)
 }
 
 function createError(code, message, details) {
@@ -456,30 +499,28 @@ exports.main = async (event) => {
 
     if (
       input.status === "completed" &&
-      (!String(current.latestPickupHandoverId || "").trim() ||
-        !String(current.latestReturnHandoverId || "").trim() ||
-        !current.pickupHandoverConfirmedAt ||
-        !current.returnHandoverConfirmedAt)
+      !isHandoverComplete(current)
     ) {
       return createError("HANDOVER_NOT_CONFIRMED", "请先完成取车和还车交接记录，并由用户核对后再结束预约")
     }
 
-    const updateRes = await db.collection("bookings").where({
-      _id: input.id,
-      status: currentStatus
-    }).update({
-      data: {
-        status: input.status,
-        updatedAt: db.serverDate()
+    if (currentStatus === "confirmed" && ["completed", "cancelled"].includes(input.status)) {
+      const outcome = await finishConfirmedBooking(input.id, openid, input.status, current.calendarSyncVersion)
+      if (outcome.error) return outcome.error
+    } else {
+      const updateRes = await db.collection("bookings").where({
+        _id: input.id,
+        status: currentStatus
+      }).update({
+        data: {
+          status: input.status,
+          updatedAt: db.serverDate()
+        }
+      })
+      const updatedCount = Number(updateRes && updateRes.stats && updateRes.stats.updated) || 0
+      if (updatedCount < 1) {
+        return createError("STATUS_CONFLICT", "预约状态已发生变化，请刷新后重试")
       }
-    })
-    const updatedCount = Number(updateRes && updateRes.stats && updateRes.stats.updated) || 0
-    if (updatedCount < 1) {
-      return createError("STATUS_CONFLICT", "预约状态已发生变化，请刷新后重试")
-    }
-
-    if (currentStatus === "confirmed" && ["completed", "cancelled"].includes(input.status) && typeof db.runTransaction === "function") {
-      await releaseBookingOccupancy(input.id, openid, input.status)
     }
 
     await writeAuditLogBestEffort({

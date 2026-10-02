@@ -30,6 +30,23 @@ describe("native callback lifecycle", () => {
     delete global.getApp
   })
 
+  test("a navigation failure cannot redirect a different foreground page", () => {
+    let navigation
+    global.wx = {
+      navigateTo: jest.fn((options) => { navigation = options }),
+      redirectTo: jest.fn(), reLaunch: jest.fn(), showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition("../pages/favorites/favorites"))
+    global.getCurrentPages = () => [page]
+    page.handleBrowseGarage()
+    global.getCurrentPages = () => [page, { route: "pages/mine/mine" }]
+    navigation.fail({ errMsg: "navigateTo:fail" })
+    expect(global.wx.redirectTo).not.toHaveBeenCalled()
+    expect(global.wx.reLaunch).not.toHaveBeenCalled()
+    expect(global.wx.showToast).not.toHaveBeenCalled()
+    page.onUnload()
+  })
+
   test("does not remove a favorite after the page unloads", () => {
     let modalOptions
     global.wx = {
@@ -229,7 +246,6 @@ describe("native callback lifecycle", () => {
 
   test.each([
     ["vehicle management", "../pages-admin/vehicle-manage/vehicle-manage"],
-    ["booking management", "../pages/booking-manage/booking-manage"],
     ["audit log management", "../pages-admin/audit-log-manage/audit-log-manage"],
     ["error log management", "../pages-admin/error-log-manage/error-log-manage"],
     ["privacy request management", "../pages-admin/privacy-request-manage/privacy-request-manage"]
@@ -248,6 +264,39 @@ describe("native callback lifecycle", () => {
     renderCallback()
 
     expect(page.fetchList).not.toHaveBeenCalled()
+  })
+
+  test("booking management immediately requests an empty keyword and ignores its result after unload", () => {
+    let request
+    global.wx = {
+      cloud: { callFunction: jest.fn((options) => { request = options }) },
+      showToast: jest.fn()
+    }
+    const previousList = [{ id: "existing-booking" }]
+    const page = createPage(loadPageDefinition("../pages/booking-manage/booking-manage"), {
+      keyword: "待清空",
+      list: previousList
+    })
+    const fetchList = jest.spyOn(page, "fetchList")
+
+    page.handleClearKeyword()
+
+    expect(fetchList).toHaveBeenCalledWith({ keyword: "" })
+    expect(global.wx.cloud.callFunction).toHaveBeenCalledTimes(1)
+    expect(request).toMatchObject({ name: "bookingList", data: { keyword: "", page: 0 } })
+    expect(page.data.keyword).toBe("")
+    expect(page.setData.mock.calls.every((call) => call.length === 1)).toBe(true)
+
+    page.onUnload()
+    page.setData.mockClear()
+    request.success({ result: { ok: true, list: [{ id: "late-booking" }], total: 1 } })
+    request.fail({ errMsg: "bookingList:fail late response" })
+
+    expect(page.setData).not.toHaveBeenCalled()
+    expect(page.data.list).toBe(previousList)
+    expect(global.wx.showToast).not.toHaveBeenCalled()
+    expect(global.wx.cloud.callFunction).toHaveBeenCalledTimes(1)
+    expect(page._bookingListRequestTimer).toBeNull()
   })
 
   test.each([

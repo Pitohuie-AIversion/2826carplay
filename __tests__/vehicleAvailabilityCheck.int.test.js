@@ -51,10 +51,15 @@ function loadModule({ openid = "user_openid", vehicle, bookings = [], total = bo
         }
       }
       if (name === "vehicle_price_rules") {
+        let offset = 0
+        let limit = 100
         const chain = {
           where: jest.fn(() => chain),
           field: jest.fn(() => chain),
-          limit: jest.fn(() => ({ get: jest.fn().mockResolvedValue({ data: priceRules }) }))
+          orderBy: jest.fn(() => chain),
+          skip: jest.fn((value) => { offset = value; return chain }),
+          limit: jest.fn((value) => { limit = Math.min(value, 100); return chain }),
+          get: jest.fn(async () => ({ data: priceRules.slice(offset, offset + limit) }))
         }
         return chain
       }
@@ -70,6 +75,34 @@ function loadModule({ openid = "user_openid", vehicle, bookings = [], total = bo
 }
 
 describe("cloudfunctions/vehicleAvailabilityCheck integration", () => {
+  test.each([undefined, "", "legacy-unknown"])("未知车辆状态 %p 不会被当成可预约", async (status) => {
+    const { mod, bookingWhere } = loadModule({ vehicle: { status, priceDay: 800 } })
+    const result = await mod.main({ vehicleId: "vehicle_1", startDate: "2099-08-01", endDate: "2099-08-02" })
+    expect(result).toMatchObject({ ok: false, code: "NOT_AVAILABLE" })
+    expect(result).not.toHaveProperty("priceSummary")
+    expect(bookingWhere).not.toHaveBeenCalled()
+  })
+
+  test.each([null, "", "1800", 1800.5, -1])("适用特殊价 %p 不合法时不回退基础低价", async (dailyPrice) => {
+    const { mod } = loadModule({ vehicle: { status: "idle", priceDay: 800 }, priceRules: [
+      { label: "基础日租", startDate: "2099-08-02", endDate: "2099-08-02", dailyPrice }
+    ] })
+    const result = await mod.main({ vehicleId: "vehicle_1", startDate: "2099-08-01", endDate: "2099-08-02" })
+    expect(result).toMatchObject({ ok: true, available: true, priceSummary: {
+      estimatedTotal: 0, estimatedTotalText: "待顾问报价", discountedTotalText: "待顾问报价", specialDayCount: 1, hasDiscount: false
+    } })
+    expect(result.priceSummary.daily.map((item) => item.dailyRate)).toEqual([800, 0])
+  })
+
+  test("价格零仍为待确认，完整特殊日期价可以为缺省基础价提供估价", async () => {
+    const unknown = loadModule({ vehicle: { status: "idle", priceDay: 0 } })
+    expect((await unknown.mod.main({ vehicleId: "vehicle_1", startDate: "2099-08-01", endDate: "2099-08-02" })).priceSummary.estimatedTotalText).toBe("待顾问报价")
+    const priced = loadModule({ vehicle: { status: "idle", priceDay: 0 }, priceRules: [
+      { startDate: "2099-08-01", endDate: "2099-08-02", dailyPrice: 1000 }
+    ] })
+    expect((await priced.mod.main({ vehicleId: "vehicle_1", startDate: "2099-08-01", endDate: "2099-08-02" })).priceSummary.estimatedTotal).toBe(2000)
+  })
+
   test("只返回同期咨询数量，不返回其他用户预约详情", async () => {
     const { mod, bookingWhere, vehicleField } = loadModule({
       vehicle: { _id: "vehicle_1", status: "idle" },
@@ -137,6 +170,22 @@ describe("cloudfunctions/vehicleAvailabilityCheck integration", () => {
     expect(res.available).toBe(true)
     expect(res.conflictCount).toBe(0)
     expect(res.message).toContain("可预约")
+  })
+
+  test("第101条相关价格规则仍参与估价，不回退成基础低价", async () => {
+    const priceRules = Array.from({ length: 100 }, (_, index) => ({ _id: `old_${index}`, startDate: "2098-01-01", endDate: "2098-01-02", dailyPrice: 500, version: 1 }))
+    priceRules.push({ _id: "new_rule", label: "假日价格", startDate: "2099-08-01", endDate: "2099-08-02", dailyPrice: 1800, version: 2 })
+    const { mod } = loadModule({ vehicle: { status: "idle", priceDay: 800 }, priceRules })
+    const result = await mod.main({ vehicleId: "vehicle_1", startDate: "2099-08-01", endDate: "2099-08-02" })
+    expect(result).toMatchObject({ ok: true, priceSummary: { estimatedTotal: 3600, specialDayCount: 2 } })
+  })
+
+  test("价格规则超过完整扫描上限时不返回部分估价", async () => {
+    const priceRules = Array.from({ length: 2001 }, (_, index) => ({ _id: `rule_${index}`, startDate: "2098-01-01", endDate: "2098-01-02", dailyPrice: 500 }))
+    const { mod } = loadModule({ vehicle: { status: "idle", priceDay: 800 }, priceRules })
+    const result = await mod.main({ vehicleId: "vehicle_1", startDate: "2099-08-01", endDate: "2099-08-02" })
+    expect(result).toMatchObject({ ok: false, code: "PRICE_RULES_INCOMPLETE" })
+    expect(result).not.toHaveProperty("priceSummary")
   })
 
   test("记录超过扫描上限时保守提示顾问确认", async () => {

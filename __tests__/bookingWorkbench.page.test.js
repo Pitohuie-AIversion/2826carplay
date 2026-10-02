@@ -530,8 +530,8 @@ describe("pages/booking-workbench", () => {
       name: "bookingUpdateCoordination",
       data: {
         id: "booking_1",
-        schedulePriority: "priority",
-        coordinationStatus: "coordinating"
+        coordinationStatus: "coordinating",
+        expectedValues: { coordinationStatus: "pending" }
       },
       success: expect.any(Function),
       fail: expect.any(Function)
@@ -631,7 +631,7 @@ describe("pages/booking-workbench", () => {
       data: {
         id: "booking_priority",
         schedulePriority: "priority",
-        coordinationStatus: "pending"
+        expectedValues: { schedulePriority: "normal" }
       },
       success: expect.any(Function),
       fail: expect.any(Function)
@@ -688,7 +688,8 @@ describe("pages/booking-workbench", () => {
       name: "bookingUpdateAdminRemark",
       data: {
         id: "booking_remark",
-        adminRemark: "客户希望周五回电"
+        adminRemark: "客户希望周五回电",
+        expectedAdminRemark: "原备注"
       },
       success: expect.any(Function),
       fail: expect.any(Function)
@@ -1005,8 +1006,8 @@ describe("pages/booking-workbench", () => {
         name: "bookingUpdateCoordination",
         data: {
           id: "booking_2",
-          schedulePriority: "normal",
-          coordinationStatus: "resolved"
+          coordinationStatus: "resolved",
+          expectedValues: { coordinationStatus: "coordinating" }
         }
       })
     )
@@ -1073,7 +1074,7 @@ describe("pages/booking-workbench", () => {
     expect(wxss).toContain(".workbench-inline-pressed")
     expect(wxml).toContain("workbench-button-pressed")
     expect(wxss).toContain(".workbench-button-pressed")
-    expect(wxml).toContain('bindconfirm="handleKeywordConfirm"')
+    expect(wxml).toContain('bindconfirm="handleSearchConfirm"')
   })
 
   test("工作台搜索框软键盘确认 handleKeywordConfirm 立即触发过滤", () => {

@@ -33,10 +33,11 @@ Component({
         (nextDisplay && isImageLoaded(nextDisplay))
 
       this._lastCover = cover
+      this._imageLoaded = Boolean(isAlreadyLoaded)
       this.setData({
         imageLoading: Boolean(cover) && !isAlreadyLoaded,
         imageFailed: false,
-        displayCover: isAlreadyLoaded && currentDisplay ? currentDisplay : nextDisplay
+        displayCover: isSameCover && isAlreadyLoaded && currentDisplay ? currentDisplay : nextDisplay
       })
       if (cover) {
         this.scheduleCoverResolve(cover)

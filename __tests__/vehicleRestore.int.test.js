@@ -18,6 +18,7 @@ function createMockDb({ rolesData, currentData, updateResult }) {
   const serverDate = jest.fn(() => serverDateValue)
 
   const db = {
+    runTransaction: jest.fn(async (callback) => callback({ collection: db.collection })),
     collection: jest.fn((name) => {
       if (name === "roles") {
         return { where: rolesWhere }
@@ -83,6 +84,7 @@ describe("cloudfunctions/vehicleRestore integration", () => {
     expect(mocks.update).toHaveBeenCalledWith({
       data: {
         status: "idle",
+        vehicleVersion: 1,
         updatedAt: mocks.serverDateValue
       }
     })

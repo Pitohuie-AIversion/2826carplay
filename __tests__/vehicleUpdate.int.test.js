@@ -23,6 +23,7 @@ function createMockDb({ rolesData, duplicateData, currentData, updateResult, upd
   const serverDate = jest.fn(() => serverDateValue)
 
   const db = {
+    runTransaction: jest.fn(async (callback) => callback({ collection: db.collection })),
     collection: jest.fn((name) => {
       if (name === "roles") {
         return { where: rolesWhere }
@@ -68,6 +69,32 @@ async function loadVehicleUpdateWith({ openid, mockDb }) {
 }
 
 describe("cloudfunctions/vehicleUpdate integration", () => {
+  test("更新性能数值零与日租金零保留原意，显式空值才清空", async () => {
+    const mocks = createMockDb({ rolesData: [{ role: "admin" }], duplicateData: [], currentData: { _id: "car_1", status: "idle" }, updateResult: { stats: { updated: 1 } } })
+    const mod = await loadVehicleUpdateWith({ openid: "admin_openid", mockDb: mocks.db })
+    const base = { id: "car_1", plateNumber: "京A12345", vehicleType: "sedan", brandModel: "BMW", registerDate: "2020-01-01", status: "idle" }
+    expect(await mod.main({ ...base, priceDay: 0, performance: { acceleration: 0, horsepower: 0, torque: 0 } })).toMatchObject({ ok: true })
+    expect(mocks.update.mock.calls[0][0].data).toMatchObject({ priceDay: 0, performance: { acceleration: "0", horsepower: "0", torque: "0" } })
+    expect(await mod.main({ ...base, priceDay: "", performance: { acceleration: "", horsepower: "", torque: "" } })).toMatchObject({ ok: true })
+    expect(mocks.update.mock.calls[1][0].data).toMatchObject({ priceDay: null, performance: { acceleration: "", horsepower: "", torque: "" } })
+  })
+
+  test("保存、清空和省略车辆配置分别写入新值、空值和保持原值", async () => {
+    const fields = { publicDrivingTips: "还车前确认随车物品", archiveDate: "2027-01-01", archiveReview: "2027-06-01", performance: { acceleration: "6.5s", horsepower: "300Ps", drivetrain: "后轮驱动", torque: "400N·m", highlights: ["全景天窗"] } }
+    const mocks = createMockDb({ rolesData: [{ role: "admin" }], duplicateData: [], currentData: { _id: "car_1", ...fields }, updateResult: { stats: { updated: 1 } } })
+    const mod = await loadVehicleUpdateWith({ openid: "admin_openid", mockDb: mocks.db })
+    const base = { id: "car_1", plateNumber: "京A12345", vehicleType: "sedan", brandModel: "BMW", registerDate: "2020-01-01", status: "idle" }
+    expect((await mod.main({ ...base, ...fields })).ok).toBe(true)
+    expect(mocks.update.mock.calls[0][0].data).toMatchObject(fields)
+    expect((await mod.main({ ...base, performance: {}, publicDrivingTips: "", archiveDate: "", archiveReview: "" })).ok).toBe(true)
+    expect(mocks.update.mock.calls[1][0].data).toMatchObject({ performance: { acceleration: "", horsepower: "", drivetrain: "", torque: "", highlights: [] }, publicDrivingTips: "", archiveDate: "", archiveReview: "" })
+    expect(mocks.auditAdd.mock.calls[1][0].data.changedKeys).toEqual(expect.arrayContaining(Object.keys(fields)))
+    expect((await mod.main(base)).ok).toBe(true)
+    for (const field of Object.keys(fields)) expect(mocks.update.mock.calls[2][0].data).not.toHaveProperty(field)
+    expect((await mod.main({ ...base, archiveDate: "2027-02-29" })).code).toBe("VALIDATION_ERROR")
+    expect(mocks.update).toHaveBeenCalledTimes(3)
+  })
+
   test("管理员可保存、清空连租规则，非法折扣不会写入", async () => {
     const mocks = createMockDb({
       rolesData: [{ role: "admin" }], duplicateData: [],
@@ -114,7 +141,7 @@ describe("cloudfunctions/vehicleUpdate integration", () => {
       note: "内部整备提醒"
     })
 
-    expect(res).toEqual({ ok: true, id: "car_1" })
+    expect(res).toEqual({ ok: true, id: "car_1", vehicleVersion: 1 })
     expect(mocks.rolesWhere).toHaveBeenCalledWith({ openid: "admin_openid" })
     expect(mocks.vehiclesDoc).toHaveBeenCalledWith("car_1")
     expect(mocks.vehiclesWhere).toHaveBeenCalledWith({ plateNumber: "京A12345" })
@@ -134,6 +161,7 @@ describe("cloudfunctions/vehicleUpdate integration", () => {
         engineNumber: "ENG-SECRET",
         publicDescription: "行政旗舰座驾",
         note: "内部整备提醒",
+        vehicleVersion: 1,
         updatedAt: mocks.serverDateValue
       }
     })
@@ -201,13 +229,14 @@ describe("cloudfunctions/vehicleUpdate integration", () => {
       internalArchiveNote: "内部档案说明"
     })
 
-    expect(res).toEqual({ ok: true, id: "car_1" })
+    expect(res).toEqual({ ok: true, id: "car_1", vehicleVersion: 1 })
     expect(mocks.update).toHaveBeenCalledWith({
       data: expect.objectContaining({
         publicArchiveReviewStatus: "reviewed",
         publicInspectionSummary: "公开检查摘要",
         internalMaintenanceRecord: "内部保养工单",
         internalInsuranceRecord: "内部保单索引",
+        vehicleVersion: 1,
         updatedAt: mocks.serverDateValue
       })
     })
@@ -265,7 +294,7 @@ describe("cloudfunctions/vehicleUpdate integration", () => {
       note: ""
     })
 
-    expect(res).toEqual({ ok: true, id: "car_1" })
+    expect(res).toEqual({ ok: true, id: "car_1", vehicleVersion: 1 })
     expect(mocks.update).toHaveBeenCalledWith({
       data: {
         plateNumber: "京A12345",
@@ -282,6 +311,7 @@ describe("cloudfunctions/vehicleUpdate integration", () => {
         vin: "",
         engineNumber: "",
         note: "",
+        vehicleVersion: 1,
         updatedAt: mocks.serverDateValue
       }
     })

@@ -43,6 +43,14 @@ function queryCollection(options = {}) {
 }
 
 describe("Phase 16 content guide cloud functions", () => {
+  test("关联车辆封面缺失时沿用管理员保存的相册首图", async () => {
+    const guides = queryCollection({ data: [{ slug: "guide-images", status: "published", publishedAt: new Date(Date.now() - 1000), vehicleIds: ["car"] }] })
+    const vehicles = queryCollection({ docs: { car: { brandModel: "车辆", imageList: ["", "cloud://saved-image"], status: "idle" } } })
+    const mod = loadFunction("../cloudfunctions/contentGuideDetail/index", { collections: { content_guides: guides, vehicles } })
+    const result = await mod.main({ contentId: "guide-images" })
+    expect(result.vehicles).toEqual([expect.objectContaining({ id: "car", cover: "cloud://saved-image" })])
+  })
+
   test("公开列表只返回当前已发布内容", async () => {
     const now = Date.now()
     const collection = queryCollection({ data: [

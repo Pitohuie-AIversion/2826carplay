@@ -34,10 +34,169 @@ function createPage(definition) {
 }
 
 describe("pages/favorites 收藏车辆视图", () => {
+  test.each(["network", "timeout", "server"])("撤销在%s失败后保留新的重试窗口", (failure) => {
+    jest.useFakeTimers()
+    const requests = []
+    global.wx = { showToast: jest.fn(), cloud: { callFunction: jest.fn((options) => requests.push(options)) } }
+    const page = createPage(loadPageDefinition())
+    page.applyFavoriteList([{ id: "car", status: "idle" }])
+    page.removeFavorite("car")
+    requests[0].success({ result: { ok: true } })
+    page.handleUndoRemove()
+    jest.advanceTimersByTime(6000)
+    expect(page.data.undoFavorite.car.id).toBe("car")
+    if (failure === "timeout") jest.advanceTimersByTime(6000)
+    else if (failure === "server") requests[1].success({ result: { ok: false } })
+    else requests[1].fail({ errMsg: "network" })
+    expect(page.data.undoingFavorite).toBe(false)
+    expect(page.data.undoFavorite.car.id).toBe("car")
+    page.handleUndoRemove()
+    requests[2].success({ result: { ok: true } })
+    expect(page.data.list.map((car) => car.id)).toEqual(["car"])
+    expect(page.data.undoFavorite).toBeNull()
+    page.onUnload()
+    expect(jest.getTimerCount()).toBe(0)
+  })
+
+  test("删除已加载收藏后继续加载不会漏掉分页边界车辆", () => {
+    jest.useFakeTimers()
+    const serverCars = ["a", "b", "c", "d"].map((id) => ({ id, name: id, status: "idle" }))
+    global.wx = { showToast: jest.fn(), setStorageSync: jest.fn(), cloud: { callFunction: jest.fn(({ name, data, success }) => {
+      if (name === "favoriteSet") {
+        serverCars.splice(serverCars.findIndex((car) => car.id === data.vehicleId), 1)
+        success({ result: { ok: true } })
+      } else {
+        const start = data.page * data.pageSize
+        success({ result: { ok: true, page: data.page, list: serverCars.slice(start, start + data.pageSize), hasMore: start + data.pageSize < serverCars.length } })
+      }
+    }) } }
+    const page = createPage(loadPageDefinition())
+    page.data.pageSize = 2
+    page.fetchList()
+    expect(page.data.list.map((car) => car.id)).toEqual(["a", "b"])
+    page.removeFavorite("a")
+    page.handleLoadMore()
+    expect(wx.cloud.callFunction.mock.calls[2][0].data.page).toBe(0)
+    expect(page.data.list.map((car) => car.id)).toEqual(["b", "c"])
+    page.handleLoadMore()
+    expect(page.data.list.map((car) => car.id)).toEqual(["b", "c", "d"])
+    page.onUnload()
+  })
+
+  test("撤销与取消收藏互斥，避免并发回调覆盖另一笔撤销", () => {
+    global.wx = { cloud: { callFunction: jest.fn() }, showModal: jest.fn() }
+    const page = createPage(loadPageDefinition())
+    page.data.undoingFavorite = true
+    page.handleRemove({ currentTarget: { dataset: { id: "other" } } })
+    page.removeFavorite("other")
+    expect(wx.showModal).not.toHaveBeenCalled()
+    expect(wx.cloud.callFunction).not.toHaveBeenCalled()
+    page.data.undoingFavorite = false
+    page.data.removingId = "other"
+    page.data.undoFavorite = { car: { id: "old" } }
+    page.handleUndoRemove()
+    expect(wx.cloud.callFunction).not.toHaveBeenCalled()
+    page.onUnload()
+  })
+
   afterEach(() => {
     jest.useRealTimers()
     delete global.Page
     delete global.wx
+    delete global.getCurrentPages
+  })
+
+  test("未知或缺失状态的收藏保留展示但不算可预约", () => {
+    const page = createPage(loadPageDefinition())
+    page.applyFavoriteList([
+      { id: "available", status: "idle" },
+      { id: "unknown", status: "unexpected" },
+      { id: "missing" }
+    ])
+    expect(page.data.list.slice(1).map((car) => car.statusText)).toEqual(["状态待确认", "状态待确认"])
+    expect(page.data.favoriteSummary).toEqual({ total: 3, available: 1 })
+    page.handleFilterTap({ currentTarget: { dataset: { mode: "available" } } })
+    expect(page.data.visibleList.map((car) => car.id)).toEqual(["available"])
+  })
+
+  test.each(["network", "server", "timeout", "missing-list", "invalid-row"])(
+    "刷新%s失败保留已加载收藏和缓存，再加载从首页恢复",
+    (failure) => {
+      jest.useFakeTimers()
+      const requests = []
+      global.wx = { setStorageSync: jest.fn(), cloud: { callFunction: jest.fn((options) => requests.push(options)) } }
+      const page = createPage(loadPageDefinition())
+      page.applyFavoriteList([{ id: "old", status: "idle" }], { page: 2, hasMore: true })
+      const done = jest.fn()
+      page.fetchList({ done })
+      if (failure === "network") requests[0].fail({ errMsg: "network" })
+      else if (failure === "server") requests[0].success({ result: { ok: false, message: "读取失败" } })
+      else if (failure === "timeout") jest.advanceTimersByTime(15000)
+      else requests[0].success({ result: { ok: true, ...(failure === "invalid-row" ? { list: [null] } : {}) } })
+      expect(page.data.loadError).not.toBe("")
+      expect(page.data.list.map((car) => car.id)).toEqual(["old"])
+      expect(page.data.page).toBe(2)
+      expect(page.data.loading).toBe(false)
+      expect(done).toHaveBeenCalledTimes(1)
+      expect(wx.setStorageSync).not.toHaveBeenCalled()
+      page.handleLoadMore()
+      expect(requests[1].data.page).toBe(0)
+      requests[1].success({ result: { ok: true, page: 0, list: [], hasMore: false } })
+      expect(page.data.list).toEqual([])
+      expect(page.data.loadError).toBe("")
+      expect(wx.setStorageSync).toHaveBeenLastCalledWith("favorites_last_snapshot", [])
+      page.onUnload()
+      expect(jest.getTimerCount()).toBe(0)
+    }
+  )
+
+  test.each(["remove", "undo"])("%s在切页后回调不会弹出提示，仍正确结束请求", (action) => {
+    jest.useFakeTimers()
+    const requests = []
+    global.wx = { showToast: jest.fn(), cloud: { callFunction: jest.fn((options) => requests.push(options)) } }
+    const page = createPage(loadPageDefinition())
+    global.getCurrentPages = () => [page]
+    page.applyFavoriteList([{ id: "car", status: "idle" }])
+    const startAction = () => {
+      if (action === "remove") page.removeFavorite("car")
+      else {
+        page.data.undoFavorite = { car: { id: "car", status: "idle" }, index: 0 }
+        page.handleUndoRemove()
+      }
+    }
+    for (const result of ["network", "server", "timeout", "success"]) {
+      startAction()
+      global.getCurrentPages = () => [page, {}]
+      const request = requests[requests.length - 1]
+      if (result === "network") request.fail({ errMsg: "network" })
+      else if (result === "timeout") jest.advanceTimersByTime(12000)
+      else request.success({ result: { ok: result === "success" } })
+      expect(page.data.removingId).toBe("")
+      expect(page.data.undoingFavorite).toBe(false)
+      expect(wx.showToast).not.toHaveBeenCalled()
+      global.getCurrentPages = () => [page]
+    }
+    expect(page.data.list.map((car) => car.id)).toEqual(action === "remove" ? [] : ["car"])
+    page.onUnload()
+    expect(jest.getTimerCount()).toBe(0)
+  })
+
+  test("追加页失败后保留页码，重试追加不会跳过失败页", () => {
+    const requests = []
+    global.wx = { cloud: { callFunction: jest.fn((options) => requests.push(options)) } }
+    const page = createPage(loadPageDefinition())
+    page.applyFavoriteList([{ id: "first", status: "idle" }], { page: 0, hasMore: true })
+    page.handleLoadMore()
+    requests[0].fail({ errMsg: "network" })
+    expect(page.data.list.map((car) => car.id)).toEqual(["first"])
+    expect(page.data.page).toBe(0)
+    expect(page.data.loadError).toBe("network")
+    page.handleLoadMore()
+    expect(requests[1].data.page).toBe(1)
+    requests[1].success({ result: { ok: true, page: 1, list: [{ id: "second", status: "idle" }], hasMore: false } })
+    expect(page.data.list.map((car) => car.id)).toEqual(["first", "second"])
+    expect(page.data.loadError).toBe("")
+    page.onUnload()
   })
 
   test("统一客户状态口径并支持只看可预约收藏", () => {
@@ -452,5 +611,6 @@ describe("pages/favorites 收藏车辆视图", () => {
     page.onLoad()
     expect(page.applyFavoriteList).toHaveBeenCalledWith(mockFavorites, expect.objectContaining({ page: 0, hasMore: true }))
     expect(page.data.initialLoading).toBe(false)
+    page.onUnload()
   })
 })

@@ -1,4 +1,5 @@
 const cloud = require("wx-server-sdk")
+const { updateVehicle } = require("./vehicleRevision")
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
@@ -143,6 +144,7 @@ function normalizeInput(event) {
   const payload = event && typeof event === "object" ? event : {}
   return {
     id: String(payload.id || "").trim(),
+    expectedVersion: payload.expectedVersion,
     status: String(payload.status || "").trim()
   }
 }
@@ -207,12 +209,8 @@ exports.main = async (event) => {
       }
     }
 
-    await db.collection("vehicles").doc(input.id).update({
-      data: {
-        status: input.status,
-        updatedAt: db.serverDate()
-      }
-    })
+    const mutation = await updateVehicle(db, input.id, { status: input.status }, input.expectedVersion, current.status)
+    if (!mutation.updated) return { ok: true, id: input.id, alreadyUpdated: true, status: input.status, message: "车辆状态未变化" }
 
     await writeAuditLogBestEffort({
       openid,
@@ -230,6 +228,7 @@ exports.main = async (event) => {
       message: "车辆状态已更新"
     }
   } catch (error) {
+    if (error && error.vehicleRevisionError) return createError(error.code, error.message)
     const errorMessage = String(
       error && (error.message || error.errMsg) ? error.message || error.errMsg : error
     ).slice(0, 300)

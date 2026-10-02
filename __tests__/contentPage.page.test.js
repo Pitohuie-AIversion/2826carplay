@@ -1,5 +1,6 @@
 const fs = require("fs")
 const path = require("path")
+const activePages = new Set()
 
 function loadPageDefinition() {
   jest.resetModules()
@@ -25,17 +26,21 @@ function createPage(definition) {
       done()
     }
   })
+  activePages.add(page)
   return page
 }
 
 describe("pages/content-page 服务指南", () => {
   afterEach(() => {
+    for (const page of activePages) page.onUnload()
+    activePages.clear()
     jest.useRealTimers()
     delete global.Page
     delete global.wx
+    delete global.getCurrentPages
   })
 
-  test("未知内容类型安全回退到常见问题并生成章节目录", () => {
+  test("未知内容类型安全回退到常见问题，加载前不显示写死的业务规则", () => {
     global.wx = {
       setNavigationBarTitle: jest.fn()
     }
@@ -48,12 +53,115 @@ describe("pages/content-page 服务指南", () => {
 
     expect(page.data.type).toBe("faq")
     expect(page.data.pageTitle).toBe("常见问题")
-    expect(page.data.sections).toHaveLength(4)
-    expect(page.data.activeSectionKey).toBe("section-1")
+    expect(page.data.content).toBe("")
+    expect(page.data.sections).toEqual([])
+    expect(page.data.activeSectionKey).toBe("")
     expect(page.loadContent).toHaveBeenCalledWith("faq")
     expect(wx.setNavigationBarTitle).toHaveBeenCalledWith({
       title: "常见问题"
     })
+  })
+
+  test.each(["faq", "rules"])("%s 读取失败明确提示，重试后空配置清除旧内容", (type) => {
+    const requests = []
+    global.wx = { setNavigationBarTitle: jest.fn(), cloud: { callFunction: jest.fn((options) => requests.push(options)) } }
+    const page = createPage(loadPageDefinition())
+    page.onLoad({ type })
+    expect(page.data.content).toBe("")
+    expect(page.data.contentLoading).toBe(true)
+    requests[0].fail({ errMsg: "network unavailable" })
+    expect(page.data.content).toBe("")
+    expect(page.data.contentLoading).toBe(false)
+    expect(page.data.contentError).toContain("重试")
+    page.handleContentRetry()
+    requests[1].success({ result: { ok: true, config: { [`${type}Content`]: "1. 已保存规则\n正文" } } })
+    expect(page.data.sections[0].title).toBe("已保存规则")
+    expect(page.data.contentError).toBe("")
+    page.handleContentRetry()
+    expect(requests).toHaveLength(3)
+    requests[2].success({ result: { ok: true, config: { [`${type}Content`]: "" } } })
+    expect(page.data.content).toBe("")
+    expect(page.data.sections).toEqual([])
+    expect(page.data.activeSectionKey).toBe("")
+    expect(page.data.contentLoading).toBe(false)
+  })
+
+  test("重新显示内容页时重读已失效配置，成功空内容不恢复旧规则", () => {
+    const requests = []
+    global.wx = { setNavigationBarTitle: jest.fn(), cloud: { callFunction: jest.fn((options) => requests.push(options)) } }
+    const page = createPage(loadPageDefinition())
+    page.onLoad({ type: "rules" })
+    page.onShow()
+    requests[0].success({ result: { ok: true, config: { rulesContent: "1. 原规则\n原正文" } } })
+    require("../shared/operationConfigRequest").clearOperationConfigCache()
+    page.onShow()
+    expect(requests).toHaveLength(2)
+    requests[1].success({ result: { ok: true, config: {} } })
+    expect(page.data.content).toBe("")
+    expect(page.data.sections).toEqual([])
+  })
+
+  test("内容读取途中缓存失效立即恢复重试，迟到内容不能再显示", () => {
+    const requests = []
+    global.wx = { setNavigationBarTitle: jest.fn(), cloud: { callFunction: jest.fn((options) => requests.push(options)) } }
+    const page = createPage(loadPageDefinition())
+    page.onLoad({ type: "rules" })
+    require("../shared/operationConfigRequest").clearOperationConfigCache()
+    expect(page.data.contentLoading).toBe(false)
+    expect(page.data.contentError).toContain("重试")
+    requests[0].success({ result: { ok: true, config: { rulesContent: "迟到旧规则" } } })
+    expect(page.data.content).toBe("")
+    page.handleContentRetry()
+    requests[1].success({ result: { ok: true, config: { rulesContent: "已保存新规则" } } })
+    expect(page.data.content).toBe("已保存新规则")
+  })
+
+  test("刷新规则失败后再次显示页面不会恢复已过时的缓存正文", () => {
+    const requests = []
+    global.wx = { nextTick: (callback) => callback(), setNavigationBarTitle: jest.fn(), cloud: { callFunction: jest.fn((options) => requests.push(options)) } }
+    const page = createPage(loadPageDefinition())
+    page.onLoad({ type: "rules" })
+    page.onShow()
+    requests[0].success({ result: { ok: true, revision: 1, config: { rulesContent: "以前保存的规则" } } })
+    page.handleContentRetry()
+    requests[1].fail({ errMsg: "network" })
+    expect(page.data.content).toBe("")
+    page.onShow()
+    expect(page.data.content).toBe("")
+    expect(page.data.contentLoading).toBe(true)
+    expect(requests).toHaveLength(3)
+    requests[2].success({ result: { ok: true, revision: 2, config: { rulesContent: "最新保存规则" } } })
+    expect(page.data.content).toBe("最新保存规则")
+  })
+
+  test("隐私政策在配置读取失败时仍可完整阅读", () => {
+    let request
+    global.wx = { setNavigationBarTitle: jest.fn(), cloud: { callFunction: jest.fn((options) => { request = options }) } }
+    const page = createPage(loadPageDefinition())
+    page.onLoad({ type: "privacy" })
+    const original = page.data.content
+    expect(original).toContain("个人信息")
+    request.fail({ errMsg: "network unavailable" })
+    expect(page.data.content).toBe(original)
+    expect(page.data.contentError).toBe("")
+    expect(page.data.contentLoading).toBe(false)
+  })
+
+  test("场景指南同样读取已保存客服电话，配置失败不改写指南正文", () => {
+    const requests = []
+    global.wx = { setNavigationBarTitle: jest.fn(), cloud: { callFunction: jest.fn((options) => requests.push(options)) } }
+    const page = createPage(loadPageDefinition())
+    page.onLoad({ contentId: "guide-contacts" })
+    const configRequest = requests.find((request) => request.name === "operationConfigGet")
+    expect(configRequest).toBeDefined()
+    configRequest.success({ result: { ok: true, config: { servicePhone: "18800000000" } } })
+    expect(page.data.servicePhone).toBe("18800000000")
+    page.applyContent("指南原文")
+    page.loadContent("", { force: true })
+    requests.filter((request) => request.name === "operationConfigGet")[1].fail({ errMsg: "network" })
+    expect(page.data.servicePhone).toBe("")
+    expect(page.data.content).toBe("指南原文")
+    expect(page.data.contentError).toBe("")
   })
 
   test("可切换服务指南并定位文档章节", () => {
@@ -174,6 +282,7 @@ describe("pages/content-page 服务指南", () => {
 
     page.loadContent("faq")
     page.onUnload()
+    page.setData.mockClear()
     requestOptions.success({
       result: {
         ok: true,
@@ -181,7 +290,8 @@ describe("pages/content-page 服务指南", () => {
       }
     })
 
-    expect(page.data.sections[0].title).toBe("默认问题")
+    expect(page.data.content).toBe("")
+    expect(page.setData).not.toHaveBeenCalled()
   })
 
   test("场景内容分享时固定 wechat_share 渠道并携带 contentId 与场景", () => {
@@ -331,6 +441,7 @@ describe("pages/content-page 服务指南", () => {
     expect(page.data.guide).toEqual(cachedGuide)
     expect(page.data.guideLoading).toBe(false)
     expect(page.data.pageTitle).toBe("自驾全攻略")
-    expect(page.data.relatedVehicles).toEqual(cachedVehicles)
+    expect(page.data.relatedVehicles).toEqual(cachedVehicles.map((vehicle) => ({ ...vehicle, statusText: "状态待确认" })))
+    page.onUnload()
   })
 })

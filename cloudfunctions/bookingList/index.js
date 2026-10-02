@@ -25,6 +25,7 @@ const BOOKING_MANAGE_LIST_FIELDS = {
   adminRemarkUpdatedAt: true,
   schedulePriority: true,
   coordinationStatus: true,
+  tags: true,
   status: true,
   createdAt: true,
   updatedAt: true
@@ -406,6 +407,7 @@ exports.main = async (event) => {
             ? item.coordinationStatus
             : "pending",
       status: item.status || "pending",
+      ...(Array.isArray(item.tags) ? { tags: item.tags } : {}),
       createdAt: formatTime(item.createdAt),
       updatedAt: formatTime(item.updatedAt)
     }))

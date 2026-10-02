@@ -281,7 +281,7 @@
       <view class="price-calendar-note">这是按日期汇总的参考价，不含 Phase 12 报价中的押金、服务项和调整；最终金额以顾问发送并由您确认的报价版本为准。</view>
     </view>
     <view class="form-item">
-      <view class="form-label-row"><view class="form-label">取车城市</view><view class="optional-mark">选填</view></view>
+      <view class="form-label-row"><view class="form-label">取车城市</view><view class="optional-mark">必填</view></view>
       <picker wx:if="{{cityOptions.length}}" mode="selector" range="{{cityOptions}}" value="{{pickerCityIndex}}" disabled="{{isSubmitting}}" bindchange="handleCityChange" aria-label="选择取车城市">
         <view class="form-picker {{form.city ? 'form-picker-filled' : ''}}" hover-class="booking-picker-pressed">
           <text>{{form.city || '请选择取车城市'}}</text>
@@ -299,7 +299,7 @@
         disabled="{{isSubmitting}}"
         bindinput="handleInput"
         confirm-type="done"
-        aria-label="填写取车城市，选填"
+        aria-label="填写取车城市，必填"
       />
     </view>
     <view class="form-item" wx:if="{{pickupHubs.length}}">
@@ -311,9 +311,12 @@
         </view>
       </picker>
       <view class="field-hint" wx:if="{{pickupHubs[pickupHubIndex] && pickupHubs[pickupHubIndex].address}}">
-        <text>{{pickupHubs[pickupHubIndex].address}} · {{pickupHubs[pickupHubIndex].feeText}}</text>
+        <text>{{pickupHubs[pickupHubIndex].address}}{{pickupHubs[pickupHubIndex].feeText ? ' · ' + pickupHubs[pickupHubIndex].feeText : ''}}</text>
       </view>
     </view>
+    <view class="field-hint" wx:if="{{!pickupHubs.length}}">取车地点请与顾问确认，可先提交预约。</view>
+    <view wx:if="{{operationConfigFailed}}" class="field-hint">网点信息暂未加载，可重试后选择，或先提交预约由顾问确认。</view>
+    <view wx:if="{{operationConfigFailed}}" class="availability-retry" bindtap="handleRetryServiceConfig" hover-class="booking-action-pressed" aria-role="button" aria-label="重新加载服务网点">重新加载网点</view>
     <view class="form-item">
       <view class="form-label-row">
         <view class="form-label">备注</view>
@@ -387,6 +390,7 @@
     </view>
   </view>
   <view class="submit-section">
+    <view wx:if="{{submitErrorText}}" class="field-hint">{{submitErrorText}}</view>
     <view class="submit-kicker">04 / 04 · SUBMIT</view>
     <view class="submit-readiness {{formProgress.ready ? 'submit-readiness-ready' : ''}}">
       <view class="submit-readiness-icon" aria-hidden="true"><view class="submit-readiness-mark"></view></view>

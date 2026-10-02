@@ -3,15 +3,16 @@ jest.mock("wx-server-sdk")
 function createMockDb({ rolesData, currentData, updateResult }) {
   const rolesGet = jest.fn().mockResolvedValue({ data: rolesData })
   const currentGet = jest.fn().mockResolvedValue({ data: currentData })
-  const update = jest.fn().mockResolvedValue(updateResult)
+  const update = jest.fn(async ({ data }) => { Object.assign(currentData, data); return updateResult })
 
   const rolesLimit = jest.fn(() => ({ get: rolesGet }))
   const rolesWhere = jest.fn(() => ({ limit: rolesLimit }))
 
-  const bookingsDoc = jest.fn(() => ({
-    get: currentGet,
-    update
-  }))
+  const bookingsDoc = jest.fn(() => {
+    const doc = { get: currentGet, update }
+    doc.field = () => doc
+    return doc
+  })
 
   const serverDateValue = { __type: "serverDate" }
   const serverDate = jest.fn(() => serverDateValue)
@@ -26,7 +27,8 @@ function createMockDb({ rolesData, currentData, updateResult }) {
       }
       throw new Error(`Unexpected collection: ${name}`)
     }),
-    serverDate
+    serverDate,
+    runTransaction: jest.fn((callback) => callback({ collection: (name) => ({ doc: db.collection(name).doc }) }))
   }
 
   return {
@@ -54,6 +56,18 @@ async function loadBookingUpdateAdminRemarkWith({ openid, mockDb }) {
 }
 
 describe("cloudfunctions/bookingUpdateAdminRemark integration", () => {
+  test("旧页面不能覆盖新备注，成功后失去响应重试不重复写入", async () => {
+    const currentData = { _id: "booking_1", adminRemark: "旧备注" }
+    const mocks = createMockDb({ rolesData: [{ role: "admin" }], currentData, updateResult: { stats: { updated: 1 } } })
+    const mod = await loadBookingUpdateAdminRemarkWith({ openid: "admin_openid", mockDb: mocks.db })
+    const first = { id: "booking_1", adminRemark: "新备注", expectedAdminRemark: "旧备注" }
+    expect(await mod.main(first)).toMatchObject({ ok: true })
+    expect(await mod.main(first)).toMatchObject({ ok: true })
+    expect(await mod.main({ id: "booking_1", adminRemark: "", expectedAdminRemark: "旧备注" })).toMatchObject({ ok: false, code: "VERSION_CONFLICT" })
+    expect(currentData.adminRemark).toBe("新备注")
+    expect(mocks.update).toHaveBeenCalledTimes(1)
+  })
+
   test("admin 可保存管理员备注", async () => {
     const mocks = createMockDb({
       rolesData: [{ role: "admin" }],

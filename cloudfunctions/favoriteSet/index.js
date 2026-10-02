@@ -22,6 +22,11 @@ function buildFavoriteId(openid, vehicleId) {
   return `favorite_${digest.slice(0, 24)}`
 }
 
+function isMissingDocument(error) {
+  const message = String(error && (error.errMsg || error.message || error.code) || "").toLowerCase()
+  return /document_not_found|document.*(?:not found|not exist)/.test(message)
+}
+
 exports.main = async (event) => {
   const wxContext = cloud.getWXContext()
   const openid = wxContext && wxContext.OPENID ? wxContext.OPENID : ""
@@ -39,7 +44,11 @@ exports.main = async (event) => {
 
     const favoriteId = buildFavoriteId(openid, vehicleId)
     if (!favorited) {
-      await db.collection("favorites").doc(favoriteId).remove()
+      try {
+        await db.collection("favorites").doc(favoriteId).remove()
+      } catch (error) {
+        if (!isMissingDocument(error)) throw error
+      }
       return {
         ok: true,
         vehicleId,
@@ -57,19 +66,31 @@ exports.main = async (event) => {
         .get()
       vehicle = vehicleRes && vehicleRes.data ? vehicleRes.data : null
     } catch (error) {
-      vehicle = null
+      if (!isMissingDocument(error)) throw error
     }
     if (!vehicle || String(vehicle.status || "") === "retired") {
       return createError("VEHICLE_NOT_AVAILABLE", "该车辆当前不可收藏")
     }
 
-    await db.collection("favorites").doc(favoriteId).set({
-      data: {
-        openid,
-        vehicleId,
-        createdAt: db.serverDate(),
-        updatedAt: db.serverDate()
+    await db.runTransaction(async (transaction) => {
+      const ref = transaction.collection("favorites").doc(favoriteId)
+      let existing = null
+      try {
+        const res = await ref.get()
+        existing = res && res.data
+      } catch (error) {
+        if (!isMissingDocument(error)) throw error
       }
+      // A retry must preserve the original position in the paginated list.
+      if (existing) return
+      await ref.set({
+        data: {
+          openid,
+          vehicleId,
+          createdAt: db.serverDate(),
+          updatedAt: db.serverDate()
+        }
+      })
     })
 
     return {

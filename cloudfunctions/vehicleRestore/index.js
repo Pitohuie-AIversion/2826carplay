@@ -1,4 +1,5 @@
 const cloud = require("wx-server-sdk")
+const { updateVehicle } = require("./vehicleRevision")
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
@@ -173,12 +174,8 @@ exports.main = async (event) => {
       }
     }
 
-    await db.collection("vehicles").doc(id).update({
-      data: {
-        status: "idle",
-        updatedAt: db.serverDate()
-      }
-    })
+    const mutation = await updateVehicle(db, id, { status: "idle" }, event && event.expectedVersion, current.status)
+    if (!mutation.updated) return { ok: true, id, alreadyRestored: true, message: "车辆当前无需恢复启用" }
 
     await writeAuditLogBestEffort({
       openid,
@@ -195,6 +192,7 @@ exports.main = async (event) => {
       message: "车辆已恢复启用"
     }
   } catch (error) {
+    if (error && error.vehicleRevisionError) return createError(error.code, error.message)
     const errorMessage = String(
       error && (error.message || error.errMsg) ? error.message || error.errMsg : error
     ).slice(0, 300)

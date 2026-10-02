@@ -33,11 +33,53 @@ function createPage(definition, data) {
 }
 
 describe("pages/booking subscription", () => {
+  function readyBookingPage() {
+    return createPage(loadPageDefinition(), {
+      carId: "car_1", carName: "预约车辆", privacyAgreed: true,
+      bookingStatusTemplateId: "template_1234567890",
+      form: { userName: "联系人", phone: "13800138000", startDate: "2099-08-01", endDate: "2099-08-02", city: "杭州", note: "" }
+    })
+  }
+
   afterEach(() => {
     jest.useRealTimers()
     delete global.Page
     delete global.wx
     delete global.getCurrentPages
+  })
+
+  test("提交前订阅弹窗无响应时恢复按钮，迟到授权不再提交", () => {
+    jest.useFakeTimers()
+    let complete
+    global.wx = { cloud: { callFunction: jest.fn() }, showToast: jest.fn(), requestSubscribeMessage: jest.fn((options) => { complete = options.complete }) }
+    const page = readyBookingPage()
+    page.handleSubmit()
+    expect(page.data.isSubmitting).toBe(true)
+    jest.advanceTimersByTime(15 * 1000)
+    expect(page.data.isSubmitting).toBe(false)
+    expect(wx.showToast).toHaveBeenCalledWith({ title: "订阅未完成，请重试", icon: "none" })
+    complete()
+    expect(wx.cloud.callFunction).not.toHaveBeenCalled()
+    page.onUnload()
+    expect(jest.getTimerCount()).toBe(0)
+  })
+
+  test("订阅弹窗期间切页不在后台提交，返回后可重试", () => {
+    jest.useFakeTimers()
+    let complete
+    global.wx = { cloud: { callFunction: jest.fn() }, showToast: jest.fn(), requestSubscribeMessage: jest.fn((options) => { complete = options.complete }) }
+    const page = readyBookingPage()
+    global.getCurrentPages = () => [page]
+    page.handleSubmit()
+    global.getCurrentPages = () => [{}]
+    complete()
+    expect(wx.cloud.callFunction).not.toHaveBeenCalled()
+    expect(wx.showToast).not.toHaveBeenCalled()
+    global.getCurrentPages = () => [page]
+    page.onShow()
+    expect(page.data.isSubmitting).toBe(false)
+    page.onUnload()
+    expect(jest.getTimerCount()).toBe(0)
   })
 
   test("配置模板时请求一次状态订阅并继续提交", () => {

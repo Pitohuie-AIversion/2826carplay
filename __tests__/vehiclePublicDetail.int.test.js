@@ -40,6 +40,47 @@ async function loadVehiclePublicDetailWith({ mockDb }) {
 }
 
 describe("cloudfunctions/vehiclePublicDetail integration", () => {
+  test.each([undefined, null, "", "   "])("未保存地点 %p 保留为空，不生成可匹配网点的业务文案", async (location) => {
+    const mocks = createMockDb({ currentData: { status: "idle", location } })
+    const mod = await loadVehiclePublicDetailWith({ mockDb: mocks.db })
+    const result = await mod.main({ id: "car_1" })
+    expect(result.car.location).toBe("")
+    expect(mocks.vehiclesField.mock.calls[0][0]).toMatchObject({ location: true })
+  })
+
+  test.each([undefined, "", "legacy-unknown"])("未知状态 %p 的车辆不作为可预约车型公开", async (status) => {
+    const mocks = createMockDb({ currentData: { status, priceDay: 800 } })
+    const mod = await loadVehiclePublicDetailWith({ mockDb: mocks.db })
+    const result = await mod.main({ id: "car_1" })
+    expect(result).toMatchObject({ ok: false, code: "NOT_AVAILABLE" })
+    expect(result).not.toHaveProperty("car")
+  })
+
+  test("公开读取旧性能数值零时不误判为未填写", async () => {
+    const mocks = createMockDb({ currentData: { status: "idle", performance: { acceleration: 0, horsepower: 0, torque: 0 } } })
+    const mod = await loadVehiclePublicDetailWith({ mockDb: mocks.db })
+    expect((await mod.main({ id: "car_1" })).car.performance).toMatchObject({ acceleration: "0", horsepower: "0", torque: "0" })
+  })
+
+  test("公开详情仅输出保存的性能与人工提示，维保到期日和额外性能字段不公开", async () => {
+    const performance = { acceleration: "6.5s", horsepower: "300Ps", drivetrain: "后轮驱动", torque: "400N·m", highlights: ["全景天窗"] }
+    const mocks = createMockDb({ currentData: { status: "idle", publicDrivingTips: "取车后先熟悉灯光操作", performance: { ...performance, internalMemo: "SECRET" }, archiveDate: "2027-01-01", archiveReview: "2027-06-01" } })
+    const mod = await loadVehiclePublicDetailWith({ mockDb: mocks.db })
+    const res = await mod.main({ id: "car_1" })
+    expect(res.car.performance).toEqual(performance)
+    expect(res.car.publicDrivingTips).toBe("取车后先熟悉灯光操作")
+    expect(res.car).not.toHaveProperty("archiveDate")
+    expect(res.car).not.toHaveProperty("archiveReview")
+    expect(mocks.vehiclesField.mock.calls[0][0]).toMatchObject({ performance: true, publicDrivingTips: true })
+    expect(mocks.vehiclesField.mock.calls[0][0]).not.toHaveProperty("archiveDate")
+    expect(JSON.stringify(res.car)).not.toContain("SECRET")
+    const emptyMocks = createMockDb({ currentData: { status: "idle" } })
+    const emptyMod = await loadVehiclePublicDetailWith({ mockDb: emptyMocks.db })
+    const empty = await emptyMod.main({ id: "car_2" })
+    expect(empty.car.performance).toEqual({ acceleration: "", horsepower: "", drivetrain: "", torque: "", highlights: [] })
+    expect(empty.car.publicDrivingTips).toBe("")
+  })
+
   test("公开详情读取管理员折扣并剔除额外字段", async () => {
     const mocks = createMockDb({ currentData: { status: "idle", rentalDiscountTiers: [{ minDays: 5, discountRate: 0.92, secret: "hidden" }] } })
     const mod = await loadVehiclePublicDetailWith({ mockDb: mocks.db })

@@ -1,6 +1,6 @@
 jest.mock("wx-server-sdk")
 
-function createMockDb({ rolesData, bookingData, rangeError = null }) {
+function createMockDb({ rolesData, bookingData, rangeError = null, priceRules = [], blocks = [], vehicles = [] }) {
   const rolesGet = jest.fn().mockResolvedValue({ data: rolesData })
   const rolesWhere = jest.fn(() => ({
     limit: jest.fn(() => ({ get: rolesGet }))
@@ -46,17 +46,28 @@ function createMockDb({ rolesData, bookingData, rangeError = null }) {
         return createBookingQuery(0, false)
       }
       if (["vehicle_availability_blocks", "vehicle_price_rules"].includes(name)) {
+        let offset = 0
+        let limit = 100
+        const records = name === "vehicle_price_rules" ? priceRules : blocks
         const chain = {
           where: jest.fn(() => chain),
           field: jest.fn(() => chain),
-          limit: jest.fn(() => ({ get: jest.fn().mockResolvedValue({ data: [] }) }))
+          orderBy: jest.fn(() => chain),
+          skip: jest.fn((value) => { offset = value; return chain }),
+          limit: jest.fn((value) => { limit = Math.min(value, 100); return chain }),
+          get: jest.fn(async () => ({ data: records.slice(offset, offset + limit) }))
         }
         return chain
       }
       if (name === "vehicles") {
+        let offset = 0
+        let limit = 100
         const chain = {
           field: jest.fn(() => chain),
-          limit: jest.fn(() => ({ get: jest.fn().mockResolvedValue({ data: [] }) }))
+          orderBy: jest.fn(() => chain),
+          skip: jest.fn((value) => { offset = value; return chain }),
+          limit: jest.fn((value) => { limit = Math.min(100, value); return chain }),
+          get: jest.fn(async () => ({ data: vehicles.slice(offset, offset + limit) }))
         }
         return chain
       }
@@ -96,6 +107,43 @@ async function loadFunctionWith({ openid, mockDb }) {
 }
 
 describe("cloudfunctions/bookingCalendarList integration", () => {
+  test.each([101, 500, 501])("车辆选择列表按100条完整分页，数量%s超过上限明确失败", async (count) => {
+    const vehicles = Array.from({ length: count }, (_, index) => ({ _id: `vehicle_${String(index).padStart(4, "0")}`, brandModel: `车辆${index}`, priceDay: 800 }))
+    const mocks = createMockDb({ rolesData: [{ role: "admin" }], bookingData: [], vehicles })
+    const mod = await loadFunctionWith({ openid: "admin", mockDb: mocks.db })
+    const result = await mod.main({ month: "2026-10" })
+    if (count > 500) {
+      expect(result).toMatchObject({ ok: false, code: "CALENDAR_VEHICLES_INCOMPLETE" })
+      expect(result).not.toHaveProperty("vehicles")
+    } else {
+      expect(result.ok).toBe(true)
+      expect(result.vehicles).toHaveLength(count)
+      expect(new Set(result.vehicles.map((vehicle) => vehicle.id)).size).toBe(count)
+      expect(result.vehicles.some((vehicle) => vehicle.id === vehicles[count - 1]._id)).toBe(true)
+    }
+  })
+
+  test("分页读取第101条有效价格规则和占用，不受单次100条限制", async () => {
+    const records = Array.from({ length: 100 }, (_, index) => ({ _id: `old_${index}`, startDate: "2025-01-01", endDate: "2025-01-02" }))
+    records.push({ _id: "current", vehicleId: "vehicle_1", startDate: "2026-07-01", endDate: "2026-07-02", dailyPrice: 1800 })
+    const mocks = createMockDb({ rolesData: [{ role: "admin" }], bookingData: [], priceRules: records, blocks: records })
+    const mod = await loadFunctionWith({ openid: "admin_openid", mockDb: mocks.db })
+    const result = await mod.main({ month: "2026-07" })
+    expect(result.ok).toBe(true)
+    expect(result.priceRules).toEqual([expect.objectContaining({ id: "current", dailyPrice: 1800 })])
+    expect(result.blocks).toEqual([expect.objectContaining({ id: "current" })])
+  })
+
+  test.each(["priceRules", "blocks"])("%s超过扫描上限时拒绝返回不完整日历", async (field) => {
+    const records = Array.from({ length: 2001 }, (_, index) => ({ _id: `record_${index}`, startDate: "2026-07-01", endDate: "2026-07-02" }))
+    const mocks = createMockDb({ rolesData: [{ role: "admin" }], bookingData: [], [field]: records })
+    const mod = await loadFunctionWith({ openid: "admin_openid", mockDb: mocks.db })
+    const result = await mod.main({ month: "2026-07" })
+    expect(result).toMatchObject({ ok: false, code: "CALENDAR_RANGES_INCOMPLETE" })
+    expect(result).not.toHaveProperty("priceRules")
+    expect(result).not.toHaveProperty("blocks")
+  })
+
   test("预约管理员按月查询且只返回日历必需字段", async () => {
     const mocks = createMockDb({
       rolesData: [{ permissions: ["booking_manage"] }],

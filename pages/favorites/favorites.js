@@ -6,45 +6,13 @@ const {
   isPageNativeActionActive
 } = require("../../shared/pageNativeAction")
 const { preloadImages } = require("../../shared/imageCache")
+const { normalizeFavoriteVehicleStatus } = require("../../shared/vehicleLabels")
 const FAVORITES_LOAD_TIMEOUT_MS = 15 * 1000
 const FAVORITE_MUTATION_TIMEOUT_MS = 12 * 1000
 
 function normalizeFavoriteCar(car) {
   const source = car && typeof car === "object" ? car : {}
-  const status = String(source.status || "").trim()
-  const statusMap = {
-    idle: {
-      status: "available",
-      statusText: "可预约",
-      statusClass: "status-available"
-    },
-    available: {
-      status: "available",
-      statusText: "可预约",
-      statusClass: "status-available"
-    },
-    active: {
-      status: "rented",
-      statusText: "使用中",
-      statusClass: "status-rented"
-    },
-    rented: {
-      status: "rented",
-      statusText: "使用中",
-      statusClass: "status-rented"
-    },
-    maintenance: {
-      status: "maintenance",
-      statusText: "维护中",
-      statusClass: "status-maintenance"
-    },
-    reserved: {
-      status: "reserved",
-      statusText: "已预约",
-      statusClass: "status-reserved"
-    }
-  }
-  const statusMeta = statusMap[status] || statusMap.idle
+  const statusMeta = normalizeFavoriteVehicleStatus(source.status)
 
   return {
     ...source,
@@ -221,7 +189,7 @@ Page({
   },
 
   handleBrowseGarage() {
-    const action = beginPageNativeAction(this)
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.navigateTo({
       url: "/pages/garage/garage",
       fail: () => {
@@ -265,7 +233,7 @@ Page({
         }
       } catch (e) {}
     }
-    const action = beginPageNativeAction(this)
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.navigateTo({
       url: `/pages/car-detail/car-detail?carId=${carId}`,
       fail: () => {
@@ -282,10 +250,11 @@ Page({
 
   handleRemove(event) {
     const vehicleId = String(event.currentTarget.dataset.id || "").trim()
-    if (!vehicleId || this.data.loading || this.data.removingId) {
+    if (!vehicleId || this.data.loading || this.data.removingId || this.data.undoingFavorite) {
       return
     }
     const action = beginPageNativeAction(this, {
+      requireCurrent: true,
       exclusiveKey: "favorite-remove-confirmation"
     })
     wx.showModal({
@@ -303,7 +272,7 @@ Page({
 
   removeFavorite(vehicleId) {
     const targetVehicleId = String(vehicleId || "").trim()
-    if (!targetVehicleId || this.data.loading || this.data.removingId) {
+    if (!targetVehicleId || this.data.loading || this.data.removingId || this.data.undoingFavorite) {
       return
     }
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
@@ -316,6 +285,7 @@ Page({
 
     const removedIndex = this.data.list.findIndex((item) => item.id === targetVehicleId)
     const removedCar = removedIndex >= 0 ? this.data.list[removedIndex] : null
+    const feedbackAction = beginPageNativeAction(this, { requireCurrent: true })
     const mutationSerial = Number(this._favoriteRemoveSerial || 0) + 1
     this._favoriteRemoveSerial = mutationSerial
     this._favoritesRequestId = Number(this._favoritesRequestId || 0) + 1
@@ -337,7 +307,7 @@ Page({
         return
       }
       this.setData({ removingId: "" })
-      wx.showToast({
+      if (isPageNativeActionActive(this, feedbackAction)) wx.showToast({
         title: formatToastTitle(message, "取消收藏失败"),
         icon: "none"
       })
@@ -360,7 +330,7 @@ Page({
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
           this.setData({ removingId: "" })
-          wx.showToast({
+          if (isPageNativeActionActive(this, feedbackAction)) wx.showToast({
             title: formatToastTitle(result && result.message, "取消收藏失败"),
             icon: "none"
           })
@@ -369,6 +339,7 @@ Page({
         this.applyFavoriteList(this.data.list.filter((item) => item.id !== targetVehicleId), {
           availableOnly: this.data.availableOnly
         })
+        this.invalidateFavoritePagination()
         if (this._undoFavoriteTimer) {
           clearTimeout(this._undoFavoriteTimer)
         }
@@ -379,12 +350,9 @@ Page({
               index: removedIndex
             }
           })
-          this._undoFavoriteTimer = setTimeout(() => {
-            this._undoFavoriteTimer = null
-            this.setData({ undoFavorite: null })
-          }, 5000)
+          this.startUndoFavoriteWindow()
         }
-        wx.showToast({
+        if (isPageNativeActionActive(this, feedbackAction)) wx.showToast({
           title: "已取消，可撤销",
           icon: "none"
         })
@@ -404,7 +372,7 @@ Page({
 
   handleUndoRemove() {
     const undo = this.data.undoFavorite
-    if (!undo || !undo.car || this.data.undoingFavorite) {
+    if (!undo || !undo.car || this.data.undoingFavorite || this.data.removingId || this.data.loading) {
       return
     }
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
@@ -412,12 +380,17 @@ Page({
       return
     }
 
+    const feedbackAction = beginPageNativeAction(this, { requireCurrent: true })
     const mutationSerial = Number(this._favoriteUndoSerial || 0) + 1
     const vehicleId = String(undo.car.id || "").trim()
     this._favoriteUndoSerial = mutationSerial
     this._favoritesRequestId = Number(this._favoritesRequestId || 0) + 1
     this.finishFavoritesLoadEffects()
     this.clearFavoriteUndoTimer()
+    if (this._undoFavoriteTimer) {
+      clearTimeout(this._undoFavoriteTimer)
+      this._undoFavoriteTimer = null
+    }
     this.setData({ undoingFavorite: true, loading: false })
 
     let settled = false
@@ -434,7 +407,8 @@ Page({
         return
       }
       this.setData({ undoingFavorite: false })
-      wx.showToast({
+      this.startUndoFavoriteWindow()
+      if (isPageNativeActionActive(this, feedbackAction)) wx.showToast({
         title: formatToastTitle(message, "撤销失败"),
         icon: "none"
       })
@@ -457,7 +431,8 @@ Page({
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
           this.setData({ undoingFavorite: false })
-          wx.showToast({
+          this.startUndoFavoriteWindow()
+          if (isPageNativeActionActive(this, feedbackAction)) wx.showToast({
             title: formatToastTitle(result && result.message, "撤销失败"),
             icon: "none"
           })
@@ -466,12 +441,13 @@ Page({
         const nextList = this.data.list.filter((item) => item.id !== vehicleId)
         nextList.splice(Math.min(Math.max(Number(undo.index) || 0, 0), nextList.length), 0, undo.car)
         this.applyFavoriteList(nextList, { availableOnly: this.data.availableOnly })
+        this.invalidateFavoritePagination()
         if (this._undoFavoriteTimer) {
           clearTimeout(this._undoFavoriteTimer)
           this._undoFavoriteTimer = null
         }
         this.setData({ undoFavorite: null, undoingFavorite: false })
-        wx.showToast({ title: "已恢复收藏", icon: "success" })
+        if (isPageNativeActionActive(this, feedbackAction)) wx.showToast({ title: "已恢复收藏", icon: "success" })
       },
       fail: (error) => {
         handleFailure(error && (error.errMsg || error.message))
@@ -483,6 +459,15 @@ Page({
     } catch (error) {
       handleFailure(error && (error.errMsg || error.message))
     }
+  },
+
+  startUndoFavoriteWindow() {
+    if (this._undoFavoriteTimer) clearTimeout(this._undoFavoriteTimer)
+    if (!this.data.undoFavorite) return
+    this._undoFavoriteTimer = setTimeout(() => {
+      this._undoFavoriteTimer = null
+      this.setData({ undoFavorite: null })
+    }, 5000)
   },
 
   clearFavoriteRemoveTimer() {
@@ -521,18 +506,33 @@ Page({
     this.setData(patch)
   },
 
+  invalidateFavoritePagination() {
+    // Removing or restoring a row shifts offset pages on the server. Refresh
+    // from page zero before the next append so a boundary row cannot be skipped.
+    this._favoritesPaginationDirty = true
+    try {
+      if (typeof wx.setStorageSync === "function") wx.setStorageSync("favorites_last_snapshot", this.data.list.slice(0, this.data.pageSize))
+    } catch (error) {}
+  },
+
   fetchList(options) {
     const input = options && typeof options === "object" ? options : {}
-    const append = Boolean(input.append)
+    if (this.data.removingId || this.data.undoingFavorite) {
+      if (typeof input.done === "function") input.done()
+      return
+    }
+    const append = Boolean(input.append) && !this._favoritesPaginationDirty
     const nextPage = append ? this.data.page + 1 : 0
     const requestId = Number(this._favoritesRequestId || 0) + 1
     this._favoritesRequestId = requestId
     this.finishFavoritesLoadEffects()
 
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
+      if (!append) this._favoritesPaginationDirty = true
       this.setData({
         initialLoading: false,
         loading: false,
+        loadedOnce: true,
         loadError: "云能力未初始化"
       })
       if (typeof input.done === "function") {
@@ -566,13 +566,7 @@ Page({
         loadedOnce: true,
         loadError: String(message || "收藏列表加载失败")
       })
-      if (!append) {
-        this.applyFavoriteList([], {
-          availableOnly: this.data.availableOnly,
-          page: 0,
-          hasMore: false
-        })
-      }
+      if (!append) this._favoritesPaginationDirty = true
     }
 
     this._favoritesLoadTimer = setTimeout(() => {
@@ -586,29 +580,21 @@ Page({
         pageSize: this.data.pageSize
       },
       success: (res) => {
+        const result = res && res.result ? res.result : null
+        if (!result || !result.ok) {
+          handleFailure((result && result.message) || "收藏列表加载失败")
+          return
+        }
+        if (!Array.isArray(result.list) || result.list.some((car) => !car || typeof car.id !== "string" || !car.id.trim())) {
+          handleFailure("收藏列表数据异常，请重新加载")
+          return
+        }
         if (!finishRequest()) {
           return
         }
-        const result = res && res.result ? res.result : null
-        if (!result || !result.ok) {
-          const nextList = append ? this.data.list : []
-          this.setData({
-            initialLoading: false,
-            loading: false,
-            loadedOnce: true,
-            loadError: (result && result.message) || "收藏列表加载失败"
-          })
-          if (!append) {
-            this.applyFavoriteList(nextList, {
-              availableOnly: this.data.availableOnly,
-              page: 0,
-              hasMore: false
-            })
-          }
-          return
-        }
-        const list = Array.isArray(result.list) ? result.list : []
-        const nextList = append ? this.data.list.concat(list) : list
+        const list = result.list
+        const nextList = Array.from(new Map((append ? this.data.list.concat(list) : list).map((car) => [car.id, car])).values())
+        this._favoritesPaginationDirty = false
         if (!append && typeof wx !== "undefined" && typeof wx.setStorageSync === "function") {
           try { wx.setStorageSync("favorites_last_snapshot", nextList) } catch (e) {}
         }

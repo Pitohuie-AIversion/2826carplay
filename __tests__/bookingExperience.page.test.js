@@ -39,6 +39,7 @@ describe("预约表单人性化体验", () => {
     jest.useRealTimers()
     delete global.Page
     delete global.wx
+    delete global.getCurrentPages
   })
 
   test("城市列表加载后不再静默选择第一个城市", () => {
@@ -181,6 +182,52 @@ describe("预约表单人性化体验", () => {
     })
     expect(page.data.loadError).toBe(true)
     expect(page.data.carName).toBe("")
+  })
+
+  test("车辆和预约提交在后台完成时不改前台标题，返回后恢复最新标题", () => {
+    jest.useFakeTimers()
+    const requests = []
+    global.wx = {
+      cloud: { callFunction: jest.fn((request) => requests.push(request)) },
+      setNavigationBarTitle: jest.fn(),
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition())
+    let stack = [page]
+    global.getCurrentPages = () => stack
+    page.data.carId = "vehicle-background"
+    page.applyCar({ name: "原车辆", location: "杭州" })
+    page.loadBookingCar(page.data.carId)
+    wx.setNavigationBarTitle.mockClear()
+    stack = [page, { route: "pages/content-page/content-page" }]
+    requests[0].success({ result: { ok: true, car: { name: "最新车辆", location: "杭州" } } })
+    expect(page.data.loadingCar).toBe(false)
+    expect(page.data.carName).toBe("最新车辆")
+    expect(wx.setNavigationBarTitle).not.toHaveBeenCalled()
+
+    stack = [page]
+    page.onShow()
+    expect(wx.setNavigationBarTitle).toHaveBeenLastCalledWith({ title: "最新车辆 预约" })
+    page.data.privacyAgreed = true
+    page.data.form = {
+      userName: "张先生", phone: "13800138000", startDate: "2099-08-10",
+      endDate: "2099-08-12", city: "杭州", note: ""
+    }
+    page.handleSubmit()
+    const submitRequest = requests.find((request) => request.name === "bookingCreate")
+    expect(submitRequest).toBeDefined()
+    stack = [page, { route: "pages/content-page/content-page" }]
+    wx.setNavigationBarTitle.mockClear()
+    submitRequest.success({ result: { ok: true, id: "booking-background" } })
+    expect(page.data.submitSuccess).toBe(true)
+    expect(page.data.isSubmitting).toBe(false)
+    expect(wx.setNavigationBarTitle).not.toHaveBeenCalled()
+
+    stack = [page]
+    page.onShow()
+    expect(wx.setNavigationBarTitle).toHaveBeenLastCalledWith({ title: "预约已提交" })
+    page.onUnload()
+    expect(jest.getTimerCount()).toBe(0)
   })
 
   test("预约提交无响应时恢复按钮并忽略迟到成功", () => {

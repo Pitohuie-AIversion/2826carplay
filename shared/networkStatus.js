@@ -8,9 +8,11 @@
 let isListening = false
 let isConnected = true
 let networkType = "unknown"
+let statusRevision = 0
 const reconnectListeners = new Set()
 
 function handleNetworkStatusChange(res) {
+  statusRevision += 1
   const previousConnected = isConnected
   isConnected = Boolean(res && res.isConnected)
   networkType = String((res && res.networkType) || "unknown")
@@ -32,9 +34,11 @@ function initNetworkStatusListener() {
   if (typeof wx === "undefined") return
 
   if (typeof wx.getNetworkType === "function") {
+    const initialRevision = statusRevision
     try {
       wx.getNetworkType({
         success: (res) => {
+          if (initialRevision !== statusRevision) return
           networkType = String((res && res.networkType) || "unknown")
           isConnected = networkType !== "none"
         }
@@ -75,6 +79,7 @@ function getNetworkState() {
 
 // 供测试环境重置与触发
 function _resetForTesting() {
+  statusRevision += 1
   isListening = false
   isConnected = true
   networkType = "unknown"

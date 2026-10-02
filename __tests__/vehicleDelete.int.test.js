@@ -18,11 +18,17 @@ function createMockDb({ rolesData, currentData, currentError = null, removeResul
   const bookingsLimit = jest.fn(() => ({ get: bookingsGet }))
   const bookingsWhere = jest.fn(() => ({ limit: bookingsLimit }))
 
+  const queueSet = jest.fn().mockResolvedValue({})
+  const queueUpdate = jest.fn().mockResolvedValue({})
   const db = {
+    runTransaction: jest.fn((callback) => callback(require("wx-server-sdk").database())),
+    command: { neq: (value) => ({ $ne: value }) },
+    serverDate: () => ({ __type: "serverDate" }),
     collection: jest.fn((name) => {
       if (name === "roles") {
         return { where: rolesWhere }
       }
+      if (name === "pending_file_deletions") return { doc: () => ({ get: async () => ({ data: null }), set: queueSet, update: queueUpdate }) }
       if (name === "vehicles") {
         return { doc: vehiclesDoc }
       }
@@ -50,6 +56,7 @@ async function loadVehicleDeleteWith({ openid, mockDb }) {
   jest.resetModules()
   const freshCloud = require("wx-server-sdk")
   freshCloud.__reset()
+  freshCloud.deleteFile.mockImplementation(async ({ fileList }) => ({ fileList: fileList.map((fileID) => ({ fileID, status: 0 })) }))
   freshCloud.__setMockContext({ OPENID: openid })
   freshCloud.__setMockDb(mockDb)
 

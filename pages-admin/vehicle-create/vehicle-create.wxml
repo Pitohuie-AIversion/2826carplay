@@ -151,6 +151,7 @@
             <view class="picker-arrow" aria-hidden="true"><view class="picker-chevron"></view></view>
           </view>
         </picker>
+        <view wx:if="{{form.transmission}}" class="section-helper" data-field="transmission" bindtap="handleClearOptionalField" hover-class="control-hover" aria-role="button" aria-label="清空变速箱">清空变速箱</view>
       </view>
       <view class="form-item form-item-half">
         <view class="form-label">燃油类型</view>
@@ -160,6 +161,7 @@
             <view class="picker-arrow" aria-hidden="true"><view class="picker-chevron"></view></view>
           </view>
         </picker>
+        <view wx:if="{{form.fuelType}}" class="section-helper" data-field="fuelType" bindtap="handleClearOptionalField" hover-class="control-hover" aria-role="button" aria-label="清空燃油类型">清空燃油类型</view>
       </view>
     </view>
     <view class="form-item">
@@ -181,6 +183,12 @@
       />
       <view class="section-helper">此内容会显示在首页和车辆详情，请勿填写内部档案信息。</view>
     </view>
+    <view class="form-item">
+      <view class="form-label field-label-row"><text>人工用车提示</text><text class="field-counter">{{form.publicDrivingTips.length}} / 500</text></view>
+      <textarea class="form-textarea" placeholder="填写取还车、操作或使用注意事项" placeholder-class="input-placeholder" value="{{form.publicDrivingTips}}" maxlength="500" data-field="publicDrivingTips" disabled="{{isSubmitting}}" bindinput="handleTextInput" aria-label="人工用车提示" />
+      <view class="section-helper">保存后会在车辆详情展示，请填写本车实际适用的提示。</view>
+    </view>
+
   </view>
   <view class="form-card">
     <view class="section-heading">
@@ -214,6 +222,7 @@
             <view class="picker-arrow" aria-hidden="true"><view class="picker-chevron"></view></view>
           </view>
         </picker>
+        <view wx:if="{{form.performance.drivetrain}}" class="section-helper" data-field="performance.drivetrain" bindtap="handleClearOptionalField" hover-class="control-hover" aria-role="button" aria-label="清空驱动方式">清空驱动方式</view>
       </view>
       <view class="form-item form-item-half">
         <view class="form-label">最大扭矩</view>
@@ -252,6 +261,20 @@
     </view>
     <view class="form-divider"></view>
     <view class="section-helper">选填信息 · 仅用于内部档案，不会在前台展示</view>
+    <view class="form-item">
+      <view class="form-label">保养到期日</view>
+      <picker mode="date" value="{{form.archiveDate}}" data-field="archiveDate" disabled="{{isSubmitting}}" bindchange="handleDueDateChange" aria-label="选择保养到期日">
+        <view class="form-picker" hover-class="vehicle-picker-pressed"><text>{{form.archiveDate || '未填写'}}</text><view class="picker-arrow" aria-hidden="true"><view class="picker-chevron"></view></view></view>
+      </picker>
+      <view wx:if="{{form.archiveDate}}" class="section-helper" data-field="archiveDate" bindtap="handleClearOptionalField" hover-class="control-hover" aria-role="button" aria-label="清空保养到期日">清空日期</view>
+    </view>
+    <view class="form-item">
+      <view class="form-label">年检到期日</view>
+      <picker mode="date" value="{{form.archiveReview}}" data-field="archiveReview" disabled="{{isSubmitting}}" bindchange="handleDueDateChange" aria-label="选择年检到期日">
+        <view class="form-picker" hover-class="vehicle-picker-pressed"><text>{{form.archiveReview || '未填写'}}</text><view class="picker-arrow" aria-hidden="true"><view class="picker-chevron"></view></view></view>
+      </picker>
+      <view wx:if="{{form.archiveReview}}" class="section-helper" data-field="archiveReview" bindtap="handleClearOptionalField" hover-class="control-hover" aria-role="button" aria-label="清空年检到期日">清空日期</view>
+    </view>
     <view class="form-item">
       <view class="form-label">VIN</view>
       <input class="form-input" placeholder="选填，最多 32 位" placeholder-class="input-placeholder" value="{{form.vin}}" maxlength="32" data-field="vin" disabled="{{isSubmitting}}" bindinput="handleTextInput" confirm-type="done" aria-label="车辆识别码 VIN" />

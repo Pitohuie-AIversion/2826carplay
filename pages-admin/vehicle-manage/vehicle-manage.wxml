@@ -28,7 +28,7 @@
         aria-label="车辆管理搜索关键词"
         value="{{keyword}}"
           bindinput="handleKeywordInput"
-          bindconfirm="handleKeywordConfirm"
+          bindconfirm="handleSearchConfirm"
           maxlength="40"
           confirm-type="search"
         />

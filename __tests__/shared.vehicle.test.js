@@ -82,6 +82,27 @@ describe("shared/vehicle.js registerDate", () => {
 })
 
 describe("shared/vehicle.js validateVehicle", () => {
+  test("用车提示与到期日接受保存和清空，并拒绝非法日期和超长提示", () => {
+    const base = { plateNumber: "京A12345", vehicleType: "sedan", brandModel: "Toyota", registerDate: "2020-01-01", status: "idle" }
+    const fields = { publicDrivingTips: "取车时确认充电余量", archiveDate: "2027-01-01", archiveReview: "2028-02-29" }
+    expect(validateVehicle({ ...base, ...fields }).value).toMatchObject(fields)
+    expect(validateVehicle({ ...base, publicDrivingTips: "", archiveDate: "", archiveReview: "" }).value).toMatchObject({ publicDrivingTips: "", archiveDate: "", archiveReview: "" })
+    const invalid = validateVehicle({ ...base, publicDrivingTips: "x".repeat(501), archiveDate: "2027-02-29", archiveReview: "2027-13-01" })
+    expect(invalid.ok).toBe(false)
+    expect(invalid.details.errors.map((item) => item.field)).toEqual(expect.arrayContaining(["publicDrivingTips", "archiveDate", "archiveReview"]))
+    expect(validateVehicle(base).value).not.toHaveProperty("archiveDate")
+  })
+
+  test("性能配置显式空对象会清空全部字段，超限配置不能被悄悄丢弃", () => {
+    const base = { plateNumber: "京A12345", vehicleType: "sedan", brandModel: "Toyota", registerDate: "2020-01-01", status: "idle" }
+    expect(validateVehicle({ ...base, performance: {} }).value.performance).toEqual({ acceleration: "", horsepower: "", drivetrain: "", torque: "", highlights: [] })
+    expect(validateVehicle(base).value).not.toHaveProperty("performance")
+    expect(validateVehicle({ ...base, performance: { horsepower: "300千瓦" } }).ok).toBe(true)
+    expect(validateVehicle({ ...base, performance: "bad" }).ok).toBe(false)
+    expect(validateVehicle({ ...base, performance: { highlights: ["x".repeat(21)] } }).ok).toBe(false)
+    expect(validateVehicle({ ...base, performance: { highlights: Array(9).fill("配置") } }).ok).toBe(false)
+  })
+
   test("validateVehicle rejects missing required fields", () => {
     const res = validateVehicle({})
     expect(res.ok).toBe(false)

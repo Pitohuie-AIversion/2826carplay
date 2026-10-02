@@ -30,6 +30,7 @@ describe("pages/booking-manage workflow filters", () => {
     jest.useRealTimers()
     delete global.Page
     delete global.wx
+    delete global.getApp
   })
 
   test("ignores share callbacks after the booking management page unloads", () => {
@@ -51,6 +52,33 @@ describe("pages/booking-manage workflow filters", () => {
     shareOptions.fail(new Error("share failed"))
 
     expect(global.wx.showToast).not.toHaveBeenCalled()
+  })
+
+  test("清空城市配置移除旧筛选项并显式重读全部城市", () => {
+    let configRequest
+    global.getApp = () => ({ globalData: {} })
+    global.wx = {
+      showToast: jest.fn(),
+      cloud: {
+        callFunction: jest.fn((options) => {
+          if (options.name === "operationConfigGet") configRequest = options
+        })
+      }
+    }
+    const definition = loadPageDefinition()
+    expect(definition.data.cityOptions).toEqual([{ value: "all", label: "全部城市" }])
+    const page = createPage(definition, {
+      currentCity: "上海",
+      cityOptions: [{ value: "all", label: "全部城市" }, { value: "上海", label: "上海" }]
+    })
+    page.fetchList = jest.fn()
+    page.onLoad()
+    page.data.pageAuthorized = true
+    configRequest.success({ result: { ok: true, config: { cityOptions: [] } } })
+    expect(page.data.cityOptions).toEqual([{ value: "all", label: "全部城市" }])
+    expect(page.data.currentCity).toBe("all")
+    expect(page.fetchList).toHaveBeenCalledWith({ city: "" })
+    page.onUnload()
   })
 
   test("预约管理列表无回调时超时收尾并忽略迟到结果", () => {
@@ -136,7 +164,7 @@ describe("pages/booking-manage workflow filters", () => {
     expect(page.data.list[0].id).toBe("fresh")
   })
 
-  test("预约导出全链路超时后删除迟到写入的文件", () => {
+  test("预约导出全链路超时后删除迟到写入的文件", async () => {
     jest.useFakeTimers()
     let exportRequest
     let writeOptions
@@ -184,8 +212,11 @@ describe("pages/booking-manage workflow filters", () => {
     })
 
     writeOptions.success()
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
     expect(unlink).toHaveBeenCalledWith(expect.objectContaining({
-      filePath: "/data/bookings.csv"
+      filePath: writeOptions.filePath
     }))
     expect(page.data.exportFilePath).toBe("")
   })
@@ -449,6 +480,8 @@ describe("pages/booking-manage workflow filters", () => {
     expect(page.data.currentCity).toBe("上海")
     expect(listCall).not.toBeNull()
     expect(listCall.data.city).toBe("上海")
+    page.onUnload()
+    expect(page._bookingListRequestTimer).toBeNull()
   })
 })
 

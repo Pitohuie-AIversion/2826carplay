@@ -8,7 +8,7 @@ const GUIDE_FIELDS = {
   scenario: true, vehicleIds: true, tags: true, shareTitle: true, status: true,
   publishedAt: true, updatedAt: true
 }
-const VEHICLE_FIELDS = { brandModel: true, name: true, coverImage: true, images: true, status: true }
+const VEHICLE_FIELDS = { brandModel: true, name: true, coverImage: true, imageList: true, status: true }
 
 function toTimestamp(value) {
   if (!value) return 0
@@ -23,7 +23,7 @@ async function readVehicle(id) {
     const res = await db.collection("vehicles").doc(id).field(VEHICLE_FIELDS).get()
     const item = res && res.data
     if (!item || item.status === "retired") return null
-    const images = Array.isArray(item.images) ? item.images : []
+    const images = Array.isArray(item.imageList) ? item.imageList.filter(Boolean) : []
     return {
       id,
       name: String(item.brandModel || item.name || "车辆"),

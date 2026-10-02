@@ -1,4 +1,5 @@
 const cloud = require("wx-server-sdk")
+const { normalizeServiceConfig, validateServiceConfig, validateCityOptions } = require("./serviceConfig")
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
@@ -12,32 +13,32 @@ const AUTH_ROLE_FIELDS = {
 }
 const OPERATION_CONFIG_UPDATE_FIELDS = {
   _id: true,
-  value: true
+  key: true,
+  value: true,
+  revision: true
 }
 const CONFIG_KEY = "operation_settings"
-const LEGACY_GARAGE_SUBTITLE = "后台车辆资料已接入首页展示，上传封面后会同步展示到车库首页"
 const DEFAULT_RENTAL_TERMS = {
-  includedText: "基础日租仅包含车辆使用费，其他项目会在正式报价前单独列明。",
-  protectionText: "基础保障内容根据车型与租期确认，不默认包含额外保障服务。",
-  serviceFeeText: "如有车辆整备或门店服务费，将在报价明细中单独列示。",
-  deliveryFeeText: "取送车服务及费用按城市、距离和时段确认，无该服务时不收费。",
-  depositText: "车辆押金与违章押金的金额、支付方式和退还时间会在确认前明确告知。",
-  cancellationText: "预约提交后可取消；顾问确认后的取消或改期规则以有效报价说明为准。",
-  overtimeText: "超时用车费用按最终确认的计费规则执行，产生前由顾问说明。",
-  energyText: "取还车油量或电量标准会在交付前确认，并以交接记录为准。",
-  estimateDisclaimer: "页面价格为基础日租参考，不是正式报价，提交预约也不会自动锁定车辆。"
+  includedText: "",
+  protectionText: "",
+  serviceFeeText: "",
+  deliveryFeeText: "",
+  depositText: "",
+  cancellationText: "",
+  overtimeText: "",
+  energyText: "",
+  estimateDisclaimer: ""
 }
 const DEFAULT_CONFIG = {
+  ...normalizeServiceConfig({}),
   brandName: "极境车库",
-  servicePhone: "15715710090",
+  servicePhone: "",
   mineUserDesc: "查看预约、个人信息申请与车库服务",
   garagePageTitle: "极境车库",
   garagePageSubtitle: "甄选座驾，为每一次出发预留专属席位",
   cityOptions: ["杭州", "上海"],
-  faqContent:
-    "1. 预约提交后，客服会尽快联系您确认档期与细节。\n2. 车辆价格、押金与取还车规则以最终沟通结果为准。\n3. 如需取消预约，可前往【我的预约】操作。",
-  rulesContent:
-    "1. 车辆展示信息仅供参考，具体以客服最终确认为准。\n2. 预约不代表最终成交，需以档期、资质与规则审核结果为准。\n3. 平台保留对异常预约、恶意占用档期等行为的处理权利。",
+  faqContent: "",
+  rulesContent: "",
   bookingStatusTemplateId: "",
   rentalTerms: DEFAULT_RENTAL_TERMS,
   bookingPrivacyTip:
@@ -79,15 +80,16 @@ function normalizeConfig(raw) {
     : DEFAULT_CONFIG.cityOptions.slice()
 
   return {
+    ...normalizeServiceConfig(input),
     brandName: normalizeText(input.brandName, 20) || DEFAULT_CONFIG.brandName,
-    servicePhone: normalizeText(input.servicePhone, 20) || DEFAULT_CONFIG.servicePhone,
+    servicePhone: normalizeText(input.servicePhone, 20),
     mineUserDesc: normalizeText(input.mineUserDesc, 80) || DEFAULT_CONFIG.mineUserDesc,
     garagePageTitle: normalizeText(input.garagePageTitle, 20) || DEFAULT_CONFIG.garagePageTitle,
     garagePageSubtitle:
-      !garagePageSubtitle || garagePageSubtitle === LEGACY_GARAGE_SUBTITLE
+      !garagePageSubtitle
         ? DEFAULT_CONFIG.garagePageSubtitle
         : garagePageSubtitle,
-    cityOptions: cityOptions.length ? cityOptions : DEFAULT_CONFIG.cityOptions.slice(),
+    cityOptions,
     faqContent: normalizeText(input.faqContent, 1000) || DEFAULT_CONFIG.faqContent,
     rulesContent: normalizeText(input.rulesContent, 1000) || DEFAULT_CONFIG.rulesContent,
     bookingStatusTemplateId: normalizeText(input.bookingStatusTemplateId, 128),
@@ -193,7 +195,7 @@ async function writeErrorLogBestEffort(payload) {
 exports.main = async (event) => {
   const wxContext = cloud.getWXContext()
   const openid = wxContext && wxContext.OPENID ? wxContext.OPENID : ""
-  const config = normalizeConfig(event && event.config)
+  const input = event && event.config
 
   try {
     const allowed = await isAdminOpenid(openid)
@@ -205,81 +207,130 @@ exports.main = async (event) => {
       }
     }
 
-    if (!isValidServicePhone(config.servicePhone)) {
-      return {
-        ok: false,
-        code: "VALIDATION_ERROR",
-        message: "客服电话格式不正确",
-        details: {
-          errors: [
-            {
-              field: "servicePhone",
-              message: "客服电话仅支持数字、连字符和可选的国际区号"
-            }
-          ]
-        }
-      }
+    if (!input || typeof input !== "object" || Array.isArray(input)) {
+      return { ok: false, code: "VALIDATION_ERROR", message: "配置格式不正确" }
     }
-
-    if (
-      config.bookingStatusTemplateId &&
-      !/^[A-Za-z0-9_-]{10,128}$/.test(config.bookingStatusTemplateId)
-    ) {
-      return {
-        ok: false,
-        code: "VALIDATION_ERROR",
-        message: "订阅消息模板 ID 格式不正确",
-        details: {
-          errors: [
-            {
-              field: "bookingStatusTemplateId",
-              message: "模板 ID 仅支持 10-128 位字母、数字、下划线和连字符"
-            }
-          ]
-        }
-      }
+    const expectedRevision = event.expectedRevision
+    if (expectedRevision !== undefined && (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0)) {
+      return { ok: false, code: "VALIDATION_ERROR", message: "配置版本不正确，请重新加载" }
     }
-
-    const existedRes = await db
-      .collection("app_configs")
-      .where({ key: CONFIG_KEY })
-      .field(OPERATION_CONFIG_UPDATE_FIELDS)
-      .limit(1)
-      .get()
+    const existedRes = await db.collection("app_configs").where({ key: CONFIG_KEY })
+      .field(OPERATION_CONFIG_UPDATE_FIELDS).limit(2).get()
     const existedList = existedRes && Array.isArray(existedRes.data) ? existedRes.data : []
-    const existed = existedList.length ? existedList[0] : null
-    const now = db.serverDate()
-    const payload = {
-      key: CONFIG_KEY,
-      value: config,
-      updatedAt: now,
-      updatedByOpenid: openid
+    if (existedList.length > 1) {
+      return { ok: false, code: "CONFIG_CONFLICT", message: "存在重复运营配置，请管理员核对后重试" }
     }
+    // Keep an existing legacy document ID; only a genuinely empty collection uses the stable ID.
+    const configId = existedList.length ? existedList[0]._id : CONFIG_KEY
+    const outcome = await db.runTransaction(async (transaction) => {
+      const ref = transaction.collection("app_configs").doc(configId)
+      let existed = null
+      try {
+        const currentResult = await ref.field(OPERATION_CONFIG_UPDATE_FIELDS).get()
+        existed = currentResult && currentResult.data || null
+      } catch (error) {
+        const message = String(error && (error.errMsg || error.message || error.code) || error)
+        if (!/document.*(?:not found|not exist)|DOCUMENT_NOT_FOUND|DATABASE_DOCUMENT_NOT_EXIST/i.test(message)) throw error
+      }
+      if (existed && existed.key !== CONFIG_KEY) {
+        return { ok: false, code: "CONFIG_CONFLICT", message: "配置记录已变化，请重新加载" }
+      }
+      if (!existed && existedList.length) {
+        return { ok: false, code: "CONFIG_CONFLICT", message: "配置记录已变化，请重新加载" }
+      }
+      const revision = Number.isSafeInteger(existed && existed.revision) ? existed.revision : 0
+      const previous = existed && existed.value || {}
+      // Preserve omitted fields for older clients; an explicit empty value clears optional fields.
+      const merged = { ...previous, ...input, rentalTerms: { ...previous.rentalTerms, ...input.rentalTerms } }
+      const serviceError = validateServiceConfig(merged) || validateCityOptions(merged.cityOptions)
+      if (serviceError) {
+        return { ok: false, code: "VALIDATION_ERROR", message: serviceError.message, details: { errors: [serviceError] } }
+      }
+      const config = normalizeConfig(merged)
+      // A successful save must also persist normalization of legacy values and missing fields.
+      // Comparing two normalized copies would report success while leaving the old record intact.
+      const changedKeys = diffConfig(previous, config)
+      if (existed && changedKeys.length === 0) {
+        return { ok: true, config, revision, updated: false, message: "运营配置已保存" }
+      }
+      if (expectedRevision === undefined && revision > 0) {
+        return { ok: false, code: "CONFIG_VERSION_REQUIRED", message: "请更新小程序并重新加载配置后保存" }
+      }
+      if (expectedRevision !== undefined && expectedRevision !== revision) {
+        return { ok: false, code: "CONFIG_CONFLICT", message: "配置已被其他管理员修改，请重新加载后核对" }
+      }
 
-    if (existedList.length) {
-      await db.collection("app_configs").doc(existedList[0]._id).update({
-        data: payload
-      })
-    } else {
-      await db.collection("app_configs").add({
-        data: {
-          ...payload,
-          createdAt: now,
-          createdByOpenid: openid
+      if (config.servicePhone && !isValidServicePhone(config.servicePhone)) {
+        return {
+          ok: false,
+          code: "VALIDATION_ERROR",
+          message: "客服电话格式不正确",
+          details: {
+            errors: [
+              {
+                field: "servicePhone",
+                message: "客服电话仅支持数字、连字符和可选的国际区号"
+              }
+            ]
+          }
         }
-      })
-    }
+      }
 
-    const changedKeys = diffConfig(existed && existed.value, config)
+      if (
+        config.bookingStatusTemplateId &&
+        !/^[A-Za-z0-9_-]{10,128}$/.test(config.bookingStatusTemplateId)
+      ) {
+        return {
+          ok: false,
+          code: "VALIDATION_ERROR",
+          message: "订阅消息模板 ID 格式不正确",
+          details: {
+            errors: [
+              {
+                field: "bookingStatusTemplateId",
+                message: "模板 ID 仅支持 10-128 位字母、数字、下划线和连字符"
+              }
+            ]
+          }
+        }
+      }
+
+      const now = db.serverDate()
+      const payload = {
+        key: CONFIG_KEY,
+        value: config,
+        revision: revision + 1,
+        updatedAt: now,
+        updatedByOpenid: openid
+      }
+
+      if (existed) {
+        await ref.update({
+          data: { ...payload, value: db.command.set(config) }
+        })
+      } else {
+        await ref.set({
+          data: {
+            ...payload,
+            createdAt: now,
+            createdByOpenid: openid
+          }
+        })
+      }
+      return { ok: true, config, revision: revision + 1, updated: true, changedKeys, message: "运营配置已保存" }
+    })
+    if (!outcome.ok || !outcome.updated) return outcome
     await writeAuditLogBestEffort({
       openid,
       action: "operationConfigUpdate",
-      changedKeys
+      changedKeys: outcome.changedKeys
     })
 
     return {
       ok: true,
-      config,
+      config: outcome.config,
+      revision: outcome.revision,
+      updated: true,
       message: "运营配置已保存"
     }
   } catch (error) {

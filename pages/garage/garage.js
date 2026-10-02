@@ -1,6 +1,7 @@
 const { trackEvent } = require("../../shared/analytics")
 const { sanitizeAttribution, buildQuery, hasAttribution, isShareLanding } = require("../../shared/contentAttribution")
 const { requestOperationConfig } = require("../../shared/operationConfigRequest")
+const { requestCloudRead } = require("../../shared/cloudReadRequest")
 const {
   activatePageNativeActions,
   beginPageNativeAction,
@@ -11,22 +12,26 @@ const { preloadImages, clearExpiredCache } = require("../../shared/imageCache")
 const { onNetworkReconnect } = require("../../shared/networkStatus")
 const { triggerHapticFeedback } = require("../../shared/hapticFeedback")
 const { createPerformanceHelpers } = require("../../shared/performance")
+const {
+  CATEGORY_LABEL_MAP: BASE_CATEGORY_LABEL_MAP,
+  CLIENT_VEHICLE_STATUS_TEXT_MAP,
+  CLIENT_VEHICLE_STATUS_CLASS_MAP
+} = require("../../shared/vehicleLabels")
 const mockCategories = require("../../data/categories")
 
 const DEFAULT_GARAGE_SUBTITLE = "甄选座驾，为每一次出发预留专属席位"
-const LEGACY_GARAGE_SUBTITLE = "后台车辆资料已接入首页展示，上传封面后会同步展示到车库首页"
 const GARAGE_LOAD_TIMEOUT_MS = 15 * 1000
 const SEARCH_DEBOUNCE_MS = 250
+const SNAPSHOT_MAX_AGE_MS = 60 * 1000
 
-const CATEGORY_LABEL_MAP = {
-  all: "全部",
-  luxury_sedan: "豪华轿车",
-  city_suv: "城市SUV",
-  offroad: "硬派越野",
-  supercar: "超级跑车",
-  commuter_ev: "代步电车",
-  pickup: "皮卡"
+function garageQueryKey(filters) {
+  return JSON.stringify([
+    filters.category || "all", filters.city || "", filters.keyword || "",
+    filters.availableOnly === true, filters.sortBy || "default"
+  ])
 }
+
+const CATEGORY_LABEL_MAP = Object.assign({}, BASE_CATEGORY_LABEL_MAP)
 
 mockCategories.forEach((item) => {
   CATEGORY_LABEL_MAP[item.id] = item.name
@@ -51,19 +56,12 @@ function normalizeGarageStatus(status) {
 
 function getStatusText(status, fallbackText) {
   const normalizedStatus = normalizeGarageStatus(status)
-  const statusTextMap = {
-    idle: "可预约",
-    active: "使用中",
-    maintenance: "维护中",
-    reserved: "已预约"
-  }
-
-  return statusTextMap[normalizedStatus] || fallbackText || "可预约"
+  return CLIENT_VEHICLE_STATUS_TEXT_MAP[normalizedStatus] || fallbackText || "可预约"
 }
 
 function normalizeGarageSubtitle(value, fallback) {
   const subtitle = String(value || "").trim()
-  if (!subtitle || subtitle === LEGACY_GARAGE_SUBTITLE) {
+  if (!subtitle) {
     return fallback || DEFAULT_GARAGE_SUBTITLE
   }
 
@@ -72,18 +70,11 @@ function normalizeGarageSubtitle(value, fallback) {
 
 function attachStatusClass(car) {
   const normalizedStatus = normalizeGarageStatus(car.status)
-  const statusClassMap = {
-    idle: "status-idle",
-    active: "status-active",
-    maintenance: "status-maintenance",
-    reserved: "status-reserved"
-  }
-
   return {
     ...car,
     garageStatus: normalizedStatus,
     statusText: getStatusText(car.status, car.statusText),
-    statusClass: statusClassMap[normalizedStatus] || "status-idle"
+    statusClass: CLIENT_VEHICLE_STATUS_CLASS_MAP[normalizedStatus] || "status-idle"
   }
 }
 
@@ -221,11 +212,11 @@ Page({
       total: 0,
       available: 0
     },
-    servicePhone: "15715710090",
+    servicePhone: "",
     currentCategory: "all",
     availableOnly: false,
     sortBy: "default",
-    cityOptions: ["杭州", "上海"],
+    cityOptions: [],
     selectedCity: "",
     searchKeyword: "",
     searchResultCount: 0,
@@ -318,8 +309,12 @@ Page({
     try {
       if (typeof wx !== "undefined" && typeof wx.getStorageSync === "function") {
         const snapshot = wx.getStorageSync("garage_last_snapshot")
-        if (snapshot && Array.isArray(snapshot.cars) && snapshot.cars.length > 0) {
-          this.applyCars(snapshot.cars, snapshot.pagination)
+        const filters = { category: this.data.currentCategory, city: this.data.selectedCity,
+          keyword: this.data.searchKeyword, availableOnly: this.data.availableOnly, sortBy: this.data.sortBy }
+        const age = snapshot && Date.now() - Number(snapshot.savedAt)
+        if (snapshot && Array.isArray(snapshot.cars) && age >= 0 && age < SNAPSHOT_MAX_AGE_MS &&
+            snapshot.filters && garageQueryKey(snapshot.filters) === garageQueryKey(filters)) {
+          this.applyCars(snapshot.cars, snapshot.pagination, filters, { persist: false, savedAt: snapshot.savedAt })
         }
       }
     } catch (e) {}
@@ -354,7 +349,7 @@ Page({
       }
       return
     }
-    this.loadOperationConfig()
+    this.loadOperationConfig({ force: true })
     this.loadContentGuides()
     this.loadCars({
       force: true,
@@ -370,24 +365,20 @@ Page({
     this.handleLoadMore()
   },
 
-  onUnload() {
-    if (typeof this._unsubscribeNetwork === "function") {
-      this._unsubscribeNetwork()
-      this._unsubscribeNetwork = null
-    }
-  },
-
   loadContentGuides() {
-    if (!wx.cloud || typeof wx.cloud.callFunction !== "function") return
-    wx.cloud.callFunction({
+    if (this._cancelContentGuidesRequest) this._cancelContentGuidesRequest()
+    this._cancelContentGuidesRequest = requestCloudRead({
       name: "contentGuideList",
       data: { limit: 4 },
-      success: (res) => {
-        const result = res && res.result
-        if (result && result.ok && Array.isArray(result.list)) {
+      onSuccess: (result) => {
+        if (Array.isArray(result.list)) {
           this._lastGuidesLoadedAt = Date.now()
           this.setData({ contentGuides: result.list })
         }
+      },
+      onFailure: () => {
+        this._lastGuidesLoadedAt = 0
+        this.setData({ contentGuides: [] })
       }
     })
   },
@@ -396,7 +387,7 @@ Page({
     const contentId = String(event.currentTarget.dataset.id || "").trim()
     const scene = String(event.currentTarget.dataset.scene || "").trim()
     if (!contentId) return
-    const action = beginPageNativeAction(this)
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.navigateTo({
       url: `/pages/content-page/content-page?${buildQuery({ contentId, scene, channel: "direct" })}`,
       fail: () => {
@@ -405,19 +396,27 @@ Page({
     })
   },
 
-  loadOperationConfig() {
+  loadOperationConfig(options) {
     this.cancelOperationConfigRequest()
     this._cancelOperationConfigRequest = requestOperationConfig({
+      force: Boolean(options && options.force),
       onSuccess: (config) => {
         const nextState = {
           pageTitle: config.garagePageTitle || this.data.pageTitle,
           pageSubtitle: normalizeGarageSubtitle(config.garagePageSubtitle, this.data.pageSubtitle),
-          servicePhone: config.servicePhone || this.data.servicePhone
+          servicePhone: String(config.servicePhone || "").trim()
         }
-        if (Array.isArray(config.cityOptions) && config.cityOptions.length) {
+        if (Array.isArray(config.cityOptions)) {
           nextState.cityOptions = config.cityOptions
         }
+        const resetCity = Array.isArray(config.cityOptions) && this.data.selectedCity &&
+          !config.cityOptions.includes(this.data.selectedCity)
+        if (resetCity) nextState.selectedCity = ""
         this.applyState(nextState)
+        if (resetCity) this.loadCars({ force: true, city: "" })
+      },
+      onFailure: () => {
+        this.applyState({ servicePhone: "" })
       }
     })
   },
@@ -471,6 +470,7 @@ Page({
 
     const requestId = Number(this._carsRequestId || 0) + 1
     this._carsRequestId = requestId
+    const feedbackAction = beginPageNativeAction(this, { requireCurrent: true })
     let settled = false
     const finishRequest = () => {
       if (settled || this._carsRequestId !== requestId) {
@@ -487,7 +487,7 @@ Page({
       }
       if (append) {
         this.applyState({ loadingCars: false })
-        wx.showToast({
+        if (isPageNativeActionActive(this, feedbackAction)) wx.showToast({
           title: "加载超时，请重试",
           icon: "none"
         })
@@ -504,7 +504,7 @@ Page({
         this.applyState({
           loadingCars: false
         })
-        wx.showToast({
+        if (isPageNativeActionActive(this, feedbackAction)) wx.showToast({
           title: "加载更多失败",
           icon: "none"
         })
@@ -523,6 +523,7 @@ Page({
         category,
         availableOnly,
         sortBy,
+        refreshStats: force && !append,
         skipStats: append
       },
       success: (res) => {
@@ -531,27 +532,36 @@ Page({
         }
         const result = res && res.result ? res.result : null
         if (!result || !result.ok || !Array.isArray(result.list)) {
+          if (append) {
+            this.applyState({ loadingCars: false })
+            if (isPageNativeActionActive(this, feedbackAction)) wx.showToast({ title: "加载更多失败", icon: "none" })
+            return
+          }
           this.setCarsLoadError((result && result.message) || "车辆列表加载失败，请稍后重试")
           return
         }
 
-        this._lastCarsLoadedAt = Date.now()
+        if (!append) this._lastCarsLoadedAt = Date.now()
         const nextCars = append ? this.data.cars.concat(result.list) : result.list
-        this.applyCars(nextCars, {
+        const pagination = {
+          ...(append ? this._carsPagination : {}),
           page: Number.isInteger(result.page) ? result.page : nextPage,
-          total: Number(result.total) || nextCars.length,
-          truncated: Boolean(result.truncated),
-          hasMore: Boolean(result.hasMore),
-          searchedTotal: Number(result.searchedTotal),
-          categoryTotal: Number(result.categoryTotal),
-          availableCount: Number(result.availableCount),
-          categoryCounts: result.categoryCounts
-        }, {
+          hasMore: Boolean(result.hasMore)
+        }
+        for (const key of ["total", "searchedTotal", "categoryTotal", "availableCount"]) {
+          if (result[key] !== undefined && Number.isFinite(Number(result[key]))) pagination[key] = Number(result[key])
+        }
+        if (!Number.isFinite(pagination.total)) pagination.total = nextCars.length
+        if (Object.prototype.hasOwnProperty.call(result, "truncated")) pagination.truncated = Boolean(result.truncated)
+        if (result.categoryCounts && typeof result.categoryCounts === "object") pagination.categoryCounts = result.categoryCounts
+        this.applyCars(nextCars, pagination, {
           category,
           city,
           keyword,
           availableOnly,
           sortBy
+        }, {
+          savedAt: append ? this._carsSnapshotSavedAt : this._lastCarsLoadedAt
         })
       },
       fail: handleFailure
@@ -565,6 +575,7 @@ Page({
   },
 
   onUnload() {
+    if (this._cancelContentGuidesRequest) this._cancelContentGuidesRequest()
     cancelPageNativeActions(this)
     this._carsRequestId = Number(this._carsRequestId || 0) + 1
     this.cancelOperationConfigRequest()
@@ -603,6 +614,7 @@ Page({
   },
 
   setCarsLoadError(message) {
+    this._lastCarsLoadedAt = 0
     this.applyState({
       loadError: true,
       initialLoading: false,
@@ -623,7 +635,7 @@ Page({
     })
   },
 
-  applyCars(carList, pagination, filterParams) {
+  applyCars(carList, pagination, filterParams, options) {
     const uniqueCars = []
     const ids = new Set()
     ;(Array.isArray(carList) ? carList : []).forEach((car) => {
@@ -664,6 +676,8 @@ Page({
       filteredCars.sort((a, b) => (Number(b.priceDay) || 0) - (Number(a.priceDay) || 0))
     }
     const serverSummary = nextPagination
+    this._carsPagination = { ...nextPagination }
+    this._carsSnapshotSavedAt = options && Number.isFinite(options.savedAt) ? options.savedAt : Date.now()
 
     const searchResultCount = serverSummary && Number.isFinite(serverSummary.total)
       ? serverSummary.total
@@ -703,11 +717,13 @@ Page({
         preloadImages(topCovers, { priority: 30 })
       } catch (e) {}
     }
-    if (sortedCars.length > 0 && typeof wx !== "undefined" && typeof wx.setStorageSync === "function") {
+    if ((!options || options.persist !== false) && typeof wx !== "undefined" && typeof wx.setStorageSync === "function") {
       try {
         wx.setStorageSync("garage_last_snapshot", {
           cars: sortedCars,
-          pagination: serverSummary
+          pagination: serverSummary,
+          filters: { category: currentCategory, city: selectedCity, keyword: searchKeyword, availableOnly, sortBy },
+          savedAt: this._carsSnapshotSavedAt
         })
       } catch (e) {}
     }
@@ -775,9 +791,14 @@ Page({
 
   handleSearchInput(event) {
     const keyword = String((event.detail && event.detail.value) || "").slice(0, 50)
+    // Invalidate immediately; a response during the debounce window belongs to
+    // the previous query and must not replace the new input or its pagination.
+    this._carsRequestId = Number(this._carsRequestId || 0) + 1
+    this.finishCarsLoadEffects()
     this.applyState({
+      loadingCars: false,
       searchKeyword: keyword,
-      searchDebouncing: Boolean(keyword)
+      searchDebouncing: canLoadGarageRemotely()
     })
     this.filterCars(this.data.currentCategory, this.data.availableOnly, keyword, null, true, this.data.selectedCity, this.data.sortBy)
     this._initStubSearchDebounce()
@@ -787,7 +808,8 @@ Page({
   },
 
   handleSearchConfirm(event) {
-    const keyword = String((event && event.detail && event.detail.value) || this.data.searchKeyword || "").slice(0, 50)
+    const value = event && event.detail && event.detail.value
+    const keyword = String(value === undefined ? this.data.searchKeyword || "" : value).slice(0, 50)
     this.clearSearchDebounce()
     this._runFilteredCarsSearch(keyword)
   },
@@ -916,7 +938,7 @@ Page({
       } catch (e) {}
     }
 
-    const action = beginPageNativeAction(this)
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     const cityParam = this.data.selectedCity ? `&city=${encodeURIComponent(this.data.selectedCity)}` : ""
     wx.navigateTo({
       url: `/pages/car-detail/car-detail?carId=${carId}${cityParam}`,

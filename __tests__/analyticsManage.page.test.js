@@ -1,5 +1,6 @@
 ﻿const fs = require("fs")
 const path = require("path")
+const activePages = new Set()
 
 function loadPageDefinition() {
   jest.resetModules()
@@ -22,11 +23,14 @@ function createPage(definition, overrides) {
   page.setData = jest.fn((patch) => {
     Object.assign(page.data, patch)
   })
+  activePages.add(page)
   return page
 }
 
 describe("pages/analytics-manage cleanup", () => {
   afterEach(() => {
+    for (const page of activePages) page.onUnload()
+    activePages.clear()
     jest.useRealTimers()
     delete global.Page
     delete global.wx

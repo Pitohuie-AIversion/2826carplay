@@ -1,28 +1,27 @@
 const { requestOperationConfig } = require("../../shared/operationConfigRequest")
+const { requestCloudRead } = require("../../shared/cloudReadRequest")
 const { trackEvent } = require("../../shared/analytics")
 const { sanitizeAttribution, buildQuery, hasAttribution, isShareLanding } = require("../../shared/contentAttribution")
 const {
   activatePageNativeActions,
   beginPageNativeAction,
   cancelPageNativeActions,
-  isPageNativeActionActive
+  isPageNativeActionActive,
+  isPageCurrent
 } = require("../../shared/pageNativeAction")
-const { openCustomerService, hasWxKfConfig } = require("../../shared/customerService")
+const { openCustomerService, hasWxKfConfig, cancelCustomerServiceRequest } = require("../../shared/customerService")
+const { getClientVehicleStatusText } = require("../../shared/vehicleLabels")
 
 const CONTENT_MAP = {
   faq: {
     title: "常见问题",
     heroDesc: "关于预约、档期与服务流程的常见解答",
-    documentTitle: "快速了解服务问题",
-    defaultContent:
-      "1. 提交预约后多久会联系？\n客服会尽快与您确认车辆档期、价格和取还车细节，预约提交不代表最终成交。\n\n2. 页面价格是最终价格吗？\n页面展示信息用于初步了解，实际价格、押金和服务规则以顾问最终确认结果为准。\n\n3. 如何查看或取消预约？\n前往【我的 → 我的预约】即可查看处理进度；符合条件的进行中预约可在线取消。\n\n4. 收藏车辆有什么作用？\n进入车辆详情点击收藏后，可在【我的 → 我的收藏】集中查看，并快速筛选当前可预约车辆。"
+    documentTitle: "快速了解服务问题"
   },
   rules: {
     title: "平台规则",
     heroDesc: "使用极境车库服务前需要了解的约定",
-    documentTitle: "服务规则与使用约定",
-    defaultContent:
-      "1. 车辆展示\n车辆图片、配置、价格和状态用于服务介绍，具体情况以客服最终确认为准。\n\n2. 预约确认\n提交预约仅代表表达用车意向，不代表最终成交；档期、资质与规则仍需进一步确认。\n\n3. 档期与价格\n车辆档期、押金、取还车方式及最终费用以双方确认结果为准。\n\n4. 合理使用\n平台可对异常预约、重复占用档期或影响正常服务的行为进行必要处理。"
+    documentTitle: "服务规则与使用约定"
   },
   privacy: {
     title: "隐私政策",
@@ -89,22 +88,26 @@ Page({
     heroDesc: CONTENT_MAP.faq.heroDesc,
     documentTitle: CONTENT_MAP.faq.documentTitle,
     content: "",
+    contentLoading: false,
+    contentError: "",
     intro: "",
     sections: [],
     contentTabs: CONTENT_TABS,
     activeSectionKey: "",
-    servicePhone: "15715710090",
+    servicePhone: "",
     wxKfReady: false,
     guideMode: false,
     guide: null,
     relatedVehicles: [],
     guideLoading: false,
     guideError: "",
+    guideNotice: "",
     attribution: { channel: "", scene: "", contentId: "", vehicleId: "" }
   },
 
   onLoad(options) {
     activatePageNativeActions(this)
+    this._contentHasShown = false
     const attribution = sanitizeAttribution(options)
     if (attribution.contentId) {
       this.setData({
@@ -115,6 +118,7 @@ Page({
         heroDesc: "正在加载真实用车场景内容"
       })
       this.loadGuide(attribution.contentId)
+      this.loadContent("")
       if (hasAttribution(attribution) && attribution.channel && attribution.channel !== "direct" && isShareLanding()) {
         trackEvent("share_open", attribution.vehicleId, attribution)
       }
@@ -140,12 +144,28 @@ Page({
     this.loadContent(type)
   },
 
+  onShow() {
+    if (isPageCurrent(this) && typeof wx.setNavigationBarTitle === "function") {
+      wx.setNavigationBarTitle({ title: this.data.pageTitle || "服务指南" })
+    }
+    if (this._contentHasShown) this.loadContent(this.data.guideMode ? "" : this.data.type)
+    this._contentHasShown = true
+  },
+
   onUnload() {
+    if (this._cancelGuideRequest) this._cancelGuideRequest()
+    cancelCustomerServiceRequest(this)
     cancelPageNativeActions(this)
     this.cancelContentConfigRequest()
   },
 
   loadGuide(contentId) {
+    if (this._cancelGuideRequest) this._cancelGuideRequest()
+    if (this._guideContentId !== contentId) {
+      this.setData({ guide: null, relatedVehicles: [], guideLoading: true, guideError: "", guideNotice: "" })
+      this.applyContent("")
+    }
+    this._guideContentId = contentId
     try {
       if (contentId && typeof wx !== "undefined" && typeof wx.getStorageSync === "function") {
         const cached = wx.getStorageSync(`guide_${contentId}`)
@@ -158,31 +178,23 @@ Page({
             pageTitle: guide.title,
             heroDesc: guide.summary,
             documentTitle: guide.title,
-            relatedVehicles: Array.isArray(cached.vehicles) ? cached.vehicles : []
+            relatedVehicles: this.buildGuideVehicles(cached.vehicles),
+            guideNotice: "正在更新已保存的内容…"
           })
           this.applyContent(guide.body)
-          if (typeof wx.setNavigationBarTitle === "function") {
+          if (isPageCurrent(this) && typeof wx.setNavigationBarTitle === "function") {
             wx.setNavigationBarTitle({ title: guide.title })
           }
         }
       }
     } catch (e) {}
 
-    if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
-      if (!this.data.guide) {
-        this.setData({ guideLoading: false, guideError: "云能力未初始化" })
-      }
-      return
-    }
-    wx.cloud.callFunction({
+    this._cancelGuideRequest = requestCloudRead({
       name: "contentGuideDetail",
       data: { contentId },
-      success: (res) => {
-        const result = res && res.result
-        if (!result || !result.ok || !result.guide) {
-          if (!this.data.guide) {
-            this.setData({ guideLoading: false, guideError: (result && result.message) || "内容加载失败" })
-          }
+      onSuccess: (result) => {
+        if (!result.guide) {
+          this.handleGuideReadFailure({ code: "INVALID_RESULT" })
           return
         }
         const guide = result.guide
@@ -198,27 +210,51 @@ Page({
           guide,
           guideLoading: false,
           guideError: "",
+          guideNotice: "",
           pageTitle: guide.title,
           heroDesc: guide.summary,
           documentTitle: guide.title,
-          relatedVehicles: Array.isArray(result.vehicles) ? result.vehicles : [],
+          relatedVehicles: this.buildGuideVehicles(result.vehicles),
           attribution
         })
         this.applyContent(guide.body)
-        wx.setNavigationBarTitle({ title: guide.title })
+        if (isPageCurrent(this) && typeof wx.setNavigationBarTitle === "function") {
+          wx.setNavigationBarTitle({ title: guide.title })
+        }
         trackEvent("content_view", attribution.vehicleId, attribution)
       },
-      fail: () => {
-        if (!this.data.guide) {
-          this.setData({ guideLoading: false, guideError: "内容加载失败，请稍后重试" })
-        }
+      onFailure: (error) => {
+        this.handleGuideReadFailure(error)
       }
+    })
+  },
+
+  buildGuideVehicles(vehicles) {
+    return (Array.isArray(vehicles) ? vehicles : []).map((vehicle) => ({
+      ...vehicle,
+      statusText: getClientVehicleStatusText(vehicle.status, "状态待确认")
+    }))
+  },
+
+  handleGuideReadFailure(error) {
+    if (error && ["NOT_FOUND", "VALIDATION_ERROR"].includes(error.code)) {
+      try {
+        if (typeof wx.removeStorageSync === "function") wx.removeStorageSync(`guide_${this._guideContentId}`)
+      } catch (e) {}
+      this.setData({ guide: null, relatedVehicles: [], guideLoading: false, guideError: "内容已下线或尚未发布", guideNotice: "" })
+      this.applyContent("")
+      return
+    }
+    this.setData({
+      guideLoading: false,
+      guideError: this.data.guide ? "" : "内容加载失败，请重试",
+      guideNotice: this.data.guide ? "更新失败，当前为上次保存的内容。" : ""
     })
   },
 
   handleGuideRetry() {
     if (!this.data.guideLoading && this.data.attribution.contentId) {
-      this.setData({ guideLoading: true, guideError: "" })
+      this.setData({ guideLoading: !this.data.guide, guideError: "", guideNotice: "" })
       this.loadGuide(this.data.attribution.contentId)
     }
   },
@@ -238,7 +274,7 @@ Page({
     const attribution = sanitizeAttribution({ ...this.data.attribution, vehicleId })
     trackEvent("content_vehicle_click", vehicleId, attribution)
     const query = buildQuery(attribution)
-    const action = beginPageNativeAction(this)
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.navigateTo({
       url: `/pages/car-detail/car-detail?${query}`,
       fail: () => {
@@ -251,7 +287,7 @@ Page({
     const vehicleId = String(event.currentTarget.dataset.id || this.data.attribution.vehicleId || "").trim()
     if (!vehicleId) return
     const attribution = sanitizeAttribution({ ...this.data.attribution, vehicleId })
-    const action = beginPageNativeAction(this)
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.navigateTo({
       url: `/pages/booking/booking?${buildQuery(attribution)}`,
       fail: () => {
@@ -283,7 +319,7 @@ Page({
       return
     }
 
-    const action = beginPageNativeAction(this)
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.redirectTo({
       url: `/pages/content-page/content-page?type=${type}`,
       fail: () => {
@@ -323,33 +359,36 @@ Page({
     })
   },
 
-  loadContent(type) {
+  loadContent(type, options) {
     const contentType = String(type || "").trim()
+    const field = contentType === "rules" ? "rulesContent" : contentType === "faq" ? "faqContent" : ""
     this.cancelContentConfigRequest()
+    this.setData({ contentLoading: Boolean(field), contentError: "" })
+    if (field) this.applyContent("")
+    const handleFailure = () => {
+      this.setData({
+        servicePhone: "", wxKfReady: false, contentLoading: false,
+        contentError: field ? "内容加载失败，请重试" : ""
+      })
+    }
     this._cancelContentConfigRequest = requestOperationConfig({
+      force: Boolean(options && options.force),
       onSuccess: (config) => {
         this.setData({
-          servicePhone: config.servicePhone || this.data.servicePhone,
+          contentLoading: false,
+          contentError: "",
+          servicePhone: String(config.servicePhone || "").trim(),
           wxKfReady: hasWxKfConfig(config)
         })
-
-        const field =
-          contentType === "rules"
-            ? "rulesContent"
-            : contentType === "faq"
-              ? "faqContent"
-              : ""
-        if (!field) {
-          return
-        }
-        const nextContent = config[field]
-        if (!nextContent) {
-          return
-        }
-
-        this.applyContent(nextContent)
-      }
+        if (field) this.applyContent(String(config[field] || "").trim())
+      },
+      onFailure: handleFailure,
+      onInvalidated: handleFailure
     })
+  },
+
+  handleContentRetry() {
+    if (!this.data.guideMode && !this.data.contentLoading) this.loadContent(this.data.type, { force: true })
   },
 
   cancelContentConfigRequest() {
@@ -365,24 +404,23 @@ Page({
     openCustomerService({
       page: this,
       source: "content:" + (contentKey || "unknown"),
-      onLegacyFallback: () => {
-        if (this.data.wxKfReady) {
-          return
-        }
+      onLegacyFallback: (config) => {
         if (!isPageNativeActionActive(this, pageAction)) {
           return
         }
+        this.setData({ wxKfReady: false, servicePhone: String(config && config.servicePhone || "").trim() })
         wx.showModal({
-          title: "在线客服未启用",
-          content: "管理员尚未配置微信客服，您可以先通过电话联系我们。",
-          confirmText: "拨打客服电话",
+          title: "在线客服暂不可用",
+          content: this.data.servicePhone ? "您可以先通过电话联系我们。" : "客服联系方式暂未提供，请稍后重试。",
+          showCancel: Boolean(this.data.servicePhone),
+          confirmText: this.data.servicePhone ? "电话咨询" : "知道了",
           cancelText: "知道了",
           confirmColor: "#528fff",
           success: (res) => {
             if (!isPageNativeActionActive(this, pageAction)) {
               return
             }
-            if (res && res.confirm) {
+            if (res && res.confirm && this.data.servicePhone) {
               this.handlePhoneCall()
             }
           }
@@ -424,7 +462,7 @@ Page({
   },
 
   handlePrivacyRequest() {
-    const action = beginPageNativeAction(this)
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.navigateTo({
       url: "/pages/privacy-request/privacy-request",
       fail: () => {

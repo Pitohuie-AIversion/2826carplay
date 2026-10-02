@@ -18,6 +18,8 @@ const PUBLIC_VEHICLE_FIELDS = {
   priceDay: true,
   rentalDiscountTiers: true,
   publicDescription: true,
+  publicDrivingTips: true,
+  performance: true,
   publicMaterialsUpdatedDate: true,
   publicInspectionDate: true,
   publicInspectionSummary: true,
@@ -325,6 +327,14 @@ function mapVehicle(vehicle) {
   const seats = Number.isInteger(vehicle && vehicle.seats) ? vehicle.seats : ""
   const priceDay = Number.isInteger(vehicle && vehicle.priceDay) ? vehicle.priceDay : 0
   const fuelType = String((vehicle && vehicle.fuelType) || "").trim() || "unknown"
+  const rawPerformance = vehicle && vehicle.performance && typeof vehicle.performance === "object" ? vehicle.performance : {}
+  const performance = {}
+  ;["acceleration", "horsepower", "drivetrain", "torque"].forEach((field) => {
+    performance[field] = String(rawPerformance[field] == null ? "" : rawPerformance[field]).trim().slice(0, field === "drivetrain" ? 30 : 20)
+  })
+  performance.highlights = Array.isArray(rawPerformance.highlights)
+    ? rawPerformance.highlights.filter((item) => typeof item === "string").map((item) => item.trim()).filter(Boolean).slice(0, 8).map((item) => item.slice(0, 20))
+    : []
 
   return {
     id: String((vehicle && vehicle._id) || (vehicle && vehicle.id) || "").trim(),
@@ -334,11 +344,13 @@ function mapVehicle(vehicle) {
     category: inferCategory(vehicleType, brandModel, fuelType),
     priceDay,
     rentalDiscountTiers: normalizeRentalDiscountTiers(vehicle && vehicle.rentalDiscountTiers),
+    performance,
+    publicDrivingTips: String((vehicle && vehicle.publicDrivingTips) || "").trim().slice(0, 500),
     priceText: buildPriceText(priceDay),
     priceSummary: buildPriceSummary(priceDay),
     status: mappedStatus.status,
     statusText: mappedStatus.statusText,
-    location: String((vehicle && vehicle.location) || "").trim() || "门店咨询",
+    location: String((vehicle && vehicle.location) || "").trim(),
     tags: buildTags(vehicle, vehicleTypeText),
     transmission: String((vehicle && vehicle.transmission) || "").trim() || "unknown",
     fuelType,
@@ -387,12 +399,17 @@ exports.main = async (event) => {
       return createError("NOT_FOUND", "车辆不存在")
     }
 
-    if (String(current.status || "").trim() === "retired") {
+    const status = String(current.status || "").trim()
+    if (status === "retired") {
       return createError("NOT_AVAILABLE", "车辆已停用")
+    }
+    if (!Object.prototype.hasOwnProperty.call(STATUS_MAP, status)) {
+      return createError("NOT_AVAILABLE", "车辆状态待确认")
     }
 
     const mapped = mapVehicle({
       ...current,
+      status,
       _id: current._id || input.id
     })
 

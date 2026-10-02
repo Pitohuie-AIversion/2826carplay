@@ -63,6 +63,7 @@ describe("pages/privacy-data-inventory", () => {
     jest.useRealTimers()
     delete global.Page
     delete global.wx
+    delete global.getCurrentPages
   })
 
   test("页面格式化三类数据并展示部分失败提示", () => {
@@ -244,17 +245,86 @@ describe("pages/privacy-data-inventory", () => {
     expect(page.data.loadError).toBe("cloud sdk crashed")
   })
 
+  test("本地文件保存后确认失败，保留文件并提供完整重试直到确认成功", async () => {
+    let confirmAttempts = 0
+    global.wx = {
+      cloud: { callFunction: jest.fn(({ data, success, fail }) => {
+        if (data.mode === "confirmExport") {
+          confirmAttempts += 1
+          if (confirmAttempts === 1) fail(new Error("network timeout"))
+          else success({ result: { ok: true, confirmed: true } })
+        } else success({ result: { ok: true, csvText: "data", exportToken: "a".repeat(40) } })
+      }) },
+      showModal: jest.fn(({ success }) => success({ confirm: true })), showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition(), { loading: false, requestId: "request_1", request: { type: "access" } })
+    page.handleExport()
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(page.data).toMatchObject({ exporting: false, exportConfirmationPending: true, exportFilePath: "wxfile://usr/privacy-data-request_1.csv" })
+    expect(mockRemoveCsvFile).not.toHaveBeenCalled()
+    const wxml = fs.readFileSync(path.resolve(__dirname, "../pages-admin/privacy-data-inventory/privacy-data-inventory.wxml"), "utf8")
+    expect(wxml).toMatch(/<button wx:if="{{exportConfirmationPending}}"[^>]*bindtap="handleExport"/)
+    page.handleExport()
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(confirmAttempts).toBe(2)
+    expect(page.data).toMatchObject({ exporting: false, exportConfirmationPending: false })
+    expect(wx.showToast).toHaveBeenLastCalledWith({ title: "个人数据已生成", icon: "none" })
+  })
+
+  test("本地保存失败时不确认导出并保留可重试状态", async () => {
+    mockSaveCsvFile.mockRejectedValueOnce(new Error("disk full"))
+    global.wx = {
+      cloud: { callFunction: jest.fn(({ success }) => success({ result: { ok: true, csvText: "data", exportToken: "test-token" } })) },
+      showModal: jest.fn(({ success }) => success({ confirm: true })), showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition(), { loading: false, requestId: "request_1", request: { type: "access" } })
+    page.handleExport()
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(wx.cloud.callFunction).toHaveBeenCalledTimes(1)
+    expect(page.data.exporting).toBe(false)
+    expect(page.data.exportFilePath).toBe("")
+  })
+
+  test("切页后保存完成会删除迟到文件且不确认导出", async () => {
+    let resolveSave
+    mockSaveCsvFile.mockImplementationOnce(() => new Promise((resolve) => { resolveSave = resolve }))
+    global.wx = {
+      cloud: { callFunction: jest.fn(({ success }) => success({ result: { ok: true, csvText: "data", exportToken: "test-token" } })) },
+      showModal: jest.fn(({ success }) => success({ confirm: true })), showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition(), { loading: false, requestId: "request_1", request: { type: "access" } })
+    global.getCurrentPages = () => [page]
+    page.handleExport()
+    global.getCurrentPages = () => [page, {}]
+    resolveSave({ filePath: "/tmp/late-private.csv", fileName: "late-private.csv" })
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(mockRemoveCsvFile).toHaveBeenCalledWith("/tmp/late-private.csv")
+    expect(wx.cloud.callFunction).toHaveBeenCalledTimes(1)
+    expect(page.data.exportFilePath).toBe("")
+    global.getCurrentPages = () => [page]
+    page.onShow()
+    expect(page.data.exporting).toBe(false)
+    delete global.getCurrentPages
+  })
+
   test("完整的查询申请可生成并保存个人数据 CSV", async () => {
     const callFunction = jest.fn(({ data, success }) => {
-      expect(data).toEqual({
-        requestId: "request_1",
-        mode: "export"
-      })
+      if (data.mode === "confirmExport") {
+        expect(data).toEqual({ requestId: "request_1", mode: "confirmExport", exportToken: "test-export-token" })
+        success({ result: { ok: true, confirmed: true } })
+        return
+      }
+      expect(data).toEqual({ requestId: "request_1", mode: "export" })
       success({
         result: {
           ok: true,
           fileName: "privacy-data-request_1.csv",
-          csvText: "\ufeff数据类别"
+          csvText: "\ufeff数据类别",
+          exportToken: "test-export-token"
         }
       })
     })
@@ -274,7 +344,7 @@ describe("pages/privacy-data-inventory", () => {
     await Promise.resolve()
     await Promise.resolve()
 
-    expect(callFunction).toHaveBeenCalledTimes(1)
+    expect(callFunction).toHaveBeenCalledTimes(2)
     expect(mockSaveCsvFile).toHaveBeenCalledWith({
       fileName: "privacy-data-request_1.csv",
       fallbackFileName: "privacy-data-request_1.csv",
@@ -349,7 +419,7 @@ describe("pages/privacy-data-inventory", () => {
     global.wx = {
       cloud: {
         callFunction: jest.fn(({ success }) => {
-          success({ result: { ok: true, fileName: "privacy-late.csv", csvText: "敏感数据" } })
+          success({ result: { ok: true, fileName: "privacy-late.csv", csvText: "敏感数据", exportToken: "test-export-token" } })
         })
       },
       showModal: jest.fn(({ success }) => success({ confirm: true })),

@@ -6,13 +6,13 @@ const ONE_DAY_MS = 24 * 60 * 60 * 1000
 
 function parseLocalDate(dateStr) {
   if (!dateStr || typeof dateStr !== "string") return null
-  const m = dateStr.trim().match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/)
+  const m = dateStr.trim().match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/)
   if (!m) return null
   const y = Number(m[1])
   const mon = Number(m[2]) - 1
   const d = Number(m[3])
   const dt = new Date(y, mon, d)
-  return Number.isNaN(dt.getTime()) ? null : dt
+  return dt.getFullYear() === y && dt.getMonth() === mon && dt.getDate() === d ? dt : null
 }
 
 function calculateDaysDiff(targetDateStr, baseDateInput) {
@@ -41,21 +41,19 @@ function calculateMaintenanceHealth(vehicleInput, baseDate) {
       daysToMaintenance !== null ? daysToMaintenance : Infinity,
       daysToReview !== null ? daysToReview : Infinity
     )
+    const dueTask = daysToMaintenance === daysToReview ? "保养和年检"
+      : minDays === daysToReview ? "年检" : "保养"
 
     if (minDays < 0) {
       urgency = "urgent"
       isOverdue = true
-      if (daysToMaintenance !== null && daysToMaintenance < 0) {
-        tip = `保养已逾期 ${Math.abs(daysToMaintenance)} 天`
-      } else {
-        tip = `年检已逾期 ${Math.abs(daysToReview)} 天`
-      }
+      tip = `${dueTask}已逾期 ${Math.abs(minDays)} 天`
     } else if (minDays <= 7) {
       urgency = "urgent"
-      tip = minDays === 0 ? "今日到期需维保" : `${minDays} 天内需维保`
+      tip = minDays === 0 ? `今日${dueTask}到期` : `${minDays} 天内需${dueTask}`
     } else if (minDays <= 30) {
       urgency = "upcoming"
-      tip = `本月内需保养 (${minDays}天)`
+      tip = `${minDays} 天内需${dueTask}`
     } else {
       urgency = "healthy"
       tip = "维保状态正常"

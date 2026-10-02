@@ -287,7 +287,7 @@ describe("cloud function log privacy", () => {
 
   test("booking mutation preflight reads use purpose-specific field allowlists", () => {
     const cases = [
-      ["bookingCancel", "BOOKING_CANCEL_FIELDS", ["openid", "vehicleId", "status"]],
+      ["bookingCancel", "BOOKING_CANCEL_FIELDS", ["openid", "vehicleId", "status", "calendarSyncVersion"]],
       [
         "bookingUpdateMyContact",
         "BOOKING_CONTACT_UPDATE_FIELDS",
@@ -301,17 +301,18 @@ describe("cloud function log privacy", () => {
           "openid",
           "vehicleName",
           "status",
+          "calendarSyncVersion",
           "latestPickupHandoverId",
           "latestReturnHandoverId",
           "pickupHandoverConfirmedAt",
           "returnHandoverConfirmedAt"
         ]
       ],
-      ["bookingUpdateAdminRemark", "BOOKING_EXISTENCE_FIELDS", ["_id"]],
+      ["bookingUpdateAdminRemark", "BOOKING_EXISTENCE_FIELDS", ["_id", "adminRemark"]],
       [
         "bookingUpdateCoordination",
         "BOOKING_COORDINATION_FIELDS",
-        ["status", "schedulePriority", "coordinationStatus"]
+        ["status", "schedulePriority", "coordinationStatus", "tags"]
       ]
     ]
 
@@ -326,7 +327,13 @@ describe("cloud function log privacy", () => {
         (match) => match[1]
       )
       expect(fields).toEqual(expectedFields)
-      expect(source).toContain(`.field(${constantName})`)
+      if (functionName === "bookingCancel") {
+        expect(source).toContain('readDocument(db.collection("bookings"), input.id, BOOKING_CANCEL_FIELDS)')
+        expect(source).toContain('readDocument(transaction.collection("bookings"), input.id, BOOKING_CANCEL_FIELDS)')
+        expect(source).toContain(".field(fields)")
+      } else {
+        expect(source).toContain(`.field(${constantName})`)
+      }
     })
   })
 
@@ -340,7 +347,7 @@ describe("cloud function log privacy", () => {
       /const RECENT_BOOKING_FIELDS = \{\s*status: true,\s*vehicleId: true,\s*startDate: true,\s*endDate: true,\s*createdAt: true\s*\}/
     )
     expect(source).toMatch(
-      /const IDEMPOTENT_BOOKING_FIELDS = \{\s*_id: true,\s*openid: true,\s*requestId: true\s*\}/
+      /const IDEMPOTENT_BOOKING_FIELDS = \{\s*_id: true,\s*openid: true,\s*requestId: true,\s*requestPayloadHash: true\s*\}/
     )
   })
 
@@ -351,7 +358,7 @@ describe("cloud function log privacy", () => {
       ["vehicleRetire", "VEHICLE_STATUS_FIELDS", ["status"]],
       ["vehicleRestore", "VEHICLE_STATUS_FIELDS", ["status"]],
       ["vehicleImageUpdate", "VEHICLE_IMAGE_FIELDS", ["imageList", "coverImage"]],
-      ["vehicleDelete", "VEHICLE_DELETE_FIELDS", ["imageList", "coverImage"]],
+      ["vehicleDelete", "VEHICLE_DELETE_FIELDS", ["imageList", "coverImage", "bookingReferenceVersion"]],
       ["vehicleDelete", "BOOKING_EXISTENCE_FIELDS", ["_id"]]
     ]
 
@@ -386,6 +393,10 @@ describe("cloud function log privacy", () => {
       "seats",
       "priceDay",
       "rentalDiscountTiers",
+      "performance",
+      "publicDrivingTips",
+      "archiveDate",
+      "archiveReview",
       "publicDescription",
       "vin",
       "engineNumber",

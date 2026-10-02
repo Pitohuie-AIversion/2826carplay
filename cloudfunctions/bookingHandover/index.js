@@ -1,8 +1,11 @@
 const cloud = require("wx-server-sdk")
+const crypto = require("crypto")
+const { createHandoverImageLifecycle, validImage, revision } = require("./handoverImageLifecycle")
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
+const handoverImages = createHandoverImageLifecycle(db, cloud)
 const AUTH_ROLE_FIELDS = {
   role: true,
   roles: true,
@@ -18,6 +21,7 @@ const BOOKING_FIELDS = {
   openid: true,
   status: true,
   vehicleName: true,
+  handoverImageRevision: true,
   latestPickupHandoverId: true,
   latestPickupHandoverVersion: true,
   latestReturnHandoverId: true,
@@ -65,7 +69,6 @@ async function canManage(openid) {
 
 function normalizePhotos(value, bookingId, stage) {
   if (!Array.isArray(value)) return []
-  const pathToken = `/handover-images/${bookingId}/${stage}/`
   const photos = value.map((item) => ({
     angle: text(item && item.angle, 20),
     fileId: text(item && (item.fileId || item.fileID), 1024)
@@ -77,7 +80,7 @@ function normalizePhotos(value, bookingId, stage) {
     angleSet.size !== ANGLES.length ||
     fileSet.size !== ANGLES.length ||
     !ANGLES.every((angle) => angleSet.has(angle)) ||
-    photos.some((item) => !item.fileId.startsWith("cloud://") || !item.fileId.includes(pathToken) || !/\.(?:jpe?g|png|webp)$/i.test(item.fileId))
+    photos.some((item) => !validImage(item.fileId, bookingId, stage))
   ) return []
   return ANGLES.map((angle) => photos.find((item) => item.angle === angle))
 }
@@ -90,6 +93,7 @@ function normalizeInput(event) {
     handoverId: text(source.handoverId, 160),
     stage: text(source.stage, 20),
     requestId: text(source.requestId, 80),
+    expectedVersion: Number(source.expectedVersion || 0),
     mileageProvided: source.mileageKm !== "" && source.mileageKm !== null && source.mileageKm !== undefined,
     mileageKm: Number(source.mileageKm),
     energyType: text(source.energyType, 20),
@@ -98,7 +102,7 @@ function normalizeInput(event) {
     damageNote: text(source.damageNote, 500),
     additionalNote: text(source.additionalNote, 500),
     photos: source.photos,
-    fileList: strings(source.fileList).slice(0, 9)
+    fileList: strings(source.fileList)
   }
 }
 
@@ -107,6 +111,7 @@ function validateSubmit(input) {
   if (!input.bookingId) errors.push({ field: "bookingId", message: "预约 ID 不能为空" })
   if (!STAGES.includes(input.stage)) errors.push({ field: "stage", message: "交接类型不合法" })
   if (!/^[A-Za-z0-9_-]{8,80}$/.test(input.requestId)) errors.push({ field: "requestId", message: "请求标识不合法" })
+  if (!Number.isSafeInteger(input.expectedVersion) || input.expectedVersion < 0) errors.push({ field: "expectedVersion", message: "交接版本不合法" })
   if (!input.mileageProvided || !Number.isInteger(input.mileageKm) || input.mileageKm < 0 || input.mileageKm > 5000000) errors.push({ field: "mileageKm", message: "里程须为 0 至 5000000 的整数" })
   if (!["fuel", "electric"].includes(input.energyType)) errors.push({ field: "energyType", message: "能源类型不合法" })
   if (!input.energyLevelProvided || !Number.isInteger(input.energyLevelPercent) || input.energyLevelPercent < 0 || input.energyLevelPercent > 100) errors.push({ field: "energyLevelPercent", message: "油量或电量须为 0 至 100 的整数" })
@@ -136,21 +141,6 @@ async function writeAudit(payload) {
   } catch (err) {}
 }
 
-async function enqueueDeletion(fileList, source, context, delayMs) {
-  const files = strings(fileList)
-  if (!files.length) return
-  await db.collection("pending_file_deletions").add({
-    data: {
-      fileList: files,
-      source,
-      context,
-      attemptCount: 0,
-      notBeforeAt: new Date(Date.now() + Math.max(0, Number(delayMs) || 0)),
-      createdAt: db.serverDate()
-    }
-  })
-}
-
 async function readHandoverTemplateId() {
   const envValue = String(process.env.BOOKING_HANDOVER_TEMPLATE_ID || process.env.BOOKING_STATUS_TEMPLATE_ID || "").trim()
   if (envValue) return envValue
@@ -175,10 +165,10 @@ async function sendHandoverNotificationBestEffort(info) {
     const envState = String(process.env.BOOKING_NOTIFY_STATE || "").trim()
     const miniprogramState = ["developer", "trial", "formal"].includes(envState) ? envState : "formal"
     const isPickup = info.stage === "pickup"
-    const statusPhrase = isPickup ? "已提车" : "已还车"
+    const statusPhrase = "待核对"
     const remark = isPickup
-      ? `交接完成，里程 ${info.mileageKm || 0}km，祝用车愉快`.slice(0, 20)
-      : `还车入库完成，存证已归档，押金结算中`.slice(0, 20)
+      ? "取车记录已提交，请核对里程与车况"
+      : "还车记录已提交，请核对里程与车况"
     await cloud.openapi.subscribeMessage.send({
       touser: target,
       templateId,
@@ -220,6 +210,11 @@ async function submit(input, openid) {
   const result = await db.runTransaction(async (transaction) => {
     const booking = await getDocOrNull(transaction.collection("bookings"), input.bookingId, BOOKING_FIELDS)
     if (!booking) return { result: error("NOT_FOUND", "预约不存在") }
+    const candidateId = `${input.bookingId}__${input.stage}__v${input.expectedVersion + 1}`
+    const candidate = await getDocOrNull(transaction.collection("booking_handovers"), candidateId, { submitRequestId: true, version: true })
+    if (candidate && candidate.submitRequestId === input.requestId) {
+      return { result: { ok: true, action: "submit", duplicate: true, handoverId: candidateId, version: Number(candidate.version) || input.expectedVersion + 1 } }
+    }
     if (booking.status !== "confirmed") return { result: error("STATUS_NOT_ALLOWED", "仅已确认预约可以提交交接记录") }
 
     const prefix = input.stage === "pickup" ? "Pickup" : "Return"
@@ -229,6 +224,9 @@ async function submit(input, openid) {
       : null
     if (latest && latest.submitRequestId === input.requestId) {
       return { result: { ok: true, action: "submit", duplicate: true, handoverId: latestId, version: Number(latest.version) || 1 } }
+    }
+    if (Math.max(Number(booking[`latest${prefix}HandoverVersion`]) || 0, Number(latest && latest.version) || 0) !== input.expectedVersion || candidate) {
+      return { result: error("VERSION_CONFLICT", "交接记录已更新，请刷新") }
     }
     if (input.stage === "return") {
       const pickupId = text(booking.latestPickupHandoverId, 160)
@@ -240,6 +238,9 @@ async function submit(input, openid) {
 
     const version = Math.max(Number(booking[`latest${prefix}HandoverVersion`]) || 0, Number(latest && latest.version) || 0) + 1
     const handoverId = `${input.bookingId}__${input.stage}__v${version}`
+    if (!(await handoverImages.canAttach(transaction, input.bookingId, validation.photos.map((photo) => photo.fileId)))) {
+      return { result: error("IMAGE_DELETION_CONFLICT", "交接图片已清理，请重新上传") }
+    }
     if (latest && ["submitted", "confirmed"].includes(latest.status)) {
       await transaction.collection("booking_handovers").doc(latestId).update({ data: {
         status: "superseded", supersededAt: db.serverDate(), supersededByVersion: version, updatedAt: db.serverDate()
@@ -268,6 +269,7 @@ async function submit(input, openid) {
       [`latest${prefix}HandoverVersion`]: version,
       [`${input.stage}HandoverSubmittedAt`]: db.serverDate(),
       [`${input.stage}HandoverConfirmedAt`]: null,
+      handoverImageRevision: revision(booking) + 1,
       updatedAt: db.serverDate()
     } })
     return {
@@ -332,18 +334,29 @@ async function archive(input, openid) {
     if (!record || record.bookingId !== input.bookingId || record.stage !== input.stage) return { result: error("NOT_FOUND", "交接记录不存在") }
     if (record.status === "archived") return { result: { ok: true, action: "archive", duplicate: true, fileList: [], version: Number(record.version) || 1 } }
     const fileList = (record.photos || []).map((item) => item && item.fileId).filter(Boolean)
+    if (fileList.length) {
+      const queueId = `handover_archive_${crypto.createHash("sha256").update(input.handoverId).digest("hex").slice(0, 32)}`
+      await transaction.collection("pending_file_deletions").doc(queueId).set({ data: {
+        fileList,
+        source: "bookingHandoverArchive",
+        context: { bookingId: input.bookingId, handoverId: input.handoverId, stage: input.stage },
+        attemptCount: 0,
+        notBeforeAt: new Date(),
+        createdAt: db.serverDate()
+      } })
+    }
     await transaction.collection("booking_handovers").doc(input.handoverId).update({ data: {
       status: "archived", photos: [], archivedPhotoCount: fileList.length, archivedBy: openid, archivedAt: db.serverDate(), updatedAt: db.serverDate()
     } })
     await transaction.collection("bookings").doc(input.bookingId).update({ data: {
       [`${input.stage}HandoverConfirmedAt`]: null,
+      handoverImageRevision: revision(booking) + 1,
       updatedAt: db.serverDate()
     } })
     return { result: { ok: true, action: "archive", duplicate: false, fileList, version: Number(record.version) || 1 } }
   })
   const response = result && result.result ? result.result : result
   if (response && response.ok && !response.duplicate) {
-    await enqueueDeletion(response.fileList, "bookingHandoverArchive", { bookingId: input.bookingId, handoverId: input.handoverId, stage: input.stage }, 0)
     await writeAudit({ openid, action: "bookingHandoverArchive", bookingId: input.bookingId, stage: input.stage, version: response.version, photoCount: response.fileList.length })
   }
   if (response) delete response.fileList
@@ -352,10 +365,9 @@ async function archive(input, openid) {
 
 async function cleanupUpload(input, openid) {
   if (!input.bookingId || !STAGES.includes(input.stage)) return error("VALIDATION_ERROR", "清理参数不完整")
-  const validPrefix = `/handover-images/${input.bookingId}/${input.stage}/`
-  const fileList = input.fileList.filter((fileId) => fileId.startsWith("cloud://") && fileId.includes(validPrefix))
-  if (!fileList.length || fileList.length !== input.fileList.length) return error("VALIDATION_ERROR", "待清理图片路径不合法")
-  await enqueueDeletion(fileList, "bookingHandoverUploadCleanup", { bookingId: input.bookingId, stage: input.stage }, 30000)
+  const fileList = input.fileList.filter((fileId) => validImage(fileId, input.bookingId, input.stage))
+  if (!fileList.length || fileList.length > 9 || fileList.length !== input.fileList.length) return error("VALIDATION_ERROR", "待清理图片路径或数量不合法")
+  await handoverImages.queueUpload(input.bookingId, input.stage, fileList)
   await writeAudit({ openid, action: "bookingHandoverUploadCleanup", bookingId: input.bookingId, stage: input.stage, photoCount: fileList.length })
   return { ok: true, action: "cleanupUpload", queued: fileList.length }
 }
@@ -367,11 +379,11 @@ exports.main = async (event) => {
     if (!openid) return error("UNAUTHORIZED", "未获取到用户身份")
     if (ADMIN_ACTIONS.includes(input.action)) {
       if (!(await canManage(openid))) return error("FORBIDDEN", "权限不足")
-      if (input.action === "submit") return submit(input, openid)
-      if (input.action === "archive") return archive(input, openid)
-      return cleanupUpload(input, openid)
+      if (input.action === "submit") return await submit(input, openid)
+      if (input.action === "archive") return await archive(input, openid)
+      return await cleanupUpload(input, openid)
     }
-    if (input.action === "confirm") return confirm(input, openid)
+    if (input.action === "confirm") return await confirm(input, openid)
     return error("VALIDATION_ERROR", "交接操作不合法")
   } catch (err) {
     const errorMessage = text(err && (err.message || err.errMsg) || err, 300)

@@ -14,13 +14,15 @@ const RECENT_BOOKING_FIELDS = {
 const IDEMPOTENT_BOOKING_FIELDS = {
   _id: true,
   openid: true,
-  requestId: true
+  requestId: true,
+  requestPayloadHash: true
 }
 const BOOKING_VEHICLE_FIELDS = {
   name: true,
   brandModel: true,
   plateNumber: true,
-  status: true
+  status: true,
+  bookingReferenceVersion: true
 }
 const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000
 const RATE_LIMIT_MAX_REQUESTS = 5
@@ -130,7 +132,7 @@ function getTodayInChina() {
   return new Date(Date.now() + chinaOffsetMs).toISOString().slice(0, 10)
 }
 
-function validateInput(input) {
+function validateInput(input, options = {}) {
   const errors = []
 
   if (!input.vehicleId) {
@@ -151,7 +153,7 @@ function validateInput(input) {
     errors.push({ field: "startDate", message: "取车日期不能为空" })
   } else if (!isValidDateOnly(input.startDate)) {
     errors.push({ field: "startDate", message: "取车日期格式不正确" })
-  } else if (input.startDate < getTodayInChina()) {
+  } else if (!options.existingRequest && input.startDate < getTodayInChina()) {
     errors.push({ field: "startDate", message: "取车日期不能早于今天" })
   }
 
@@ -283,14 +285,28 @@ function buildBookingDocumentId(openid, requestId) {
     .slice(0, 32)
 }
 
-async function findIdempotentBooking(openid, requestId) {
+function payloadHash(input) {
+  const payload = {
+    vehicleId: input.vehicleId, userName: input.userName, phone: input.phone,
+    startDate: input.startDate, endDate: input.endDate, city: input.city,
+    pickupLocation: input.pickupLocation, returnLocation: input.returnLocation, note: input.note
+  }
+  return crypto.createHash("sha256").update(JSON.stringify(payload)).digest("hex")
+}
+
+function documentMissing(error) {
+  const message = String(error && (error.errMsg || error.message) || error || "").toLowerCase()
+  return message.includes("not exist") || message.includes("not found") || message.includes("document_not_found") || message.includes("-502005")
+}
+
+async function findIdempotentBooking(openid, requestId, database = db, expectedHash = "") {
   if (!requestId) {
     return null
   }
 
   const bookingId = buildBookingDocumentId(openid, requestId)
   try {
-    const res = await db
+    const res = await database
       .collection("bookings")
       .doc(bookingId)
       .field(IDEMPOTENT_BOOKING_FIELDS)
@@ -302,13 +318,15 @@ async function findIdempotentBooking(openid, requestId) {
 
     const sameRequest =
       String(booking.openid || "").trim() === openid &&
-      String(booking.requestId || "").trim() === requestId
+      String(booking.requestId || "").trim() === requestId &&
+      (!booking.requestPayloadHash || booking.requestPayloadHash === expectedHash)
     return {
       bookingId,
       existing: sameRequest,
       conflict: !sameRequest
     }
   } catch (error) {
+    if (!documentMissing(error)) throw error
     return { bookingId, existing: false, conflict: false }
   }
 }
@@ -371,12 +389,13 @@ exports.main = async (event) => {
       return createError("UNAUTHORIZED", "未获取到用户身份")
     }
 
-    const errors = validateInput(input)
+    const errors = validateInput(input, { existingRequest: Boolean(input.requestId) })
     if (errors.length) {
       return createError("VALIDATION_ERROR", "参数校验失败", { errors })
     }
 
-    const idempotency = await findIdempotentBooking(openid, input.requestId)
+    const requestPayloadHash = payloadHash(input)
+    const idempotency = await findIdempotentBooking(openid, input.requestId, db, requestPayloadHash)
     if (idempotency && idempotency.conflict) {
       return createError("IDEMPOTENCY_CONFLICT", "请求标识冲突，请修改预约信息后重试")
     }
@@ -388,6 +407,9 @@ exports.main = async (event) => {
         message: "预约信息已提交，请勿重复操作"
       }
     }
+
+    const creationErrors = validateInput(input)
+    if (creationErrors.length) return createError("VALIDATION_ERROR", "参数校验失败", { errors: creationErrors })
 
     const submissionError = await checkBookingSubmission(openid, input)
     if (submissionError) {
@@ -427,24 +449,35 @@ exports.main = async (event) => {
           scene: input.attribution.scene
         }
       } : {}),
-      ...(input.requestId ? { requestId: input.requestId } : {}),
+      ...(input.requestId ? { requestId: input.requestId, requestPayloadHash } : {}),
       status: "pending",
       createdAt: db.serverDate(),
       updatedAt: db.serverDate()
     }
 
-    let bookingId = ""
-    if (idempotency && input.requestId) {
-      bookingId = idempotency.bookingId
-      await db.collection("bookings").doc(bookingId).set({
-        data: bookingData
-      })
-    } else {
-      const addRes = await db.collection("bookings").add({
-        data: bookingData
-      })
-      bookingId = addRes && (addRes._id || addRes.id) ? addRes._id || addRes.id : ""
-    }
+    const bookingId = idempotency && input.requestId ? idempotency.bookingId : crypto.randomBytes(16).toString("hex")
+    const outcome = await db.runTransaction(async (transaction) => {
+      const latest = input.requestId ? await findIdempotentBooking(openid, input.requestId, transaction, requestPayloadHash) : {}
+      if (latest.conflict || latest.existing) return latest
+      let latestVehicle = null
+      try {
+        const result = await transaction.collection("vehicles").doc(input.vehicleId).field(BOOKING_VEHICLE_FIELDS).get()
+        latestVehicle = result && result.data
+      } catch (error) {
+        const message = String(error && (error.errMsg || error.message) || error).toLowerCase()
+        if (!/not found|not exist|document_not_found|-502005/.test(message)) throw error
+      }
+      if (!latestVehicle) return { error: createError("NOT_FOUND", "车辆不存在") }
+      if (String(latestVehicle.status || "").trim() === "retired") return { error: createError("NOT_AVAILABLE", "车辆已停用，暂不可预约") }
+      await transaction.collection("vehicles").doc(input.vehicleId).update({ data: {
+        bookingReferenceVersion: Number(latestVehicle.bookingReferenceVersion || 0) + 1
+      } })
+      await transaction.collection("bookings").doc(bookingId).set({ data: { ...bookingData, vehicleName: getBookingVehicleName(latestVehicle) } })
+      return latest
+    })
+    if (outcome.error) return outcome.error
+    if (outcome.conflict) return createError("IDEMPOTENCY_CONFLICT", "请求标识冲突，请修改预约信息后重试")
+    if (outcome.existing) return { ok: true, id: bookingId, duplicated: true, message: "预约信息已提交，请勿重复操作" }
 
     await writeAuditLogBestEffort({
       openid,

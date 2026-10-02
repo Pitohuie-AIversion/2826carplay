@@ -26,10 +26,200 @@ function createPage(definition, overrides) {
 }
 
 describe("pages/booking-calendar", () => {
+  test("校正超长车辆编号不会继续复用无效提交快照", () => {
+    const requests = []
+    global.wx = { showToast: jest.fn(), cloud: { callFunction: (request) => requests.push(request) } }
+    const page = createPage(loadPageDefinition())
+    const input = { vehicleId: "a".repeat(129), kind: "hold", startDate: "2026-10-01", endDate: "2026-10-02", reason: "核对" }
+    page.saveCalendarChange("createBlock", input)
+    requests[0].success({ result: { ok: false, code: "VALIDATION_ERROR" } })
+    page.saveCalendarChange("createBlock", { ...input, vehicleId: "a".repeat(128) })
+    expect(requests[1].data.requestId).not.toBe(requests[0].data.requestId)
+    expect(requests[1].data.vehicleId).toHaveLength(128)
+    page.onUnload()
+  })
+  test.each(["Block", "PriceRule"])("新建%s超时保持请求标识，内容更改换新标识，旧响应不清新草稿", (type) => {
+    jest.useFakeTimers()
+    const requests = []
+    global.wx = { showToast: jest.fn(), cloud: { callFunction: (request) => requests.push(request) } }
+    const formKey = type === "Block" ? "blockForm" : "priceForm"
+    const page = createPage(loadPageDefinition(), { vehicles: [{ id: "a", name: "A" }], [formKey]: { vehicleId: "a", kind: "hold", label: "假期价", dailyPrice: "1000", startDate: "2026-10-01", endDate: "2026-10-02", reason: "原原因" } })
+    global.getCurrentPages = () => [page]
+    page.fetchBookings = jest.fn()
+    page[`handleSave${type}`]()
+    const firstId = requests[0].data.requestId
+    expect(firstId).toMatch(/^[A-Za-z0-9_-]{12,64}$/)
+    jest.advanceTimersByTime(15000)
+    page.data[formKey].reason = " 原原因 "
+    page[`handleSave${type}`]()
+    expect(requests[1].data.requestId).toBe(firstId)
+    requests[1].fail({ errMsg: "offline" })
+    page.handleCalendarFormInput({ currentTarget: { dataset: { form: formKey, field: "reason" } }, detail: { value: "新原因" } })
+    page[`handleSave${type}`]()
+    expect(requests[2].data.requestId).not.toBe(firstId)
+    requests[0].success({ result: { ok: true } })
+    expect(page.data.isSavingCalendar).toBe(true)
+    expect(page.data[formKey].reason).toBe("新原因")
+    requests[2].success({ result: { ok: true, duplicate: true } })
+    expect(page.data.isSavingCalendar).toBe(false)
+    expect(page.data[formKey].reason).toBe("")
+    page.onUnload()
+    expect(jest.getTimerCount()).toBe(0)
+  })
+
+  test("价格编辑保留读取版本，冲突刷新不会覆盖草稿，重新选择调整才采用新版本", () => {
+    const requests = []
+    global.wx = { showToast: jest.fn(), cloud: { callFunction: (request) => requests.push(request) } }
+    const rule = { id: "rule", vehicleId: "a", label: "节日价", startDate: "2026-10-01", endDate: "2026-10-02", dailyPrice: 800, version: 4 }
+    const vehicles = [{ id: "a", name: "A" }]
+    const page = createPage(loadPageDefinition(), { monthKey: "2026-10", vehicles, allPriceRules: [rule] })
+    global.getCurrentPages = () => [page]
+    const event = { currentTarget: { dataset: { id: "rule" } } }
+    page.handleEditPriceRule(event)
+    page.handleCalendarFormInput({ currentTarget: { dataset: { form: "priceForm", field: "dailyPrice" } }, detail: { value: "900" } })
+    page.handleSavePriceRule()
+    expect(requests[0].data).toMatchObject({ action: "updatePriceRule", id: "rule", expectedVersion: 4, dailyPrice: "900" })
+    requests[0].success({ result: { ok: false, code: "CALENDAR_VERSION_CONFLICT", message: "配置已变化，请重新选择调整" } })
+    const newer = { ...rule, dailyPrice: 1000, version: 5 }
+    requests[1].success({ result: { ok: true, vehicles, priceRules: [newer] } })
+    expect(page.data.priceForm.dailyPrice).toBe("900")
+    expect(page.data.editingRuleVersion).toBe(4)
+    expect(page._hasUnsavedChanges).toBe(true)
+    expect(page.data.calendarSaveError).toContain("重新选择调整")
+    page.handleEditPriceRule(event)
+    expect(page.data.priceForm.dailyPrice).toBe("1000")
+    expect(page.data.editingRuleVersion).toBe(5)
+    page.onUnload()
+  })
+
+  test("释放弹窗提交的是打开时的版本，后台列表刷新不能暗中扩大释放范围", () => {
+    let modal
+    global.wx = { showModal: (options) => { modal = options } }
+    const page = createPage(loadPageDefinition(), { allBlocks: [{ id: "block", kind: "hold", version: 2 }] })
+    global.getCurrentPages = () => [page]
+    page.saveCalendarChange = jest.fn()
+    page.handleReleaseBlock({ currentTarget: { dataset: { id: "block" } } })
+    page.data.allBlocks = [{ id: "block", kind: "hold", version: 3 }]
+    modal.success({ confirm: true, content: "核对后释放" })
+    expect(page.saveCalendarChange).toHaveBeenCalledWith("releaseBlock", { id: "block", expectedVersion: 2, reason: "核对后释放" })
+    page.onUnload()
+  })
+
+  test("车辆列表加载、重排和原车辆消失时，下拉展示与提交车辆保持一致", () => {
+    const requests = []
+    global.wx = { cloud: { callFunction: (request) => requests.push(request) } }
+    const page = createPage(loadPageDefinition(), { monthKey: "2026-10", blockForm: { vehicleId: "b" }, priceForm: { vehicleId: "b" } })
+    const vehicles = [{ id: "a", name: "A" }, { id: "b", name: "B" }]
+    page.fetchBookings()
+    requests[0].success({ result: { ok: true, vehicles } })
+    expect(page.data.blockVehicleIndex).toBe(1)
+    expect(page.data.priceVehicleIndex).toBe(1)
+    page.fetchBookings()
+    requests[1].success({ result: { ok: true, vehicles: vehicles.slice().reverse() } })
+    expect(page.data.blockVehicleIndex).toBe(0)
+    expect(page.data.priceVehicleIndex).toBe(0)
+    page.fetchBookings()
+    requests[2].success({ result: { ok: true, vehicles: [vehicles[0]] } })
+    expect(page.data.blockVehicleIndex).toBe(-1)
+    expect(page.data.priceVehicleIndex).toBe(-1)
+    expect(page.data.blockForm.vehicleId).toBe("b")
+    expect(page.data.priceForm.vehicleId).toBe("b")
+    page.saveCalendarChange = jest.fn()
+    page.handleSaveBlock()
+    page.handleSavePriceRule()
+    expect(page.saveCalendarChange).not.toHaveBeenCalled()
+    page.onUnload()
+  })
+
+  test("保存或重置一张表单不会清除另一张表单的草稿和离开提醒", () => {
+    let request
+    global.wx = { showToast: jest.fn(), cloud: { callFunction: (options) => { request = options } } }
+    const page = createPage(loadPageDefinition(), { monthKey: "2026-10", selectedDate: "2026-10-01", vehicles: [{ id: "a", name: "A" }] })
+    global.getCurrentPages = () => [page]
+    page.fetchBookings = jest.fn()
+    const edit = (form, field, value) => page.handleCalendarFormInput({ currentTarget: { dataset: { form, field } }, detail: { value } })
+    edit("blockForm", "reason", "尚未保存的档期草稿")
+    edit("priceForm", "reason", "价格调整")
+    page.saveCalendarChange("createPriceRule", { vehicleId: "a" })
+    request.success({ result: { ok: true } })
+    expect(page.data.blockForm.reason).toBe("尚未保存的档期草稿")
+    expect(page._hasUnsavedChanges).toBe(true)
+    page.handleResetPriceForm()
+    expect(page._hasUnsavedChanges).toBe(true)
+    page.handleResetBlockForm()
+    expect(page._hasUnsavedChanges).toBe(false)
+    page.onUnload()
+  })
+
   afterEach(() => {
     jest.useRealTimers()
     delete global.Page
     delete global.wx
+    delete global.getCurrentPages
+  })
+
+  test("预约占用不提供人工编辑或释放入口", () => {
+    global.wx = { showModal: jest.fn() }
+    const block = { id: "booking_block", kind: "booking", bookingId: "booking_1", vehicleId: "vehicle_1", startDate: "2026-09-01", endDate: "2026-09-02" }
+    const page = createPage(loadPageDefinition(), { monthKey: "2026-09", selectedDate: "2026-09-01", allBlocks: [block] })
+    page.applyCalendar()
+    expect(page.data.selectedBlocks[0].canEdit).toBe(false)
+    page.handleEditBlock({ currentTarget: { dataset: { id: block.id } } })
+    page.handleReleaseBlock({ currentTarget: { dataset: { id: block.id } } })
+    expect(page.data.editingBlockId).toBe("")
+    expect(global.wx.showModal).not.toHaveBeenCalled()
+  })
+
+  test("日历保存卸载后迟到回调不刷新页面或弹提示", () => {
+    jest.useFakeTimers()
+    let request
+    global.wx = { showToast: jest.fn(), cloud: { callFunction: jest.fn((options) => { request = options }) } }
+    const page = createPage(loadPageDefinition())
+    global.getCurrentPages = () => [page]
+    page.fetchBookings = jest.fn()
+    page.saveCalendarChange("createBlock", { vehicleId: "vehicle_1" })
+    page.onUnload()
+    const calls = page.setData.mock.calls.length
+    request.success({ result: { ok: true } })
+    request.fail({})
+    expect(page.setData.mock.calls).toHaveLength(calls)
+    expect(page.fetchBookings).not.toHaveBeenCalled()
+    expect(global.wx.showToast).not.toHaveBeenCalled()
+    expect(jest.getTimerCount()).toBe(0)
+  })
+
+  test("日历保存同步抛错也结束等待并允许重试", () => {
+    jest.useFakeTimers()
+    global.wx = { showToast: jest.fn(), cloud: { callFunction: jest.fn(() => { throw new Error("offline") }) } }
+    const page = createPage(loadPageDefinition())
+    global.getCurrentPages = () => [page]
+    expect(() => page.saveCalendarChange("createBlock", {})).not.toThrow()
+    expect(page.data.isSavingCalendar).toBe(false)
+    expect(jest.getTimerCount()).toBe(0)
+    expect(global.wx.showToast).toHaveBeenCalledWith({ title: "保存失败，请重试", icon: "none" })
+  })
+
+  test("释放确认在页面退到后台后不能继续提交", () => {
+    let modal
+    global.wx = { showModal: jest.fn((options) => { modal = options }) }
+    const page = createPage(loadPageDefinition(), { allBlocks: [{ id: "hold_1", kind: "hold" }] })
+    global.getCurrentPages = () => [page]
+    page.saveCalendarChange = jest.fn()
+    page.handleReleaseBlock({ currentTarget: { dataset: { id: "hold_1" } } })
+    global.getCurrentPages = () => [page, {}]
+    modal.success({ confirm: true, content: "释放" })
+    expect(page.saveCalendarChange).not.toHaveBeenCalled()
+  })
+
+  test("空价格按原值提交由服务端校验，保存时冻结正在提交的表单", () => {
+    const page = createPage(loadPageDefinition(), { priceForm: { dailyPrice: "" }, blockForm: { reason: "原原因" } })
+    page.saveCalendarChange = jest.fn()
+    page.handleSavePriceRule()
+    expect(page.saveCalendarChange).toHaveBeenCalledWith("createPriceRule", expect.objectContaining({ dailyPrice: "" }))
+    page.data.isSavingCalendar = true
+    page.handleCalendarFormInput({ currentTarget: { dataset: { form: "blockForm", field: "reason" } }, detail: { value: "新原因" } })
+    page.handleResetBlockForm()
+    expect(page.data.blockForm.reason).toBe("原原因")
   })
 
   test("切换月份后重新从云端查询该月数据", () => {

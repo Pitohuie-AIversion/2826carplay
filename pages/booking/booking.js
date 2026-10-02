@@ -3,11 +3,13 @@ const { trackEvent } = require("../../shared/analytics")
 const { sanitizeAttribution } = require("../../shared/contentAttribution")
 const { formatToastTitle } = require("../../shared/uiFeedback")
 const { requestOperationConfig } = require("../../shared/operationConfigRequest")
-const { getCityHubs } = require("../../shared/locations")
+const { getCityHubs, normalizeCity } = require("../../shared/locations")
+const { normalizeServiceConfig } = require("../../shared/serviceConfig")
 const {
   activatePageNativeActions,
   beginPageNativeAction,
   cancelPageNativeActions,
+  isPageCurrent,
   isPageNativeActionActive
 } = require("../../shared/pageNativeAction")
 const { onNetworkReconnect } = require("../../shared/networkStatus")
@@ -16,6 +18,16 @@ const LAST_BOOKING_CONTACT_KEY = "lastBookingContact"
 const BOOKING_CAR_LOAD_TIMEOUT_MS = 15 * 1000
 const AVAILABILITY_CHECK_TIMEOUT_MS = 12 * 1000
 const BOOKING_SUBMIT_TIMEOUT_MS = 15 * 1000
+
+function normalizedSubmission(form, vehicleId, attribution) {
+  const limits = { userName: 20, phone: 20, startDate: 20, endDate: 20, city: 20, pickupLocation: 60, returnLocation: 60, note: 200 }
+  const fields = Object.fromEntries(Object.entries(limits).map(([key, limit]) => [key, String(form && form[key] || "").trim().slice(0, limit)]))
+  const source = sanitizeAttribution(attribution)
+  return {
+    vehicleId: String(vehicleId || "").trim().slice(0, 64), ...fields,
+    attribution: source.contentId ? { contentId: source.contentId, channel: source.channel || "direct", scene: source.scene } : {}
+  }
+}
 
 function formatDate(date) {
   const year = date.getFullYear()
@@ -60,13 +72,14 @@ function buildFormProgress(form, privacyAgreed) {
           String(source.endDate) >= String(source.startDate)
       )
     },
+    { key: "city", label: "填写或选择取车城市", complete: Boolean(String(source.city || "").trim()) },
     { key: "privacy", label: "阅读并同意隐私政策", complete: Boolean(privacyAgreed) }
   ]
   const completed = checks.filter((item) => item.complete).length
   const nextCheck = checks.find((item) => !item.complete)
   const contactComplete = checks[0].complete && checks[1].complete
-  const datesComplete = checks[2].complete && checks[3].complete
-  const privacyComplete = checks[4].complete
+  const datesComplete = checks[2].complete && checks[3].complete && checks[4].complete
+  const privacyComplete = checks[5].complete
   const ready = completed === checks.length
 
   return {
@@ -171,6 +184,7 @@ Page({
     submittedBookingId: "",
     submittedSummary: null,
     submitRequestId: "",
+    submitErrorText: "",
     privacyAgreed: false,
     formProgress: buildFormProgress(null, false),
     bookingSummary: buildBookingSummary(null, ""),
@@ -180,6 +194,9 @@ Page({
     cityIndex: -1,
     pickerCityIndex: 0,
     pickupHubs: [],
+    serviceHubs: [],
+    operationConfigLoading: false,
+    operationConfigFailed: false,
     pickupHubIndex: 0,
     bookingStatusTemplateId: "",
     subscriptionEnabled: false,
@@ -240,9 +257,30 @@ Page({
     if (attribution.contentId) trackEvent("content_booking_start", carId, this.data.attribution)
 
     this._unsubscribeNetwork = onNetworkReconnect(() => {
+      if (this.data.operationConfigFailed) this.handleRetryServiceConfig()
       if (this.data.loadError && this.data.carId) {
         this.loadBookingCar(this.data.carId)
       }
+    })
+  },
+
+  onShow() {
+    if (this._bookingSubmissionInterrupted) {
+      this._bookingSubmissionInterrupted = false
+      this.applyState({ isSubmitting: false, submitButtonText: "提交预约" })
+    }
+    this.updateBookingNavigationTitle()
+    const refreshConfig = this._operationConfigSeenOnShow || this.data.operationConfigFailed
+    this._operationConfigSeenOnShow = true
+    if (refreshConfig && !this.data.isSubmitting && !this.data.submitSuccess) this.loadOperationConfig({ force: this.data.operationConfigFailed })
+  },
+
+  updateBookingNavigationTitle() {
+    if (this._nativeActionsUnloaded || !isPageCurrent(this) || typeof wx.setNavigationBarTitle !== "function") {
+      return
+    }
+    wx.setNavigationBarTitle({
+      title: this.data.submitSuccess ? "预约已提交" : this.data.carName ? `${this.data.carName} 预约` : "预约咨询"
     })
   },
 
@@ -287,20 +325,44 @@ Page({
     wx.showToast({ title: "已填入上次联系人", icon: "none" })
   },
 
-  loadOperationConfig() {
+  loadOperationConfig(options) {
     this.cancelOperationConfigRequest()
+    this.applyState({ operationConfigLoading: true, operationConfigFailed: false })
+    const handleUnavailable = () => {
+      const form = this.data.form || {}
+      const selectedHub = getCityHubs(form.city, this.data.serviceHubs).find((hub) => hub.name === form.pickupLocation)
+      if (selectedHub) this._pendingPickupSelection = { city: normalizeCity(form.city), id: selectedHub.id }
+      this.setData({ operationConfigLoading: false, operationConfigFailed: true, cityOptions: [], serviceHubs: [], bookingStatusTemplateId: "", subscriptionEnabled: false })
+      this.syncCitySelection()
+    }
     this._cancelOperationConfigRequest = requestOperationConfig({
+      force: Boolean(options && options.force),
       onSuccess: (config) => {
         this.setData({
+          operationConfigLoading: false,
+          operationConfigFailed: false,
           privacyTip: config.bookingPrivacyTip || this.data.privacyTip,
           cityOptions: Array.isArray(config.cityOptions) ? config.cityOptions : [],
+          serviceHubs: normalizeServiceConfig(config).serviceHubs,
           bookingStatusTemplateId: String(config.bookingStatusTemplateId || "").trim(),
           subscriptionEnabled: Boolean(String(config.bookingStatusTemplateId || "").trim())
         })
-
+        const pending = this._pendingPickupSelection
+        const restored = pending && pending.city === normalizeCity(this.data.form.city)
+          ? getCityHubs(this.data.form.city, this.data.serviceHubs).find((hub) => hub.id === pending.id)
+          : null
+        if (restored) this.setData({ "form.pickupLocation": restored.name })
+        this._pendingPickupSelection = null
         this.syncCitySelection()
-      }
+      },
+      onFailure: handleUnavailable,
+      onInvalidated: handleUnavailable
     })
+  },
+
+  handleRetryServiceConfig() {
+    if (this.data.operationConfigLoading || this.data.isSubmitting || this.data.submitSuccess) return
+    this.loadOperationConfig({ force: true })
   },
 
   loadBookingCar(carId) {
@@ -419,16 +481,14 @@ Page({
       carName: ""
     })
 
-    wx.setNavigationBarTitle({
-      title: "预约咨询"
-    })
+    this.updateBookingNavigationTitle()
   },
 
   applyCar(car) {
     const carName = car ? car.name || "" : ""
     const priceDay = car ? Number(car.priceDay) || 0 : 0
     this._carPriceDay = priceDay
-    const city = this._initialCity || (car ? car.location || "" : "")
+    const city = this._cityEdited ? this.data.form.city : this._initialCity || (car ? car.location || "" : "")
     const nextForm = {
       ...this.data.form,
       city
@@ -439,15 +499,14 @@ Page({
       carName,
       priceDay,
       "form.city": nextForm.city,
+      formProgress: buildFormProgress(nextForm, this.data.privacyAgreed),
       bookingSummary: buildBookingSummary(nextForm, carName),
       rentalEstimate: calculateRentalEstimate(nextForm.startDate, nextForm.endDate, priceDay)
     })
 
     this.syncCitySelection()
 
-    wx.setNavigationBarTitle({
-      title: car ? `${car.name} 预约` : "预约咨询"
-    })
+    this.updateBookingNavigationTitle()
   },
 
   syncCitySelection() {
@@ -455,11 +514,11 @@ Page({
     const currentCity = String((this.data.form && this.data.form.city) || "").trim()
     let cityIndex = cityOptions.indexOf(currentCity)
     if (cityIndex < 0 && currentCity) {
-      cityIndex = cityOptions.findIndex((opt) => currentCity.includes(opt) || opt.includes(currentCity))
+      cityIndex = cityOptions.findIndex((opt) => normalizeCity(opt) === normalizeCity(currentCity))
     }
-    const hubs = getCityHubs(currentCity)
+    const hubs = getCityHubs(currentCity, this.data.serviceHubs)
     const existingPickup = (this.data.form && this.data.form.pickupLocation) || ""
-    const pickupLocation = existingPickup || (hubs[0] ? hubs[0].name : "")
+    const pickupLocation = hubs.some((hub) => hub.name === existingPickup) ? existingPickup : (hubs[0] ? hubs[0].name : "")
     let pickupHubIndex = hubs.findIndex((h) => h.name === pickupLocation)
     if (pickupHubIndex < 0) pickupHubIndex = 0
 
@@ -497,6 +556,11 @@ Page({
       formProgress: buildFormProgress(nextForm, this.data.privacyAgreed),
       bookingSummary: buildBookingSummary(nextForm, this.data.carName)
     })
+    if (field === "city") {
+      this._cityEdited = true
+      this._pendingPickupSelection = null
+      this.syncCitySelection()
+    }
     markUnsaved(this)
   },
 
@@ -757,7 +821,9 @@ Page({
     }
 
     const selectedCity = cityOptions[index]
-    const hubs = getCityHubs(selectedCity)
+    this._cityEdited = true
+    this._pendingPickupSelection = null
+    const hubs = getCityHubs(selectedCity, this.data.serviceHubs)
     const pickupLocation = hubs[0] ? hubs[0].name : ""
     const nextForm = {
       ...this.data.form,
@@ -772,6 +838,7 @@ Page({
       "form.city": selectedCity,
       "form.pickupLocation": pickupLocation,
       submitRequestId: "",
+      formProgress: buildFormProgress(nextForm, this.data.privacyAgreed),
       bookingSummary: buildBookingSummary(nextForm, this.data.carName)
     })
     markUnsaved(this)
@@ -831,6 +898,10 @@ Page({
       return "还车日期不能早于取车日期"
     }
 
+    if (!String(form.city || "").trim()) {
+      return "请输入或选择取车城市"
+    }
+
     if (!this.data.privacyAgreed) {
       return "请先阅读并同意隐私政策"
     }
@@ -851,7 +922,7 @@ Page({
   },
 
   handleOpenPrivacyPolicy() {
-    const action = beginPageNativeAction(this)
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.navigateTo({
       url: "/pages/content-page/content-page?type=privacy",
       fail: () => {
@@ -894,7 +965,7 @@ Page({
   },
 
   handleSubmit() {
-    if (this.data.isSubmitting) {
+    if (this.data.isSubmitting || this.data.submitSuccess) {
       return
     }
 
@@ -908,11 +979,16 @@ Page({
       return
     }
 
-    const requestId = this.data.submitRequestId || createBookingRequestId()
-    const submittedVehicleId = String(this.data.carId || "").trim()
-    const submittedForm = {
-      ...this.data.form
+    const candidate = normalizedSubmission(this.data.form, this.data.carId, this.data.attribution)
+    const { attribution, ...businessContent } = candidate
+    const key = JSON.stringify(businessContent)
+    if (!this._bookingSubmitSnapshot || this._bookingSubmitSnapshot.key !== key) {
+      this._bookingSubmitSnapshot = { key, requestId: createBookingRequestId(), submission: candidate }
     }
+    const submission = this._bookingSubmitSnapshot.submission
+    const requestId = this._bookingSubmitSnapshot.requestId
+    const submittedVehicleId = submission.vehicleId
+    const submittedForm = submission
     const submittedSummary = {
       ...this.data.bookingSummary
     }
@@ -921,6 +997,7 @@ Page({
 
     this.applyState({
       isSubmitting: true,
+      submitErrorText: "",
       submitButtonText: "正在提交",
       submitRequestId: requestId
     })
@@ -938,10 +1015,29 @@ Page({
       return
     }
 
+    const subscriptionAction = beginPageNativeAction(this, { requireCurrent: true })
+    const stopBeforeSubmit = () => {
+      if (submitSerial !== this._bookingSubmitSerial) return
+      this._bookingSubmitSerial = submitSerial + 1
+      this.clearBookingSubmitTimer()
+      if (!isPageNativeActionActive(this, subscriptionAction)) {
+        this._bookingSubmissionInterrupted = true
+        return
+      }
+      this.applyState({ isSubmitting: false, submitButtonText: "提交预约" })
+      wx.showToast({ title: "订阅未完成，请重试", icon: "none" })
+    }
+    this.clearBookingSubmitTimer()
+    this._bookingSubmitTimer = setTimeout(stopBeforeSubmit, BOOKING_SUBMIT_TIMEOUT_MS)
     this.requestStatusSubscription(() => {
       if (submitSerial !== this._bookingSubmitSerial) {
         return
       }
+      if (!isPageNativeActionActive(this, subscriptionAction)) {
+        stopBeforeSubmit()
+        return
+      }
+      this.clearBookingSubmitTimer()
 
       let settled = false
       const finishRequest = () => {
@@ -956,7 +1052,7 @@ Page({
         if (!finishRequest()) {
           return
         }
-        wx.showToast({
+        if (isPageCurrent(this)) wx.showToast({
           title: formatToastTitle(message, "预约提交失败"),
           icon: "none"
         })
@@ -982,7 +1078,7 @@ Page({
           pickupLocation: submittedForm.pickupLocation || "",
           returnLocation: submittedForm.returnLocation || "",
           note: submittedForm.note,
-          attribution: this.data.attribution,
+          attribution: submission.attribution,
           requestId
         },
         success: (res) => {
@@ -991,20 +1087,22 @@ Page({
           }
           const result = res && res.result ? res.result : null
           if (!result || !result.ok) {
-            wx.showToast({
-              title: formatToastTitle(result && result.message, "预约提交失败"),
+            const duplicate = result && result.code === "DUPLICATE_BOOKING"
+            if (isPageCurrent(this)) wx.showToast({
+              title: duplicate ? "已有同日期预约" : formatToastTitle(result && result.message, "预约提交失败"),
               icon: "none"
             })
             this.applyState({
               isSubmitting: false,
+              submitErrorText: duplicate ? "该车辆和日期已有预约，请到“我的预约”查看；本次修改尚未保存。" : String(result && result.message || "预约提交失败，请重试"),
               submitButtonText: "提交预约"
             })
             return
           }
 
           trackEvent("booking_submit", submittedVehicleId)
-          if (this.data.attribution.contentId) {
-            trackEvent("content_booking_submit", submittedVehicleId, this.data.attribution)
+          if (submission.attribution.contentId) {
+            trackEvent("content_booking_submit", submittedVehicleId, submission.attribution)
           }
           if (typeof wx.setStorageSync === "function") {
             try {
@@ -1022,9 +1120,7 @@ Page({
             submittedSummary
           })
           clearUnsaved(this)
-          wx.setNavigationBarTitle({
-            title: "预约已提交"
-          })
+          this.updateBookingNavigationTitle()
         },
         fail: (error) => {
           handleFailure(error && (error.errMsg || error.message))
@@ -1041,7 +1137,7 @@ Page({
 
   handleViewSubmittedBooking() {
     const id = String(this.data.submittedBookingId || "").trim()
-    const action = beginPageNativeAction(this)
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.navigateTo({
       url: id
         ? `/pages/booking-detail/booking-detail?id=${id}`
@@ -1059,7 +1155,7 @@ Page({
   },
 
   handleContinueBrowse() {
-    const action = beginPageNativeAction(this)
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.redirectTo({
       url: "/pages/garage/garage",
       fail: () => {
@@ -1083,7 +1179,7 @@ Page({
   },
 
   handleBackGarage() {
-    const action = beginPageNativeAction(this)
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     const pages = getCurrentPages()
 
     if (pages.length > 1) {

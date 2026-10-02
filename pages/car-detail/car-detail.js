@@ -3,13 +3,16 @@ const { normalizeRentalDiscountTiers } = require("../../shared/rentalPricing")
 const { sanitizeAttribution, buildQuery, hasAttribution, isShareLanding } = require("../../shared/contentAttribution")
 const { formatToastTitle } = require("../../shared/uiFeedback")
 const { requestOperationConfig } = require("../../shared/operationConfigRequest")
+const { requestCloudRead } = require("../../shared/cloudReadRequest")
+const { resolveServiceHub, hasHubCoordinates } = require("../../shared/locations")
 const { onNetworkReconnect } = require("../../shared/networkStatus")
 const { triggerHapticFeedback } = require("../../shared/hapticFeedback")
 const {
   activatePageNativeActions,
   beginPageNativeAction,
   cancelPageNativeActions,
-  isPageNativeActionActive
+  isPageNativeActionActive,
+  isPageCurrent
 } = require("../../shared/pageNativeAction")
 const {
   resolveImage,
@@ -19,28 +22,22 @@ const {
   markImageLoaded,
   unmarkImageLoaded
 } = require("../../shared/imageCache")
-const { openCustomerService, hasWxKfConfig } = require("../../shared/customerService")
+const { openCustomerService, hasWxKfConfig, cancelCustomerServiceRequest } = require("../../shared/customerService")
+const { getClientVehicleStatusText } = require("../../shared/vehicleLabels")
 const detailLoadedImagesCache = new Set()
 const carDetailMemoryCache = new Map()
 const CAR_DETAIL_LOAD_TIMEOUT_MS = 15 * 1000
 const FAVORITE_STATUS_TIMEOUT_MS = 10 * 1000
 const FAVORITE_UPDATE_TIMEOUT_MS = 12 * 1000
-const DEFAULT_RENTAL_TERMS = {
-  includedText: "基础日租仅包含车辆使用费，其他项目会在正式报价前单独列明。",
-  protectionText: "基础保障内容根据车型与租期确认，不默认包含额外保障服务。",
-  serviceFeeText: "如有车辆整备或门店服务费，将在报价明细中单独列示。",
-  deliveryFeeText: "取送车服务及费用按城市、距离和时段确认，无该服务时不收费。",
-  depositText: "车辆押金与违章押金的金额、支付方式和退还时间会在确认前明确告知。",
-  cancellationText: "预约提交后可取消；顾问确认后的取消或改期规则以有效报价说明为准。",
-  overtimeText: "超时用车费用按最终确认的计费规则执行，产生前由顾问说明。",
-  energyText: "取还车油量或电量标准会在交付前确认，并以交接记录为准。",
-  estimateDisclaimer: "页面价格为基础日租参考，不是正式报价，提交预约也不会自动锁定车辆。"
-}
+const RENTAL_TERM_KEYS = [
+  "includedText", "protectionText", "serviceFeeText", "deliveryFeeText",
+  "depositText", "cancellationText", "overtimeText", "energyText", "estimateDisclaimer"
+]
 
 function normalizeRentalTerms(raw) {
   const input = raw && typeof raw === "object" ? raw : {}
-  return Object.keys(DEFAULT_RENTAL_TERMS).reduce((result, key) => {
-    result[key] = String(input[key] || "").trim() || DEFAULT_RENTAL_TERMS[key]
+  return RENTAL_TERM_KEYS.reduce((result, key) => {
+    result[key] = String(input[key] || "").trim()
     return result
   }, {})
 }
@@ -71,26 +68,19 @@ function buildPricingOverview(car, rentalTermsInput) {
       { key: "protection", label: "保障说明", text: rentalTerms.protectionText },
       { key: "service", label: "服务费用", text: rentalTerms.serviceFeeText },
       { key: "delivery", label: "取送车费用", text: rentalTerms.deliveryFeeText }
-    ],
+    ].filter((item) => item.text),
     ruleItems: [
       { key: "deposit", label: "押金与退还", text: rentalTerms.depositText },
       { key: "cancellation", label: "取消与改期", text: rentalTerms.cancellationText },
       { key: "overtime", label: "超时用车", text: rentalTerms.overtimeText },
       { key: "energy", label: "油量或电量", text: rentalTerms.energyText }
-    ],
+    ].filter((item) => item.text),
     disclaimer: rentalTerms.estimateDisclaimer
   }
 }
 
 function getStatusText(status, fallbackText) {
-  const statusTextMap = {
-    available: "可预约",
-    rented: "使用中",
-    maintenance: "维护中",
-    reserved: "已预约"
-  }
-
-  return statusTextMap[status] || fallbackText || "可预约"
+  return getClientVehicleStatusText(status, fallbackText || "可预约")
 }
 
 function attachStatusClass(car) {
@@ -131,10 +121,10 @@ function buildPerformanceHighlights(car) {
 
   const fallbackHighlights = ["具体配置以车辆实车为准", "建议到店体验后确认功能"]
 
-  const rawAcceleration = String(rawPerf.acceleration || source.acceleration || "").trim()
-  const rawHorsepower = String(rawPerf.horsepower || source.horsepower || "").trim()
-  const rawDrivetrain = String(rawPerf.drivetrain || source.drivetrain || "").trim()
-  const rawTorque = String(rawPerf.torque || source.torque || "").trim()
+  const rawAcceleration = String(rawPerf.acceleration != null ? rawPerf.acceleration : source.acceleration == null ? "" : source.acceleration).trim()
+  const rawHorsepower = String(rawPerf.horsepower != null ? rawPerf.horsepower : source.horsepower == null ? "" : source.horsepower).trim()
+  const rawDrivetrain = String(rawPerf.drivetrain != null ? rawPerf.drivetrain : source.drivetrain == null ? "" : source.drivetrain).trim()
+  const rawTorque = String(rawPerf.torque != null ? rawPerf.torque : source.torque == null ? "" : source.torque).trim()
   const rawHighlights = Array.isArray(rawPerf.highlights) && rawPerf.highlights.length ? rawPerf.highlights.slice() : null
 
   return {
@@ -212,7 +202,7 @@ function formatCarViewModel(car) {
     fuelTypeText: fuelTypeMap[car.fuelType] || car.fuelType || "—",
     seatsText: car.seatsText || (car.seats ? `${car.seats} 座` : "—"),
     brand: car.brand || "未知品牌",
-    location: car.location || "门店咨询",
+    location: String(car.location || "").trim(),
     performance: buildPerformanceHighlights(car),
     trustArchive: buildTrustArchiveView(car.trustArchive),
     vehicleYear: car.vehicleYear || (car.registerDate ? String(car.registerDate).slice(0, 4) : "—")
@@ -281,15 +271,20 @@ function drawPosterTextEllipsis(ctx, text, x, y, maxWidth) {
 Page({
   data: {
     brandName: "极境车库",
-    servicePhone: "15715710090",
+    servicePhone: "",
+    serviceHoursText: "",
+    serviceHubs: [],
+    serviceHub: null,
+    canNavigate: false,
     wxKfReady: false,
     rentalTerms: normalizeRentalTerms(),
-    pricingOverview: buildPricingOverview(null, DEFAULT_RENTAL_TERMS),
+    pricingOverview: buildPricingOverview(null),
     pricingExpanded: false,
     rulesExpanded: false,
     trustExpanded: false,
     carId: "",
     car: null,
+    detailVerified: false,
     relatedGuides: [],
     attribution: { channel: "", scene: "", contentId: "", vehicleId: "" },
     currentImageIndex: 0,
@@ -330,7 +325,6 @@ Page({
 
     const attribution = sanitizeAttribution(options)
     const carId = attribution.vehicleId || String((options && options.carId) || "").trim()
-    this._initialCity = String((options && options.city) || "").trim()
     this.setData({
       carId,
       attribution: sanitizeAttribution({ ...attribution, vehicleId: carId })
@@ -373,7 +367,7 @@ Page({
       }
       return
     }
-    this.loadOperationConfig()
+    this.loadOperationConfig({ force: true })
     if (this.data.carId) {
       this.loadFavoriteStatus(this.data.carId)
       this.loadRelatedGuides(this.data.carId)
@@ -388,13 +382,16 @@ Page({
   },
 
   loadRelatedGuides(vehicleId) {
-    if (!vehicleId || !wx.cloud || typeof wx.cloud.callFunction !== "function") return
-    wx.cloud.callFunction({
+    if (this._cancelRelatedGuidesRequest) this._cancelRelatedGuidesRequest()
+    if (!vehicleId) { this.setData({ relatedGuides: [] }); return }
+    this._cancelRelatedGuidesRequest = requestCloudRead({
       name: "contentGuideList",
       data: { vehicleId, limit: 4 },
-      success: (res) => {
-        const result = res && res.result
-        if (result && result.ok && Array.isArray(result.list)) this.setData({ relatedGuides: result.list })
+      onSuccess: (result) => {
+        this.setData({ relatedGuides: Array.isArray(result.list) ? result.list : [] })
+      },
+      onFailure: () => {
+        this.setData({ relatedGuides: [] })
       }
     })
   },
@@ -404,7 +401,7 @@ Page({
     const scene = String(event.currentTarget.dataset.scene || "").trim()
     if (!contentId) return
     const attribution = sanitizeAttribution({ ...this.data.attribution, channel: this.data.attribution.channel || "direct", contentId, scene, vehicleId: this.data.carId })
-    const action = beginPageNativeAction(this)
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.navigateTo({
       url: `/pages/content-page/content-page?${buildQuery(attribution)}`,
       fail: () => {
@@ -413,9 +410,10 @@ Page({
     })
   },
 
-  loadOperationConfig() {
+  loadOperationConfig(options) {
     this.cancelOperationConfigRequest()
     this._cancelOperationConfigRequest = requestOperationConfig({
+      force: Boolean(options && options.force),
       onSuccess: (config) => {
         const servicePhone =
           String(config.servicePhone || "").trim()
@@ -423,13 +421,32 @@ Page({
 
         this.setData({
           brandName: String(config.brandName || "").trim() || this.data.brandName,
-          servicePhone: servicePhone || this.data.servicePhone,
+          servicePhone,
+          serviceHoursText: String(config.serviceHoursText || "").trim(),
+          serviceHubs: Array.isArray(config.serviceHubs) ? config.serviceHubs : [],
           wxKfReady: hasWxKfConfig(config),
           rentalTerms,
           pricingOverview: buildPricingOverview(this.data.car, rentalTerms)
         })
+        this.updateServiceHub()
+      },
+      onFailure: () => {
+        const rentalTerms = normalizeRentalTerms()
+        this.setData({
+          servicePhone: "", serviceHoursText: "", serviceHubs: [], serviceHub: null,
+          canNavigate: false, wxKfReady: false, rentalTerms,
+          pricingOverview: buildPricingOverview(this.data.car, rentalTerms)
+        })
       }
     })
+  },
+
+  updateServiceHub() {
+    const car = this.data.car || {}
+    // The saved location may be a city or a legacy store reference. Route and
+    // preview city hints must not override it or disambiguate different stores.
+    const serviceHub = resolveServiceHub(car.location, "", this.data.serviceHubs)
+    this.setData({ serviceHub, canNavigate: hasHubCoordinates(serviceHub) })
   },
 
   loadFavoriteStatus(carId) {
@@ -441,7 +458,7 @@ Page({
     }
     let settled = false
     const finishRequest = () => {
-      if (settled || requestId !== this._favoriteStatusRequestId) {
+      if (settled || requestId !== this._favoriteStatusRequestId || (this.data.carId && String(this.data.carId) !== String(carId))) {
         return false
       }
       settled = true
@@ -493,10 +510,22 @@ Page({
   },
 
   loadCarDetail(carId, options) {
+    carId = String(carId || "").trim()
     const input = options && typeof options === "object" ? options : {}
     const requestId = Number(this._carDetailRequestId || 0) + 1
     this._carDetailRequestId = requestId
     this.finishCarDetailLoadEffects()
+    const changingCar = this.data.carId !== carId || (this.data.car && String(this.data.car.id) !== carId)
+    if (changingCar) {
+      this._favoriteStatusRequestId = Number(this._favoriteStatusRequestId || 0) + 1
+      this._favoriteUpdateSerial = Number(this._favoriteUpdateSerial || 0) + 1
+      this.clearFavoriteStatusTimer()
+      this.clearFavoriteUpdateTimer()
+      if (this._cancelRelatedGuidesRequest) this._cancelRelatedGuidesRequest()
+      this.applyCar(null)
+      this.setData({ carId, favoriteLoading: false, favorited: false, relatedGuides: [] })
+    }
+    this.setData({ detailVerified: false })
 
     if (!carId) {
       this.applyCar(null)
@@ -510,7 +539,7 @@ Page({
     if (!cachedCar && typeof wx !== "undefined" && typeof wx.getStorageSync === "function") {
       try {
         const stored = wx.getStorageSync(`car_detail_${carId}`)
-        if (stored && stored.id) {
+        if (stored && String(stored.id || "") === carId) {
           cachedCar = stored
           carDetailMemoryCache.set(carId, stored)
         }
@@ -521,9 +550,7 @@ Page({
     }
 
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
-      if (!cachedCar) {
-        this.setLoadError("云能力未初始化，请稍后重试")
-      }
+      this.setLoadError("云能力未初始化，请稍后重试")
       if (typeof input.done === "function") {
         try { input.done() } catch (e) {}
       }
@@ -538,7 +565,7 @@ Page({
 
     let settled = false
     const finishRequest = () => {
-      if (settled || requestId !== this._carDetailRequestId) {
+      if (settled || requestId !== this._carDetailRequestId || this.data.carId !== carId) {
         return false
       }
       settled = true
@@ -567,7 +594,7 @@ Page({
         }
         const result = res && res.result ? res.result : null
         const car = result && result.ok ? result.car : null
-        if (car) {
+        if (car && String(car.id || "") === carId) {
           carDetailMemoryCache.set(carId, car)
           if (carDetailMemoryCache.size > 30) {
             const oldestKey = carDetailMemoryCache.keys().next().value
@@ -576,11 +603,11 @@ Page({
           if (typeof wx !== "undefined" && typeof wx.setStorageSync === "function") {
             try { wx.setStorageSync(`car_detail_${carId}`, car) } catch (e) {}
           }
-          this.applyCar(car)
+          this.applyCar(car, { verified: true })
           return
         }
 
-        if (result && result.code === "NOT_FOUND") {
+        if (result && ["NOT_FOUND", "NOT_AVAILABLE"].includes(result.code)) {
           carDetailMemoryCache.delete(carId)
           if (typeof wx !== "undefined" && typeof wx.removeStorageSync === "function") {
             try { wx.removeStorageSync(`car_detail_${carId}`) } catch (e) {}
@@ -611,7 +638,21 @@ Page({
     this._carDetailLoadTimer = null
   },
 
+  onShow() {
+    if (this.data.posterModalVisible && this.data.posterGenerating) this.handleClosePosterModal()
+    if (isPageCurrent(this) && typeof wx.setNavigationBarTitle === "function") {
+      wx.setNavigationBarTitle({ title: this.data.car && this.data.car.name || "车辆详情" })
+    }
+  },
+
+  onHide() {
+    this.cancelPosterGeneration()
+  },
+
   onUnload() {
+    this.cancelPosterGeneration()
+    if (this._cancelRelatedGuidesRequest) this._cancelRelatedGuidesRequest()
+    cancelCustomerServiceRequest(this)
     cancelPageNativeActions(this)
     if (typeof this._unsubscribeNetwork === "function") {
       this._unsubscribeNetwork()
@@ -647,32 +688,45 @@ Page({
   },
 
   setLoadError(message) {
+    this.cancelImageResolves()
+    this.cancelPosterGeneration()
     this.setData({
       car: null,
+      detailVerified: false,
+      serviceHub: null,
+      canNavigate: false,
       currentImageIndex: 0,
       trustExpanded: false,
       loading: false,
       loadError: true,
+      posterModalVisible: false,
+      posterGenerating: false,
+      posterImagePath: "",
       loadErrorText: String(message || "车辆详情加载失败，请返回车库后重试")
     })
 
-    if (typeof wx !== "undefined" && typeof wx.setNavigationBarTitle === "function") {
+    if (isPageCurrent(this) && typeof wx !== "undefined" && typeof wx.setNavigationBarTitle === "function") {
       wx.setNavigationBarTitle({
         title: "车辆详情"
       })
     }
   },
 
-  applyCar(targetCar) {
+  applyCar(targetCar, options) {
     this.cancelImageResolves()
+    this.cancelPosterGeneration()
+    if (this.data.posterModalVisible) this.setData({ posterModalVisible: false, posterGenerating: false, posterImagePath: "" })
     if (!targetCar) {
       this.setData({
         car: null,
+        detailVerified: false,
+        serviceHub: null,
+        canNavigate: false,
         currentImageIndex: 0,
         loading: false,
         loadError: false
       })
-      if (typeof wx !== "undefined" && typeof wx.setNavigationBarTitle === "function") {
+      if (isPageCurrent(this) && typeof wx !== "undefined" && typeof wx.setNavigationBarTitle === "function") {
         wx.setNavigationBarTitle({
           title: "车辆详情"
         })
@@ -687,6 +741,7 @@ Page({
       : 0
     this.setData({
       car: viewModel,
+      detailVerified: Boolean(options && options.verified),
       pricingOverview: buildPricingOverview(targetCar, this.data.rentalTerms),
       currentImageIndex: nextImageIndex,
       trustExpanded: false,
@@ -694,9 +749,10 @@ Page({
       loadError: false
     })
     this._trustProfileViewTracked = false
+    this.updateServiceHub()
     this.scheduleImageResolves(viewModel.imageItems, 0)
 
-    if (typeof wx !== "undefined" && typeof wx.setNavigationBarTitle === "function") {
+    if (isPageCurrent(this) && typeof wx !== "undefined" && typeof wx.setNavigationBarTitle === "function") {
       wx.setNavigationBarTitle({
         title: targetCar.name || "车辆详情"
       })
@@ -813,17 +869,27 @@ Page({
     const car = this.data.car
     const item = car && car.imageItems && car.imageItems[index]
     if (!item || !item.src) return
+    const serial = this._imageResolveSerial
+    const src = item.src
     this.setData({
       [`car.imageItems[${index}].failed`]: false,
       [`car.imageItems[${index}].loaded`]: false
     })
     resolveImage(item.src, { priority: 90 })
       .then((resolved) => {
-        if (resolved) {
-          this.setData({ [`car.imageItems[${index}].displaySrc`]: resolved })
+        const currentCar = this.data.car
+        const currentItem = currentCar && currentCar.imageItems && currentCar.imageItems[index]
+        if (this._imageResolveSerial !== serial || !currentItem || currentItem.src !== src) return
+        if (resolved && resolved.localPath) {
+          this.setData({ [`car.imageItems[${index}].displaySrc`]: resolved.localPath })
         }
       })
-      .catch(() => {})
+      .catch(() => {
+        const currentCar = this.data.car
+        const currentItem = currentCar && currentCar.imageItems && currentCar.imageItems[index]
+        if (this._imageResolveSerial !== serial || !currentItem || currentItem.src !== src) return
+        this.setData({ [`car.imageItems[${index}].failed`]: true })
+      })
   },
 
   handleHeroSwiperChange(event) {
@@ -888,7 +954,7 @@ Page({
 
     let settled = false
     const finishRequest = () => {
-      if (settled || updateSerial !== this._favoriteUpdateSerial) {
+      if (settled || updateSerial !== this._favoriteUpdateSerial || this.data.carId !== vehicleId) {
         return false
       }
       settled = true
@@ -963,13 +1029,14 @@ Page({
   },
 
   handleBookingTap() {
-    if (!this.data.carId) {
+    if (!this.data.carId || !this.data.detailVerified || !this.data.car || String(this.data.car.id || "") !== this.data.carId) {
       return
     }
 
-    const action = beginPageNativeAction(this)
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     const attribution = sanitizeAttribution({ ...this.data.attribution, vehicleId: this.data.carId })
-    const city = this._initialCity || (this.data.car && this.data.car.location) || ""
+    this.updateServiceHub()
+    const city = (this.data.serviceHub && this.data.serviceHub.city) || this.data.car.location || ""
     const query = buildQuery(attribution)
     const cityParam = city ? `${query ? "&" : ""}city=${encodeURIComponent(city)}` : ""
     const fullQuery = [query, cityParam].filter(Boolean).join("")
@@ -1019,22 +1086,9 @@ Page({
       page: this,
       vehicleId: this.data.carId,
       source: "car_detail",
-      onLegacyFallback: () => {
-        if (this.data.wxKfReady) {
-          return
-        }
-        wx.showActionSheet({
-          itemList: ["拨打客服电话", "复制官方微信号"],
-          itemColor: "#2a2a33",
-          success: (res) => {
-            if (!res) return
-            if (res.tapIndex === 0) {
-              this.handlePhoneCall()
-            } else if (res.tapIndex === 1) {
-              this.handleWechatConsult()
-            }
-          }
-        })
+      onLegacyFallback: (config) => {
+        this.setData({ wxKfReady: false, servicePhone: String(config && config.servicePhone || "").trim() })
+        wx.showToast({ title: "请使用电话咨询", icon: "none" })
       }
     })
   },
@@ -1074,7 +1128,7 @@ Page({
   },
 
   handleBackGarage() {
-    const action = beginPageNativeAction(this)
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     const pages = getCurrentPages()
 
     if (pages.length > 1) {
@@ -1157,6 +1211,7 @@ Page({
   },
 
   handleOpenPosterModal() {
+    this.cancelPosterGeneration()
     this.setData({
       posterModalVisible: true,
       posterGenerating: true,
@@ -1175,11 +1230,27 @@ Page({
     }
   },
 
-  handleClosePosterModal() {
+  cancelPosterGeneration() {
+    this._posterRenderSerial = Number(this._posterRenderSerial || 0) + 1
     if (this._posterTimer) {
       clearTimeout(this._posterTimer)
       this._posterTimer = null
     }
+    if (this._posterSaveLoadingAction) {
+      this._posterSaveLoadingAction = null
+      if (typeof wx !== "undefined" && typeof wx.hideLoading === "function") wx.hideLoading()
+    }
+  },
+
+  isPosterActionActive(action, serial, vehicleId) {
+    return isPageNativeActionActive(this, action) &&
+      Number(this._posterRenderSerial || 0) === serial &&
+      this.data.posterModalVisible &&
+      String(this.data.car && this.data.car.id || this.data.carId || "") === vehicleId
+  },
+
+  handleClosePosterModal() {
+    this.cancelPosterGeneration()
     this.setData({
       posterModalVisible: false,
       posterGenerating: false
@@ -1213,8 +1284,13 @@ Page({
   },
 
   renderPoster() {
+    const action = beginPageNativeAction(this, { requireCurrent: true })
+    const serial = Number(this._posterRenderSerial || 0)
+    const vehicleId = String(this.data.car && this.data.car.id || this.data.carId || "")
+    const isActive = () => this.isPosterActionActive(action, serial, vehicleId)
+    if (!isActive()) return
     if (typeof wx === "undefined" || !wx || typeof wx.createSelectorQuery !== "function") {
-      this.fallbackRenderPoster()
+      this.fallbackRenderPoster(isActive)
       return
     }
     const query = wx.createSelectorQuery().in(this)
@@ -1222,14 +1298,15 @@ Page({
       .select("#posterCanvas")
       .fields({ node: true, size: true })
       .exec(async (res) => {
+        if (!isActive()) return
         if (!res || !res[0] || !res[0].node) {
-          this.fallbackRenderPoster()
+          this.fallbackRenderPoster(isActive)
           return
         }
         const canvas = res[0].node
         const ctx = canvas.getContext ? canvas.getContext("2d") : null
         if (!ctx) {
-          this.fallbackRenderPoster()
+          this.fallbackRenderPoster(isActive)
           return
         }
 
@@ -1431,23 +1508,25 @@ Page({
           ctx.fillText("极境", qrX + (qrSize - qr1W) / 2, qrY + 25)
           ctx.fillText("车库", qrX + (qrSize - qr2W) / 2, qrY + 45)
 
+          if (!isActive()) return
           if (typeof wx.canvasToTempFilePath === "function") {
             wx.canvasToTempFilePath({
               canvas,
               fileType: "png",
               quality: 1,
               success: (tempRes) => {
+                if (!isPageNativeActionActive(this, action) || !isActive()) return
                 this.setData({
                   posterImagePath: tempRes.tempFilePath,
                   posterGenerating: false
                 })
               },
               fail: () => {
-                this.fallbackRenderPoster()
+                this.fallbackRenderPoster(isActive)
               }
             })
           } else {
-            this.fallbackRenderPoster()
+            this.fallbackRenderPoster(isActive)
           }
         }
 
@@ -1459,9 +1538,11 @@ Page({
           resolvedCover = rawCover
         }
 
+        if (!isActive()) return
         if (resolvedCover && typeof canvas.createImage === "function") {
           const img = canvas.createImage()
           img.onload = () => {
+            if (!isActive()) return
             try {
               drawPosterAspectFillImage(ctx, img, photoX, photoY, photoW, photoH, photoRadius)
               ctx.strokeStyle = "rgba(255, 255, 255, 0.08)"
@@ -1474,6 +1555,7 @@ Page({
             drawFooterAndExport()
           }
           img.onerror = () => {
+            if (!isActive()) return
             drawPlaceholder()
             drawFooterAndExport()
           }
@@ -1485,7 +1567,8 @@ Page({
       })
   },
 
-  fallbackRenderPoster() {
+  fallbackRenderPoster(isActive) {
+    if (typeof isActive !== "function" || !isActive()) return
     const car = this.data.car || {}
     const fallbackImage = (car.imageItems && car.imageItems[0] && (car.imageItems[0].displaySrc || car.imageItems[0].src)) || car.cover || "/assets/icons/jijing-garage-emblem.png"
     this.setData({
@@ -1495,6 +1578,11 @@ Page({
   },
 
   async handleSavePoster() {
+    const action = beginPageNativeAction(this, { requireCurrent: true, exclusiveKey: "poster-save" })
+    const serial = Number(this._posterRenderSerial || 0)
+    const vehicleId = String(this.data.car && this.data.car.id || this.data.carId || "")
+    const isActive = () => this.isPosterActionActive(action, serial, vehicleId)
+    if (!isActive()) return
     let filePath = this.data.posterImagePath
     if (!filePath) {
       wx.showToast({ title: "海报生成中", icon: "none" })
@@ -1504,30 +1592,32 @@ Page({
     if (filePath.startsWith("http://") || filePath.startsWith("https://") || filePath.startsWith("cloud://")) {
       try {
         if (typeof wx.showLoading === "function") {
+          this._posterSaveLoadingAction = action
           wx.showLoading({ title: "保存中…", mask: true })
         }
         filePath = await this.resolvePosterCover(filePath)
       } catch (e) {
       } finally {
-        if (typeof wx.hideLoading === "function") {
-          wx.hideLoading()
+        if (this._posterSaveLoadingAction === action) {
+          this._posterSaveLoadingAction = null
+          if (typeof wx.hideLoading === "function") wx.hideLoading()
         }
       }
     }
 
-    const action = beginPageNativeAction(this, { requireCurrent: true })
+    if (!isActive()) return
     if (typeof wx.saveImageToPhotosAlbum === "function") {
       wx.saveImageToPhotosAlbum({
         filePath,
         success: () => {
-          triggerHapticFeedback("medium")
-          if (isPageNativeActionActive(this, action)) {
+          if (isPageNativeActionActive(this, action) && isActive()) {
+            triggerHapticFeedback("medium")
             wx.showToast({ title: "海报已保存相册", icon: "success" })
             this.handleClosePosterModal()
           }
         },
         fail: (err) => {
-          if (!isPageNativeActionActive(this, action)) return
+          if (!isPageNativeActionActive(this, action) || !isActive()) return
           const msg = String((err && (err.errMsg || err.message)) || "").toLowerCase()
           if (msg.includes("cancel")) {
             return
@@ -1545,21 +1635,23 @@ Page({
   },
 
   handleOpenLocation() {
-    const car = this.data.car || {}
-    const locationName = String(car.location || "极境车库").trim()
-    const isShanghai = locationName.includes("上海")
-    const latitude = isShanghai ? 31.2304 : 30.2741
-    const longitude = isShanghai ? 121.4737 : 120.1551
-    const name = `极境车库 · ${isShanghai ? "上海交付中心" : "杭州交付中心"}`
+    this.updateServiceHub()
+    const hub = this.data.serviceHub
+    if (!hasHubCoordinates(hub)) {
+      wx.showToast({ title: "导航位置暂未提供", icon: "none" })
+      return
+    }
+    const action = beginPageNativeAction(this, { requireCurrent: true })
 
     if (typeof wx.openLocation === "function") {
       wx.openLocation({
-        latitude,
-        longitude,
-        name,
-        address: locationName,
+        latitude: Number(hub.latitude),
+        longitude: Number(hub.longitude),
+        name: hub.name,
+        address: hub.address,
         scale: 15,
         fail: () => {
+          if (!isPageNativeActionActive(this, action)) return
           wx.showToast({ title: "定位打开失败", icon: "none" })
         }
       })
@@ -1600,29 +1692,6 @@ Page({
   },
 
   handleWechatConsult() {
-    const wechatId = "jijing_garage"
-    const action = beginPageNativeAction(this, { requireCurrent: true })
-    if (typeof wx.setClipboardData === "function") {
-      wx.setClipboardData({
-        data: wechatId,
-        success: () => {
-          triggerHapticFeedback("medium")
-          if (isPageNativeActionActive(this, action)) {
-            wx.showToast({
-              title: "微信号已复制",
-              icon: "success"
-            })
-          }
-        },
-        fail: () => {
-          if (isPageNativeActionActive(this, action)) {
-            wx.showToast({
-              title: "复制失败",
-              icon: "none"
-            })
-          }
-        }
-      })
-    }
+    this.handleOpenCustomerService()
   }
 })

@@ -17,13 +17,19 @@ function loadPage(relativePath, wxOverrides = {}) {
   const page = {
     ...definition,
     data: JSON.parse(JSON.stringify(definition.data)),
-    setData(update) { Object.keys(update).forEach((key) => { this.data[key] = update[key] }) }
+    setData(update) { Object.keys(update).forEach((key) => {
+      const parts = key.replace(/\[(\d+)\]/g, ".$1").split(".")
+      let target = this.data
+      parts.slice(0, -1).forEach((part) => { target = target[part] })
+      target[parts[parts.length - 1]] = update[key]
+    }) }
   }
   return page
 }
 
 describe("Phase 14 预约交接页面", () => {
   afterEach(() => {
+    jest.useRealTimers()
     delete global.Page
     delete global.getApp
     delete global.getCurrentPages
@@ -36,7 +42,7 @@ describe("Phase 14 预约交接页面", () => {
       expect(data).toMatchObject({ action: "submit", bookingId: "booking_1", stage: "pickup", mileageKm: 12000, energyLevelPercent: 80 })
       expect(data.photos.map((item) => item.angle)).toEqual(["front", "rear", "left", "right"])
       success({ result: { ok: true, version: 1 } })
-      complete()
+      if (complete) complete()
     })
     const page = loadPage("../pages/booking-manage-detail/booking-manage-detail.js", { cloud: { callFunction } })
     page.data.id = "booking_1"
@@ -74,6 +80,102 @@ describe("Phase 14 预约交接页面", () => {
 
     expect(callFunction).toHaveBeenCalledTimes(1)
     expect(page.loadDetail).toHaveBeenCalledTimes(1)
+  })
+
+  test("同毫秒上传同角度仍使用不同云路径，旧图清理同步异常不丢失新图", () => {
+    jest.useFakeTimers().setSystemTime(new Date("2026-09-30T00:00:00Z"))
+    const uploadFile = jest.fn(({ cloudPath, success }) => success({ fileID: `cloud://env/${cloudPath}` }))
+    const page = loadPage("../pages/booking-manage-detail/booking-manage-detail.js", {
+      chooseImage: jest.fn(({ success }) => success({ tempFilePaths: ["temp/front.jpg"], tempFiles: [{ size: 100 }] })),
+      cloud: { uploadFile, callFunction: jest.fn(() => { throw new Error("cleanup SDK unavailable") }) }
+    })
+    page.data.id = "booking_1"
+    page.data.booking = { status: "confirmed" }
+    const event = { currentTarget: { dataset: { angle: "front" } } }
+    page.handleChooseHandoverPhoto(event)
+    const first = page.data.handoverForm.photos[0].fileId
+    expect(() => page.handleChooseHandoverPhoto(event)).not.toThrow()
+    expect(uploadFile).toHaveBeenCalledTimes(2)
+    expect(uploadFile.mock.calls[0][0].cloudPath).not.toBe(uploadFile.mock.calls[1][0].cloudPath)
+    expect(page.data.handoverForm.photos[0].fileId).not.toBe(first)
+    expect(page.data.handoverLoading).toBe(false)
+    expect(() => page.onUnload()).not.toThrow()
+    expect(jest.getTimerCount()).toBe(0)
+  })
+
+  test("被清理图片提交受阻时提示重新上传，保留其他交接字段", () => {
+    const page = loadPage("../pages/booking-manage-detail/booking-manage-detail.js", {
+      cloud: { callFunction: jest.fn(({ success }) => success({ result: { ok: false, code: "IMAGE_DELETION_CONFLICT" } })) }
+    })
+    page.data.id = "booking_1"
+    page.data.booking = { status: "confirmed" }
+    Object.assign(page.data.handoverForm, { mileageKm: "12000", energyLevelPercent: "80", damageNote: "未发现损伤" })
+    page.data.handoverForm.photos.forEach((photo) => { photo.fileId = `cloud://env/handover-images/booking_1/pickup/${photo.angle}.jpg` })
+    page.handleSubmitHandover()
+    expect(wx.showToast).toHaveBeenCalledWith({ title: "请重新上传交接图片", icon: "none" })
+    expect(page.data.handoverForm.mileageKm).toBe("12000")
+    expect(page.data.handoverLoading).toBe(false)
+  })
+
+  test("历史暂不可用时当前取还车仍可完成核对，恢复后清除提示", () => {
+    const page = loadPage("../pages/booking-manage-detail/booking-manage-detail.js")
+    const booking = { latestPickupHandoverId: "pickup_45", latestReturnHandoverId: "return_1", status: "confirmed" }
+    const handovers = [{ id: "pickup_45", stage: "pickup", status: "confirmed" }, { id: "return_1", stage: "return", status: "confirmed" }]
+    page.applyBooking(booking, {}, {}, handovers, true)
+    expect(page.data.handoverReadyForCompletion).toBe(true)
+    expect(page.data.handoverHistoryUnavailable).toBe(true)
+    page.applyBooking(booking, {}, {}, handovers, false)
+    expect(page.data.handoverHistoryUnavailable).toBe(false)
+  })
+
+  test("交接填写时固定版本，详情后续更新不能把旧表单当成新版本提交", () => {
+    const callFunction = jest.fn(({ success }) => success({ result: { ok: false, code: "VERSION_CONFLICT" } }))
+    const page = loadPage("../pages/booking-manage-detail/booking-manage-detail.js", { cloud: { callFunction }, showModal: jest.fn(({ success }) => success({ confirm: false })) })
+    page.data.id = "booking_1"
+    page.data.booking = { status: "confirmed", latestPickupHandoverVersion: 1 }
+    page.handleHandoverInput({ currentTarget: { dataset: { field: "mileageKm" } }, detail: { value: "12000" } })
+    page.data.handoverForm.energyLevelPercent = "80"
+    page.data.handoverForm.damageNote = "未发现损伤"
+    page.data.handoverForm.photos.forEach((photo) => { photo.fileId = `cloud://env/handover-images/booking_1/pickup/${photo.angle}.jpg` })
+    page.data.booking.latestPickupHandoverVersion = 2
+    page.handleSubmitHandover()
+    expect(callFunction.mock.calls[0][0].data.expectedVersion).toBe(1)
+    expect(page.data.handoverForm.mileageKm).toBe("12000")
+    expect(page.data.handoverForm.expectedVersion).toBe(1)
+    expect(wx.showModal).toHaveBeenCalledWith(expect.objectContaining({ title: "交接记录已更新", cancelText: "保留输入" }))
+  })
+
+  test("客户核对无响应可重试，卸载后失败回调保持静默", () => {
+    jest.useFakeTimers()
+    const requests = []
+    const page = loadPage("../pages/booking-detail/booking-detail.js", { cloud: { callFunction: jest.fn((request) => requests.push(request)) } })
+    page.data.id = "booking_1"
+    page.data.handovers.pickup = { id: "handover_1", stageText: "取车", status: "submitted" }
+    page.loadDetail = jest.fn()
+    const event = { currentTarget: { dataset: { stage: "pickup" } } }
+    page.handleConfirmHandover(event)
+    expect(page.data.handoverResponding).toBe(true)
+    jest.advanceTimersByTime(12000)
+    expect(page.data.handoverResponding).toBe(false)
+    requests[0].success({ result: { ok: true } })
+    expect(page.loadDetail).not.toHaveBeenCalled()
+    page.handleConfirmHandover(event)
+    page.onUnload()
+    wx.showToast.mockClear()
+    requests[1].fail(new Error("late failure"))
+    requests[1].complete()
+    expect(wx.showToast).not.toHaveBeenCalled()
+    expect(jest.getTimerCount()).toBe(0)
+  })
+
+  test("客户核对接口同步异常会恢复按钮并清除计时器", () => {
+    jest.useFakeTimers()
+    const page = loadPage("../pages/booking-detail/booking-detail.js", { cloud: { callFunction: jest.fn(() => { throw new Error("sdk failure") }) } })
+    page.data.id = "booking_1"
+    page.data.handovers.pickup = { id: "handover_1", stageText: "取车", status: "submitted" }
+    expect(() => page.handleConfirmHandover({ currentTarget: { dataset: { stage: "pickup" } } })).not.toThrow()
+    expect(page.data.handoverResponding).toBe(false)
+    expect(jest.getTimerCount()).toBe(0)
   })
 
   test("双端模板包含交接边界、私有照片和人工救援提示", () => {

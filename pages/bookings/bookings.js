@@ -5,7 +5,8 @@ const {
   activatePageNativeActions,
   beginPageNativeAction,
   cancelPageNativeActions,
-  isPageNativeActionActive
+  isPageNativeActionActive,
+  isPageCurrent
 } = require("../../shared/pageNativeAction")
 const { onNetworkReconnect } = require("../../shared/networkStatus")
 const { mapStatusText, mapStatusClass, canCancelBooking } = require("../../shared/bookingStatus")
@@ -29,7 +30,7 @@ function buildStatusGuidance(status) {
     },
     quoted: { title: "报价待确认", desc: "请进入详情核对费用并确认或申请调整。", tone: "quoted" },
     adjustment_requested: { title: "报价调整中", desc: "顾问正在根据你的说明重新报价。", tone: "adjustment" },
-    confirmed: { title: "报价已确认", desc: "当前方案已确认但尚未付款，请关注后续安排。", tone: "confirmed" },
+    confirmed: { title: "报价已确认", desc: "所选档期已保留，尚未付款或签署合同，请关注后续安排。", tone: "confirmed" },
     completed: {
       title: "本次行程已完成",
       desc: "预约流程已结束，可返回车库继续浏览其他车辆。",
@@ -202,12 +203,13 @@ Page({
             page: 0,
             hasMore: true
           })
+          this._lastBookingsLoadedAt = 0
         }
       }
     } catch (e) {}
 
     this._unsubscribeNetwork = onNetworkReconnect(() => {
-      if (this.data.loadError) {
+      if (this.data.loadFailed) {
         this.loadList()
       }
     })
@@ -227,7 +229,8 @@ Page({
       now - this._lastBookingsLoadedAt < 30 * 1000 &&
       Array.isArray(this.data.list) &&
       this.data.list.length > 0
-    if (!isFresh) {
+    if (!isFresh || this.data.loadFailed || this._bookingsNeedRefresh) {
+      this._bookingsNeedRefresh = false
       this.loadList()
     }
   },
@@ -483,6 +486,7 @@ Page({
     }
 
     const current = this.data.list.find((item) => item.id === id)
+    this._bookingsNeedRefresh = true
 
     const action = beginPageNativeAction(this)
     wx.navigateTo({
@@ -498,7 +502,7 @@ Page({
         }
       },
       fail: () => {
-        if (!isPageNativeActionActive(this, action)) {
+        if (!isPageNativeActionActive(this, action) || !isPageCurrent(this)) {
           return
         }
         wx.showToast({
@@ -516,6 +520,7 @@ Page({
     }
 
     const action = beginPageNativeAction(this, {
+      requireCurrent: true,
       exclusiveKey: "booking-cancel-confirmation"
     })
     wx.showModal({
@@ -626,7 +631,7 @@ Page({
   },
 
   handleBackGarage() {
-    const action = beginPageNativeAction(this)
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.redirectTo({
       url: "/pages/garage/garage",
       fail: () => {

@@ -1,3 +1,6 @@
+const CSV_SESSION_ID = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
+let csvSaveSerial = 0
+
 function getErrorMessage(error) {
   if (!error) {
     return ""
@@ -32,28 +35,42 @@ function canShareCsvFile() {
   return !isDevtoolsEnv() && typeof wx.shareFileMessage === "function"
 }
 
-function saveCsvFile(options) {
+async function saveCsvFile(options) {
   const input = options && typeof options === "object" ? options : {}
   const fileName = ensureCsvFileName(input.fileName, input.fallbackFileName)
   const fs = wx.getFileSystemManager && wx.getFileSystemManager()
-  if (!fs) {
-    return Promise.reject(new Error("文件系统不可用"))
+  if (!fs || typeof fs.writeFile !== "function") {
+    throw new Error("文件系统不可用")
   }
   const basePath = wx.env && wx.env.USER_DATA_PATH ? wx.env.USER_DATA_PATH : ""
-  const filePath = basePath ? `${basePath}/${fileName}` : fileName
+  if (!basePath) {
+    throw new Error("文件目录不可用")
+  }
+  // Every write owns its path, so a timed-out export cannot overwrite or remove a retry.
+  csvSaveSerial += 1
+  const filePath = `${basePath}/csv_${CSV_SESSION_ID}_${csvSaveSerial}.csv`
 
   return new Promise((resolve, reject) => {
-    fs.writeFile({
+    const fail = (error) => {
+      removeCsvFile(filePath).catch(() => {})
+      reject(error)
+    }
+    const writeOptions = {
       filePath,
       data: String(input.csvText || ""),
       encoding: "utf8",
       success: () => resolve({ filePath, fileName }),
-      fail: (error) => reject(error)
-    })
+      fail
+    }
+    try {
+      fs.writeFile(writeOptions)
+    } catch (error) {
+      fail(error)
+    }
   })
 }
 
-function removeCsvFile(filePath) {
+async function removeCsvFile(filePath) {
   const target = String(filePath || "").trim()
   const basePath = wx.env && wx.env.USER_DATA_PATH ? String(wx.env.USER_DATA_PATH) : ""
   const normalizePath = (value) => String(value || "").replace(/\\/g, "/").replace(/\/+$/, "")
@@ -62,6 +79,7 @@ function removeCsvFile(filePath) {
   const allowed =
     normalizedBase &&
     normalizedTarget.startsWith(`${normalizedBase}/`) &&
+    !normalizedTarget.slice(normalizedBase.length + 1).split("/").some((part) => part === "." || part === "..") &&
     /\.csv$/i.test(normalizedTarget)
 
   if (!allowed) {

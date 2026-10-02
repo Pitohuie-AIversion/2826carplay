@@ -51,6 +51,7 @@ let confirmedUrls = null
 let pendingDownloads = new Map()
 let downloadQueue = []
 let activeDownloads = 0
+let cacheGeneration = 0
 
 function loadUrlMap() {
   if (urlMap !== null) return urlMap
@@ -90,7 +91,7 @@ function loadConfirmedUrls() {
   if (confirmedUrls !== null) return confirmedUrls
   try {
     const raw = wx.getStorageSync(STORAGE_KEY_CONFIRMED)
-    confirmedUrls = Array.isArray(raw) ? new Set(raw) : new Set()
+    confirmedUrls = Array.isArray(raw) ? new Set(raw.slice(-MAX_CONFIRMED_URLS)) : new Set()
   } catch (e) {
     confirmedUrls = new Set()
   }
@@ -99,6 +100,9 @@ function loadConfirmedUrls() {
 
 function saveConfirmedUrls() {
   if (!confirmedUrls) return
+  while (confirmedUrls.size > MAX_CONFIRMED_URLS) {
+    confirmedUrls.delete(confirmedUrls.values().next().value)
+  }
   try {
     const list = Array.from(confirmedUrls)
     const trimmed = list.length > MAX_CONFIRMED_URLS ? list.slice(list.length - MAX_CONFIRMED_URLS) : list
@@ -129,7 +133,12 @@ function removeCacheEntry(url) {
     if (localPath) confirmedUrls.delete(localPath)
     saveConfirmedUrls()
   }
-  if (localPath) {
+  removeUnreferencedFile(localPath)
+}
+
+function removeUnreferencedFile(localPath) {
+  loadUrlMap()
+  if (localPath && !Object.values(urlMap).includes(localPath)) {
     try {
       if (typeof wx !== "undefined") {
         if (typeof wx.removeSavedFile === "function") {
@@ -229,7 +238,7 @@ function processDownloadQueue() {
 function enqueueDownload(url, options) {
   const priority = Number(options && options.priority) || 0
   return new Promise((resolve, reject) => {
-    downloadQueue.push({ url, options: options || {}, resolve, reject, priority })
+    downloadQueue.push({ url, options: { ...options, generation: cacheGeneration }, resolve, reject, priority })
     downloadQueue.sort((a, b) => b.priority - a.priority)
     processDownloadQueue()
   })
@@ -244,7 +253,6 @@ function executeDownload(url, options) {
       if (settled) return
       settled = true
       if (timer) clearTimeout(timer)
-      pendingDownloads.delete(url)
       if (ok) resolve(value)
       else reject(value)
     }
@@ -255,12 +263,25 @@ function executeDownload(url, options) {
 
     const handleSuccess = (tempFilePath) => {
       if (settled) return
+      if (options.generation !== cacheGeneration) {
+        finish(false, new Error("image cache cleared"))
+        return
+      }
       try {
         const fs = wx.getFileSystemManager()
         fs.saveFile({
           tempFilePath,
           success: (saveRes) => {
             const savedPath = saveRes.savedFilePath
+            if (settled || options.generation !== cacheGeneration) {
+              removeUnreferencedFile(savedPath)
+              finish(false, new Error("image cache cleared"))
+              return
+            }
+            if (!savedPath) {
+              finish(true, { localPath: tempFilePath, cached: false, temp: true })
+              return
+            }
             loadUrlMap()
             loadCacheMeta()
             urlMap[url] = savedPath
@@ -276,7 +297,8 @@ function executeDownload(url, options) {
             finish(true, { localPath: savedPath, cached: false })
           },
           fail: (err) => {
-            finish(true, { localPath: tempFilePath, cached: false, temp: true })
+            if (options.generation !== cacheGeneration) finish(false, new Error("image cache cleared"))
+            else finish(true, { localPath: tempFilePath, cached: false, temp: true })
           }
         })
       } catch (e) {
@@ -358,7 +380,10 @@ function resolveImage(url, options) {
   const priority = Number(options && options.priority) || 0
   const promise = enqueueDownload(url, { priority })
   pendingDownloads.set(url, promise)
-  promise.catch(() => {})
+  const releasePending = () => {
+    if (pendingDownloads.get(url) === promise) pendingDownloads.delete(url)
+  }
+  promise.then(releasePending, releasePending)
   return promise
 }
 
@@ -429,14 +454,17 @@ function clearExpiredCache(maxAgeMs) {
 }
 
 function clearAllCache() {
+  cacheGeneration++
+  const queued = downloadQueue
+  downloadQueue = []
+  queued.forEach((item) => item.reject(new Error("image cache cleared")))
+  pendingDownloads.clear()
   loadUrlMap()
   const urls = Object.keys(urlMap || {})
   urls.forEach((url) => removeCacheEntry(url))
   memoryCache.keys().forEach((key) => memoryCache.delete(key))
-  if (confirmedUrls) {
-    confirmedUrls.clear()
-    saveConfirmedUrls()
-  }
+  loadConfirmedUrls().clear()
+  saveConfirmedUrls()
 }
 
 function getCacheStats() {
@@ -469,9 +497,11 @@ function isImageLoaded(url) {
 function markImageLoaded(url) {
   if (!url || typeof url !== "string") return
   const set = loadConfirmedUrls()
+  set.delete(url)
   set.add(url)
   const cached = getCachedPath(url)
   if (cached && cached !== url) {
+    set.delete(cached)
     set.add(cached)
   }
   saveConfirmedUrls()
@@ -485,6 +515,10 @@ function unmarkImageLoaded(url) {
   if (cached && cached !== url) {
     set.delete(cached)
   }
+  // An existing file can still fail image decoding; a retry must download it again.
+  loadUrlMap()
+  Object.keys(urlMap).filter((key) => key === url || urlMap[key] === url)
+    .forEach((key) => removeCacheEntry(key))
   saveConfirmedUrls()
 }
 

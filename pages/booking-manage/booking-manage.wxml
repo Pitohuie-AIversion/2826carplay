@@ -28,7 +28,7 @@
         bindinput="handleKeywordInput"
         maxlength="40"
         confirm-type="search"
-        bindconfirm="handleKeywordConfirm"
+        bindconfirm="handleSearchConfirm"
       />
       <button
         wx:if="{{keyword}}"

@@ -11,16 +11,15 @@ const {
   normalizeUsablePhone
 } = require("../../shared/bookingWorkbench")
 const { createPerformanceHelpers } = require('../../shared/performance')
-const { hasMatchingTag, PRESET_CUSTOMER_TAGS, autoTagBooking } = require("../../shared/bookingTags")
+const { hasMatchingTag, PRESET_CUSTOMER_TAGS, autoTagBooking, normalizeTags } = require("../../shared/bookingTags")
+const {
+  STATUS_TEXT_MAP,
+  WORKBENCH_PRIORITY_OPTIONS
+} = require("../../shared/bookingStatus")
+
 const WORKBENCH_LOAD_TIMEOUT_MS = 15 * 1000
 const WORKBENCH_WRITE_TIMEOUT_MS = 20 * 1000
-const STATUS_LABELS = {
-  pending: "待联系",
-  contacted: "已联系",
-  quoted: "已报价",
-  adjustment_requested: "待调整",
-  confirmed: "已确认"
-}
+const STATUS_LABELS = STATUS_TEXT_MAP
 const FILTER_OPTIONS = [
   { key: "todo", label: "全部待办" },
   { key: "pending", label: "待启动" },
@@ -36,11 +35,7 @@ const SORT_OPTIONS = [
   { key: "waiting", label: "等待最久", hint: "按提交时间从早到晚排列" },
   { key: "pickup", label: "用车日期", hint: "按预计用车日期从近到远排列" }
 ]
-const PRIORITY_OPTIONS = [
-  { key: "priority", label: "优先" },
-  { key: "normal", label: "常规" },
-  { key: "standby", label: "候补" }
-]
+const PRIORITY_OPTIONS = WORKBENCH_PRIORITY_OPTIONS
 function formatSyncTime(value) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) {
@@ -65,7 +60,7 @@ function formatQueueItem(item) {
     phone: item.phone || "",
     phoneDisplay: normalizedPhone || "手机号待补充",
     phoneAvailable: Boolean(normalizedPhone),
-    tags: autoTagBooking(item),
+    tags: Array.isArray(item.tags) ? normalizeTags(item.tags) : autoTagBooking(item),
     city: item.city || "未填写城市",
     startDate: item.startDate || "—",
     endDate: item.endDate || "—",
@@ -230,6 +225,10 @@ Page({
     this.fetchBookings(() => wx.stopPullDownRefresh())
   },
   onShow() {
+    if (this._workbenchNativeReset) {
+      this.applyState(this._workbenchNativeReset)
+      this._workbenchNativeReset = null
+    }
     if (
       this.data.pageAuthorized &&
       this.data.allBookings.length &&
@@ -269,7 +268,10 @@ Page({
     this._workbenchWriteActive = false
     this._workbenchStatusFeedbackPending = false
   },
-  applyWorkbench(mode) {
+  applyWorkbench(mode, input = {}) {
+    const keyword = typeof input.keyword === "string" ? input.keyword : this.data.keyword
+    const selectedTag = typeof input.selectedTag === "string" ? input.selectedTag : this.data.selectedTag
+    const selectedSort = input.selectedSort || this.data.selectedSort
     const view = buildBookingWorkbench(
       this.data.allBookings,
       mode || this.data.selectedMode,
@@ -281,36 +283,39 @@ Page({
     }))
     const formattedQueue = sortQueue(
       view.queue.map(formatQueueItem),
-      this.data.selectedSort
+      selectedSort
     )
     this.setData({
       selectedMode: view.mode,
-      queue: filterQueueByKeyword(formattedQueue, this.data.keyword, this.data.selectedTag),
+      queue: filterQueueByKeyword(formattedQueue, keyword, selectedTag),
       queueTotal: formattedQueue.length,
       summary: view.summary,
       filterOptions,
       viewCustomized: Boolean(
         view.mode !== "todo" ||
-        String(this.data.keyword || "").trim() ||
-        Boolean(this.data.selectedTag) ||
-        this.data.selectedSort !== "smart"
+        String(keyword || "").trim() ||
+        Boolean(selectedTag) ||
+        selectedSort !== "smart"
       )
     })
   },
   handleKeywordInput(event) {
+    const keyword = String(event.detail.value || "").slice(0, 40)
     this.setData({
-      keyword: String(event.detail.value || "").slice(0, 40)
+      keyword
     })
-    this.applyWorkbench()
+    this.applyWorkbench(undefined, { keyword })
   },
-  handleKeywordConfirm(event) {
+  handleSearchConfirm(event) {
     const value = event && event.detail && typeof event.detail.value === "string"
       ? event.detail.value
       : this.data.keyword
-    this.setData({
-      keyword: String(value || "").slice(0, 40)
-    })
-    this.applyWorkbench()
+    const keyword = String(value || "").slice(0, 40)
+    this.setData({ keyword })
+    this.applyWorkbench(undefined, { keyword })
+  },
+  handleKeywordConfirm(event) {
+    this.handleSearchConfirm(event)
   },
   handleClearKeyword() {
     if (!this.data.keyword) {
@@ -319,7 +324,7 @@ Page({
     this.setData({
       keyword: ""
     })
-    this.applyWorkbench()
+    this.applyWorkbench(undefined, { keyword: "" })
   },
   handleManualRefresh() {
     if (
@@ -345,13 +350,13 @@ Page({
       sortHint: SORT_OPTIONS[0].hint
     })
     saveSortPreference("smart")
-    this.applyWorkbench("todo")
+    this.applyWorkbench("todo", { keyword: "", selectedTag: "", selectedSort: "smart" })
   },
   handleTagFilter(event) {
     const tag = String((event && event.currentTarget && event.currentTarget.dataset && event.currentTarget.dataset.tag) || "").trim()
     const nextTag = this.data.selectedTag === tag ? "" : tag
     this.setData({ selectedTag: nextTag })
-    this.applyWorkbench()
+    this.applyWorkbench(undefined, { selectedTag: nextTag })
   },
   handleSortTap(event) {
     const selectedSort = String(event.currentTarget.dataset.sort || "")
@@ -364,7 +369,7 @@ Page({
       sortHint: option.hint
     })
     saveSortPreference(selectedSort)
-    this.applyWorkbench()
+    this.applyWorkbench(undefined, { selectedSort })
   },
   handleFilterTap(event) {
     const mode = String(event.currentTarget.dataset.mode || "")
@@ -385,7 +390,7 @@ Page({
     if (this.isWorkbenchInteractionBusy() || !id) {
       return
     }
-    const action = beginPageNativeAction(this)
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.navigateTo({
       url: `/pages/booking-manage-detail/booking-manage-detail?id=${id}`,
       fail: () => {
@@ -481,7 +486,7 @@ Page({
     ) {
       return
     }
-    const action = beginPageNativeAction(this)
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.showActionSheet({
       alertText: "调整预约优先级",
       itemList: PRIORITY_OPTIONS.map((item) => item.label),
@@ -505,7 +510,7 @@ Page({
           {
             id,
             schedulePriority: option.key,
-            coordinationStatus
+            expectedValues: { schedulePriority: currentPriority }
           },
           "优先级已更新"
         )
@@ -570,7 +575,8 @@ Page({
       name: "bookingUpdateAdminRemark",
       data: {
         id,
-        adminRemark
+        adminRemark,
+        expectedAdminRemark: String(current && current.adminRemark || "").trim()
       },
       timeoutTitle: "备注保存超时，请重试",
       failureFallback: "内部备注保存失败",
@@ -615,7 +621,7 @@ Page({
     this.applyState({
       statusUpdatingId: id
     })
-    const action = beginPageNativeAction(this)
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.showModal({
       title: "确认已联系客户？",
       content: "预约将更新为「已联系」；如客户已订阅，系统会发送状态提醒。",
@@ -623,6 +629,7 @@ Page({
       confirmColor: "#528fff",
       success: (res) => {
         if (!isPageNativeActionActive(this, action)) {
+          this._workbenchNativeReset = { statusUpdatingId: "" }
           return
         }
         if (res && res.confirm) {
@@ -635,6 +642,7 @@ Page({
       },
       fail: () => {
         if (!isPageNativeActionActive(this, action)) {
+          this._workbenchNativeReset = { statusUpdatingId: "" }
           return
         }
         this.applyState({
@@ -753,15 +761,15 @@ Page({
     const update = () => {
       this.updateCoordination({
         id,
-        schedulePriority,
-        coordinationStatus: nextStatus
+        coordinationStatus: nextStatus,
+        expectedValues: { coordinationStatus: currentStatus }
       })
     }
     if (nextStatus === "resolved") {
       this.applyState({
         updatingId: id
       })
-      const action = beginPageNativeAction(this)
+      const action = beginPageNativeAction(this, { requireCurrent: true })
       wx.showModal({
         title: "确认完成协调？",
         content: "完成后，该预约将从待协调队列中移除。",
@@ -769,6 +777,7 @@ Page({
         confirmColor: "#528fff",
         success: (res) => {
           if (!isPageNativeActionActive(this, action)) {
+            this._workbenchNativeReset = { updatingId: "" }
             return
           }
           if (res && res.confirm) {
@@ -781,6 +790,7 @@ Page({
         },
         fail: () => {
           if (!isPageNativeActionActive(this, action)) {
+            this._workbenchNativeReset = { updatingId: "" }
             return
           }
           this.applyState({
@@ -795,12 +805,9 @@ Page({
   updateCoordination(payload, successTitle) {
     const coordinationPayload = {
       id: String((payload && payload.id) || "").trim(),
-      schedulePriority: String(
-        (payload && payload.schedulePriority) || "normal"
-      ),
-      coordinationStatus: String(
-        (payload && payload.coordinationStatus) || "pending"
-      )
+      ...(payload && payload.schedulePriority ? { schedulePriority: String(payload.schedulePriority) } : {}),
+      ...(payload && payload.coordinationStatus ? { coordinationStatus: String(payload.coordinationStatus) } : {}),
+      expectedValues: payload && payload.expectedValues || {}
     }
     if (!coordinationPayload.id) {
       return
@@ -936,7 +943,7 @@ Page({
     if (this.isWorkbenchInteractionBusy()) {
       return
     }
-    const action = beginPageNativeAction(this)
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.navigateTo({
       url: "/pages/booking-manage/booking-manage",
       fail: () => {

@@ -59,6 +59,13 @@ async function loadModule(openid, mockDb) {
 }
 
 describe("cloudfunctions/privacyRequestUpdateStatus integration", () => {
+  test("另一管理员已用不同说明处理完毕时不会把本次内容假报保存成功", async () => {
+    const mocks = createMockDb({ roles: [{ openid: "admin", role: "admin" }], current: { type: "correction", status: "completed", resolutionNote: "已有处理结果" } })
+    const mod = await loadModule("admin", mocks.db)
+    expect(await mod.main({ id: "p1", status: "completed", resolutionNote: "本次新处理结果" })).toMatchObject({ ok: false, code: "STATUS_CONFLICT" })
+    expect(await mod.main({ id: "p1", status: "completed", resolutionNote: "已有处理结果" })).toMatchObject({ ok: true, updated: false })
+    expect(mocks.privacyUpdate).not.toHaveBeenCalled()
+  })
   test("管理员可完成申请并写入不含处理正文的审计记录", async () => {
     const mocks = createMockDb({
       roles: [{ openid: "admin_openid", role: "admin" }],
@@ -80,6 +87,7 @@ describe("cloudfunctions/privacyRequestUpdateStatus integration", () => {
     expect(mocks.privacyField).toHaveBeenCalledWith({
       type: true,
       status: true,
+      resolutionNote: true,
       dataExportedAt: true
     })
     expect(mocks.privacyWhere).toHaveBeenCalledWith({

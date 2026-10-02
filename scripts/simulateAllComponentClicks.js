@@ -52,6 +52,9 @@ const c = {
 let totalSimulated = 0
 let passedCount = 0
 let failedCount = 0
+let activeSimulatedPage = null
+const loadedPages = []
+const cloudCalls = []
 
 function logSuite(title) {
   console.log(`\n${c.bold}${c.cyan}┌── ${title}${c.reset}`)
@@ -60,6 +63,12 @@ function logSuite(title) {
 function simulateClick(desc, actionFn) {
   totalSimulated++
   try {
+    // Each case clicks the currently displayed page. Navigation in a preceding
+    // case must not leave this case interacting with a hidden page instance.
+    if (activeSimulatedPage) {
+      pageStack.length = 0
+      pageStack.push(activeSimulatedPage)
+    }
     actionFn()
     passedCount++
     console.log(`│  ${c.green}✓${c.reset} [CLICK] ${desc}`)
@@ -108,7 +117,10 @@ global.wx = {
   setStorageSync: (k, v) => { storage[k] = v },
   removeStorageSync: (k) => { delete storage[k] },
   getFileSystemManager: () => mockFs,
-  showToast: () => {},
+  showToast: ({ success, complete } = {}) => {
+    if (typeof success === "function") success()
+    if (typeof complete === "function") complete()
+  },
   showModal: ({ success }) => { if (typeof success === "function") success({ confirm: true, cancel: false }) },
   showLoading: () => {},
   hideLoading: () => {},
@@ -136,11 +148,12 @@ global.wx = {
   },
   switchTab: () => {},
   setNavigationBarTitle: () => {},
-  makePhoneCall: () => {},
+  nextTick: (callback) => callback(),
+  makePhoneCall: (options) => { global.wx._lastPhoneCall = options },
   setClipboardData: ({ success }) => { if (typeof success === "function") success() },
   getClipboardData: ({ success }) => { if (typeof success === "function") success({ data: "mocked-data" }) },
   openCustomerServiceChat: ({ success }) => { if (typeof success === "function") success() },
-  openLocation: ({ success }) => { if (typeof success === "function") success() },
+  openLocation: (options) => { global.wx._lastLocation = options; if (typeof options.success === "function") options.success() },
   previewImage: () => {},
   chooseImage: ({ success }) => {
     if (typeof success === "function") {
@@ -175,6 +188,7 @@ global.wx = {
       if (typeof complete === "function") complete({ fileID: "cloud://prod-garage-env/uploaded-file.jpg" })
     },
     callFunction: ({ name, data, success, complete }) => {
+      cloudCalls.push({ name, data })
       let result = { ok: true }
       if (name === "garageVehicleList") {
         result = {
@@ -241,6 +255,8 @@ global.wx = {
         }
       } else if (name === "bookingCreate") {
         result = { ok: true, bookingId: "bk-2026-001", message: "预约已提交" }
+      } else if (name === "bookingUpdateCoordination") {
+        result = { ok: true, ...data }
       } else if (name === "bookingMyList" || name === "bookingList") {
         result = {
           ok: true,
@@ -388,8 +404,16 @@ global.wx = {
       } else if (name === "operationConfigGet") {
         result = {
           ok: true,
-          config: { maintenanceMode: false, bookingDepositRequired: true }
+          config: {
+            cityOptions: ["杭州", "上海"], servicePhone: "18800001111", emergencyPhone: "18800002222",
+            serviceHoursText: "周一至周五 10:00–18:00", serviceHubs: [{
+              id: "test-hz-store", city: "杭州", name: "测试杭州门店", type: "store",
+              address: "测试地址一号", feeText: "按保存说明确认", latitude: 30.2, longitude: 120.1
+            }]
+          }
         }
+      } else if (name === "operationConfigUpdate") {
+        result = { ok: true, config: data.config }
       } else if (name === "systemHealthCheck") {
         result = {
           ok: true,
@@ -408,11 +432,14 @@ global.wx = {
           list: [{ id: "err-001", message: "Network timeout", count: 1 }],
           hasMore: false
         }
-      } else if (name === "privacyDataInventory") {
-        result = {
-          ok: true,
-          summary: { totalRecords: 120, userCount: 45 }
-        }
+      } else if (name === "privacyRequestDataInventory") {
+        result = data.mode === "export"
+          ? { ok: true, csvText: "类型,记录\n申请,req-001", fileName: "privacy-data.csv", exportToken: "a".repeat(40) }
+          : data.mode === "confirmExport"
+            ? { ok: true, confirmed: true }
+            : { ok: true, request: { id: "req-001", type: "access", status: "processing", openid: "user-openid-123" },
+              bookings: { list: [], count: 0 }, quotes: { list: [], count: 0 }, handovers: { list: [], count: 0 },
+              favorites: { list: [], count: 0 }, privacyRequests: { list: [], count: 0 }, partial: false }
       } else if (name === "getOpenid") {
         result = { ok: true, openid: "mock-user-openid-12345" }
       }
@@ -482,6 +509,8 @@ function loadPage(pagePath, options = {}) {
 
   const instance = {
     ...definition,
+    route: pagePath,
+    __route__: pagePath,
     data: { ...(definition.data || {}) },
     setData(patch, cb) {
       applySetData(this.data, patch, cb)
@@ -496,6 +525,10 @@ function loadPage(pagePath, options = {}) {
     }
   })
 
+  activeSimulatedPage = instance
+  loadedPages.push(instance)
+  pageStack.length = 0
+  pageStack.push(instance)
   // 自动执行已声明的生命周期
   if (typeof instance.onLoad === "function") instance.onLoad(options)
   if (typeof instance.onReady === "function") instance.onReady()
@@ -513,6 +546,7 @@ function makeEvent(dataset = {}, detail = {}) {
   }
 }
 
+async function runSimulation() {
 console.log(`${c.bold}${c.magenta}========================================================================${c.reset}`)
 console.log(`${c.bold}${c.magenta}   极境车库小程序 - 全量组件与 26 页面交互点击自动化仿真套件   ${c.reset}`)
 console.log(`${c.bold}${c.magenta}========================================================================${c.reset}`)
@@ -767,6 +801,15 @@ simulateClick("点击返回车库首页 (handleBackGarage)", () => {
 logSuite("5. 主包页面: pages/booking/booking (预约提交)")
 const bookingPage = loadPage("pages/booking/booking", { vehicleId: "car-911" })
 
+simulateClick("网点配置读取失败后重新加载 (handleRetryServiceConfig)", () => {
+  bookingPage.setData({ operationConfigLoading: false, operationConfigFailed: true })
+  const before = cloudCalls.filter((call) => call.name === "operationConfigGet").length
+  bookingPage.handleRetryServiceConfig()
+  const after = cloudCalls.filter((call) => call.name === "operationConfigGet").length
+  if (after !== before + 1) throw new Error("网点重试未重新请求配置")
+  if (bookingPage.data.operationConfigLoading || bookingPage.data.operationConfigFailed) throw new Error("网点读取成功后未恢复状态")
+})
+
 simulateClick("输入联系人姓名 (handleInput: userName)", () => {
   bookingPage.handleInput(makeEvent({ field: "userName" }, { value: "李先生" }))
   if (bookingPage.data.form.userName !== "李先生") throw new Error("姓名录入失败")
@@ -801,6 +844,7 @@ simulateClick("切换提车服务城市 (handleCityChange)", () => {
 
 simulateClick("切换接送网点/服务枢纽 (handlePickupHubChange)", () => {
   bookingPage.handlePickupHubChange(makeEvent({}, { value: 0 }))
+  if (bookingPage.data.form.pickupLocation !== "测试杭州门店") throw new Error("未选择已保存网点")
 })
 
 simulateClick("主动勾选隐私与租车服务协议 (handlePrivacyAgreementChange)", () => {
@@ -871,10 +915,13 @@ simulateClick("点击一键复制预约单号 (handleCopyBookingId)", () => {
 
 simulateClick("点击紧急服务热线拨号 (handleEmergencyCall)", () => {
   bookingDetailPage.handleEmergencyCall()
+  if (!wx._lastPhoneCall || wx._lastPhoneCall.phoneNumber !== "18800002222") throw new Error("未拨打独立救援电话")
 })
 
 simulateClick("点击取车门店位置导航 (handleOpenLocation)", () => {
+  bookingDetailPage.setData({ booking: { ...bookingDetailPage.data.booking, city: "杭州", pickupLocation: "测试杭州门店" } })
   bookingDetailPage.handleOpenLocation()
+  if (!wx._lastLocation || wx._lastLocation.latitude !== 30.2 || wx._lastLocation.address !== "测试地址一号") throw new Error("未使用已保存导航坐标")
 })
 
 simulateClick("点击关联车辆信息卡片查看车型 (handleViewVehicle)", () => {
@@ -1026,6 +1073,15 @@ simulateClick("点击行使隐私数据权利入口 (handlePrivacyRequest)", () 
 
 simulateClick("点击指南加载重试 (handleGuideRetry)", () => {
   contentPage.handleGuideRetry()
+})
+
+simulateClick("服务内容加载失败后重新读取已保存配置 (handleContentRetry)", () => {
+  contentPage.setData({ guideMode: false, type: "rules", contentLoading: false, contentError: "内容加载失败，请重试" })
+  const before = cloudCalls.filter((call) => call.name === "operationConfigGet").length
+  contentPage.handleContentRetry()
+  const after = cloudCalls.filter((call) => call.name === "operationConfigGet").length
+  if (after !== before + 1) throw new Error("服务内容重试未重新请求配置")
+  if (contentPage.data.contentLoading || contentPage.data.contentError) throw new Error("配置读取成功后未结束加载状态")
 })
 
 logSuite("10. 主包页面: pages/privacy-request/privacy-request (个人信息与隐私权申请)")
@@ -1468,6 +1524,8 @@ simulateClick("点击为客户打上跟进标签 (handleToggleCustomerTag: 高�
   else if (!Array.isArray(bmdPage.data.booking.tags)) bmdPage.setData({ "booking.tags": [] })
   bmdPage.handleToggleCustomerTag(makeEvent({ tag: "高意向" }))
   if (!bmdPage.data.booking.tags.includes("高意向")) throw new Error("客户标签添加未生效")
+  const saved = cloudCalls[cloudCalls.length - 1]
+  if (saved.name !== "bookingUpdateCoordination" || !saved.data.tags.includes("高意向")) throw new Error("客户标签未保存到云端")
   bmdPage.handleToggleCustomerTag(makeEvent({ tag: "高意向" }))
   if (bmdPage.data.booking.tags.includes("高意向")) throw new Error("客户标签取消未生效")
 })
@@ -1600,6 +1658,15 @@ simulateClick("点击确认提交录入车辆 (handleSubmit)", () => {
   vcPage.handleSubmit()
 })
 
+simulateClick("新建车辆维护和清空未来到期日及人工用车提示", () => {
+  vcPage.setData({ isSubmitting: false })
+  vcPage.handleDueDateChange(makeEvent({ field: "archiveDate" }, { value: "2030-01-01" }))
+  if (vcPage.data.form.archiveDate !== "2030-01-01") throw new Error("保养到期日未保存")
+  vcPage.handleClearOptionalField(makeEvent({ field: "archiveDate" }))
+  vcPage.handleTextInput(makeEvent({ field: "publicDrivingTips" }, { value: "请检查车窗" }))
+  if (vcPage.data.form.archiveDate !== "" || vcPage.data.form.publicDrivingTips !== "请检查车窗") throw new Error("字段编辑清空未生效")
+})
+
 logSuite("18. 分包页面: pages-admin/vehicle-edit/vehicle-edit (编辑车辆资料)")
 const vePage = loadPage("pages-admin/vehicle-edit/vehicle-edit", { id: "car-911" })
 vePage.setData({ isSubmitting: false, loading: false, pageAuthorized: true })
@@ -1659,6 +1726,15 @@ simulateClick("点击跳转相册图集维护 (handleManageImages)", () => {
 
 simulateClick("点击保存车辆修改 (handleSubmit)", () => {
   vePage.handleSubmit()
+})
+
+simulateClick("编辑车辆录入年检到期日并清除已有可选配置", () => {
+  vePage.setData({ isSubmitting: false, loading: false })
+  vePage.handleDueDateChange(makeEvent({ field: "archiveReview" }, { value: "2030-02-01" }))
+  if (vePage.data.form.archiveReview !== "2030-02-01") throw new Error("年检到期日未回填")
+  vePage.handleClearOptionalField(makeEvent({ field: "archiveReview" }))
+  vePage.handleClearOptionalField(makeEvent({ field: "performance.drivetrain" }))
+  if (vePage.data.form.archiveReview !== "" || vePage.buildSubmitPayload().performance.drivetrain !== "") throw new Error("清空值未透传")
 })
 
 simulateClick("点击返回车队列表 (handleBackList)", () => {
@@ -1806,8 +1882,28 @@ simulateClick("点击加载更多管理员列表 (handleLoadMore)", () => {
 logSuite("23. 分包页面: pages-admin/config-manage/config-manage (系统参数配置)")
 const cmPage = loadPage("pages-admin/config-manage/config-manage")
 
-simulateClick("修改系统配置参数项 (handleInput: bookingDepositRequired)", () => {
-  cmPage.handleInput(makeEvent({ key: "bookingDepositRequired" }, { value: "0" }))
+simulateClick("修改已开放的服务时间配置", () => {
+  cmPage.handleInput(makeEvent({ field: "serviceHoursText" }, { value: "每日 10:00–18:00" }))
+  if (cmPage.data.form.serviceHoursText !== "每日 10:00–18:00") throw new Error("服务时间未编辑")
+})
+
+simulateClick("新增服务网点并编辑城市地址坐标和类型", () => {
+  const count = cmPage.data.form.serviceHubs.length
+  cmPage.handleAddServiceHub()
+  const hub = cmPage.data.form.serviceHubs[count]
+  if (!hub || !hub.id) throw new Error("网点未创建")
+  for (const [field, value] of Object.entries({ city: "上海", name: "测试上海网点", address: "测试地址二号", feeText: "预约确认", latitude: "31.2", longitude: "121.4" })) {
+    cmPage.handleServiceHubInput(makeEvent({ id: hub.id, field }, { value }))
+  }
+  cmPage.handleServiceHubTypeChange(makeEvent({ id: hub.id }, { value: 1 }))
+  const updated = cmPage.data.form.serviceHubs[count]
+  if (updated.type !== "hub" || updated.latitude !== "31.2" || updated.city !== "上海") throw new Error("网点编辑未生效")
+})
+
+simulateClick("移除服务网点并保留其他已配置网点", () => {
+  const hubs = cmPage.data.form.serviceHubs
+  cmPage.handleRemoveServiceHub(makeEvent({ id: hubs[hubs.length - 1].id }))
+  if (cmPage.data.form.serviceHubs.length !== hubs.length - 1) throw new Error("网点未移除")
 })
 
 simulateClick("点击提交保存全局参数 (handleSubmit)", () => {
@@ -1978,7 +2074,7 @@ simulateClick("点击触底加载更多申请记录 (handleLoadMore)", () => {
 })
 
 logSuite("28. 分包页面: pages-admin/privacy-data-inventory/privacy-data-inventory (个人数据台账)")
-const pdiPage = loadPage("pages-admin/privacy-data-inventory/privacy-data-inventory")
+const pdiPage = loadPage("pages-admin/privacy-data-inventory/privacy-data-inventory", { id: "req-001" })
 
 simulateClick("点击刷新个人数据台账 (handleRefresh)", () => {
   pdiPage.handleRefresh()
@@ -1990,6 +2086,12 @@ simulateClick("点击复制当前用户专属数据凭证 (handleCopyOpenid)", (
 
 simulateClick("点击导出个人数据资产清单 (handleExport)", () => {
   pdiPage.handleExport()
+})
+for (let i = 0; i < 8; i++) await Promise.resolve()
+simulateClick("个人数据文件保存后确认导出完成", () => {
+  const exportCalls = cloudCalls.filter((call) => call.name === "privacyRequestDataInventory" && call.data.mode === "confirmExport")
+  if (!pdiPage.data.exportFilePath || pdiPage.data.exporting || exportCalls.length !== 1) throw new Error("导出保存与确认未完成")
+  if (exportCalls[0].data.exportToken !== "a".repeat(40)) throw new Error("导出确认令牌未透传")
 })
 
 simulateClick("点击打开导出的台账报表 (handleOpenExportedFile)", () => {
@@ -2014,6 +2116,9 @@ simulateClick("点击台账中关联预约单跳转详情 (handleBookingTap)", (
 // ========================================================================
 // 4. 汇总报告与通过率断言
 // ========================================================================
+loadedPages.forEach((page) => {
+  if (typeof page.onUnload === "function") page.onUnload()
+})
 console.log(`\n${c.bold}${c.magenta}========================================================================${c.reset}`)
 console.log(`${c.bold}   自动化全组件与全页面点击测试执行完成   ${c.reset}`)
 console.log(`${c.bold}${c.magenta}========================================================================${c.reset}`)
@@ -2028,3 +2133,10 @@ if (failedCount > 0) {
 } else {
   console.log(`\n${c.green}${c.bold}✓ 极境车库小程序所有自定义组件及 26 个页面全量交互点击均正常工作！${c.reset}\n`)
 }
+}
+
+runSimulation().catch((error) => {
+  loadedPages.forEach((page) => { if (typeof page.onUnload === "function") page.onUnload() })
+  console.error(error)
+  process.exitCode = 1
+})

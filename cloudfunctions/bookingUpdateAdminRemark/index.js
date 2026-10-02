@@ -11,7 +11,8 @@ const AUTH_ROLE_FIELDS = {
   admin: true
 }
 const BOOKING_EXISTENCE_FIELDS = {
-  _id: true
+  _id: true,
+  adminRemark: true
 }
 const MAX_REMARK_LENGTH = 200
 
@@ -142,7 +143,8 @@ function normalizeEvent(event) {
   const payload = event && typeof event === "object" ? event : {}
   return {
     id: String(payload.id || "").trim(),
-    adminRemark: String(payload.adminRemark || "").trim()
+    adminRemark: String(payload.adminRemark || "").trim(),
+    expectedAdminRemark: String(payload.expectedAdminRemark || "").trim()
   }
 }
 
@@ -174,7 +176,8 @@ exports.main = async (event) => {
       })
     }
 
-    const currentRes = await db
+    const outcome = await db.runTransaction(async (transaction) => {
+    const currentRes = await transaction
       .collection("bookings")
       .doc(input.id)
       .field(BOOKING_EXISTENCE_FIELDS)
@@ -183,16 +186,22 @@ exports.main = async (event) => {
     if (!current) {
       return createError("NOT_FOUND", "预约不存在")
     }
+    const currentRemark = String(current.adminRemark || "").trim()
+    if (currentRemark === input.adminRemark) return { ok: true, changed: false }
+    if (currentRemark !== input.expectedAdminRemark) return createError("VERSION_CONFLICT", "备注已更新，请刷新")
 
-    await db.collection("bookings").doc(input.id).update({
+    await transaction.collection("bookings").doc(input.id).update({
       data: {
         adminRemark: input.adminRemark,
         adminRemarkUpdatedAt: db.serverDate(),
         updatedAt: db.serverDate()
       }
     })
+    return { ok: true, changed: true }
+    })
+    if (!outcome.ok) return outcome
 
-    await writeAuditLogBestEffort({
+    if (outcome.changed) await writeAuditLogBestEffort({
       openid,
       action: "bookingUpdateAdminRemark",
       bookingId: input.id,

@@ -96,7 +96,7 @@ async function readAllByMode(ordered) {
   for (let offset = 0; offset <= MAX_RECORDS; offset += BATCH_SIZE) {
     const remaining = MAX_RECORDS + 1 - list.length
     const limit = Math.min(BATCH_SIZE, remaining)
-    let query = db.collection("privacy_requests").field(PRIVACY_REQUEST_LIST_FIELDS)
+    let query = db.collection("privacy_requests").where({ type: db.command.in(REQUEST_TYPES) }).field(PRIVACY_REQUEST_LIST_FIELDS)
     if (ordered) {
       query = query.orderBy("createdAt", "desc")
     }

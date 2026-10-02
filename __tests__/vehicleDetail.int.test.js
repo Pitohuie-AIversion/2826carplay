@@ -69,6 +69,10 @@ describe("cloudfunctions/vehicleDetail integration", () => {
         vin: "VIN001",
         engineNumber: "ENG001",
         publicDescription: "公开车辆亮点",
+        publicDrivingTips: "注意取还车时的电量",
+        performance: { horsepower: "300Ps", highlights: ["全景天窗"] },
+        archiveDate: "2027-01-01",
+        archiveReview: "2027-06-01",
         note: "管理备注",
         imageList: ["cloud://img1", "cloud://img2"],
         coverImage: "cloud://img2",
@@ -86,6 +90,7 @@ describe("cloudfunctions/vehicleDetail integration", () => {
     expect(res.ok).toBe(true)
     expect(res.detail).toEqual({
       id: "car_1",
+      vehicleVersion: 0,
       plateNumber: "京A12345",
       vehicleType: "sedan",
       brandModel: "BMW 740Li",
@@ -100,6 +105,10 @@ describe("cloudfunctions/vehicleDetail integration", () => {
       vin: "VIN001",
       engineNumber: "ENG001",
       publicDescription: "公开车辆亮点",
+      publicDrivingTips: "注意取还车时的电量",
+      performance: { horsepower: "300Ps", highlights: ["全景天窗"] },
+      archiveDate: "2027-01-01",
+      archiveReview: "2027-06-01",
       note: "管理备注",
       publicMaterialsUpdatedDate: "",
       publicInspectionDate: "",
@@ -128,6 +137,7 @@ describe("cloudfunctions/vehicleDetail integration", () => {
     expect(mocks.vehiclesDoc).toHaveBeenCalledWith("car_1")
     expect(mocks.vehicleField).toHaveBeenCalledWith({
       _id: true,
+      vehicleVersion: true,
       plateNumber: true,
       vehicleType: true,
       brandModel: true,
@@ -139,6 +149,10 @@ describe("cloudfunctions/vehicleDetail integration", () => {
       seats: true,
       priceDay: true,
       rentalDiscountTiers: true,
+      performance: true,
+      publicDrivingTips: true,
+      archiveDate: true,
+      archiveReview: true,
       vin: true,
       engineNumber: true,
       publicDescription: true,

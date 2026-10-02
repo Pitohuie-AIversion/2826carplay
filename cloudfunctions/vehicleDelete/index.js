@@ -1,8 +1,10 @@
 const cloud = require("wx-server-sdk")
+const { createImageLifecycle } = require("./imageLifecycle")
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
+const imageLifecycle = createImageLifecycle(db, cloud)
 const AUTH_ROLE_FIELDS = {
   role: true,
   roles: true,
@@ -12,7 +14,8 @@ const AUTH_ROLE_FIELDS = {
 }
 const VEHICLE_DELETE_FIELDS = {
   imageList: true,
-  coverImage: true
+  coverImage: true,
+  bookingReferenceVersion: true
 }
 const BOOKING_EXISTENCE_FIELDS = {
   _id: true
@@ -111,14 +114,6 @@ function normalizeStringArray(input) {
   return result
 }
 
-function normalizeDeletionContext(context) {
-  const input = context && typeof context === "object" ? context : {}
-  return {
-    vehicleId: String(input.vehicleId || input.id || "").trim().slice(0, 128),
-    action: String(input.action || "deleteVehicle").trim().slice(0, 32)
-  }
-}
-
 function getSafeErrorCode(error) {
   return String((error && (error.code || error.errCode)) || "").trim().slice(0, 64)
 }
@@ -132,38 +127,6 @@ function isDocumentNotFoundError(error) {
     /DOCUMENT_NOT_FOUND|DATABASE_DOCUMENT_NOT_EXIST|OBJECT_NOT_EXIST/i.test(code) ||
     /document.*(?:not\s+found|not\s+exist)|文档不存在/i.test(message)
   )
-}
-
-async function deleteFilesBestEffort(fileList, context) {
-  const list = normalizeStringArray(fileList)
-  if (!list.length) {
-    return
-  }
-  const safeContext = normalizeDeletionContext(context)
-
-  try {
-    await cloud.deleteFile({ fileList: list })
-  } catch (error) {
-    console.error({
-      function: "vehicleDelete",
-      stage: "deleteFile",
-      fileCount: list.length,
-      context: safeContext,
-      errorCode: getSafeErrorCode(error),
-      createdAt: new Date().toISOString()
-    })
-
-    try {
-      await db.collection("pending_file_deletions").add({
-        data: {
-          fileList: list,
-          context: safeContext,
-          source: "vehicleDelete",
-          createdAt: db.serverDate()
-        }
-      })
-    } catch (queueError) {}
-  }
 }
 
 async function writeAuditLogBestEffort(payload) {
@@ -258,24 +221,32 @@ exports.main = async (event) => {
       return createError("VEHICLE_HAS_BOOKINGS", "车辆存在预约记录，请改为停用车辆")
     }
 
-    const removeRes = await db.collection("vehicles").doc(id).remove()
-    const removed = Number(removeRes && removeRes.stats && removeRes.stats.removed) || 0
-    if (removed < 1) {
-      return createError("DELETE_CONFLICT", "车辆未能删除，可能已被其他管理员处理，请刷新后重试")
-    }
-
-    const coverImage = String((current && current.coverImage) || "").trim()
-    const fileList = normalizeStringArray(current && current.imageList).concat(coverImage ? [coverImage] : [])
-    await deleteFilesBestEffort(fileList, {
-      vehicleId: id,
-      action: "deleteVehicle"
+    const outcome = await db.runTransaction(async (transaction) => {
+      const latestRes = await transaction.collection("vehicles").doc(id).field(VEHICLE_DELETE_FIELDS).get()
+      const latest = latestRes && latestRes.data
+      if (!latest) return { error: createError("NOT_FOUND", "车辆不存在或已被删除") }
+      if (Number(latest.bookingReferenceVersion || 0) !== Number(current.bookingReferenceVersion || 0)) {
+        return { error: createError("DELETE_CONFLICT", "车辆预约已变更，请刷新后重试") }
+      }
+      const removeRes = await transaction.collection("vehicles").doc(id).remove()
+      const removed = Number(removeRes && removeRes.stats && removeRes.stats.removed) || 0
+      if (removed < 1) return { error: createError("DELETE_CONFLICT", "车辆未能删除，可能已被其他管理员处理，请刷新后重试") }
+      const fileList = normalizeStringArray(latest.imageList).concat(String(latest.coverImage || "").trim() ? [String(latest.coverImage).trim()] : [])
+      const claimedFiles = []
+      for (const fileId of normalizeStringArray(fileList)) {
+        if (await imageLifecycle.writeClaim(transaction, id, fileId, "vehicleDelete", "deleteVehicle")) claimedFiles.push(fileId)
+      }
+      return { latest, claimedFiles }
     })
+    if (outcome.error) return outcome.error
+    const coverImage = String(outcome.latest.coverImage || "").trim()
+    await imageLifecycle.deleteClaimed(id, outcome.claimedFiles)
 
     await writeAuditLogBestEffort({
       openid,
       action: "vehicleDelete",
       vehicleId: id,
-      imageCount: normalizeStringArray(current && current.imageList).length,
+      imageCount: normalizeStringArray(outcome.latest.imageList).length,
       hasCoverImage: Boolean(coverImage)
     })
 

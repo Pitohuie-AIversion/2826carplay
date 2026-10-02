@@ -1,9 +1,10 @@
 const cloud = require("wx-server-sdk")
-const crypto = require("crypto")
+const { createImageLifecycle } = require("./imageLifecycle")
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
+const imageLifecycle = createImageLifecycle(db, cloud)
 const AUTH_ROLE_FIELDS = {
   role: true,
   roles: true,
@@ -123,89 +124,21 @@ function normalizeEvent(event) {
 function isCurrentVehicleImageFileId(fileId, vehicleId) {
   const value = String(fileId || "").trim()
   const id = String(vehicleId || "").trim()
+  const pathStart = value.indexOf("/", "cloud://".length)
+  const path = pathStart >= 0 ? value.slice(pathStart) : ""
+  const prefix = `/vehicle-images/${id}/`
   return (
     Boolean(value) &&
     value.length <= MAX_FILE_ID_LENGTH &&
     value.startsWith("cloud://") &&
-    value.includes(`/vehicle-images/${id}/`)
+    path.startsWith(prefix) && /^[^/?#]+$/.test(path.slice(prefix.length))
   )
-}
-
-function normalizeDeletionContext(context) {
-  const input = context && typeof context === "object" ? context : {}
-  return {
-    vehicleId: String(input.vehicleId || input.id || "").trim().slice(0, 128),
-    action: String(input.action || "removeImage").trim().slice(0, 32)
-  }
-}
-
-function getSafeErrorCode(error) {
-  return String((error && (error.code || error.errCode)) || "").trim().slice(0, 64)
-}
-
-async function deleteFilesBestEffort(fileList, context) {
-  const list = normalizeStringArray(fileList)
-  if (!list.length) {
-    return
-  }
-  const safeContext = normalizeDeletionContext(context)
-
-  try {
-    await cloud.deleteFile({ fileList: list })
-  } catch (error) {
-    console.error({
-      function: "vehicleImageUpdate",
-      stage: "deleteFile",
-      fileCount: list.length,
-      context: safeContext,
-      errorCode: getSafeErrorCode(error),
-      createdAt: new Date().toISOString()
-    })
-
-    try {
-      await db.collection("pending_file_deletions").add({
-        data: {
-          fileList: list,
-          context: safeContext,
-          source: "vehicleImageUpdate",
-          createdAt: db.serverDate()
-        }
-      })
-    } catch (queueError) {}
-  }
 }
 
 async function queueUploadedFilesForCleanup(fileList, vehicleId) {
   const list = normalizeStringArray(fileList)
-  if (!list.length) {
-    return 0
-  }
-  const normalizedVehicleId = String(vehicleId || "").trim().slice(0, 128)
-
-  await Promise.all(list.map((fileId) => {
-    const digest = crypto
-      .createHash("sha256")
-      .update(`${normalizedVehicleId}|${fileId}`)
-      .digest("hex")
-      .slice(0, 32)
-    return db
-      .collection("pending_file_deletions")
-      .doc(`pending_image_cleanup_${digest}`)
-      .set({
-        data: {
-          fileList: [fileId],
-          context: {
-            vehicleId: normalizedVehicleId,
-            action: "cleanupUpload"
-          },
-          source: "vehicleImageUploadCleanup",
-          notBeforeAt: new Date(
-            resolveUploadTimestamp(fileId) + ORPHAN_CLEANUP_GRACE_MS
-          ),
-          createdAt: db.serverDate()
-        }
-      })
-  }))
+  await Promise.all(list.map((fileId) => imageLifecycle.queueUpload(vehicleId, fileId,
+    new Date(resolveUploadTimestamp(fileId) + ORPHAN_CLEANUP_GRACE_MS))))
   return list.length
 }
 
@@ -330,97 +263,102 @@ exports.main = async (event) => {
       }
     }
 
-    const currentRes = await db
-      .collection("vehicles")
-      .doc(input.id)
-      .field(VEHICLE_IMAGE_FIELDS)
-      .get()
-    const current = currentRes && currentRes.data ? currentRes.data : null
-    if (!current) {
-      return createError("NOT_FOUND", "车辆不存在")
-    }
-
-    const state = buildImageState(current)
-    let nextImageList = state.imageList.slice()
-    let nextCoverImage = state.coverImage
-    const shouldDeleteFile = input.action === "remove" && input.fileId && state.imageList.includes(input.fileId)
-
-    if (input.action === "add") {
-      if (!input.fileIds.length) {
-        return createError("VALIDATION_ERROR", "未提供待上传图片", {
-          errors: [{ field: "fileIds", message: "至少上传一张图片" }]
-        })
+    const mutation = await db.runTransaction(async (transaction) => {
+      const currentRes = await transaction
+        .collection("vehicles")
+        .doc(input.id)
+        .field(VEHICLE_IMAGE_FIELDS)
+        .get()
+      const current = currentRes && currentRes.data ? currentRes.data : null
+      if (!current) {
+        return createError("NOT_FOUND", "车辆不存在")
       }
 
-      const invalidFileIds = input.fileIds.filter(
-        (fileId) => !isCurrentVehicleImageFileId(fileId, input.id)
-      )
-      if (invalidFileIds.length) {
-        return createError("VALIDATION_ERROR", "图片不属于当前车辆目录", {
-          errors: [{ field: "fileIds", message: "只能添加当前车辆目录下的云图片" }]
+      const state = buildImageState(current)
+      let nextImageList = state.imageList.slice()
+      let nextCoverImage = state.coverImage
+      const shouldDeleteFile = input.action === "remove" && input.fileId && state.imageList.includes(input.fileId)
+
+      if (input.action === "add") {
+        if (!input.fileIds.length) {
+          return createError("VALIDATION_ERROR", "未提供待上传图片", {
+            errors: [{ field: "fileIds", message: "至少上传一张图片" }]
+          })
+        }
+
+        const invalidFileIds = input.fileIds.filter(
+          (fileId) => !isCurrentVehicleImageFileId(fileId, input.id)
+        )
+        if (invalidFileIds.length) {
+          return createError("VALIDATION_ERROR", "图片不属于当前车辆目录", {
+            errors: [{ field: "fileIds", message: "只能添加当前车辆目录下的云图片" }]
+          })
+        }
+
+        input.fileIds.forEach((fileId) => {
+          if (!nextImageList.includes(fileId)) {
+            nextImageList.push(fileId)
+          }
         })
+
+        if (nextImageList.length > MAX_IMAGE_COUNT) {
+          return createError("VALIDATION_ERROR", `最多只能上传 ${MAX_IMAGE_COUNT} 张图片`, {
+            errors: [{ field: "fileIds", message: `图片数量不能超过 ${MAX_IMAGE_COUNT} 张` }]
+          })
+        }
+
+        if (!(await imageLifecycle.canAttach(transaction, input.id, input.fileIds))) {
+          return createError("IMAGE_DELETION_CONFLICT", "图片正在清理，请重新上传")
+        }
+
+        if (!nextCoverImage) {
+          nextCoverImage = nextImageList[0] || ""
+        }
       }
 
-      input.fileIds.forEach((fileId) => {
-        if (!nextImageList.includes(fileId)) {
-          nextImageList.push(fileId)
+      if (input.action === "remove") {
+        if (!input.fileId) {
+          return createError("VALIDATION_ERROR", "未提供待删除图片", {
+            errors: [{ field: "fileId", message: "图片文件 ID 不能为空" }]
+          })
+        }
+
+        nextImageList = nextImageList.filter((fileId) => fileId !== input.fileId)
+        if (nextCoverImage === input.fileId) {
+          nextCoverImage = nextImageList[0] || ""
+        }
+      }
+
+      if (input.action === "setCover") {
+        if (!input.fileId) {
+          return createError("VALIDATION_ERROR", "未提供封面图片", {
+            errors: [{ field: "fileId", message: "封面文件 ID 不能为空" }]
+          })
+        }
+
+        if (!nextImageList.includes(input.fileId)) {
+          return createError("VALIDATION_ERROR", "封面图片不在当前图片列表中", {
+            errors: [{ field: "fileId", message: "请先上传该图片后再设为封面" }]
+          })
+        }
+
+        nextCoverImage = input.fileId
+      }
+
+      await transaction.collection("vehicles").doc(input.id).update({
+        data: {
+          imageList: nextImageList,
+          coverImage: nextCoverImage,
+          updatedAt: db.serverDate()
         }
       })
 
-      if (nextImageList.length > MAX_IMAGE_COUNT) {
-        return createError("VALIDATION_ERROR", `最多只能上传 ${MAX_IMAGE_COUNT} 张图片`, {
-          errors: [{ field: "fileIds", message: `图片数量不能超过 ${MAX_IMAGE_COUNT} 张` }]
-        })
-      }
-
-      if (!nextCoverImage) {
-        nextCoverImage = nextImageList[0] || ""
-      }
-    }
-
-    if (input.action === "remove") {
-      if (!input.fileId) {
-        return createError("VALIDATION_ERROR", "未提供待删除图片", {
-          errors: [{ field: "fileId", message: "图片文件 ID 不能为空" }]
-        })
-      }
-
-      nextImageList = nextImageList.filter((fileId) => fileId !== input.fileId)
-      if (nextCoverImage === input.fileId) {
-        nextCoverImage = nextImageList[0] || ""
-      }
-    }
-
-    if (input.action === "setCover") {
-      if (!input.fileId) {
-        return createError("VALIDATION_ERROR", "未提供封面图片", {
-          errors: [{ field: "fileId", message: "封面文件 ID 不能为空" }]
-        })
-      }
-
-      if (!nextImageList.includes(input.fileId)) {
-        return createError("VALIDATION_ERROR", "封面图片不在当前图片列表中", {
-          errors: [{ field: "fileId", message: "请先上传该图片后再设为封面" }]
-        })
-      }
-
-      nextCoverImage = input.fileId
-    }
-
-    await db.collection("vehicles").doc(input.id).update({
-      data: {
-        imageList: nextImageList,
-        coverImage: nextCoverImage,
-        updatedAt: db.serverDate()
-      }
+      const claimed = shouldDeleteFile && await imageLifecycle.writeClaim(transaction, input.id, input.fileId, "vehicleImageUpdate", "remove")
+      return { ok: true, nextImageList, nextCoverImage, claimed }
     })
-
-    if (shouldDeleteFile) {
-      await deleteFilesBestEffort([input.fileId], {
-        vehicleId: input.id,
-        action: input.action
-      })
-    }
+    if (!mutation.ok) return mutation
+    const { nextImageList, nextCoverImage } = mutation
+    if (mutation.claimed) await imageLifecycle.deleteClaimed(input.id, [input.fileId])
 
     await writeAuditLogBestEffort({
       openid,

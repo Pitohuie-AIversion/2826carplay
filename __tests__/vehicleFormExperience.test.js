@@ -45,7 +45,10 @@ function createPage(definition, overrides = {}) {
   page.setData = jest.fn((patch) => {
     Object.keys(patch).forEach((key) => {
       if (key.startsWith("form.")) {
-        page.data.form[key.slice(5)] = patch[key]
+        const fields = key.split(".").slice(1)
+        const lastField = fields.pop()
+        const target = fields.reduce((value, field) => value[field], page.data.form)
+        target[lastField] = patch[key]
         return
       }
       page.data[key] = patch[key]
@@ -55,6 +58,122 @@ function createPage(definition, overrides = {}) {
 }
 
 describe("车辆新增与编辑表单体验", () => {
+  test("保存后全部返回路径失败仍能使用回执中的新版本继续编辑", () => {
+    jest.useFakeTimers()
+    const requests = []
+    global.wx = {
+      cloud: { callFunction: jest.fn((request) => requests.push(request)) }, showToast: jest.fn(),
+      navigateBack: jest.fn(({ fail }) => fail()), redirectTo: jest.fn(({ fail }) => fail()), reLaunch: jest.fn(({ fail }) => fail())
+    }
+    const page = createPage(loadPageDefinition("../pages-admin/vehicle-edit/vehicle-edit"), { id: "car_1", loading: false, form: VALID_FORM })
+    global.getCurrentPages = () => [page]
+    page._vehicleVersion = 7
+    page.handleSubmit()
+    requests[0].success({ result: { ok: true, id: "car_1", vehicleVersion: 8 } })
+    jest.advanceTimersByTime(900)
+    expect(page.data.isSubmitting).toBe(false)
+    page.handleTextInput({ currentTarget: { dataset: { field: "publicDrivingTips" } }, detail: { value: "新的用车提示" } })
+    page.handleSubmit()
+    expect(requests[1].data).toMatchObject({ expectedVersion: 8, publicDrivingTips: "新的用车提示" })
+    requests[1].success({ result: { ok: true, id: "car_1", vehicleVersion: 9 } })
+    expect(page._vehicleVersion).toBe(9)
+    page.onUnload()
+    expect(jest.getTimerCount()).toBe(0)
+  })
+  test("编辑回填和再次提交保留旧数据中的性能数值零与零租金", () => {
+    const detail = { ...VALID_FORM, priceDay: 0, performance: { acceleration: 0, horsepower: 0, torque: 0 } }
+    global.wx = { cloud: { callFunction: jest.fn(({ success }) => success({ result: { ok: true, detail } })) }, showToast: jest.fn() }
+    const page = createPage(loadPageDefinition("../pages-admin/vehicle-edit/vehicle-edit"))
+    page.fetchDetail("car_1")
+    expect(page.data.form.priceDay).toBe("0")
+    expect(page.buildSubmitPayload().performance).toMatchObject({ acceleration: "0", horsepower: "0", torque: "0" })
+    page.onUnload()
+  })
+
+  test.each([null, { minDays: 5, discountRate: 0.955 }])("旧折扣异常项 %p 不阻塞回填也不被自动改成有效折扣", (tier) => {
+    const detail = { ...VALID_FORM, rentalDiscountTiers: [tier] }
+    global.wx = { cloud: { callFunction: jest.fn(({ success }) => success({ result: { ok: true, detail } })) }, showToast: jest.fn() }
+    const page = createPage(loadPageDefinition("../pages-admin/vehicle-edit/vehicle-edit"), { id: "car_1" })
+    page.fetchDetail("car_1")
+    expect(page.data.loading).toBe(false)
+    expect(page.data.discountRows).toHaveLength(1)
+    page.handleSubmit()
+    expect(wx.cloud.callFunction).toHaveBeenCalledTimes(1)
+    expect(page.data.isSubmitting).toBe(false)
+    expect(require("../shared/vehicle").validateVehicle(page.buildSubmitPayload()).ok).toBe(false)
+    page.handleRemoveDiscountTier({ currentTarget: { dataset: { index: 0 } } })
+    expect(require("../shared/vehicle").validateVehicle(page.buildSubmitPayload()).ok).toBe(true)
+    page.onUnload()
+  })
+
+  test.each(["", "legacy-unknown"])("旧车未知类型和状态 %p 保留原值并阻止无意覆盖", (value) => {
+    const detail = { ...VALID_FORM, vehicleType: value, status: value }
+    global.wx = { cloud: { callFunction: jest.fn(({ success }) => success({ result: { ok: true, detail } })) }, showToast: jest.fn() }
+    const page = createPage(loadPageDefinition("../pages-admin/vehicle-edit/vehicle-edit"), { id: "car_1" })
+    page.fetchDetail("car_1")
+    expect(page.buildSubmitPayload()).toMatchObject({ vehicleType: value, status: value })
+    page.handleTextInput({ currentTarget: { dataset: { field: "note" } }, detail: { value: "只改备注" } })
+    page.handleSubmit()
+    expect(wx.cloud.callFunction).toHaveBeenCalledTimes(1)
+    page.handleVehicleTypeChange({ detail: { value: 0 } })
+    page.handleStatusChange({ detail: { value: 0 } })
+    expect(require("../shared/vehicle").validateVehicle(page.buildSubmitPayload()).ok).toBe(true)
+    page.onUnload()
+  })
+
+  test("编辑提交带读取版本，冲突保留表单并由用户选择重新加载", () => {
+    jest.useFakeTimers()
+    const calls = []
+    global.wx = { cloud: { callFunction: jest.fn((options) => calls.push(options)) }, showToast: jest.fn(), showModal: jest.fn() }
+    const page = createPage(loadPageDefinition("../pages-admin/vehicle-edit/vehicle-edit"), { id: "car_1" })
+    page.fetchDetail("car_1")
+    calls[0].success({ result: { ok: true, detail: { ...VALID_FORM, vehicleVersion: 7 } } })
+    page.data.form.note = "尚未保存的内容"
+    page.handleSubmit()
+    expect(calls[1].data.expectedVersion).toBe(7)
+    calls[1].success({ result: { ok: false, code: "VERSION_CONFLICT" } })
+    expect(page.data.isSubmitting).toBe(false)
+    expect(page.data.form.note).toBe("尚未保存的内容")
+    const confirmation = wx.showModal.mock.calls[0][0]
+    confirmation.success({ confirm: false })
+    expect(calls).toHaveLength(2)
+    page.onUnload()
+    confirmation.success({ confirm: true })
+    expect(calls).toHaveLength(2)
+  })
+  test.each(["vehicle-create", "vehicle-edit"])("%s 新字段输入后立即提交，并可清空性能与到期日", (name) => {
+    global.wx = { showToast: jest.fn() }
+    const page = createPage(loadPageDefinition(`../pages-admin/${name}/${name}`), { loading: false, form: { ...VALID_FORM, performance: { acceleration: "6.5s", horsepower: "300Ps", drivetrain: "后轮驱动", torque: "400N·m", highlights: ["天窗"] } } })
+    const event = (field, value) => ({ currentTarget: { dataset: { field } }, detail: { value } })
+    page.handleTextInput(event("publicDrivingTips", "启程前确认座椅位置"))
+    page.handleDueDateChange(event("archiveDate", "2027-01-01"))
+    page.handleDueDateChange(event("archiveReview", "2027-06-01"))
+    expect(page.buildSubmitPayload()).toMatchObject({ publicDrivingTips: "启程前确认座椅位置", archiveDate: "2027-01-01", archiveReview: "2027-06-01" })
+    for (const field of ["acceleration", "horsepower", "torque"]) page.handlePerformanceTextInput(event(`performance.${field}`, ""))
+    page.handleClearOptionalField(event("performance.drivetrain"))
+    page.handleRemoveHighlight({ currentTarget: { dataset: { index: 0 } } })
+    page.handleClearOptionalField(event("archiveDate"))
+    page.handleClearOptionalField(event("archiveReview"))
+    page.handleTextInput(event("publicDrivingTips", ""))
+    expect(page.buildSubmitPayload()).toMatchObject({ publicDrivingTips: "", archiveDate: "", archiveReview: "", performance: { acceleration: "", horsepower: "", drivetrain: "", torque: "", highlights: [] } })
+    page.data.isSubmitting = true
+    page.handleDueDateChange(event("archiveDate", "2028-01-01"))
+    expect(page.data.form.archiveDate).toBe("")
+  })
+
+  test("编辑回填保存的人工提示、到期日与性能，重新读取空配置不补示例值", () => {
+    jest.useFakeTimers()
+    let detail = { ...VALID_FORM, publicDrivingTips: "停车后关闭灯光", archiveDate: "2027-01-01", archiveReview: "2027-06-01", performance: { horsepower: "300Ps", highlights: ["天窗"] } }
+    global.wx = { cloud: { callFunction: jest.fn(({ success }) => success({ result: { ok: true, detail } })) }, showToast: jest.fn() }
+    const page = createPage(loadPageDefinition("../pages-admin/vehicle-edit/vehicle-edit"))
+    page.fetchDetail("car_1")
+    expect(page.buildSubmitPayload()).toMatchObject(detail)
+    detail = { ...VALID_FORM }
+    page.fetchDetail("car_1")
+    expect(page.buildSubmitPayload()).toMatchObject({ publicDrivingTips: "", archiveDate: "", archiveReview: "", performance: { acceleration: "", horsepower: "", drivetrain: "", torque: "", highlights: [] } })
+    page.onUnload()
+  })
+
   test("重新进入编辑页回填已保存折扣，不给旧车补默认档位", () => {
     jest.useFakeTimers()
     let detail = { ...VALID_FORM, rentalDiscountTiers: [{ minDays: 5, discountRate: 0.92 }] }

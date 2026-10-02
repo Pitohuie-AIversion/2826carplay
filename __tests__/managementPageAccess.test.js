@@ -317,7 +317,6 @@ describe("shared/pageAuth", () => {
 
   test("返回上一页失败后若已离页则不再执行重定向降级", () => {
     let navigateOptions = null
-    global.getCurrentPages.mockReturnValue([{}, {}])
     wx.navigateBack.mockImplementation((options) => {
       navigateOptions = options
     })
@@ -325,6 +324,7 @@ describe("shared/pageAuth", () => {
       success({ result: { ok: true, canManageRoles: false } })
     })
     const page = createPage()
+    global.getCurrentPages.mockReturnValue([{}, page])
     const {
       cancelPagePermissionCheck,
       requirePagePermission
@@ -332,6 +332,7 @@ describe("shared/pageAuth", () => {
 
     requirePagePermission(page, { required: "canManageRoles" })
     jest.advanceTimersByTime(700)
+    expect(wx.navigateBack).toHaveBeenCalledTimes(1)
     cancelPagePermissionCheck(page)
     navigateOptions.fail()
 
@@ -364,11 +365,11 @@ describe("shared/pageAuth", () => {
   })
 
   test("存在上一页时优先返回上一页", () => {
-    global.getCurrentPages.mockReturnValue([{}, {}])
     wx.cloud.callFunction.mockImplementation(({ success }) => {
       success({ result: { ok: true, canManageRoles: false } })
     })
     const page = createPage()
+    global.getCurrentPages.mockReturnValue([{}, page])
     const { requirePagePermission } = require("../shared/pageAuth")
 
     requirePagePermission(page, { required: "canManageRoles" })

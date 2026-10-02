@@ -328,6 +328,7 @@ async function readVehiclesByMode(ordered) {
     const remaining = MAX_VEHICLE_RECORDS + 1 - list.length
     const batchSize = Math.min(VEHICLE_BATCH_SIZE, remaining)
     let query = db.collection("vehicles").field(PUBLIC_VEHICLE_FIELDS)
+    if (_ && typeof query.where === "function") query = query.where({ status: _.neq("retired") })
     if (ordered) {
       query = query.orderBy("updatedAt", "desc")
     }
@@ -374,9 +375,16 @@ async function queryNativePage(page, pageSize, ordered) {
     query = query.orderBy("updatedAt", "desc")
   }
 
-  const res = await query.skip(skip).limit(pageSize).get()
+  const res = await query.skip(skip).limit(Math.min(pageSize + 1, VEHICLE_BATCH_SIZE)).get()
+  const records = res && Array.isArray(res.data) ? res.data : []
+  let hasMore = records.length > pageSize
+  if (pageSize === VEHICLE_BATCH_SIZE && records.length === pageSize) {
+    const extra = await query.skip(skip + pageSize).limit(1).get()
+    hasMore = Boolean(extra && Array.isArray(extra.data) && extra.data.length)
+  }
   return {
-    list: res && Array.isArray(res.data) ? res.data : [],
+    list: records.slice(0, pageSize),
+    hasMore,
     ordered
   }
 }
@@ -394,7 +402,9 @@ async function queryNativePageWithFallback(page, pageSize) {
           : String(indexError),
       createdAt: new Date().toISOString()
     })
-    return queryNativePage(page, pageSize, false)
+    // Without the ordering index, sort the complete bounded fallback dataset.
+    // Sorting each independently selected page would omit newer vehicles.
+    throw indexError
   }
 }
 
@@ -420,6 +430,7 @@ const STATS_PROJECTION_FIELDS = {
   priceDay: true,
   publicDescription: true,
   coverImage: true,
+  imageList: true,
   updatedAt: true,
   createdAt: true
 }
@@ -461,9 +472,11 @@ async function queryStatsProjection(ordered) {
 
 let cachedStatsProjection = null
 let cachedStatsProjectionExpiresAt = 0
+let statsRequestSerial = 0
 const STATS_CACHE_TTL_MS = 30 * 1000
 
 function clearStatsProjectionCache() {
+  statsRequestSerial++
   cachedStatsProjection = null
   cachedStatsProjectionExpiresAt = 0
 }
@@ -473,8 +486,9 @@ async function queryStatsProjectionCached() {
   if (cachedStatsProjection && now < cachedStatsProjectionExpiresAt) {
     return cachedStatsProjection
   }
+  const serial = ++statsRequestSerial
   const result = await queryStatsProjectionWithFallback()
-  if (result && Array.isArray(result.list)) {
+  if (serial === statsRequestSerial && result && Array.isArray(result.list)) {
     cachedStatsProjection = result
     cachedStatsProjectionExpiresAt = now + STATS_CACHE_TTL_MS
   }
@@ -528,6 +542,9 @@ function buildFilteredLists(publicList, keyword, category, availableOnly, city, 
 
 async function runLegacyFallback(page, pageSize, keyword, category, availableOnly, city, sortBy) {
   const vehicleRecords = await readVehicles()
+  if (vehicleRecords.truncated) {
+    return createError("CATALOG_LIMIT_REACHED", "车辆列表暂无法完整读取，请稍后重试或联系门店")
+  }
   const publicList = vehicleRecords.list
     .filter((item) => item && item.status !== "retired")
     .map(mapVehicle)
@@ -577,20 +594,23 @@ async function runNativeOptimized(page, pageSize, keyword, category, availableOn
       ok: true,
       page,
       pageSize,
-      hasMore: pagePublicList.length >= pageSize,
+      hasMore: pageResult.hasMore,
       list: pagePublicList
     }
   }
 
   const [totalCountResult, statsResult, pageResult] = await Promise.all([
     countTotalActive().catch(() => null),
-    queryStatsProjectionCached(),
+    hasFilter ? queryStatsProjectionWithFallback() : queryStatsProjectionCached(),
     queryNativePageWithFallback(page, pageSize)
   ])
 
 
   if (!statsResult || !pageResult) {
     throw new Error("NATIVE_QUERY_EMPTY_RESULT")
+  }
+  if (hasFilter && statsResult.truncated) {
+    return createError("CATALOG_LIMIT_REACHED", "车辆较多，暂无法完整筛选，请查看全部车辆或联系门店")
   }
 
   const statsPublicList = statsResult.list
@@ -608,10 +628,10 @@ async function runNativeOptimized(page, pageSize, keyword, category, availableOn
 
   const pageFiltered = buildFilteredLists(pagePublicList, keyword, category, availableOnly, city, sortBy)
   const offset = page * pageSize
-  const hasMore = offset + pageSize < fullList.length
+  const hasMore = hasFilter ? offset + pageSize < fullList.length : pageResult.hasMore
 
   const categoryTotalForMeta = categoryList.length
-  const totalForMeta = fullList.length
+  const totalForMeta = !hasFilter && totalCountResult !== null ? totalCountResult : fullList.length
 
   const truncated = Boolean(statsResult.truncated) || (totalCountResult !== null && totalCountResult > STATS_PROJECTION_LIMIT)
   const list = hasFilter ? fullList.slice(offset, offset + pageSize) : pageFiltered.fullList
@@ -649,6 +669,7 @@ exports.main = async (event) => {
     const category = String(payload.category || "all").trim().slice(0, 50) || "all"
     const availableOnly = payload.availableOnly === true
     const skipStats = payload.skipStats === true
+    if (payload.refreshStats === true) clearStatsProjectionCache()
     const sortBy = String(payload.sortBy || "default").trim().slice(0, 50) || "default"
 
     try {
@@ -663,7 +684,7 @@ exports.main = async (event) => {
             : String(nativeError),
         createdAt: new Date().toISOString()
       })
-      return runLegacyFallback(page, pageSize, keyword, category, availableOnly, city, sortBy)
+      return await runLegacyFallback(page, pageSize, keyword, category, availableOnly, city, sortBy)
     }
   } catch (error) {
     console.error({

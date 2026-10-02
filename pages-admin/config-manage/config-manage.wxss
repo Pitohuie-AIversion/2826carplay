@@ -94,3 +94,16 @@
 .save-native-icon{position:relative;width:22rpx;height:22rpx;margin-right:10rpx;border:2rpx solid currentColor;border-radius:4rpx;box-sizing:border-box;}
 .save-native-icon::before{position:absolute;top:-2rpx;left:4rpx;width:10rpx;height:7rpx;border:2rpx solid currentColor;border-top:0;box-sizing:border-box;content:"";}
 .save-native-icon::after{position:absolute;right:4rpx;bottom:3rpx;left:4rpx;height:5rpx;border:2rpx solid currentColor;border-radius:2rpx;box-sizing:border-box;content:"";}
+.service-hubs-heading,.service-hub-heading{display:flex;align-items:center;justify-content:space-between;gap:16rpx;margin-top:26rpx;}
+.service-hubs-heading .form-label{margin:0;}
+.hub-add-btn{flex-shrink:0;margin:0;padding:0 22rpx;height:66rpx;line-height:66rpx;font-size:22rpx;}
+.service-hub-card{margin-top:22rpx;padding:22rpx;border:1rpx solid rgba(255,255,255,0.09);border-radius:20rpx;background:#11151b;}
+.service-hub-heading{margin-top:0;}
+.service-hub-title{font-size:25rpx;color:#edf0f4;}
+.hub-remove-btn{margin:0;padding:0 18rpx;background:transparent;color:#e39898;font-size:22rpx;line-height:54rpx;}
+.hub-remove-btn::after{border:0;}
+.hub-type-picker{display:flex;align-items:center;justify-content:space-between;padding:0 20rpx;}
+.hub-picker-chevron{flex-shrink:0;width:10rpx;height:10rpx;margin-left:16rpx;margin-top:-5rpx;border-right:2rpx solid currentColor;border-bottom:2rpx solid currentColor;transform:rotate(45deg);}
+.hub-coordinate-row{display:flex;gap:16rpx;}
+.hub-coordinate-field{flex:1;min-width:0;}
+.config-page .control-hover{opacity:0.78;}

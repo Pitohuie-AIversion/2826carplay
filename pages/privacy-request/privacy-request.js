@@ -10,49 +10,15 @@ const { formatDisplayTime } = require("../../shared/formatTime")
 const PRIVACY_REQUEST_LIST_TIMEOUT_MS = 15 * 1000
 const PRIVACY_REQUEST_MUTATION_TIMEOUT_MS = 12 * 1000
 
-const TYPE_OPTIONS = [
-  { value: "access", label: "查询信息", desc: "申请了解平台当前保存的个人信息" },
-  { value: "correction", label: "更正信息", desc: "申请修正不准确或已变化的个人信息" },
-  { value: "deletion", label: "删除信息", desc: "申请删除符合法律与业务条件的个人信息" }
-]
-
-const TYPE_LABELS = {
-  access: "查询信息",
-  correction: "更正信息",
-  deletion: "删除信息"
-}
-
-const STATUS_META = {
-  pending: {
-    label: "待处理",
-    className: "status-pending",
-    stageHint: "申请已进入队列，开始处理前可随时撤回"
-  },
-  processing: {
-    label: "处理中",
-    className: "status-processing",
-    stageHint: "工作人员正在核验相关信息，请留意处理反馈"
-  },
-  completed: {
-    label: "已完成",
-    className: "status-completed",
-    stageHint: "本次申请已处理完成，请查看下方反馈"
-  },
-  rejected: {
-    label: "未通过",
-    className: "status-rejected",
-    stageHint: "本次申请未通过，请根据反馈调整后再提交"
-  },
-  cancelled: {
-    label: "已撤回",
-    className: "status-cancelled",
-    stageHint: "本次申请已撤回，如仍有需要可重新提交"
-  }
-}
-
-const ACTIVE_STATUSES = new Set(["pending", "processing"])
-
-
+const {
+  TYPE_OPTIONS,
+  TYPE_LABELS,
+  STATUS_META,
+  ACTIVE_STATUSES,
+  getPrivacyTypeLabel,
+  canCancelPrivacyRequest,
+  isPrivacyRequestActive
+} = require("../../shared/privacy")
 
 function buildDescriptionState(value) {
   const text = String(value || "")
@@ -81,13 +47,13 @@ function normalizeRequestItem(item) {
   return {
     ...source,
     status,
-    typeLabel: TYPE_LABELS[source.type] || "隐私申请",
+    typeLabel: getPrivacyTypeLabel(source.type, "隐私申请"),
     statusLabel: statusMeta.label,
     statusClass: statusMeta.className,
     stageHint: statusMeta.stageHint,
     createdAtText: formatDisplayTime(source.createdAt),
-    canCancel: status === "pending",
-    active: ACTIVE_STATUSES.has(status)
+    canCancel: canCancelPrivacyRequest(status),
+    active: isPrivacyRequestActive(status)
   }
 }
 
@@ -267,6 +233,10 @@ Page({
     }
 
     const requestType = String(this.data.currentType || "access")
+    const snapshot = JSON.stringify({ type: requestType, description })
+    if (!this._submissionSnapshot || this._submissionSnapshot.content !== snapshot) {
+      this._submissionSnapshot = { content: snapshot, requestId: `privacy_${Date.now()}_${Math.random().toString(36).slice(2, 10)}` }
+    }
     const submitSerial = Number(this._submitRequestSerial || 0) + 1
     this._submitRequestSerial = submitSerial
     this.clearSubmitRequestTimer()
@@ -300,7 +270,8 @@ Page({
       name: "privacyRequestCreate",
       data: {
         type: requestType,
-        description
+        description,
+        requestId: this._submissionSnapshot.requestId
       },
       success: (res) => {
         if (!finishRequest()) {
@@ -316,6 +287,7 @@ Page({
           return
         }
         clearUnsaved(this)
+        this._submissionSnapshot = null
         this.setData({
           ...buildDescriptionState(""),
           submitting: false
@@ -367,7 +339,8 @@ Page({
     }
 
     const action = beginPageNativeAction(this, {
-      exclusiveKey: "privacy-request-cancel-confirmation"
+      exclusiveKey: "privacy-request-cancel-confirmation",
+      requireCurrent: true
     })
     wx.showModal({
       title: "撤回隐私申请",

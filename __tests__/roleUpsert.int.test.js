@@ -63,6 +63,21 @@ async function loadRoleUpsertWith({ openid, mockDb }) {
 }
 
 describe("cloudfunctions/roleUpsert integration", () => {
+  test("撤销历史角色别名后，实际权限读取不再保留车辆或预约权限", async () => {
+    const target = { _id: "role_ops", openid: "ops_openid", role: "vehicle_manager", roles: ["vehicle_manager", "booking_manager"], permissions: ["booking_manage"] }
+    const mocks = createMockDb({ rolesData: [{ openid: "admin_openid", role: "admin" }, target] })
+    mocks.rolesUpdate.mockImplementation(async ({ data }) => {
+      Object.assign(target, data)
+      return { stats: { updated: 1 } }
+    })
+    const mod = await loadRoleUpsertWith({ openid: "admin_openid", mockDb: mocks.db })
+    expect((await mod.main({ openid: "ops_openid", permissions: [] })).ok).toBe(true)
+    const cloud = require("wx-server-sdk")
+    cloud.__setMockContext({ OPENID: "ops_openid" })
+    const permissions = await require("../cloudfunctions/getMyPermissions/index").main()
+    expect(permissions).toMatchObject({ ok: true, permissions: [], canManageVehicles: false, canManageBookings: false })
+  })
+
   test("admin 可新增 scoped 权限", async () => {
     const mocks = createMockDb({
       rolesData: [{ openid: "admin_openid", role: "admin" }]
@@ -94,6 +109,7 @@ describe("cloudfunctions/roleUpsert integration", () => {
       data: {
         openid: "ops_openid",
         role: "operator",
+        roles: [],
         permissions: ["vehicle_manage"],
         updatedAt: mocks.serverDateValue,
         updatedByOpenid: "admin_openid",
@@ -133,6 +149,7 @@ describe("cloudfunctions/roleUpsert integration", () => {
       data: {
         openid: "ops_openid",
         role: "operator",
+        roles: [],
         permissions: ["booking_manage"],
         updatedAt: mocks.serverDateValue,
         updatedByOpenid: "admin_openid"

@@ -1,8 +1,12 @@
 const cloud = require("wx-server-sdk")
+const { createImageLifecycle } = require("./imageLifecycle")
+const { createHandoverImageLifecycle } = require("./handoverImageLifecycle")
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
+const imageLifecycle = createImageLifecycle(db, cloud)
+const handoverImages = createHandoverImageLifecycle(db, cloud)
 const AUTH_ROLE_FIELDS = {
   role: true,
   roles: true,
@@ -16,10 +20,8 @@ const PENDING_DELETION_FIELDS = {
   attemptCount: true,
   context: true,
   source: true,
-  notBeforeAt: true
-}
-const VEHICLE_IMAGE_REFERENCE_FIELDS = {
-  imageList: true
+  notBeforeAt: true,
+  deletionState: true
 }
 const VERIFIED_IMAGE_CLEANUP_SOURCE = "vehicleImageUploadCleanup"
 const VERIFIED_HANDOVER_CLEANUP_SOURCE = "bookingHandoverUploadCleanup"
@@ -131,45 +133,11 @@ function isDeferredImageCleanup(record, now) {
   return Boolean(notBeforeAt && now < notBeforeAt)
 }
 
-async function readHandoverImageReferences(bookingId) {
-  const res = await db.collection("booking_handovers").where({ bookingId }).field({ photos: true }).limit(40).get()
-  return normalizeStringArray((res && res.data || []).flatMap((record) =>
-    Array.isArray(record.photos) ? record.photos.map((photo) => photo && photo.fileId) : []
-  ))
-}
-
 function selectQueueRecords(records, limit, now) {
   const list = Array.isArray(records) ? records : []
   const ready = list.filter((record) => !isDeferredImageCleanup(record, now))
   const candidates = ready.length ? ready : list
   return candidates.slice(0, limit)
-}
-
-function isDocumentNotFoundError(error) {
-  const code = String((error && (error.code || error.errCode)) || "")
-  const message = String(
-    error && (error.message || error.errMsg) ? error.message || error.errMsg : error || ""
-  )
-  return (
-    /DOCUMENT_NOT_FOUND|DATABASE_DOCUMENT_NOT_EXIST|OBJECT_NOT_EXIST/i.test(code) ||
-    /document.*(?:not\s+found|not\s+exist)|文档不存在/i.test(message)
-  )
-}
-
-async function readVehicleImageReferences(vehicleId) {
-  try {
-    const res = await db
-      .collection("vehicles")
-      .doc(vehicleId)
-      .field(VEHICLE_IMAGE_REFERENCE_FIELDS)
-      .get()
-    return normalizeStringArray(res && res.data && res.data.imageList)
-  } catch (error) {
-    if (isDocumentNotFoundError(error)) {
-      return []
-    }
-    throw error
-  }
 }
 
 function failedFilesFromResult(result, originalFileList) {
@@ -230,6 +198,7 @@ exports.main = async (event) => {
 
     const queueRes = await db
       .collection("pending_file_deletions")
+      .where({ deletionState: db.command.neq("deleted") })
       .field(PENDING_DELETION_FIELDS)
       .limit(QUEUE_SCAN_LIMIT)
       .get()
@@ -248,62 +217,26 @@ exports.main = async (event) => {
         return { deleted: 0, failed: 0, invalid: 1, deferred: 0, preserved: 0 }
       }
 
-      if (String(record && record.source) === VERIFIED_IMAGE_CLEANUP_SOURCE) {
-        const notBeforeAt = toTimestamp(record && record.notBeforeAt)
-        if (notBeforeAt && Date.now() < notBeforeAt) {
-          return { deleted: 0, failed: 0, invalid: 0, deferred: 1, preserved: 0 }
-        }
-
-        const vehicleId = String(
-          record && record.context && record.context.vehicleId
-            ? record.context.vehicleId
-            : ""
-        ).trim()
-        if (!vehicleId) {
-          await db.collection("pending_file_deletions").doc(recordId).remove()
-          return { deleted: 0, failed: 0, invalid: 1, deferred: 0, preserved: 0 }
-        }
-
+      if ([VERIFIED_IMAGE_CLEANUP_SOURCE, "vehicleImageUpdate", "vehicleDelete"].includes(String(record && record.source))) {
+        if (isDeferredImageCleanup(record, Date.now())) return { deleted: 0, failed: 0, invalid: 0, deferred: 1, preserved: 0 }
         try {
-          const referencedFileIds = new Set(await readVehicleImageReferences(vehicleId))
-          const orphanFileIds = fileList.filter((fileId) => !referencedFileIds.has(fileId))
-          preserved = fileList.length - orphanFileIds.length
-          fileList = orphanFileIds
-          if (!fileList.length) {
-            await db.collection("pending_file_deletions").doc(recordId).remove()
-            return { deleted: 0, failed: 0, invalid: 0, deferred: 0, preserved }
-          }
+          return await imageLifecycle.processQueueRecord(record)
         } catch (error) {
-          await db.collection("pending_file_deletions").doc(recordId).update({
-            data: {
-              attemptCount: (Number(record.attemptCount) || 0) + 1,
-              lastError: "图片引用核验失败",
-              lastAttemptAt: db.serverDate()
-            }
-          })
+          await db.collection("pending_file_deletions").doc(recordId).update({ data: {
+            attemptCount: (Number(record.attemptCount) || 0) + 1,
+            lastError: "图片引用核验或清理失败", lastAttemptAt: db.serverDate()
+          } })
           return { deleted: 0, failed: 1, invalid: 0, deferred: 0, preserved: 0 }
         }
       }
 
-      if (String(record && record.source) === VERIFIED_HANDOVER_CLEANUP_SOURCE) {
+      if ([VERIFIED_HANDOVER_CLEANUP_SOURCE, "bookingHandoverArchive"].includes(String(record && record.source))) {
         const notBeforeAt = toTimestamp(record && record.notBeforeAt)
         if (notBeforeAt && Date.now() < notBeforeAt) {
           return { deleted: 0, failed: 0, invalid: 0, deferred: 1, preserved: 0 }
         }
-        const bookingId = String(record && record.context && record.context.bookingId || "").trim()
-        if (!bookingId) {
-          await db.collection("pending_file_deletions").doc(recordId).remove()
-          return { deleted: 0, failed: 0, invalid: 1, deferred: 0, preserved: 0 }
-        }
         try {
-          const referenced = new Set(await readHandoverImageReferences(bookingId))
-          const orphanFileIds = fileList.filter((fileId) => !referenced.has(fileId))
-          preserved = fileList.length - orphanFileIds.length
-          fileList = orphanFileIds
-          if (!fileList.length) {
-            await db.collection("pending_file_deletions").doc(recordId).remove()
-            return { deleted: 0, failed: 0, invalid: 0, deferred: 0, preserved }
-          }
+          return await handoverImages.processQueueRecord(record)
         } catch (error) {
           await db.collection("pending_file_deletions").doc(recordId).update({ data: {
             attemptCount: (Number(record.attemptCount) || 0) + 1,

@@ -15,7 +15,7 @@ const VEHICLE_STATUS_LABELS = {
   retired: "已停用"
 }
 const OVERVIEW_SOURCE_TIMEOUT_MS = 15 * 1000
-function callCloud(name, data) {
+function callCloud(name, data, registerCancel) {
   return new Promise((resolve) => {
     let settled = false
     let timeoutId = null
@@ -39,6 +39,7 @@ function callCloud(name, data) {
     timeoutId = setTimeout(() => {
       handleFailure({ message: "数据请求超时，请稍后刷新" })
     }, OVERVIEW_SOURCE_TIMEOUT_MS)
+    registerCancel(() => finish(null))
     try {
       wx.cloud.callFunction({
         name,
@@ -179,7 +180,7 @@ Page({
     if (!url) {
       return
     }
-    const action = beginPageNativeAction(this)
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.navigateTo({
       url,
       fail: () => {
@@ -224,14 +225,16 @@ Page({
       loadError: "",
       requestedSourceCount
     })
+    this._overviewRequestCancels = []
+    const registerCancel = (cancel) => this._overviewRequestCancels.push(cancel)
     const vehicleTask = permissions.canManageVehicles
-      ? callCloud("vehicleList", { page: 0, pageSize: 1 })
+      ? callCloud("vehicleList", { page: 0, pageSize: 1 }, registerCancel)
       : Promise.resolve(null)
     const bookingTask = permissions.canManageBookings
-      ? callCloud("bookingList", { page: 0, pageSize: 1 })
+      ? callCloud("bookingList", { page: 0, pageSize: 1 }, registerCancel)
       : Promise.resolve(null)
     const summaryTask = permissions.canManageBookings || permissions.canManageRoles
-      ? callCloud("operationSummaryGet")
+      ? callCloud("operationSummaryGet", {}, registerCancel)
       : Promise.resolve(null)
     let settled = false
     const isCurrent = () => this._overviewRequestId === requestId
@@ -427,6 +430,9 @@ Page({
       })
   },
   finishOverviewRequestEffects() {
+    const cancels = this._overviewRequestCancels || []
+    this._overviewRequestCancels = []
+    cancels.forEach((cancel) => cancel())
     if (typeof this._overviewRequestDone === "function") {
       const done = this._overviewRequestDone
       this._overviewRequestDone = null

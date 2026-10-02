@@ -6,6 +6,7 @@ const db = cloud.database()
 const DEFAULT_PAGE_SIZE = 20
 const MAX_PAGE_SIZE = 50
 const FALLBACK_MAX_RECORDS = 500
+const FALLBACK_BATCH_SIZE = 100
 const PRIVACY_REQUEST_MY_FIELDS = {
   _id: true,
   type: true,
@@ -71,20 +72,24 @@ async function queryWithIndex(openid, page, pageSize) {
 }
 
 async function queryWithoutIndex(openid, page, pageSize) {
-  const res = await db
-    .collection("privacy_requests")
-    .where({ openid })
-    .field(PRIVACY_REQUEST_MY_FIELDS)
-    .limit(FALLBACK_MAX_RECORDS + 1)
-    .get()
-  const rawList = res && Array.isArray(res.data) ? res.data : []
-  const truncated = rawList.length > FALLBACK_MAX_RECORDS
-  const list = sortByCreatedAt(rawList.slice(0, FALLBACK_MAX_RECORDS))
+  const rawList = []
+  for (let offset = 0; offset <= FALLBACK_MAX_RECORDS; offset += FALLBACK_BATCH_SIZE) {
+    const limit = Math.min(FALLBACK_BATCH_SIZE, FALLBACK_MAX_RECORDS + 1 - rawList.length)
+    const res = await db.collection("privacy_requests").where({ openid })
+      .field(PRIVACY_REQUEST_MY_FIELDS).skip(offset).limit(limit).get()
+    const batch = res && Array.isArray(res.data) ? res.data : []
+    rawList.push(...batch)
+    if (rawList.length > FALLBACK_MAX_RECORDS) {
+      throw Object.assign(new Error("申请记录较多，暂时无法完整加载，请稍后重试"), { code: "INDEX_REQUIRED" })
+    }
+    if (batch.length < limit) break
+  }
+  const list = sortByCreatedAt(rawList)
   const start = page * pageSize
   return {
     list: list.slice(start, start + pageSize),
-    hasMore: start + pageSize < list.length || truncated,
-    truncated
+    hasMore: start + pageSize < list.length,
+    truncated: false
   }
 }
 
@@ -144,8 +149,8 @@ exports.main = async (event) => {
     })
     return {
       ok: false,
-      code: "INTERNAL_ERROR",
-      message: "隐私申请加载失败，请稍后重试"
+      code: error && error.code === "INDEX_REQUIRED" ? "INDEX_REQUIRED" : "INTERNAL_ERROR",
+      message: error && error.code === "INDEX_REQUIRED" ? error.message : "隐私申请加载失败，请稍后重试"
     }
   }
 }

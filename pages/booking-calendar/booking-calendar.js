@@ -8,6 +8,7 @@ const {
   cancelPageNativeActions,
   isPageNativeActionActive
 } = require("../../shared/pageNativeAction")
+const { STATUS_TEXT_MAP, mapStatusClass } = require("../../shared/bookingStatus")
 
 const CURRENT_MONTH_KEY = normalizeMonthKey("")
 function getCalendarSnapshotKey(monthKey) {
@@ -42,8 +43,6 @@ const BLOCK_KIND_LABELS = {
   hold: "人工保留",
   unavailable: "其他不可用"
 }
-
-const { STATUS_TEXT_MAP, mapStatusClass } = require("../../shared/bookingStatus")
 
 function formatBooking(item) {
   const status = String(item.status || "pending")

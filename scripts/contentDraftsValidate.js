@@ -246,23 +246,56 @@ function main() {
     slugMap.set(normalized.slug, true)
 
     const ok = invalid.length === 0 && !duplicate
-    const record = {
-      ...normalized,
-      status: "draft",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    }
     if (ok) {
-      const slug = record.slug.replace(/[^A-Za-z0-9_-]/g, "_")
+      const slug = normalized.slug.replace(/[^A-Za-z0-9_-]/g, "_")
       const target = path.join(outDir, `draft_${slug}.json`)
-      fs.writeFileSync(target, JSON.stringify(record, null, 2) + "\n", "utf8")
+      let existingRecord = null
+      if (fs.existsSync(target)) {
+        try {
+          existingRecord = JSON.parse(fs.readFileSync(target, "utf8"))
+        } catch (e) {}
+      }
+      const isUnchanged = existingRecord && [
+        "slug", "title", "summary", "body", "contentType", "scenario", "shareTitle"
+      ].every((k) => normalized[k] === existingRecord[k]) &&
+      (existingRecord.status === "draft") &&
+      JSON.stringify(normalized.vehicleIds || []) === JSON.stringify(existingRecord.vehicleIds || []) &&
+      JSON.stringify(normalized.tags || []) === JSON.stringify(existingRecord.tags || [])
+
+      const now = new Date().toISOString()
+      const record = {
+        ...normalized,
+        status: "draft",
+        createdAt: existingRecord && existingRecord.createdAt ? existingRecord.createdAt : now,
+        updatedAt: isUnchanged && existingRecord && existingRecord.updatedAt ? existingRecord.updatedAt : now
+      }
+      const newContent = JSON.stringify(record, null, 2) + "\n"
+      const currentContent = fs.existsSync(target) ? fs.readFileSync(target, "utf8") : null
+      if (currentContent !== newContent) {
+        fs.writeFileSync(target, newContent, "utf8")
+      }
     }
     return { slug: normalized.slug, ok, invalid, duplicate }
   })
 
   const passed = results.filter((r) => r.ok).length
+  const summaryPath = path.join(outDir, "summary.json")
+  let existingSummary = null
+  if (fs.existsSync(summaryPath)) {
+    try {
+      existingSummary = JSON.parse(fs.readFileSync(summaryPath, "utf8"))
+    } catch (e) {}
+  }
+  const isSummaryUnchanged = existingSummary &&
+    existingSummary.total === results.length &&
+    existingSummary.passed === passed &&
+    existingSummary.failed === (results.length - passed) &&
+    JSON.stringify(existingSummary.results) === JSON.stringify(results)
+
   const summary = {
-    generatedAt: new Date().toISOString(),
+    generatedAt: isSummaryUnchanged && existingSummary && existingSummary.generatedAt
+      ? existingSummary.generatedAt
+      : new Date().toISOString(),
     total: results.length,
     passed,
     failed: results.length - passed,
@@ -272,8 +305,11 @@ function main() {
     results
   }
 
-  const summaryPath = path.join(outDir, "summary.json")
-  fs.writeFileSync(summaryPath, JSON.stringify(summary, null, 2) + "\n", "utf8")
+  const newSummaryContent = JSON.stringify(summary, null, 2) + "\n"
+  const currentSummaryContent = fs.existsSync(summaryPath) ? fs.readFileSync(summaryPath, "utf8") : null
+  if (currentSummaryContent !== newSummaryContent) {
+    fs.writeFileSync(summaryPath, newSummaryContent, "utf8")
+  }
 
   console.log(`== content_guides 草稿本地校验报告 ==`)
   console.log(`总数: ${summary.total}，通过: ${passed}，失败: ${summary.failed}`)

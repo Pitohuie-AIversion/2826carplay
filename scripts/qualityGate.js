@@ -6,14 +6,15 @@
  * 2. 密钥与敏感凭据防线 (checkRepositorySecrets)
  * 3. 运营攻略内容合规校验 (contentDraftsValidate)
  * 4. 16 集合 × 52 复合索引安全规则巡检 (checkDatabaseIndexes)
- * 5. 小程序主包与分包体积预算 (checkMiniProgramPackage, <= 1.75 MiB)
- * 6. Jest 自动化测试全量回归 (154 套件，1840+ 用例)
- * 7. 无头全页面组件交互点击仿真 (333 项点击断言)
- * 8. 真实用户多角色业务旅程全闭环验证 (30 项端到端流程)
+ * 5. 56 个云函数架构规范与安全鉴权审计 (cloudCheck)
+ * 6. 小程序主包与分包体积预算 (checkMiniProgramPackage, <= 1.75 MiB)
+ * 7. Jest 自动化测试全量回归 (154 套件，1850+ 用例)
+ * 8. 无头全页面组件交互点击仿真 (333 项点击断言)
+ * 9. 真实用户多角色业务旅程全闭环验证 (30 项端到端流程)
  *
  * 用法：
- *   node scripts/qualityGate.js          # 全量 8 阶段体检
- *   node scripts/qualityGate.js --static # 仅运行静态合规与包预算 (前 5 项)
+ *   node scripts/qualityGate.js          # 全量 9 阶段深度体检
+ *   node scripts/qualityGate.js --static # 静态合规与架构规范快速体检 (前 6 项)
  */
 
 const { spawnSync } = require("child_process")
@@ -25,31 +26,37 @@ const isStaticOnly = process.argv.includes("--static") || process.argv.includes(
 const STAGES = [
   {
     id: "structure",
-    name: "阶段 1/8: 项目目录与页面声明规范",
+    name: "阶段 1/9: 项目目录与页面声明规范",
     script: "scripts/checkProjectStructure.js",
     args: []
   },
   {
     id: "secrets",
-    name: "阶段 2/8: 仓库敏感信息与凭据扫描",
+    name: "阶段 2/9: 仓库敏感信息与凭据扫描",
     script: "scripts/checkRepositorySecrets.js",
     args: []
   },
   {
     id: "drafts",
-    name: "阶段 3/8: 运营攻略草稿 Schema 校验",
+    name: "阶段 3/9: 运营攻略草稿 Schema 校验",
     script: "scripts/contentDraftsValidate.js",
     args: []
   },
   {
     id: "database",
-    name: "阶段 4/8: 数据库集合安全规则与索引校验",
+    name: "阶段 4/9: 数据库集合安全规则与索引校验",
     script: "scripts/checkDatabaseIndexes.js",
     args: []
   },
   {
+    id: "cloud",
+    name: "阶段 5/9: 云函数架构规范与安全鉴权审计 (56 Functions)",
+    script: "scripts/cloudCheck.js",
+    args: []
+  },
+  {
     id: "package",
-    name: "阶段 5/8: 小程序主包与分包体积预算",
+    name: "阶段 6/9: 小程序主包与分包体积预算",
     script: "scripts/checkMiniProgramPackage.js",
     args: []
   }
@@ -59,19 +66,19 @@ if (!isStaticOnly) {
   STAGES.push(
     {
       id: "jest",
-      name: "阶段 6/8: 单元与集成测试全量回归 (Jest 154 Suites)",
+      name: "阶段 7/9: 单元与集成测试全量回归 (Jest 154 Suites)",
       script: "node_modules/jest/bin/jest.js",
       args: ["--runInBand"]
     },
     {
       id: "clicks",
-      name: "阶段 7/8: 无头全页面组件交互点击仿真 (333 Clicks)",
+      name: "阶段 8/9: 无头全页面组件交互点击仿真 (333 Clicks)",
       script: "scripts/simulateAllComponentClicks.js",
       args: []
     },
     {
       id: "usage",
-      name: "阶段 8/8: 真实用户全场景业务旅程仿真 (30 Scenarios)",
+      name: "阶段 9/9: 真实用户全场景业务旅程仿真 (30 Scenarios)",
       script: "scripts/verifyActualUsage.js",
       args: []
     }
@@ -109,7 +116,7 @@ function main() {
   console.log("╔════════════════════════════════════════════════════════════════════╗")
   console.log("║         极境车库工程质量总门禁 (Quality Gate & Doctor)             ║")
   console.log("╚════════════════════════════════════════════════════════════════════╝")
-  console.log(`模式: ${isStaticOnly ? "静态快速体检 (前 5 阶段)" : "全量深度体检 (全 8 阶段)"}`)
+  console.log(`模式: ${isStaticOnly ? "静态快速体检 (前 6 阶段)" : "全量深度体检 (全 9 阶段)"}`)
   console.log(`基准目录: ${PROJECT_ROOT}\x1b[0m`)
 
   const results = []

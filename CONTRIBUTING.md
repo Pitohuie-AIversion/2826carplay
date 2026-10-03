@@ -84,21 +84,22 @@ gitGraph
 在发起 Pull Request 或提交代码前，请在本地运行一键工程质量门禁：
 
 ```bash
-# 全量 8 阶段深度体检（规范扫描 + 包预算 + 单元测试 + 333次交互仿真 + 30条业务旅程）
+# 全量 9 阶段深度体检（前后端规范扫描 + 云函数审计 + 包预算 + 单元测试 + 333次交互仿真 + 30条业务旅程）
 node scripts/qualityGate.js
 
-# 快捷静态扫描（前 5 阶段：规范、密钥、草稿、索引、包体积）
+# 快捷静态扫描（前 6 阶段：规范、密钥、草稿、索引、云函数架构、包体积）
 node scripts/qualityGate.js --static
 ```
 
-质量门禁 8 个检查阶段：
+质量门禁 9 个检查阶段：
 1. **项目目录与页面声明规范** (`scripts/checkProjectStructure.js`)
 2. **仓库敏感信息与凭据扫描** (`scripts/checkRepositorySecrets.js`)
 3. **运营攻略草稿 Schema 校验** (`scripts/contentDraftsValidate.js`)
 4. **数据库集合安全规则与索引校验** (`scripts/checkDatabaseIndexes.js`)
-5. **小程序主包与分包体积预算** (`scripts/checkMiniProgramPackage.js`)
-6. **Jest 自动化测试全量回归** (154 套件，1840+ 用例)
-7. **无头全页面组件交互点击仿真** (333 项点击断言)
-8. **真实用户全场景业务旅程仿真** (30 项端到端流程)
+5. **56 个云函数架构规范与安全鉴权审计** (`scripts/cloudCheck.js`)
+6. **小程序主包与分包体积预算** (`scripts/checkMiniProgramPackage.js`)
+7. **Jest 自动化测试全量回归** (154 套件，1850+ 用例)
+8. **无头全页面组件交互点击仿真** (333 项点击断言)
+9. **真实用户全场景业务旅程仿真** (30 项端到端流程)
 
 **门禁健康评分必须达到 100 / 100 分方可允许合并与发布。**

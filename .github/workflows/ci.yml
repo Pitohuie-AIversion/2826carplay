@@ -41,5 +41,8 @@ jobs:
       - name: Run headless component interaction simulation (333 clicks)
         run: npm run simulate:clicks
 
+      - name: Run cloud function architecture & security check (56 functions)
+        run: node scripts/cloudCheck.js
+
       - name: Run end-to-end real user scenario validation (30 scenarios)
         run: node scripts/verifyActualUsage.js

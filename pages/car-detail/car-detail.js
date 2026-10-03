@@ -23,7 +23,7 @@ const {
   unmarkImageLoaded
 } = require("../../shared/imageCache")
 const { openCustomerService, hasWxKfConfig, cancelCustomerServiceRequest } = require("../../shared/customerService")
-const { getClientVehicleStatusText } = require("../../shared/vehicleLabels")
+const { getClientVehicleStatusText, getClientVehicleStatusClass } = require("../../shared/vehicleLabels")
 const detailLoadedImagesCache = new Set()
 const carDetailMemoryCache = new Map()
 const CAR_DETAIL_LOAD_TIMEOUT_MS = 15 * 1000
@@ -84,17 +84,11 @@ function getStatusText(status, fallbackText) {
 }
 
 function attachStatusClass(car) {
-  const statusClassMap = {
-    available: "status-available",
-    rented: "status-rented",
-    maintenance: "status-maintenance",
-    reserved: "status-reserved"
-  }
-
+  const source = car && typeof car === "object" ? car : {}
   return {
-    ...car,
-    statusText: getStatusText(car.status, car.statusText),
-    statusClass: statusClassMap[car.status] || "status-available"
+    ...source,
+    statusText: getStatusText(source.status, source.statusText),
+    statusClass: getClientVehicleStatusClass(source.status, "status-available")
   }
 }
 

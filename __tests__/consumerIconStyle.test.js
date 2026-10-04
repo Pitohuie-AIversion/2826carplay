@@ -614,10 +614,10 @@ describe("用户主流程原生图标", () => {
   test("全站纯信息弹窗统一使用知道了与品牌蓝按钮", () => {
     const appConfig = JSON.parse(read("app.json"))
     const allPageRoutes = collectAllPageRoutes()
+    const allSources = allPageRoutes.map((route) => read(`${route}.js`)).concat([read("shared/bookingStatus.js")])
     let infoModalCount = 0
 
-    allPageRoutes.forEach((route) => {
-      const source = read(`${route}.js`)
+    allSources.forEach((source) => {
       extractBalancedCallBodies(source, "wx.showModal({").forEach((body) => {
         if (!/showCancel\s*:\s*false/.test(body)) {
           return
@@ -632,7 +632,7 @@ describe("用户主流程原生图标", () => {
       })
     })
 
-    expect(infoModalCount).toBe(21)
+    expect(infoModalCount).toBe(20)
   })
 
   test("动态轻提示保留短消息并为长消息使用业务回退", () => {

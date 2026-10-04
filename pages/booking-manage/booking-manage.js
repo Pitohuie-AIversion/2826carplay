@@ -25,7 +25,8 @@ const {
   PRIORITY_TEXT_MAP,
   COORDINATION_TEXT_MAP,
   PRIORITY_OPTIONS,
-  COORDINATION_OPTIONS
+  COORDINATION_OPTIONS,
+  showStatusUpdateFeedback
 } = require("../../shared/bookingStatus")
 const CITY_OPTIONS = [
   { value: "all", label: "全部城市" }
@@ -34,51 +35,7 @@ const DEFAULT_PAGE_SIZE = 20
 const BOOKING_MANAGE_LIST_TIMEOUT_MS = 15 * 1000
 const BOOKING_MANAGE_MUTATION_TIMEOUT_MS = 20 * 1000
 const BOOKING_MANAGE_EXPORT_TIMEOUT_MS = 20 * 1000
-function showStatusUpdateFeedback(result, done) {
-  const next = typeof done === "function" ? done : () => {}
-  let settled = false
-  const finish = () => {
-    if (settled) {
-      return
-    }
-    settled = true
-    next()
-  }
-  const notificationStatus = String((result && result.notificationStatus) || "")
-  if (notificationStatus === "failed") {
-    if (typeof wx.showModal !== "function") {
-      finish()
-      return
-    }
-    try {
-      wx.showModal({
-        title: "状态已更新",
-        content: "预约状态已更新，但提醒发送失败。可在错误日志中查看原因。",
-        confirmText: "知道了",
-        confirmColor: "#528fff",
-        showCancel: false,
-        complete: finish
-      })
-    } catch (error) {
-      finish()
-    }
-    return
-  }
-  const title =
-    notificationStatus === "sent"
-      ? "提醒已发送"
-      : notificationStatus === "not_subscribed"
-        ? "用户未订阅提醒"
-        : "状态已更新"
-  try {
-    wx.showToast({
-      title,
-      icon: "none"
-    })
-  } finally {
-    finish()
-  }
-}
+
 function buildStatusSummary(stats) {
   return [
     { key: "pending", label: "待联系", value: stats.pending || 0 },

@@ -50,6 +50,8 @@ describe("Architecture & Modular Facade", () => {
     expect(typeof shared.getFieldLabel).toBe("function")
     expect(typeof shared.buildLabels).toBe("function")
     expect(typeof shared.FIELD_LABEL_MAP).toBe("object")
+    expect(typeof shared.normalizeClientVehicleStatus).toBe("function")
+    expect(typeof shared.showStatusUpdateFeedback).toBe("function")
   })
 })
 
@@ -133,6 +135,34 @@ describe("Date & Rental Span Utilities (dateUtils)", () => {
     expect(getFieldLabel("non_existent_key")).toBe("non_existent_key")
     expect(getFieldLabel("non_existent_key", "默认")).toBe("默认")
     expect(buildLabels(["plateNumber", "brandModel", "other"])).toEqual(["车牌号", "品牌型号", "other"])
+  })
+
+  test("vehicleLabels.normalizeClientVehicleStatus 别名规整与兜底", () => {
+    const { normalizeClientVehicleStatus } = shared.domains.vehicleLabels
+    expect(normalizeClientVehicleStatus("idle")).toBe("idle")
+    expect(normalizeClientVehicleStatus("available")).toBe("idle")
+    expect(normalizeClientVehicleStatus("active")).toBe("active")
+    expect(normalizeClientVehicleStatus("rented")).toBe("active")
+    expect(normalizeClientVehicleStatus("maintenance")).toBe("maintenance")
+    expect(normalizeClientVehicleStatus("reserved")).toBe("reserved")
+    expect(normalizeClientVehicleStatus("unknown_status")).toBe("idle")
+  })
+
+  test("bookingStatus.showStatusUpdateFeedback 统一提醒反馈处理", () => {
+    const { showStatusUpdateFeedback } = shared.domains.bookingStatus
+    global.wx = {
+      showToast: jest.fn(),
+      showModal: jest.fn(({ complete }) => complete && complete())
+    }
+    const done1 = jest.fn()
+    showStatusUpdateFeedback({ notificationStatus: "sent" }, done1)
+    expect(global.wx.showToast).toHaveBeenCalledWith({ title: "提醒已发送", icon: "none" })
+    expect(done1).toHaveBeenCalled()
+
+    const done2 = jest.fn()
+    showStatusUpdateFeedback({ notificationStatus: "failed" }, done2)
+    expect(global.wx.showModal).toHaveBeenCalledWith(expect.objectContaining({ title: "状态已更新" }))
+    expect(done2).toHaveBeenCalled()
   })
 })
 

@@ -14,8 +14,9 @@ const { triggerHapticFeedback } = require("../../shared/hapticFeedback")
 const { createPerformanceHelpers } = require("../../shared/performance")
 const {
   CATEGORY_LABEL_MAP: BASE_CATEGORY_LABEL_MAP,
-  CLIENT_VEHICLE_STATUS_TEXT_MAP,
-  CLIENT_VEHICLE_STATUS_CLASS_MAP
+  getClientVehicleStatusText,
+  getClientVehicleStatusClass,
+  normalizeClientVehicleStatus
 } = require("../../shared/vehicleLabels")
 const mockCategories = require("../../data/categories")
 
@@ -37,26 +38,10 @@ mockCategories.forEach((item) => {
   CATEGORY_LABEL_MAP[item.id] = item.name
 })
 
-function normalizeGarageStatus(status) {
-  const value = String(status || "").trim()
-  if (value === "idle" || value === "available") {
-    return "idle"
-  }
-  if (value === "active" || value === "rented") {
-    return "active"
-  }
-  if (value === "maintenance") {
-    return "maintenance"
-  }
-  if (value === "reserved") {
-    return "reserved"
-  }
-  return "idle"
-}
+const normalizeGarageStatus = normalizeClientVehicleStatus
 
 function getStatusText(status, fallbackText) {
-  const normalizedStatus = normalizeGarageStatus(status)
-  return CLIENT_VEHICLE_STATUS_TEXT_MAP[normalizedStatus] || fallbackText || "可预约"
+  return getClientVehicleStatusText(status, fallbackText || "可预约")
 }
 
 function normalizeGarageSubtitle(value, fallback) {
@@ -69,12 +54,12 @@ function normalizeGarageSubtitle(value, fallback) {
 }
 
 function attachStatusClass(car) {
-  const normalizedStatus = normalizeGarageStatus(car.status)
+  const normalizedStatus = normalizeClientVehicleStatus(car.status)
   return {
     ...car,
     garageStatus: normalizedStatus,
-    statusText: getStatusText(car.status, car.statusText),
-    statusClass: CLIENT_VEHICLE_STATUS_CLASS_MAP[normalizedStatus] || "status-idle"
+    statusText: getClientVehicleStatusText(car.status, car.statusText || "可预约"),
+    statusClass: getClientVehicleStatusClass(car.status)
   }
 }
 

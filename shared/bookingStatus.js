@@ -282,6 +282,54 @@ function filterBookings(list, filter) {
   return source
 }
 
+function showStatusUpdateFeedback(result, done) {
+  const next = typeof done === "function" ? done : () => {}
+  let settled = false
+  const finish = () => {
+    if (settled) {
+      return
+    }
+    settled = true
+    next()
+  }
+  const notificationStatus = String((result && result.notificationStatus) || "")
+  if (notificationStatus === "failed") {
+    if (typeof wx === "undefined" || typeof wx.showModal !== "function") {
+      finish()
+      return
+    }
+    try {
+      wx.showModal({
+        title: "状态已更新",
+        content: "预约状态已更新，但提醒发送失败。可在错误日志中查看原因。",
+        confirmText: "知道了",
+        confirmColor: "#528fff",
+        showCancel: false,
+        complete: finish
+      })
+    } catch (error) {
+      finish()
+    }
+    return
+  }
+  const title =
+    notificationStatus === "sent"
+      ? "提醒已发送"
+      : notificationStatus === "not_subscribed"
+        ? "用户未订阅提醒"
+        : "状态已更新"
+  try {
+    if (typeof wx !== "undefined" && typeof wx.showToast === "function") {
+      wx.showToast({
+        title,
+        icon: "none"
+      })
+    }
+  } finally {
+    finish()
+  }
+}
+
 module.exports = {
   STATUS_TEXT_MAP,
   STATUS_CLASS_MAP,
@@ -301,5 +349,6 @@ module.exports = {
   buildJourneyProgress,
   buildProgressSteps,
   buildListSummary,
-  filterBookings
+  filterBookings,
+  showStatusUpdateFeedback
 }

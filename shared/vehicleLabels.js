@@ -116,6 +116,15 @@ function getClientVehicleStatusClass(status, fallbackClass = "status-idle") {
   return CLIENT_VEHICLE_STATUS_CLASS_MAP[value] || fallbackClass
 }
 
+function normalizeClientVehicleStatus(status) {
+  const value = String(status || "").trim()
+  if (value === "idle" || value === "available") return "idle"
+  if (value === "active" || value === "rented") return "active"
+  if (value === "maintenance") return "maintenance"
+  if (value === "reserved") return "reserved"
+  return "idle"
+}
+
 const FAVORITE_VEHICLE_STATUS_MAP = {
   idle: {
     status: "available",
@@ -224,6 +233,7 @@ module.exports = {
   getFuelTypeLabel,
   getClientVehicleStatusText,
   getClientVehicleStatusClass,
+  normalizeClientVehicleStatus,
   getFieldLabel,
   buildLabels
 }

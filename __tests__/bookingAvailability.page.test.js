@@ -355,4 +355,11 @@ describe("pages/booking availability advisory", () => {
     expect(wxss).toContain(".booking-action-pressed")
     expect(wxss).toContain(".booking-picker-pressed")
   })
+
+  test("确认区预估优先采用服务端价格卡（含特殊价与连租折扣），本地估算仅作兜底", () => {
+    const wxml = fs.readFileSync(path.join(__dirname, "../pages/booking/booking.wxml"), "utf8")
+    expect(wxml).toContain('<text wx:if="{{priceCalendarSummary}}" id="booking-confirmation-estimate">')
+    expect(wxml).toContain("priceCalendarSummary.hasDiscount ? priceCalendarSummary.discountedTotalText : priceCalendarSummary.estimatedTotalText")
+    expect(wxml).toContain('<text wx:elif="{{rentalEstimate.estimateText}}" id="booking-confirmation-estimate-fallback">')
+  })
 })

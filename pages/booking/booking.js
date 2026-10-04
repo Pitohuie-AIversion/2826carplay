@@ -159,7 +159,8 @@ function calculateRentalEstimate(startDate, endDate, priceDay) {
     return { rentalDays: 0, estimateTotal: 0, estimateText: "" }
   }
   const diffDays = Math.round((end.getTime() - start.getTime()) / 86400000)
-  const rentalDays = Math.max(diffDays, 1)
+  // Fallback only: match vehicleAvailabilityCheck, which prices each selected date (inclusive).
+  const rentalDays = diffDays + 1
   const dailyRate = Number(priceDay) || 0
   const estimateTotal = dailyRate > 0 ? rentalDays * dailyRate : 0
   const estimateText = estimateTotal > 0 ? `预估参考 ￥${estimateTotal}` : ""

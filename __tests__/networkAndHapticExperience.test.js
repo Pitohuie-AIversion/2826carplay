@@ -307,9 +307,10 @@ describe("网络重连与触感反馈全链路体验优化", () => {
         const summary = page.data.bookingSummary
         expect(summary.durationText).toBe("3 天跨度")
         const estimate = page.data.rentalEstimate
-        expect(estimate.rentalDays).toBe(3)
-        expect(estimate.estimateTotal).toBe(4500)
-        expect(estimate.estimateText).toBe("预估参考 ￥4500")
+        // 兜底预估与服务端价格卡一致：按含起止日的日期数计价（3 天跨度 = 4 个日期）
+        expect(estimate.rentalDays).toBe(4)
+        expect(estimate.estimateTotal).toBe(6000)
+        expect(estimate.estimateText).toBe("预估参考 ￥6000")
       })
     })
   })

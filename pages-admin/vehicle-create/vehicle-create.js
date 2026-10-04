@@ -10,55 +10,12 @@ const {
   VEHICLE_TYPE_LABEL_MAP,
   STATUS_LABEL_MAP,
   TRANSMISSION_LABEL_MAP,
-  FUEL_TYPE_LABEL_MAP
+  FUEL_TYPE_LABEL_MAP,
+  FIELD_LABEL_MAP,
+  buildLabels
 } = require("../../shared/vehicleLabels")
-const DRIVETRAIN_OPTIONS = [
-  "前置前驱 (FF)",
-  "前置后驱 (FR)",
-  "中置后驱 (MR)",
-  "后置后驱 (RR)",
-  "前置四驱 (4WD)",
-  "全时四驱 (AWD)",
-  "分时四驱 (Part-Time 4WD)",
-  "智能四驱",
-  "后轮驱动 (RWD)",
-  "前轮驱动 (FWD)",
-  "双电机四驱",
-  "三电机四驱"
-]
-const FIELD_LABEL_MAP = {
-  plateNumber: "车牌号",
-  vehicleType: "车辆类型",
-  brandModel: "品牌型号",
-  registerDate: "注册日期",
-  status: "使用状态",
-  location: "城市",
-  transmission: "变速箱",
-  fuelType: "燃油类型",
-  seats: "座位数",
-  priceDay: "日租金",
-  rentalDiscountTiers: "连租折扣",
-  vin: "VIN",
-  engineNumber: "发动机号",
-  publicDescription: "公开说明",
-  publicDrivingTips: "人工用车提示",
-  archiveDate: "保养到期日",
-  archiveReview: "年检到期日",
-  note: "内部备注",
-  "performance.acceleration": "百公里加速",
-  "performance.horsepower": "最大马力",
-  "performance.drivetrain": "驱动方式",
-  "performance.torque": "最大扭矩"
-}
-function formatDate(date) {
-  const year = date.getFullYear()
-  const month = `${date.getMonth() + 1}`.padStart(2, "0")
-  const day = `${date.getDate()}`.padStart(2, "0")
-  return `${year}-${month}-${day}`
-}
-function buildLabels(values, map) {
-  return values.map((value) => map[value] || value)
-}
+const { formatDate } = require("../../shared/dateUtils")
+const DRIVETRAIN_OPTIONS = vehicleUtils.DRIVETRAIN_OPTIONS
 Page({
   ...discountFormMethods,
   data: {

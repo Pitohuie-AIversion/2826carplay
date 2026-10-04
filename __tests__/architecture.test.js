@@ -45,6 +45,11 @@ describe("Architecture & Modular Facade", () => {
     expect(typeof shared.buildListSummary).toBe("function")
     expect(typeof shared.filterBookings).toBe("function")
     expect(typeof shared.definePage).toBe("function")
+    expect(typeof shared.formatDate).toBe("function")
+    expect(typeof shared.getDateSpanText).toBe("function")
+    expect(typeof shared.getFieldLabel).toBe("function")
+    expect(typeof shared.buildLabels).toBe("function")
+    expect(typeof shared.FIELD_LABEL_MAP).toBe("object")
   })
 })
 
@@ -102,6 +107,32 @@ describe("Date & Rental Span Utilities (dateUtils)", () => {
     expect(dateUtils.compareDates("2026-10-01", "2026-10-05")).toBe(-1)
     expect(dateUtils.compareDates("2026-10-05", "2026-10-01")).toBe(1)
     expect(dateUtils.compareDates("2026-10-01", "2026-10-01")).toBe(0)
+  })
+
+  test("formatDate 正确格式化日期对象与时间戳", () => {
+    expect(dateUtils.formatDate(new Date("2026-10-04T12:00:00Z"))).toBe("2026-10-04")
+    expect(dateUtils.formatDate("2026-08-01T00:00:00")).toBe("2026-08-01")
+    expect(dateUtils.formatDate("invalid-date")).toBe("")
+    expect(typeof dateUtils.formatDate()).toBe("string")
+    expect(dateUtils.formatDate().length).toBe(10)
+  })
+
+  test("getDateSpanText 跨度文案计算与异常兜底", () => {
+    expect(dateUtils.getDateSpanText("2026-10-01", "2026-10-01")).toBe("当日取还")
+    expect(dateUtils.getDateSpanText("2026-10-01", "2026-10-04")).toBe("3 天跨度")
+    expect(dateUtils.getDateSpanText("2026-10-04", "2026-10-01")).toBe("待选择日期")
+    expect(dateUtils.getDateSpanText("", "2026-10-01", "日期待确认")).toBe("日期待确认")
+  })
+
+  test("vehicleLabels.FIELD_LABEL_MAP 与 buildLabels 字段映射及回退", () => {
+    const { FIELD_LABEL_MAP, getFieldLabel, buildLabels } = shared.domains.vehicleLabels
+    expect(FIELD_LABEL_MAP.plateNumber).toBe("车牌号")
+    expect(FIELD_LABEL_MAP.brandModel).toBe("品牌型号")
+    expect(FIELD_LABEL_MAP["performance.drivetrain"]).toBe("驱动方式")
+    expect(getFieldLabel("plateNumber")).toBe("车牌号")
+    expect(getFieldLabel("non_existent_key")).toBe("non_existent_key")
+    expect(getFieldLabel("non_existent_key", "默认")).toBe("默认")
+    expect(buildLabels(["plateNumber", "brandModel", "other"])).toEqual(["车牌号", "品牌型号", "other"])
   })
 })
 

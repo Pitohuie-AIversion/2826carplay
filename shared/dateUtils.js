@@ -151,6 +151,39 @@ function compareDates(dateA, dateB) {
   return 0
 }
 
+/**
+ * 格式化 Date 实例或日期值为 YYYY-MM-DD
+ * @param {Date|number|string} [date] Date对象、时间戳或可解析字符串，默认当前时间
+ * @returns {string} YYYY-MM-DD
+ */
+function formatDate(date) {
+  const d = date instanceof Date
+    ? date
+    : (date !== undefined && date !== null ? new Date(date) : new Date())
+  if (Number.isNaN(d.getTime())) return ""
+  const year = d.getFullYear()
+  const month = `${d.getMonth() + 1}`.padStart(2, "0")
+  const day = `${d.getDate()}`.padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
+/**
+ * 获取跨度描述文案（如 "当日取还"、"3 天跨度"）
+ * @param {string} startDate 
+ * @param {string} endDate 
+ * @param {string} [fallback="待选择日期"] 异常或空时的兜底文案
+ * @returns {string}
+ */
+function getDateSpanText(startDate, endDate, fallback = "待选择日期") {
+  const start = new Date(`${String(startDate || "")}T00:00:00`)
+  const end = new Date(`${String(endDate || "")}T00:00:00`)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) {
+    return fallback
+  }
+  const days = Math.round((end.getTime() - start.getTime()) / MS_PER_DAY)
+  return days === 0 ? "当日取还" : `${days} 天跨度`
+}
+
 module.exports = {
   DATE_REGEX,
   MS_PER_DAY,
@@ -158,6 +191,8 @@ module.exports = {
   isDateRangeValid,
   calculateRentalDays,
   formatDateSpan,
+  getDateSpanText,
+  formatDate,
   addDays,
   isDateOverlap,
   isDateInRange,

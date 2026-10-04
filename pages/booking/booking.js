@@ -14,6 +14,7 @@ const {
 } = require("../../shared/pageNativeAction")
 const { onNetworkReconnect } = require("../../shared/networkStatus")
 const { clearUnsaved, markUnsaved } = require("../../shared/unsavedChanges")
+const { formatDate, addDays, getDateSpanText } = require("../../shared/dateUtils")
 const LAST_BOOKING_CONTACT_KEY = "lastBookingContact"
 const BOOKING_CAR_LOAD_TIMEOUT_MS = 15 * 1000
 const AVAILABILITY_CHECK_TIMEOUT_MS = 12 * 1000
@@ -29,19 +30,7 @@ function normalizedSubmission(form, vehicleId, attribution) {
   }
 }
 
-function formatDate(date) {
-  const year = date.getFullYear()
-  const month = `${date.getMonth() + 1}`.padStart(2, "0")
-  const day = `${date.getDate()}`.padStart(2, "0")
 
-  return `${year}-${month}-${day}`
-}
-
-function addDays(dateText, days) {
-  const base = dateText ? new Date(`${dateText}T00:00:00`) : new Date()
-  base.setDate(base.getDate() + Number(days || 0))
-  return formatDate(base)
-}
 
 function createBookingRequestId() {
   const timestamp = Date.now().toString(36)
@@ -121,15 +110,7 @@ function maskPhone(value) {
     : phone || "—"
 }
 
-function getDateSpanText(startDate, endDate) {
-  const start = new Date(`${String(startDate || "")}T00:00:00`)
-  const end = new Date(`${String(endDate || "")}T00:00:00`)
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) {
-    return "待选择日期"
-  }
-  const days = Math.round((end.getTime() - start.getTime()) / 86400000)
-  return days === 0 ? "当日取还" : `${days} 天跨度`
-}
+
 
 function buildBookingSummary(form, carName) {
   const source = form && typeof form === "object" ? form : {}

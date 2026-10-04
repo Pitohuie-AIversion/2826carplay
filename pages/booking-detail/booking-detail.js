@@ -22,6 +22,7 @@ const {
   buildStatusGuidance: getSharedStatusGuidance
 } = require("../../shared/bookingStatus")
 const { formatDisplayTime } = require("../../shared/formatTime")
+const { getDateSpanText } = require("../../shared/dateUtils")
 const BOOKING_DETAIL_LOAD_TIMEOUT_MS = 15 * 1000
 const BOOKING_DETAIL_MUTATION_TIMEOUT_MS = 12 * 1000
 const SUBSCRIPTION_REQUEST_TIMEOUT_MS = 15 * 1000
@@ -76,13 +77,7 @@ function formatBookingReference(value) {
   return id ? `#${id.slice(-8).toUpperCase()}` : "—"
 }
 function getJourneySpanText(startDate, endDate) {
-  const start = new Date(`${String(startDate || "")}T00:00:00`)
-  const end = new Date(`${String(endDate || "")}T00:00:00`)
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) {
-    return "日期待确认"
-  }
-  const days = Math.round((end.getTime() - start.getTime()) / 86400000)
-  return days === 0 ? "当日取还" : `${days} 天跨度`
+  return getDateSpanText(startDate, endDate, "日期待确认")
 }
 function normalizeBooking(item) {
   const booking = item && typeof item === "object" ? item : {}

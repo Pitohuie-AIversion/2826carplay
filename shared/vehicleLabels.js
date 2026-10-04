@@ -156,6 +156,52 @@ function normalizeFavoriteVehicleStatus(status) {
     : { status: "unknown", statusText: "状态待确认", statusClass: "status-pending" }
 }
 
+const FIELD_LABEL_MAP = {
+  id: "车辆ID",
+  plateNumber: "车牌号",
+  vehicleType: "车辆类型",
+  brandModel: "品牌型号",
+  registerDate: "注册日期",
+  status: "使用状态",
+  location: "城市",
+  transmission: "变速箱",
+  fuelType: "燃油类型",
+  seats: "座位数",
+  priceDay: "日租金",
+  rentalDiscountTiers: "连租折扣",
+  vin: "VIN",
+  engineNumber: "发动机号",
+  publicDescription: "公开说明",
+  publicDrivingTips: "人工用车提示",
+  archiveDate: "保养到期日",
+  archiveReview: "年检到期日",
+  note: "内部备注",
+  publicMaterialsUpdatedDate: "实拍/资料更新日期",
+  publicInspectionDate: "最近保养/检查日期",
+  publicInspectionSummary: "保养/检查摘要",
+  publicExteriorSummary: "已知外观情况",
+  publicInsuranceSummary: "商业保险摘要",
+  publicAssistanceSummary: "救援能力摘要",
+  publicArchiveReviewStatus: "公开档案复核状态",
+  internalMaintenanceRecord: "内部保养记录",
+  internalInspectionRecord: "内部检查记录",
+  internalInsuranceRecord: "内部保险记录",
+  internalArchiveNote: "内部档案说明",
+  "performance.acceleration": "百公里加速",
+  "performance.horsepower": "最大马力",
+  "performance.drivetrain": "驱动方式",
+  "performance.torque": "最大扭矩"
+}
+
+function getFieldLabel(field, fallback) {
+  return FIELD_LABEL_MAP[field] || (fallback !== undefined ? fallback : field)
+}
+
+function buildLabels(values, map = FIELD_LABEL_MAP) {
+  if (!Array.isArray(values)) return []
+  return values.map((value) => (map && map[value]) || value)
+}
+
 module.exports = {
   VEHICLE_TYPE_LABEL_MAP,
   STATUS_LABEL_MAP,
@@ -169,6 +215,7 @@ module.exports = {
   CLIENT_VEHICLE_STATUS_TEXT_MAP,
   CLIENT_VEHICLE_STATUS_CLASS_MAP,
   FAVORITE_VEHICLE_STATUS_MAP,
+  FIELD_LABEL_MAP,
   normalizeFavoriteVehicleStatus,
   getVehicleTypeLabel,
   getVehicleStatusLabel,
@@ -176,5 +223,7 @@ module.exports = {
   getTransmissionLabel,
   getFuelTypeLabel,
   getClientVehicleStatusText,
-  getClientVehicleStatusClass
+  getClientVehicleStatusClass,
+  getFieldLabel,
+  buildLabels
 }

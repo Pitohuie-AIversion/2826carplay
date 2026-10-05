@@ -52,6 +52,9 @@ describe("Architecture & Modular Facade", () => {
     expect(typeof shared.FIELD_LABEL_MAP).toBe("object")
     expect(typeof shared.normalizeClientVehicleStatus).toBe("function")
     expect(typeof shared.showStatusUpdateFeedback).toBe("function")
+    expect(typeof shared.formatYuan).toBe("function")
+    expect(typeof shared.normalizePhone).toBe("function")
+    expect(typeof shared.normalizeRemark).toBe("function")
   })
 })
 
@@ -163,6 +166,30 @@ describe("Date & Rental Span Utilities (dateUtils)", () => {
     showStatusUpdateFeedback({ notificationStatus: "failed" }, done2)
     expect(global.wx.showModal).toHaveBeenCalledWith(expect.objectContaining({ title: "状态已更新" }))
     expect(done2).toHaveBeenCalled()
+  })
+
+  test("bookingStatus.normalizePhone 与 normalizeRemark 格式清洗", () => {
+    const { normalizePhone, normalizeRemark } = shared.domains.bookingStatus
+    expect(normalizePhone("13812345678")).toBe("13812345678")
+    expect(normalizePhone("+86-138-1234-5678")).toBe("+86-138-1234-5678")
+    expect(normalizePhone("123")).toBe("")
+    expect(normalizePhone("abc")).toBe("")
+    expect(normalizePhone(null)).toBe("")
+
+    expect(normalizeRemark("这是一条备注")).toBe("这是一条备注")
+    expect(normalizeRemark("a".repeat(250)).length).toBe(200)
+    expect(normalizeRemark("a".repeat(50), 30).length).toBe(30)
+    expect(normalizeRemark(null)).toBe("")
+  })
+
+  test("rentalPricing.formatYuan 格式化金额元角分", () => {
+    const { formatYuan } = shared.domains.rentalPricing
+    expect(formatYuan(12800)).toBe("128.00")
+    expect(formatYuan(0)).toBe("0.00")
+    expect(formatYuan(99)).toBe("0.99")
+    expect(formatYuan("5000")).toBe("50.00")
+    expect(formatYuan(-100)).toBe("0.00")
+    expect(formatYuan(null)).toBe("0.00")
   })
 })
 

@@ -330,6 +330,30 @@ function showStatusUpdateFeedback(result, done) {
   }
 }
 
+/**
+ * 校验并规整联系电话 (支持国内与国际格式，有效纯数字长度 6-15 位)
+ * @param {string} value 
+ * @returns {string} 规整后电话，不合法返回空字符串
+ */
+function normalizePhone(value) {
+  const phone = String(value || "").trim()
+  const digitCount = phone.replace(/\D/g, "").length
+  if (!/^\+?[0-9-]{6,20}$/.test(phone) || digitCount < 6 || digitCount > 15) {
+    return ""
+  }
+  return phone
+}
+
+/**
+ * 规整备注文本，防止超长与异常输入
+ * @param {string} value 
+ * @param {number} [maxLength=200] 
+ * @returns {string}
+ */
+function normalizeRemark(value, maxLength = 200) {
+  return String(value || "").slice(0, maxLength)
+}
+
 module.exports = {
   STATUS_TEXT_MAP,
   STATUS_CLASS_MAP,
@@ -350,5 +374,7 @@ module.exports = {
   buildProgressSteps,
   buildListSummary,
   filterBookings,
-  showStatusUpdateFeedback
+  showStatusUpdateFeedback,
+  normalizePhone,
+  normalizeRemark
 }

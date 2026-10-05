@@ -14,10 +14,12 @@ const {
   STATUS_CLASS_MAP,
   PRIORITY_TEXT_MAP,
   COORDINATION_TEXT_MAP,
-  showStatusUpdateFeedback
+  showStatusUpdateFeedback,
+  normalizePhone,
+  normalizeRemark
 } = require("../../shared/bookingStatus")
 const { formatDisplayTime } = require("../../shared/formatTime")
-const { getRentalDiscountTier } = require("../../shared/rentalPricing")
+const { getRentalDiscountTier, formatYuan } = require("../../shared/rentalPricing")
 const { calculateRentalDays } = require("../../shared/dateUtils")
 const BOOKING_DETAIL_LOAD_TIMEOUT_MS = 15 * 1000
 const BOOKING_DETAIL_WRITE_TIMEOUT_MS = 20 * 1000
@@ -30,21 +32,7 @@ const HANDOVER_ANGLES = [
 const HANDOVER_MAX_IMAGE_BYTES = 10 * 1024 * 1024
 
 
-function normalizeRemark(value) {
-  return String(value || "").slice(0, 200)
-}
-function normalizePhone(value) {
-  const phone = String(value || "").trim()
-  const digitCount = phone.replace(/\D/g, "").length
-  if (!/^\+?[0-9-]{6,20}$/.test(phone) || digitCount < 6 || digitCount > 15) {
-    return ""
-  }
-  return phone
-}
-function formatYuan(cents) {
-  const value = Math.max(0, Number(cents || 0))
-  return (value / 100).toFixed(2)
-}
+
 function normalizeQuote(item) {
   const quote = item && typeof item === "object" ? item : {}
   return {

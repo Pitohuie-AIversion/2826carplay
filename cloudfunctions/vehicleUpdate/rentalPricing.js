@@ -65,10 +65,21 @@ function calculateRentalDiscount(originalTotal, daysCount, tiers) {
   }
 }
 
+/**
+ * 将分金额转换为两位小数元字符串 (例如 12800 -> "128.00")
+ * @param {number|string} cents 
+ * @returns {string}
+ */
+function formatYuan(cents) {
+  const value = Math.max(0, Number(cents || 0))
+  return (value / 100).toFixed(2)
+}
+
 module.exports = {
   MAX_RENTAL_DISCOUNT_TIERS,
   validateRentalDiscountTiers,
   normalizeRentalDiscountTiers,
   getRentalDiscountTier,
-  calculateRentalDiscount
+  calculateRentalDiscount,
+  formatYuan
 }

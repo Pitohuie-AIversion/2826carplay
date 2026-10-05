@@ -23,14 +23,13 @@ const {
 } = require("../../shared/bookingStatus")
 const { formatDisplayTime } = require("../../shared/formatTime")
 const { getDateSpanText } = require("../../shared/dateUtils")
+const { formatYuan } = require("../../shared/rentalPricing")
 const BOOKING_DETAIL_LOAD_TIMEOUT_MS = 15 * 1000
 const BOOKING_DETAIL_MUTATION_TIMEOUT_MS = 12 * 1000
 const SUBSCRIPTION_REQUEST_TIMEOUT_MS = 15 * 1000
 
 const buildStatusGuidance = (status) => getSharedStatusGuidance(status, { mode: "detail" })
-function formatYuan(cents) {
-  return (Math.max(0, Number(cents || 0)) / 100).toFixed(2)
-}
+
 function normalizeQuote(item) {
   const quote = item && typeof item === "object" ? item : {}
   const moneyText = (field) => quote[`${field}Cents`] !== undefined

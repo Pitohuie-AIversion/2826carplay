@@ -26,7 +26,9 @@ const {
   COORDINATION_TEXT_MAP,
   PRIORITY_OPTIONS,
   COORDINATION_OPTIONS,
-  showStatusUpdateFeedback
+  showStatusUpdateFeedback,
+  normalizePhone,
+  normalizeRemark
 } = require("../../shared/bookingStatus")
 const CITY_OPTIONS = [
   { value: "all", label: "全部城市" }
@@ -114,17 +116,7 @@ function buildRecentCreatedViewModel(list) {
   })
 }
 
-function normalizeRemark(value) {
-  return String(value || "").slice(0, 200)
-}
-function normalizePhone(value) {
-  const phone = String(value || "").trim()
-  const digitCount = phone.replace(/\D/g, "").length
-  if (!/^\+?[0-9-]{6,20}$/.test(phone) || digitCount < 6 || digitCount > 15) {
-    return ""
-  }
-  return phone
-}
+
 function buildJourneyView(status) {
   const current = String(status || "pending")
   if (current === "contacted") {

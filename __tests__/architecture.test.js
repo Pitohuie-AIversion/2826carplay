@@ -62,6 +62,10 @@ describe("Architecture & Modular Facade", () => {
     expect(typeof shared.formatMonthDay).toBe("function")
     expect(typeof shared.maskPhone).toBe("function")
     expect(typeof shared.formatPriceDayText).toBe("function")
+    expect(typeof shared.buildVehicleFormProgress).toBe("function")
+    expect(typeof shared.cleanVehicleTextInput).toBe("function")
+    expect(typeof shared.cleanPerformanceValue).toBe("function")
+    expect(typeof shared.getClearOptionalFieldPatch).toBe("function")
   })
 })
 
@@ -559,4 +563,47 @@ describe("UI Feedback & Data Normalization (uiFeedback)", () => {
     expect(normalized).toEqual(["豪华车", "SUV", "商务车"])
   })
 })
+
+describe("Vehicle Form Progress & Input Cleaning (vehicleFormProgress)", () => {
+  const vehicleFormProgress = require("../shared/vehicleFormProgress")
+
+  test("cleanVehicleTextInput 按照业务字段限制清洗并截断输入", () => {
+    expect(vehicleFormProgress.cleanVehicleTextInput("brandModel", "a".repeat(100))).toHaveLength(50)
+    expect(vehicleFormProgress.cleanVehicleTextInput("location", "a".repeat(30))).toHaveLength(20)
+    expect(vehicleFormProgress.cleanVehicleTextInput("seats", "5人座")).toBe("5")
+    expect(vehicleFormProgress.cleanVehicleTextInput("priceDay", "￥1299元/天")).toBe("1299")
+    expect(vehicleFormProgress.cleanVehicleTextInput("unknownField", "普通文本")).toBe("普通文本")
+  })
+
+  test("cleanPerformanceValue 安全过滤参数单位并截断", () => {
+    expect(vehicleFormProgress.cleanPerformanceValue("acceleration", "3.2s秒abc")).toBe("3.2s秒")
+    expect(vehicleFormProgress.cleanPerformanceValue("horsepower", "650匹/478kw!@#")).toBe("650匹478kw")
+    expect(vehicleFormProgress.cleanPerformanceValue("torque", "800N·m牛米*&^")).toBe("800N·m牛米")
+    expect(vehicleFormProgress.cleanPerformanceValue("other", "x".repeat(50))).toHaveLength(30)
+  })
+
+  test("getClearOptionalFieldPatch 针对白名单生成正确 patch 与索引重置", () => {
+    expect(vehicleFormProgress.getClearOptionalFieldPatch("notAllowed")).toBeNull()
+
+    const drivetrainPatch = vehicleFormProgress.getClearOptionalFieldPatch("performance.drivetrain")
+    expect(drivetrainPatch).toEqual({
+      "form.performance.drivetrain": "",
+      drivetrainIndex: -1,
+      drivetrainLabel: ""
+    })
+
+    const transmissionPatch = vehicleFormProgress.getClearOptionalFieldPatch("transmission")
+    expect(transmissionPatch).toEqual({
+      "form.transmission": "",
+      transmissionIndex: 0,
+      transmissionLabel: ""
+    })
+
+    const archivePatch = vehicleFormProgress.getClearOptionalFieldPatch("archiveDate")
+    expect(archivePatch).toEqual({
+      "form.archiveDate": ""
+    })
+  })
+})
+
 

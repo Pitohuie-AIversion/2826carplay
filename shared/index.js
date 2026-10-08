@@ -168,7 +168,12 @@ module.exports = {
   getPrivacyTypeLabel: privacy.getPrivacyTypeLabel,
   getPrivacyStatusLabel: privacy.getPrivacyStatusLabel,
   getPrivacyStatusClass: privacy.getPrivacyStatusClass,
+  buildVehicleFormProgress: vehicleFormProgress.buildVehicleFormProgress,
+  cleanVehicleTextInput: vehicleFormProgress.cleanVehicleTextInput,
+  cleanPerformanceValue: vehicleFormProgress.cleanPerformanceValue,
+  getClearOptionalFieldPatch: vehicleFormProgress.getClearOptionalFieldPatch,
   createPageController: pageController.createPageController,
   definePage: pageController.definePage
 }
+
 

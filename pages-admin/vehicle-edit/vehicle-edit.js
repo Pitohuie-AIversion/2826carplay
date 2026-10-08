@@ -1,6 +1,11 @@
 const vehicleUtils = require("../../shared/vehicle")
 const { toDiscountRows, toDiscountTiers, discountFormMethods } = require("../rentalDiscountForm")
-const { buildVehicleFormProgress } = require("../../shared/vehicleFormProgress")
+const {
+  buildVehicleFormProgress,
+  cleanVehicleTextInput,
+  cleanPerformanceValue,
+  getClearOptionalFieldPatch
+} = require("../../shared/vehicleFormProgress")
 const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
 const { formatToastTitle } = require("../../shared/uiFeedback")
 const { clearUnsaved, markUnsaved } = require("../../shared/unsavedChanges")
@@ -342,34 +347,7 @@ Page({
     if (!field) {
       return
     }
-    let value = event.detail.value
-    if (field === "brandModel") {
-      value = String(value || "").slice(0, 50)
-    }
-    if (field === "location") {
-      value = String(value || "").slice(0, 20)
-    }
-    if (field === "vin" || field === "engineNumber") {
-      value = String(value || "").slice(0, 32)
-    }
-    if (field === "publicDrivingTips") {
-      value = String(value || "").slice(0, 500)
-    }
-    if (field === "publicDescription" || field === "note") {
-      value = String(value || "").slice(0, 200)
-    }
-    if (vehicleUtils.PUBLIC_ARCHIVE_TEXT_FIELDS.includes(field)) {
-      value = String(value || "").slice(0, 200)
-    }
-    if (vehicleUtils.INTERNAL_ARCHIVE_TEXT_FIELDS.includes(field)) {
-      value = String(value || "").slice(0, 500)
-    }
-    if (field === "seats") {
-      value = String(value || "").replace(/\D/g, "").slice(0, 1)
-    }
-    if (field === "priceDay") {
-      value = String(value || "").replace(/\D/g, "").slice(0, 5)
-    }
+    const value = cleanVehicleTextInput(field, event.detail.value)
     const nextData = {
       [`form.${field}`]: value,
       formProgress: buildVehicleFormProgress({ ...this.data.form, [field]: value })
@@ -485,16 +463,8 @@ Page({
   handleClearOptionalField(event) {
     if (this.data.isSubmitting) return
     const field = String(event.currentTarget.dataset.field || "")
-    if (!["archiveDate", "archiveReview", "publicMaterialsUpdatedDate", "publicInspectionDate", "performance.drivetrain", "transmission", "fuelType"].includes(field)) return
-    const patch = { [`form.${field}`]: "" }
-    if (field === "performance.drivetrain") {
-      patch.drivetrainIndex = -1
-      patch.drivetrainLabel = ""
-    }
-    if (field === "transmission" || field === "fuelType") {
-      patch[`${field}Index`] = 0
-      patch[`${field}Label`] = ""
-    }
+    const patch = getClearOptionalFieldPatch(field)
+    if (!patch) return
     this.setData(patch)
     markUnsaved(this, "车辆资料尚未保存，确定离开吗？")
   },
@@ -524,16 +494,7 @@ Page({
       return
     }
     const inner = field.slice("performance.".length)
-    let value = event.detail.value
-    if (inner === "acceleration") {
-      value = String(value || "").replace(/[^\d.s秒]/g, "").slice(0, 12)
-    } else if (inner === "horsepower") {
-      value = String(value || "").replace(/[^\d.kKwWpPsShH匹马力千瓦]/g, "").slice(0, 16)
-    } else if (inner === "torque") {
-      value = String(value || "").replace(/[^\d.nN·mM牛米]/g, "").slice(0, 18)
-    } else {
-      value = String(value || "").slice(0, 30)
-    }
+    const value = cleanPerformanceValue(inner, event.detail.value)
     const next = { [`form.performance.${inner}`]: value }
     this.setData(next)
     markUnsaved(this, "车辆资料尚未保存，确定离开吗？")

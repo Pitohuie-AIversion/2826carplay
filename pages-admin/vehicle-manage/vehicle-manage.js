@@ -1,6 +1,6 @@
 const vehicleUtils = require("../../shared/vehicle")
 const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
-const { formatToastTitle } = require("../../shared/uiFeedback")
+const { formatToastTitle, calculateRatioSegments } = require("../../shared/uiFeedback")
 const {
   activatePageNativeActions,
   beginPageNativeAction,
@@ -34,44 +34,11 @@ function buildStatusRatioSegments(stats) {
   const idle = Number(stats && stats.idle) || 0
   const active = Number(stats && stats.active) || 0
   const maintenance = Number(stats && stats.maintenance) || 0
-  const total = idle + active + maintenance
-  const base = [
+  return calculateRatioSegments([
     { key: "idle", label: "在库", value: idle, className: "ratio-idle" },
     { key: "active", label: "在用", value: active, className: "ratio-active" },
     { key: "maintenance", label: "维修中", value: maintenance, className: "ratio-maintenance" }
-  ]
-  if (!total) {
-    return base.map((item) => ({
-      ...item,
-      percent: 0,
-      percentText: "0%"
-    }))
-  }
-  const rawPercents = base.map((item) => (item.value / total) * 100)
-  const floors = rawPercents.map((value) => Math.floor(value))
-  let used = floors.reduce((sum, n) => sum + n, 0)
-  let remain = 100 - used
-  const order = rawPercents
-    .map((value, index) => ({
-      index,
-      frac: value - floors[index]
-    }))
-    .sort((a, b) => b.frac - a.frac)
-  const percents = floors.slice()
-  let i = 0
-  while (remain > 0 && i < order.length) {
-    percents[order[i].index] += 1
-    remain -= 1
-    i += 1
-    if (i >= order.length) {
-      i = 0
-    }
-  }
-  return base.map((item, index) => ({
-    ...item,
-    percent: percents[index],
-    percentText: `${percents[index]}%`
-  }))
+  ])
 }
 function formatPriceDayText(priceDay) {
   if (Number.isInteger(priceDay) && priceDay > 0) {

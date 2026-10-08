@@ -55,6 +55,9 @@ describe("Architecture & Modular Facade", () => {
     expect(typeof shared.formatYuan).toBe("function")
     expect(typeof shared.normalizePhone).toBe("function")
     expect(typeof shared.normalizeRemark).toBe("function")
+    expect(typeof shared.calculateRatioSegments).toBe("function")
+    expect(typeof shared.buildSummaryRows).toBe("function")
+    expect(typeof shared.normalizeStringArray).toBe("function")
   })
 })
 
@@ -454,3 +457,65 @@ describe("Booking Status & Coordination (bookingStatus)", () => {
     expect(steps.length).toBe(5)
   })
 })
+
+describe("UI Feedback & Data Normalization (uiFeedback)", () => {
+  const uiFeedback = require("../shared/uiFeedback")
+
+  test("calculateRatioSegments 使用最大余额法分配百分比且总和为100%", () => {
+    // 边界情况：空数组或非数组
+    expect(uiFeedback.calculateRatioSegments([])).toEqual([])
+    expect(uiFeedback.calculateRatioSegments(null)).toEqual([])
+
+    // 全为 0 或总数为 0
+    const zeroSegments = [
+      { key: "a", value: 0 },
+      { key: "b", value: 0 }
+    ]
+    const zeroResult = uiFeedback.calculateRatioSegments(zeroSegments)
+    expect(zeroResult).toEqual([
+      { key: "a", value: 0, percent: 0, percentText: "0%" },
+      { key: "b", value: 0, percent: 0, percentText: "0%" }
+    ])
+
+    // 经典 1:1:1 无法整除，最大余额法保证总和 100%
+    const threeSegments = [
+      { key: "a", value: 10 },
+      { key: "b", value: 10 },
+      { key: "c", value: 10 }
+    ]
+    const threeResult = uiFeedback.calculateRatioSegments(threeSegments)
+    const sum = threeResult.reduce((acc, item) => acc + item.percent, 0)
+    expect(sum).toBe(100)
+    expect(threeResult[0].percent + threeResult[1].percent + threeResult[2].percent).toBe(100)
+    expect(threeResult.map((i) => i.percentText)).toEqual(["34%", "33%", "33%"])
+
+    // 自定义 customTotal
+    const customResult = uiFeedback.calculateRatioSegments([{ key: "a", value: 50 }], 100)
+    expect(customResult[0].percent).toBe(50)
+    expect(customResult[0].percentText).toBe("50%")
+  })
+
+  test("buildSummaryRows 正确解析中文字符冒号分隔的键值对", () => {
+    expect(uiFeedback.buildSummaryRows("")).toEqual([])
+    expect(uiFeedback.buildSummaryRows(null)).toEqual([])
+
+    const summaryText = "操作类型：车辆上下架\n操作人：管理员\n无冒号普通说明\n空值项目："
+    const rows = uiFeedback.buildSummaryRows(summaryText)
+    expect(rows).toEqual([
+      { label: "操作类型", value: "车辆上下架" },
+      { label: "操作人", value: "管理员" },
+      { label: "详情", value: "无冒号普通说明" },
+      { label: "空值项目", value: "—" }
+    ])
+  })
+
+  test("normalizeStringArray 裁剪前后空格、过滤空项并去重", () => {
+    expect(uiFeedback.normalizeStringArray(null)).toEqual([])
+    expect(uiFeedback.normalizeStringArray("not an array")).toEqual([])
+
+    const rawList = [" 豪华车 ", "SUV", "  ", "", "豪华车", " 商务车  ", null, undefined]
+    const normalized = uiFeedback.normalizeStringArray(rawList)
+    expect(normalized).toEqual(["豪华车", "SUV", "商务车"])
+  })
+})
+

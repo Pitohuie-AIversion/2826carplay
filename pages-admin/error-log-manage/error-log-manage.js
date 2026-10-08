@@ -1,6 +1,6 @@
 const { activatePageNativeActions, beginPageNativeAction, cancelPageNativeActions, isPageNativeActionActive } = require("../../shared/pageNativeAction")
 const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
-const { formatToastTitle } = require("../../shared/uiFeedback")
+const { formatToastTitle, buildSummaryRows } = require("../../shared/uiFeedback")
 const {
   activatePageCsvFileActions,
   applyPageCsvFileRemoval,
@@ -104,21 +104,7 @@ function buildSummary(item) {
   }
   return parts.join("\n")
 }
-function buildSummaryRows(summary) {
-  return String(summary || "")
-    .split("\n")
-    .filter(Boolean)
-    .map((line) => {
-      const separatorIndex = line.indexOf("：")
-      if (separatorIndex < 0) {
-        return { label: "详情", value: line }
-      }
-      return {
-        label: line.slice(0, separatorIndex),
-        value: line.slice(separatorIndex + 1) || "—"
-      }
-    })
-}
+
 function buildMessagePreview(message) {
   const text = String(message || "").trim()
   if (!text) {

@@ -1,5 +1,5 @@
 const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
-const { formatToastTitle } = require("../../shared/uiFeedback")
+const { formatToastTitle, normalizeStringArray } = require("../../shared/uiFeedback")
 const {
   activatePageNativeActions,
   beginPageNativeAction,
@@ -150,19 +150,7 @@ function normalizeChosenImages(chooseRes) {
   })
   return { filePaths, rejectedCount }
 }
-function normalizeStringArray(input) {
-  if (!Array.isArray(input)) {
-    return []
-  }
-  const result = []
-  input.forEach((item) => {
-    const value = String(item || "").trim()
-    if (value && !result.includes(value)) {
-      result.push(value)
-    }
-  })
-  return result
-}
+
 function deleteCloudFilesDirectBestEffort(fileList) {
   const list = normalizeStringArray(fileList)
   if (!list.length) {

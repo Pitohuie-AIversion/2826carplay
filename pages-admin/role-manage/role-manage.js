@@ -1,5 +1,5 @@
 const { cancelPagePermissionCheck, clearPagePermissionCache, requirePagePermission } = require("../../shared/pageAuth")
-const { formatToastTitle } = require("../../shared/uiFeedback")
+const { formatToastTitle, normalizeStringArray } = require("../../shared/uiFeedback")
 const { clearUnsaved, markUnsaved } = require("../../shared/unsavedChanges")
 const PERMISSION_OPTIONS = [
   {
@@ -18,19 +18,7 @@ const PERMISSION_OPTIONS = [
 const OPENID_PATTERN = /^[A-Za-z0-9_-]{6,128}$/
 const ROLE_LIST_TIMEOUT_MS = 15 * 1000
 const ROLE_SAVE_TIMEOUT_MS = 20 * 1000
-function normalizeStringArray(value) {
-  if (!Array.isArray(value)) {
-    return []
-  }
-  const list = []
-  value.forEach((item) => {
-    const text = String(item || "").trim()
-    if (text && !list.includes(text)) {
-      list.push(text)
-    }
-  })
-  return list
-}
+
 function buildPermissionOptions(selectedPermissions) {
   const selected = normalizeStringArray(selectedPermissions)
   return PERMISSION_OPTIONS.map((item) => ({

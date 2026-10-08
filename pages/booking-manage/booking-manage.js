@@ -1,6 +1,6 @@
 const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
 const { isUserCancelError, removeCsvFile, saveCsvFile } = require("../../shared/csvFile")
-const { formatToastTitle } = require("../../shared/uiFeedback")
+const { formatToastTitle, calculateRatioSegments } = require("../../shared/uiFeedback")
 const { requestOperationConfig } = require("../../shared/operationConfigRequest")
 const {
   activatePageCsvFileActions,
@@ -54,46 +54,13 @@ function buildStatusRatioSegments(stats) {
   const quoted = Number(stats && stats.quoted) || 0
   const confirmed = Number(stats && stats.confirmed) || 0
   const completed = Number(stats && stats.completed) || 0
-  const total = pending + contacted + quoted + confirmed + completed
-  const base = [
+  return calculateRatioSegments([
     { key: "pending", label: "待联系", value: pending, className: "ratio-pending" },
     { key: "contacted", label: "已联系", value: contacted, className: "ratio-contacted" },
     { key: "quoted", label: "已报价", value: quoted, className: "ratio-contacted" },
     { key: "confirmed", label: "已确认", value: confirmed, className: "ratio-completed" },
     { key: "completed", label: "已完成", value: completed, className: "ratio-completed" }
-  ]
-  if (!total) {
-    return base.map((item) => ({
-      ...item,
-      percent: 0,
-      percentText: "0%"
-    }))
-  }
-  const rawPercents = base.map((item) => (item.value / total) * 100)
-  const floors = rawPercents.map((value) => Math.floor(value))
-  let used = floors.reduce((sum, n) => sum + n, 0)
-  let remain = 100 - used
-  const order = rawPercents
-    .map((value, index) => ({
-      index,
-      frac: value - floors[index]
-    }))
-    .sort((a, b) => b.frac - a.frac)
-  const percents = floors.slice()
-  let i = 0
-  while (remain > 0 && i < order.length) {
-    percents[order[i].index] += 1
-    remain -= 1
-    i += 1
-    if (i >= order.length) {
-      i = 0
-    }
-  }
-  return base.map((item, index) => ({
-    ...item,
-    percent: percents[index],
-    percentText: `${percents[index]}%`
-  }))
+  ])
 }
 function buildRecentCreatedViewModel(list) {
   if (!Array.isArray(list)) {

@@ -20,7 +20,7 @@ const {
 } = require("../../shared/bookingStatus")
 const { formatDisplayTime } = require("../../shared/formatTime")
 const { getRentalDiscountTier, formatYuan } = require("../../shared/rentalPricing")
-const { calculateRentalDays } = require("../../shared/dateUtils")
+const { calculateRentalDays, getChinaToday } = require("../../shared/dateUtils")
 const BOOKING_DETAIL_LOAD_TIMEOUT_MS = 15 * 1000
 const BOOKING_DETAIL_WRITE_TIMEOUT_MS = 20 * 1000
 const HANDOVER_ANGLES = [
@@ -80,9 +80,7 @@ function createQuoteForm(quote) {
     customerNote: source.customerNote || ""
   }
 }
-function getChinaToday() {
-  return new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10)
-}
+
 function createHandoverForm() {
   return {
     expectedVersion: null,

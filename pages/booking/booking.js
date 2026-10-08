@@ -14,7 +14,8 @@ const {
 } = require("../../shared/pageNativeAction")
 const { onNetworkReconnect } = require("../../shared/networkStatus")
 const { clearUnsaved, markUnsaved } = require("../../shared/unsavedChanges")
-const { formatDate, addDays, getDateSpanText } = require("../../shared/dateUtils")
+const { formatDate, addDays, getDateSpanText, formatMonthDay } = require("../../shared/dateUtils")
+const { maskPhone } = require("../../shared/bookingStatus")
 const LAST_BOOKING_CONTACT_KEY = "lastBookingContact"
 const BOOKING_CAR_LOAD_TIMEOUT_MS = 15 * 1000
 const AVAILABILITY_CHECK_TIMEOUT_MS = 12 * 1000
@@ -97,18 +98,7 @@ function buildFormProgress(form, privacyAgreed) {
   }
 }
 
-function formatBookingDate(value) {
-  const text = String(value || "").trim()
-  const match = text.match(/^\d{4}-(\d{2})-(\d{2})$/)
-  return match ? `${match[1]}月${match[2]}日` : "—"
-}
 
-function maskPhone(value) {
-  const phone = String(value || "").trim()
-  return /^1\d{10}$/.test(phone)
-    ? `${phone.slice(0, 3)}****${phone.slice(-4)}`
-    : phone || "—"
-}
 
 
 
@@ -119,7 +109,7 @@ function buildBookingSummary(form, carName) {
   return {
     carName: String(carName || "").trim() || "—",
     dateText: hasDates
-      ? `${formatBookingDate(source.startDate)} → ${formatBookingDate(source.endDate)}`
+      ? `${formatMonthDay(source.startDate)} → ${formatMonthDay(source.endDate)}`
       : "待选择日期",
     durationText: getDateSpanText(source.startDate, source.endDate),
     contactText: String(source.userName || "").trim()

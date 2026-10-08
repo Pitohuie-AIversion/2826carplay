@@ -1,6 +1,7 @@
 const vehicleUtils = require("../../shared/vehicle")
 const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
 const { formatToastTitle, calculateRatioSegments } = require("../../shared/uiFeedback")
+const { formatPriceDayText } = require("../../shared/rentalPricing")
 const {
   activatePageNativeActions,
   beginPageNativeAction,
@@ -40,12 +41,7 @@ function buildStatusRatioSegments(stats) {
     { key: "maintenance", label: "维修中", value: maintenance, className: "ratio-maintenance" }
   ])
 }
-function formatPriceDayText(priceDay) {
-  if (Number.isInteger(priceDay) && priceDay > 0) {
-    return `￥${priceDay} / 24小时`
-  }
-  return "—"
-}
+
 function buildMediaHealth(item) {
   const source = item && typeof item === "object" ? item : {}
   const imageCount = Math.max(0, Number(source.imageCount) || 0)

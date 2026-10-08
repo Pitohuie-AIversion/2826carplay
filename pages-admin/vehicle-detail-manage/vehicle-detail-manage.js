@@ -1,5 +1,6 @@
 const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
 const { formatToastTitle, normalizeStringArray } = require("../../shared/uiFeedback")
+const { formatPriceDayText } = require("../../shared/rentalPricing")
 const {
   activatePageNativeActions,
   beginPageNativeAction,
@@ -53,7 +54,7 @@ function formatDetail(detail) {
     fuelTypeText: FUEL_TYPE_LABEL_MAP[detail.fuelType] || detail.fuelType || "—",
     seatsText: detail.seats ? `${detail.seats} 座` : "—",
     locationText: detail.location || "—",
-    priceDayText: detail.priceDay || detail.priceDay === 0 ? `￥${detail.priceDay} / 24小时` : "—",
+    priceDayText: formatPriceDayText(detail.priceDay),
     createdAtText: formatDisplayTime(detail.createdAt) || "—",
     updatedAtText: formatDisplayTime(detail.updatedAt) || "—",
     vinText: detail.vin || "—",

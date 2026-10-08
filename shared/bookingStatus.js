@@ -354,6 +354,18 @@ function normalizeRemark(value, maxLength = 200) {
   return String(value || "").slice(0, maxLength)
 }
 
+/**
+ * 手机号脱敏掩码展示 (如 138****8000)
+ * @param {string} value 
+ * @returns {string} 脱敏后的手机号，不合法则返回原值或兜底
+ */
+function maskPhone(value) {
+  const phone = String(value || "").trim()
+  return /^1\d{10}$/.test(phone)
+    ? `${phone.slice(0, 3)}****${phone.slice(-4)}`
+    : phone || "—"
+}
+
 module.exports = {
   STATUS_TEXT_MAP,
   STATUS_CLASS_MAP,
@@ -376,5 +388,7 @@ module.exports = {
   filterBookings,
   showStatusUpdateFeedback,
   normalizePhone,
-  normalizeRemark
+  normalizeRemark,
+  maskPhone
 }
+

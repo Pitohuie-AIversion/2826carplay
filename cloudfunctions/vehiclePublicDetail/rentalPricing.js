@@ -75,11 +75,26 @@ function formatYuan(cents) {
   return (value / 100).toFixed(2)
 }
 
+/**
+ * 格式化日租金展示文案 (例如 599 -> "￥599 / 24小时")
+ * @param {number} priceDay 
+ * @param {string} [fallback="—"] 
+ * @returns {string}
+ */
+function formatPriceDayText(priceDay, fallback = "—") {
+  if (Number.isInteger(priceDay) && priceDay > 0) {
+    return `￥${priceDay} / 24小时`
+  }
+  return fallback
+}
+
 module.exports = {
   MAX_RENTAL_DISCOUNT_TIERS,
   validateRentalDiscountTiers,
   normalizeRentalDiscountTiers,
   getRentalDiscountTier,
   calculateRentalDiscount,
-  formatYuan
+  formatYuan,
+  formatPriceDayText
 }
+

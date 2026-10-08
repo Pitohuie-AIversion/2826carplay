@@ -184,6 +184,31 @@ function getDateSpanText(startDate, endDate, fallback = "待选择日期") {
   return days === 0 ? "当日取还" : `${days} 天跨度`
 }
 
+/**
+ * 获取中国标准时间 (UTC+8) 的 YYYY-MM-DD 日期字符串
+ * @param {Date|number|string} [date] 可选的基准时间，缺省为当前时间
+ * @returns {string} YYYY-MM-DD
+ */
+function getChinaToday(date) {
+  const time = date instanceof Date
+    ? date.getTime()
+    : (date !== undefined && date !== null ? new Date(date).getTime() : Date.now())
+  if (Number.isNaN(time)) return ""
+  return new Date(time + 8 * 60 * 60 * 1000).toISOString().slice(0, 10)
+}
+
+/**
+ * 格式化日期为中文 "M月D日" (例如 "2026-10-08" -> "10月08日")
+ * @param {string} value 
+ * @param {string} [fallback="—"] 
+ * @returns {string}
+ */
+function formatMonthDay(value, fallback = "—") {
+  const text = String(value || "").trim()
+  const match = text.match(/^\d{4}-(\d{2})-(\d{2})$/)
+  return match ? `${match[1]}月${match[2]}日` : fallback
+}
+
 module.exports = {
   DATE_REGEX,
   MS_PER_DAY,
@@ -196,5 +221,8 @@ module.exports = {
   addDays,
   isDateOverlap,
   isDateInRange,
-  compareDates
+  compareDates,
+  getChinaToday,
+  formatMonthDay
 }
+

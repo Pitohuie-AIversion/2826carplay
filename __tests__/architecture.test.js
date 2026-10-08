@@ -58,6 +58,10 @@ describe("Architecture & Modular Facade", () => {
     expect(typeof shared.calculateRatioSegments).toBe("function")
     expect(typeof shared.buildSummaryRows).toBe("function")
     expect(typeof shared.normalizeStringArray).toBe("function")
+    expect(typeof shared.getChinaToday).toBe("function")
+    expect(typeof shared.formatMonthDay).toBe("function")
+    expect(typeof shared.maskPhone).toBe("function")
+    expect(typeof shared.formatPriceDayText).toBe("function")
   })
 })
 
@@ -132,6 +136,24 @@ describe("Date & Rental Span Utilities (dateUtils)", () => {
     expect(dateUtils.getDateSpanText("", "2026-10-01", "日期待确认")).toBe("日期待确认")
   })
 
+  test("getChinaToday 获取中国标准时间 YYYY-MM-DD", () => {
+    // 固定的 UTC 时间测试：2026-10-08T00:00:00Z -> 北京时间 2026-10-08
+    expect(dateUtils.getChinaToday("2026-10-08T00:00:00Z")).toBe("2026-10-08")
+    // 2026-10-08T20:00:00Z -> 北京时间 2026-10-09
+    expect(dateUtils.getChinaToday("2026-10-08T20:00:00Z")).toBe("2026-10-09")
+    // 异常输入
+    expect(dateUtils.getChinaToday("invalid")).toBe("")
+    // 缺省参数返回 10 位长度
+    expect(dateUtils.getChinaToday().length).toBe(10)
+  })
+
+  test("formatMonthDay 格式化月日展示文案", () => {
+    expect(dateUtils.formatMonthDay("2026-10-08")).toBe("10月08日")
+    expect(dateUtils.formatMonthDay("2026-05-01")).toBe("05月01日")
+    expect(dateUtils.formatMonthDay("invalid")).toBe("—")
+    expect(dateUtils.formatMonthDay("", "待定")).toBe("待定")
+  })
+
   test("vehicleLabels.FIELD_LABEL_MAP 与 buildLabels 字段映射及回退", () => {
     const { FIELD_LABEL_MAP, getFieldLabel, buildLabels } = shared.domains.vehicleLabels
     expect(FIELD_LABEL_MAP.plateNumber).toBe("车牌号")
@@ -193,6 +215,25 @@ describe("Date & Rental Span Utilities (dateUtils)", () => {
     expect(formatYuan("5000")).toBe("50.00")
     expect(formatYuan(-100)).toBe("0.00")
     expect(formatYuan(null)).toBe("0.00")
+  })
+
+  test("rentalPricing.formatPriceDayText 格式化日租金文案", () => {
+    const { formatPriceDayText } = shared.domains.rentalPricing
+    expect(formatPriceDayText(599)).toBe("￥599 / 24小时")
+    expect(formatPriceDayText(1299)).toBe("￥1299 / 24小时")
+    expect(formatPriceDayText(0)).toBe("—")
+    expect(formatPriceDayText(-500)).toBe("—")
+    expect(formatPriceDayText(null)).toBe("—")
+    expect(formatPriceDayText(null, "价格面议")).toBe("价格面议")
+  })
+
+  test("bookingStatus.maskPhone 手机号隐私脱敏", () => {
+    const { maskPhone } = shared.domains.bookingStatus
+    expect(maskPhone("13812345678")).toBe("138****5678")
+    expect(maskPhone("15700000090")).toBe("157****0090")
+    expect(maskPhone("12345")).toBe("12345")
+    expect(maskPhone("")).toBe("—")
+    expect(maskPhone(null)).toBe("—")
   })
 })
 

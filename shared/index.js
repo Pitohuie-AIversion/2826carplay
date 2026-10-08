@@ -160,10 +160,15 @@ module.exports = {
   showStatusUpdateFeedback: bookingStatus.showStatusUpdateFeedback,
   normalizePhone: bookingStatus.normalizePhone,
   normalizeRemark: bookingStatus.normalizeRemark,
+  maskPhone: bookingStatus.maskPhone,
   formatYuan: rentalPricing.formatYuan,
+  formatPriceDayText: rentalPricing.formatPriceDayText,
+  getChinaToday: dateUtils.getChinaToday,
+  formatMonthDay: dateUtils.formatMonthDay,
   getPrivacyTypeLabel: privacy.getPrivacyTypeLabel,
   getPrivacyStatusLabel: privacy.getPrivacyStatusLabel,
   getPrivacyStatusClass: privacy.getPrivacyStatusClass,
   createPageController: pageController.createPageController,
   definePage: pageController.definePage
 }
+

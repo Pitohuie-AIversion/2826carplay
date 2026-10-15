@@ -246,6 +246,13 @@
         >
           查看 {{item.brand || item.name}} 详情
         </button>
+        <button
+          class="compare-action-btn ui-btn ui-btn-ghost"
+          bindtap="handleCopyComparison"
+          aria-label="复制当前对比车型清单"
+        >
+          复制对比清单
+        </button>
       </view>
     </view>
   </view>

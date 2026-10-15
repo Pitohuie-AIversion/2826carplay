@@ -145,5 +145,5 @@
 .compare-switch-chip { display: inline-flex; align-items: center; padding: 8rpx 18rpx; margin-right: 12rpx; border-radius: 999rpx; border: 1rpx solid rgba(255, 255, 255, 0.1); background: rgba(255, 255, 255, 0.04); color: #94a3b8; font-size: 19rpx; cursor: pointer; }
 .compare-switch-chip-active { border-color: rgba(230, 197, 135, 0.5); background: rgba(230, 197, 135, 0.15); color: #f5dfb8; font-weight: 600; }
 
-.compare-modal-actions { display: flex; gap: 14rpx; }
-.compare-action-btn { flex: 1; height: 74rpx; border-radius: 16rpx; font-size: 22rpx; font-weight: 600; }
+.compare-modal-actions { display: flex; gap: 14rpx; flex-wrap: wrap; }
+.compare-action-btn { flex: 1; min-width: 190rpx; height: 74rpx; border-radius: 16rpx; font-size: 22rpx; font-weight: 600; }

@@ -1121,6 +1121,12 @@ simulateClick("点击从对比矩阵中跳转车辆详情 (handleCompareCarDetai
   favoritesPage.handleCompareCarDetail(makeEvent({ id: "car-911" }))
 })
 
+simulateClick("点击复制心仪车型对比清单 (handleCopyComparison)", () => {
+  favoritesPage.handleOpenCompareModal()
+  favoritesPage.handleCopyComparison()
+  favoritesPage.handleCloseCompareModal()
+})
+
 simulateClick("点击「去车库逛逛」入口 (handleBrowseGarage)", () => {
   favoritesPage.handleBrowseGarage()
 })

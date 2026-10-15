@@ -296,6 +296,28 @@ Page({
     this.handleCarTap({ detail: { carId } })
   },
 
+  handleCopyComparison() {
+    const cars = this.data.compareCars || []
+    if (!cars.length) return
+    triggerHapticFeedback("light")
+    const lines = ["【极境车库 · 心仪车型对比】"]
+    cars.forEach((car, index) => {
+      const price = car.priceText || (car.priceDay ? `￥${car.priceDay}/天` : "日租待确认")
+      const tags = Array.isArray(car.tags) && car.tags.length ? `[${car.tags.join("、")}]` : ""
+      lines.push(`${index + 1}. ${car.name} (${car.statusText || "可预约"}) - ${price} ${tags}`)
+    })
+    lines.push("更多车型与排期请在极境车库小程序查看。")
+    const text = lines.join("\n")
+    if (typeof wx.setClipboardData === "function") {
+      wx.setClipboardData({
+        data: text,
+        success: () => {
+          wx.showToast({ title: "对比清单已复制", icon: "success" })
+        }
+      })
+    }
+  },
+
   handleRemove(event) {
     const vehicleId = String(event.currentTarget.dataset.id || "").trim()
     if (!vehicleId || this.data.loading || this.data.removingId || this.data.undoingFavorite) {
@@ -679,6 +701,20 @@ Page({
     this._favoritesLoadDone = null
     if (typeof done === "function") {
       done()
+    }
+  },
+
+  onShareAppMessage() {
+    return {
+      title: "极境车库 · 心仪豪华座驾收藏",
+      path: "/pages/favorites/favorites?channel=wechat_share"
+    }
+  },
+
+  onShareTimeline() {
+    return {
+      title: "极境车库 · 心仪豪华座驾收藏",
+      query: "channel=timeline_share"
     }
   }
 })

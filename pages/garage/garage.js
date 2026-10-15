@@ -244,6 +244,8 @@ Page({
   data: {
     pageTitle: "极境车库",
     pageSubtitle: DEFAULT_GARAGE_SUBTITLE,
+    announcementText: "",
+    announcementDismissed: false,
     emptyText: "当前分类暂无车辆，更多车型即将入库",
     loadError: false,
     loadErrorText: "车辆列表加载失败，请稍后重试",
@@ -504,10 +506,12 @@ Page({
     this._cancelOperationConfigRequest = requestOperationConfig({
       force: Boolean(options && options.force),
       onSuccess: (config) => {
+        const announcementText = String(config.announcementText || "").trim()
         const nextState = {
           pageTitle: config.garagePageTitle || this.data.pageTitle,
           pageSubtitle: normalizeGarageSubtitle(config.garagePageSubtitle, this.data.pageSubtitle),
-          servicePhone: String(config.servicePhone || "").trim()
+          servicePhone: String(config.servicePhone || "").trim(),
+          announcementText
         }
         if (Array.isArray(config.cityOptions)) {
           nextState.cityOptions = config.cityOptions
@@ -1157,6 +1161,11 @@ Page({
     }
 
     this.loadCars()
+  },
+
+  handleDismissAnnouncement() {
+    triggerHapticFeedback("light")
+    this.setData({ announcementDismissed: true })
   },
 
   onShareAppMessage() {

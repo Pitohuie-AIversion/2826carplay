@@ -18,6 +18,14 @@
     <view class="offline-badge-dot" aria-hidden="true"></view>
     <text>网络已断开，当前正在浏览离线缓存车源</text>
   </view>
+  <view wx:if="{{announcementText && !announcementDismissed}}" class="garage-announcement-bar ui-card" aria-role="alert">
+    <view class="announcement-bell-dot" aria-hidden="true"></view>
+    <view class="announcement-content">
+      <text class="announcement-badge">公告</text>
+      <text class="announcement-text">{{announcementText}}</text>
+    </view>
+    <view class="announcement-close-btn" bindtap="handleDismissAnnouncement" hover-class="announcement-close-pressed" aria-role="button" aria-label="关闭公告">✕</view>
+  </view>
   <view wx:if="{{(!initialLoading && !loadingCars) || cars.length}}" class="garage-search ui-card">
     <view class="search-symbol" aria-hidden="true"></view>
     <input

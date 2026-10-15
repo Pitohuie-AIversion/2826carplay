@@ -1,18 +1,18 @@
-const CURRENT_VERSION = "1.0.1"
+const CURRENT_VERSION = "1.1.0"
 const STORAGE_KEY_VERSION = "app_current_version"
 const STORAGE_KEY_MIGRATED_AT = "app_version_migrated_at"
 const STORAGE_KEY_RELEASE_NOTES = "app_latest_release_notes"
 
 const RELEASE_NOTES = {
   version: CURRENT_VERSION,
-  releaseDate: "2026-09-18",
-  title: "极境车库 v1.0.1 体验更新",
+  releaseDate: "2026-10-15",
+  title: "极境车库 v1.1.0 尊享体验与运营敏捷升级",
   highlights: [
-    "【城市筛选】首页车库与管理端新增取车交付中心城市即时过滤，支持本地与云端联动查询",
-    "【偏好记忆】待协调工作台排序偏好及我的收藏「只看可预约」状态支持本地记忆与自动恢复",
-    "【海报生成】车辆详情支持生成专属分享海报，优化相册权限提示文案与拦截引导",
-    "【交互体验】全站核心数据页面接入微信原生下拉刷新，优化网络同步与按压微动画",
-    "【热更新】引入客户端新版本就绪自动提示与启动数据平滑迁移机制"
+    "【动态试算】预约页面接入梯度连租折扣试算与省费明细即时计算，租后开启五星体验评价闭环",
+    "【驾控座舱】车型详情配置支持「动力驾控」与「奢享座舱」双模态无缝切换与尊享权益全景看板",
+    "【运营通告】管理员支持线上即时发布首页全局公告，支持弱网自愈指示条与离线浏览",
+    "【性能加速】全站接入腾讯云数据万象 WebP 动态压缩与微信后台数据预拉取（Background Fetch）",
+    "【特色筛选】车库页面新增免押金、￥2000内、尊享超跑与纯电性能快速筛选芯片"
   ]
 }
 

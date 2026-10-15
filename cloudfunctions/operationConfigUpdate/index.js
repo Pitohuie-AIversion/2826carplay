@@ -36,6 +36,7 @@ const DEFAULT_CONFIG = {
   mineUserDesc: "查看预约、个人信息申请与车库服务",
   garagePageTitle: "极境车库",
   garagePageSubtitle: "甄选座驾，为每一次出发预留专属席位",
+  announcementText: "",
   cityOptions: ["杭州", "上海"],
   faqContent: "",
   rulesContent: "",
@@ -89,6 +90,7 @@ function normalizeConfig(raw) {
       !garagePageSubtitle
         ? DEFAULT_CONFIG.garagePageSubtitle
         : garagePageSubtitle,
+    announcementText: normalizeText(input.announcementText, 120),
     cityOptions,
     faqContent: normalizeText(input.faqContent, 1000) || DEFAULT_CONFIG.faqContent,
     rulesContent: normalizeText(input.rulesContent, 1000) || DEFAULT_CONFIG.rulesContent,

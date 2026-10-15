@@ -305,7 +305,15 @@ Page({
     ],
     posterModalVisible: false,
     posterGenerating: false,
-    posterImagePath: ""
+    posterImagePath: "",
+    privilegeModalVisible: false,
+    vipPrivileges: [
+      { key: "real_car", icon: "👑", title: "100% 实车保真", desc: "车牌、配置与实拍图严格一致，杜绝任何虚假车源" },
+      { key: "inspection", icon: "🛡️", title: "36项交付整备", desc: "交付前完成全车36道安全性能点检与舱内深层无菌除味" },
+      { key: "full_energy", icon: "🚗", title: "满油/满电交付", desc: "专属交付中心满能量交付，支持同等返还或便捷代充" },
+      { key: "concierge", icon: "💎", title: "1对1管家陪同", desc: "尊享顾问交付教学、全程线路指引与24小时全国道路救援" },
+      { key: "deposit_free", icon: "⚡", title: "信用尊享免押", desc: "优质信用资质客户免收全额车辆押金，退款秒级对账" }
+    ]
   },
 
   onLoad(options) {
@@ -1103,6 +1111,16 @@ Page({
     if (this.data.specTab === tab) return
     triggerHapticFeedback("selection")
     this.setData({ specTab: tab })
+  },
+
+  handleTogglePrivilegeModal() {
+    triggerHapticFeedback("light")
+    const privilegeModalVisible = !this.data.privilegeModalVisible
+    this.setData({ privilegeModalVisible })
+  },
+
+  handleClosePrivilegeModal() {
+    this.setData({ privilegeModalVisible: false })
   },
 
   handleOpenCustomerService() {

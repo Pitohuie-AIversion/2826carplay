@@ -711,6 +711,12 @@ simulateClick("点击车库热搜推荐词芯片 (handleHotSearchTap)", () => {
   if (garagePage.data.searchKeyword !== "") throw new Error("搜索词未清空")
 })
 
+simulateClick("点击关闭车库公告栏 (handleDismissAnnouncement)", () => {
+  garagePage.setData({ announcementText: "系统维护测试公告", announcementDismissed: false })
+  garagePage.handleDismissAnnouncement()
+  if (!garagePage.data.announcementDismissed) throw new Error("公告未被成功关闭")
+})
+
 simulateClick("点击推荐场景指南入口 (handleContentGuideTap)", () => {
   garagePage.handleContentGuideTap(makeEvent({ slug: "weekend-short-trip-prep-2026" }))
 })
@@ -756,6 +762,13 @@ simulateClick("点击切换车型配置参数模态:「奢享座舱」(handleSpe
   if (carDetailPage.data.specTab !== "cabin") throw new Error("配置卡片未切换至奢享座舱")
   carDetailPage.handleSpecTabChange(makeEvent({ tab: "perf" }))
   if (carDetailPage.data.specTab !== "perf") throw new Error("配置卡片未恢复至动力驾控")
+})
+
+simulateClick("点击展开/关闭极境尊享权益保障弹窗 (handleTogglePrivilegeModal)", () => {
+  carDetailPage.handleTogglePrivilegeModal()
+  if (!carDetailPage.data.privilegeModalVisible) throw new Error("权益保障弹窗未开启")
+  carDetailPage.handleClosePrivilegeModal()
+  if (carDetailPage.data.privilegeModalVisible) throw new Error("权益保障弹窗未关闭")
 })
 
 simulateClick("点击展开/折叠价格说明手风琴 (handleTogglePricing)", () => {

@@ -7,6 +7,7 @@ const {
 } = require("../../shared/pageNativeAction")
 const { preloadImages } = require("../../shared/imageCache")
 const { normalizeFavoriteVehicleStatus } = require("../../shared/vehicleLabels")
+const { triggerHapticFeedback } = require("../../shared/hapticFeedback")
 const FAVORITES_LOAD_TIMEOUT_MS = 15 * 1000
 const FAVORITE_MUTATION_TIMEOUT_MS = 12 * 1000
 
@@ -70,6 +71,8 @@ Page({
       total: 0,
       available: 0
     },
+    compareModalVisible: false,
+    compareCars: [],
     page: 0,
     pageSize: 10,
     hasMore: false,
@@ -246,6 +249,51 @@ Page({
         })
       }
     })
+  },
+
+  handleOpenCompareModal() {
+    const list = (this.data.visibleList && this.data.visibleList.length >= 2)
+      ? this.data.visibleList
+      : this.data.list
+    if (!list || list.length < 2) {
+      wx.showToast({
+        title: "请至少收藏2辆车进行对比",
+        icon: "none"
+      })
+      return
+    }
+    triggerHapticFeedback("light")
+    this.setData({
+      compareModalVisible: true,
+      compareCars: [list[0], list[1]]
+    })
+  },
+
+  handleCloseCompareModal() {
+    this.setData({ compareModalVisible: false })
+  },
+
+  handleSwitchCompareCar(event) {
+    const carId = String((event && event.currentTarget && event.currentTarget.dataset && event.currentTarget.dataset.carid) || "").trim()
+    if (!carId) return
+    const list = this.data.list || []
+    const selected = list.find((c) => c.id === carId)
+    if (!selected) return
+
+    const compareCars = (this.data.compareCars || []).slice()
+    if (compareCars.some((c) => c.id === carId)) {
+      return
+    }
+    triggerHapticFeedback("selection")
+    compareCars[1] = selected
+    this.setData({ compareCars })
+  },
+
+  handleCompareCarDetail(event) {
+    const carId = String((event && event.currentTarget && event.currentTarget.dataset && event.currentTarget.dataset.id) || "").trim()
+    if (!carId) return
+    this.handleCloseCompareModal()
+    this.handleCarTap({ detail: { carId } })
   },
 
   handleRemove(event) {

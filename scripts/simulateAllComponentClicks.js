@@ -250,7 +250,10 @@ global.wx = {
       } else if (name === "favoriteMyList") {
         result = {
           ok: true,
-          list: [{ id: "car-911", name: "保时捷 911 Carrera S", priceDay: 2800, status: "available" }],
+          list: [
+            { id: "car-911", name: "保时捷 911 Carrera S", brand: "保时捷", priceDay: 2800, priceText: "今日 ￥2800 / 24小时", status: "available", cover: "https://example.com/911.jpg" },
+            { id: "car-panamera", name: "保时捷 Panamera", brand: "保时捷", priceDay: 2200, priceText: "今日 ￥2200 / 24小时", status: "available", cover: "https://example.com/panamera.jpg" }
+          ],
           hasMore: false
         }
       } else if (name === "bookingCreate") {
@@ -1088,6 +1091,19 @@ simulateClick("点击移除收藏项 (handleRemove)", () => {
 
 simulateClick("点击撤销刚刚的移除收藏操作 (handleUndoRemove)", () => {
   favoritesPage.handleUndoRemove()
+})
+
+simulateClick("点击打开心仪车型对比矩阵 (handleOpenCompareModal)", () => {
+  favoritesPage.handleOpenCompareModal()
+  if (!favoritesPage.data.compareModalVisible) throw new Error("车型对比弹窗未开启")
+  if (favoritesPage.data.compareCars.length < 2) throw new Error("对比车辆数不足2辆")
+  favoritesPage.handleCloseCompareModal()
+  if (favoritesPage.data.compareModalVisible) throw new Error("车型对比弹窗未关闭")
+})
+
+simulateClick("点击从对比矩阵中跳转车辆详情 (handleCompareCarDetail)", () => {
+  favoritesPage.handleOpenCompareModal()
+  favoritesPage.handleCompareCarDetail(makeEvent({ id: "car-911" }))
 })
 
 simulateClick("点击「去车库逛逛」入口 (handleBrowseGarage)", () => {

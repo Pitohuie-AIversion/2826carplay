@@ -113,6 +113,7 @@ function buildVehicleCard(vehicle) {
     brand,
     cover,
     coverPlaceholderText: brandModel || vehicleTypeText,
+    priceDay: priceDay || 0,
     priceText: priceDay ? `今日 ￥${priceDay} / 24小时` : "价格到店详询",
     status: statusMeta.status,
     statusText: statusMeta.statusText,

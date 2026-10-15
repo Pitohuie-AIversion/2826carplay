@@ -68,9 +68,21 @@
           <view class="summary-kicker">COLLECTION STATUS</view>
           <view class="summary-title">{{hasMore ? '当前已加载' : '已收藏'}} {{favoriteSummary.total}} 辆</view>
         </view>
-        <view class="summary-available">
-          <text class="summary-available-value">{{favoriteSummary.available}}</text>
-          <text class="summary-available-label">可预约</text>
+        <view class="summary-side-actions">
+          <button
+            wx:if="{{favoriteSummary.total >= 2}}"
+            class="compare-launch-btn ui-btn ui-btn-ghost"
+            bindtap="handleOpenCompareModal"
+            hover-class="compare-launch-pressed"
+            aria-role="button"
+            aria-label="打开心仪车型对比矩阵"
+          >
+            <view class="compare-btn-content"><text class="compare-btn-icon">⚡</text><text>车型对比</text></view>
+          </button>
+          <view class="summary-available">
+            <text class="summary-available-value">{{favoriteSummary.available}}</text>
+            <text class="summary-available-label">可预约</text>
+          </view>
         </view>
       </view>
       <view class="status-filter" aria-role="group" aria-label="收藏车辆状态筛选">
@@ -156,6 +168,86 @@
   <view wx:if="{{undoFavorite}}" class="favorite-undo-bar" aria-live="polite">
     <text>已取消收藏“{{undoFavorite.car.name || '车辆'}}”</text>
     <button class="favorite-undo-button" loading="{{undoingFavorite}}" disabled="{{undoingFavorite || removingId || loading}}" bindtap="handleUndoRemove">撤销</button>
+  </view>
+  <view wx:if="{{compareModalVisible}}" class="compare-modal-overlay" bindtap="handleCloseCompareModal" hover-class="none" aria-modal="true" aria-role="dialog">
+    <view class="compare-modal-dialog ui-card" catchtap="true">
+      <view class="compare-modal-header">
+        <view class="compare-modal-title-wrap">
+          <view class="compare-modal-kicker">BENCHMARK MATRIX</view>
+          <view class="compare-modal-title">心仪车型参数对比</view>
+        </view>
+        <view class="compare-modal-close" bindtap="handleCloseCompareModal" hover-class="compare-modal-close-hover" aria-role="button" aria-label="关闭对比">✕</view>
+      </view>
+
+      <view class="compare-matrix-body">
+        <view class="compare-matrix-table">
+          <!-- 车辆头部与缩略图 -->
+          <view class="compare-matrix-row compare-header-row">
+            <view class="compare-col-label">车型对比</view>
+            <view class="compare-col-car" wx:for="{{compareCars}}" wx:key="id">
+              <image class="compare-car-thumb" src="{{item.cover}}" mode="aspectFill" aria-hidden="true" />
+              <view class="compare-car-name">{{item.name}}</view>
+              <view class="compare-car-status {{item.statusClass}}">{{item.statusText}}</view>
+            </view>
+          </view>
+
+          <!-- 日租金 -->
+          <view class="compare-matrix-row">
+            <view class="compare-col-label">参考日租金</view>
+            <view class="compare-col-car" wx:for="{{compareCars}}" wx:key="id">
+              <view class="compare-price-val">{{item.priceText}}</view>
+            </view>
+          </view>
+
+          <!-- 驱动与排挡 -->
+          <view class="compare-matrix-row">
+            <view class="compare-col-label">传动/排挡</view>
+            <view class="compare-col-car" wx:for="{{compareCars}}" wx:key="id">
+              <view class="compare-spec-val">{{item.nickname || '—'}}</view>
+            </view>
+          </view>
+
+          <!-- 核心特色标签 -->
+          <view class="compare-matrix-row">
+            <view class="compare-col-label">特色亮点</view>
+            <view class="compare-col-car" wx:for="{{compareCars}}" wx:key="id">
+              <view class="compare-tags-wrap">
+                <text class="compare-tag-chip" wx:for="{{item.tags}}" wx:for-item="tag" wx:key="*this">{{tag}}</text>
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 车型快速替换选择器（如果有 3 辆以上收藏） -->
+      <view wx:if="{{list.length > 2}}" class="compare-switch-row">
+        <view class="compare-switch-label">替换对比车辆：</view>
+        <scroll-view class="compare-switch-scroll" scroll-x enable-flex>
+          <view
+            class="compare-switch-chip {{(compareCars[0].id === car.id || compareCars[1].id === car.id) ? 'compare-switch-chip-active' : ''}}"
+            wx:for="{{list}}"
+            wx:for-item="car"
+            wx:key="id"
+            data-carid="{{car.id}}"
+            bindtap="handleSwitchCompareCar"
+          >
+            <text>{{car.name}}</text>
+          </view>
+        </scroll-view>
+      </view>
+
+      <view class="compare-modal-actions">
+        <button
+          class="compare-action-btn ui-btn ui-btn-primary"
+          wx:for="{{compareCars}}"
+          wx:key="id"
+          data-id="{{item.id}}"
+          bindtap="handleCompareCarDetail"
+        >
+          查看 {{item.brand || item.name}} 详情
+        </button>
+      </view>
+    </view>
   </view>
   <core-nav active-key="favorites" />
 </view>

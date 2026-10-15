@@ -1,5 +1,5 @@
 const { trackEvent } = require("../../shared/analytics")
-const { normalizeRentalDiscountTiers } = require("../../shared/rentalPricing")
+const { normalizeRentalDiscountTiers, calculateRentalDiscount } = require("../../shared/rentalPricing")
 const { sanitizeAttribution, buildQuery, hasAttribution, isShareLanding } = require("../../shared/contentAttribution")
 const { formatToastTitle } = require("../../shared/uiFeedback")
 const { requestOperationConfig } = require("../../shared/operationConfigRequest")
@@ -40,6 +40,23 @@ function normalizeRentalTerms(raw) {
     result[key] = String(input[key] || "").trim()
     return result
   }, {})
+}
+
+function buildTrialPricing(baseDailyRate, days, discountTiers) {
+  const rate = Number(baseDailyRate) || 0
+  const count = Number(days) || 1
+  if (!rate || count <= 0) return null
+  const originalTotal = rate * count
+  const discountRes = calculateRentalDiscount(originalTotal, count, discountTiers)
+  return {
+    days: count,
+    originalTotal,
+    discountedTotal: discountRes.discountedTotal,
+    savingsAmount: discountRes.savingsAmount,
+    discountLabel: discountRes.discountTier ? discountRes.discountTier.label : "",
+    rateText: `￥${discountRes.discountedTotal}`,
+    savingsText: discountRes.savingsAmount > 0 ? `省 ￥${discountRes.savingsAmount}` : ""
+  }
 }
 
 function buildPricingOverview(car, rentalTermsInput) {
@@ -282,6 +299,8 @@ Page({
     wxKfReady: false,
     rentalTerms: normalizeRentalTerms(),
     pricingOverview: buildPricingOverview(null),
+    trialDays: 1,
+    trialPricing: null,
     pricingExpanded: false,
     rulesExpanded: false,
     trustExpanded: false,
@@ -751,10 +770,13 @@ Page({
     const nextImageIndex = isSameCar
       ? Math.min(Math.max(Number(this.data.currentImageIndex) || 0, 0), Math.max((viewModel.imageItems.length || 1) - 1, 0))
       : 0
+    const baseDailyRate = Number(targetCar.priceDay) || 0
+    const trialPricing = buildTrialPricing(baseDailyRate, this.data.trialDays || 1, targetCar.rentalDiscountTiers)
     this.setData({
       car: viewModel,
       detailVerified: Boolean(options && options.verified),
       pricingOverview: buildPricingOverview(targetCar, this.data.rentalTerms),
+      trialPricing,
       currentImageIndex: nextImageIndex,
       trustExpanded: false,
       loading: false,
@@ -1063,8 +1085,11 @@ Page({
     this.updateServiceHub()
     const city = (this.data.serviceHub && this.data.serviceHub.city) || this.data.car.location || ""
     const query = buildQuery(attribution)
-    const cityParam = city ? `${query ? "&" : ""}city=${encodeURIComponent(city)}` : ""
-    const fullQuery = [query, cityParam].filter(Boolean).join("")
+    const params = []
+    if (query) params.push(query)
+    if (city) params.push(`city=${encodeURIComponent(city)}`)
+    if (this.data.trialDays && this.data.trialDays > 1) params.push(`days=${this.data.trialDays}`)
+    const fullQuery = params.join("&")
     wx.navigateTo({
       url: `/pages/booking/booking?${fullQuery}`,
       fail: () => {
@@ -1076,6 +1101,18 @@ Page({
           icon: "none"
         })
       }
+    })
+  },
+
+  handleTrialDaysChange(event) {
+    const days = Number(event && event.currentTarget && event.currentTarget.dataset && event.currentTarget.dataset.days) || 1
+    if (days === this.data.trialDays) return
+    triggerHapticFeedback("selection")
+    const priceDay = (this.data.car && Number(this.data.car.priceDay)) || 0
+    const tiers = (this.data.car && this.data.car.rentalDiscountTiers) || []
+    this.setData({
+      trialDays: days,
+      trialPricing: buildTrialPricing(priceDay, days, tiers)
     })
   },
 

@@ -267,14 +267,28 @@ Page({
     const attribution = sanitizeAttribution(options)
     const carId = attribution.vehicleId || String((options && options.carId) || "").trim()
     this._initialCity = String((options && options.city) || "").trim()
-    this.setData({
+    const requestedDays = Math.max(1, Math.min(90, Number(options && options.days) || 0))
+    const initialData = {
       carId,
       attribution: sanitizeAttribution({ ...attribution, vehicleId: carId })
-    })
+    }
+    if (requestedDays > 1 && !this.data.form.startDate && !this.data.form.endDate) {
+      const today = formatDate(new Date())
+      const end = addDays(today, requestedDays)
+      const nextForm = { ...this.data.form, startDate: today, endDate: end }
+      initialData.form = nextForm
+      initialData.endMinDate = today
+      initialData.formProgress = buildFormProgress(nextForm, this.data.privacyAgreed)
+      initialData.bookingSummary = buildBookingSummary(nextForm, this.data.carName)
+    }
+    this.setData(initialData)
 
     this.loadSavedContact()
     this.loadOperationConfig()
     this.loadBookingCar(carId)
+    if (requestedDays > 1) {
+      this.checkVehicleAvailability()
+    }
     trackEvent("booking_start", carId)
     if (attribution.contentId) trackEvent("content_booking_start", carId, this.data.attribution)
 

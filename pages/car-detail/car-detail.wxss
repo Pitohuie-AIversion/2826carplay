@@ -294,3 +294,18 @@
 .privilege-item-desc { margin-top: 6rpx; color: #94a3b8; font-size: 20rpx; line-height: 1.45; }
 .privilege-confirm-btn { width: 100%; height: 80rpx; border-radius: 999rpx; font-size: 26rpx; font-weight: 600; }
 
+/* 快捷租期试算面板 */
+.pricing-trial-section { margin-top: 22rpx; padding: 20rpx 22rpx; border: 1rpx solid rgba(82, 143, 255, 0.22); border-radius: 20rpx; background: rgba(82, 143, 255, 0.05); }
+.pricing-trial-header { display: flex; align-items: center; justify-content: space-between; }
+.pricing-trial-title { color: #8faeff; font-size: 21rpx; font-weight: 600; letter-spacing: 1rpx; }
+.pricing-trial-chips { display: flex; align-items: center; gap: 10rpx; }
+.pricing-trial-chip { padding: 6rpx 16rpx; border: 1rpx solid rgba(255, 255, 255, 0.12); border-radius: 999rpx; background: rgba(255, 255, 255, 0.03); color: #94a3b8; font-size: 20rpx; transition: all 120ms ease; cursor: pointer; }
+.pricing-trial-chip-active { border-color: #528fff; background: rgba(82, 143, 255, 0.18); color: #ffffff; font-weight: 600; }
+.pricing-trial-result { display: flex; align-items: center; justify-content: space-between; margin-top: 14rpx; padding-top: 14rpx; border-top: 1rpx solid rgba(82, 143, 255, 0.12); }
+.pricing-trial-estimate { display: flex; align-items: baseline; gap: 8rpx; }
+.pricing-trial-count { color: #8ea1b8; font-size: 20rpx; }
+.pricing-trial-amount { color: #f5f7fa; font-size: 28rpx; font-weight: 700; }
+.pricing-trial-savings { padding: 2rpx 10rpx; border-radius: 6rpx; background: rgba(242, 153, 74, 0.18); color: #f5b46e; font-size: 18rpx; font-weight: 600; }
+.pricing-trial-tier-badge { padding: 4rpx 12rpx; border-radius: 8rpx; background: rgba(82, 143, 255, 0.16); color: #7cb2ff; font-size: 19rpx; font-weight: 500; }
+
+

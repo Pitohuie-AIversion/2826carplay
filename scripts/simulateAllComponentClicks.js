@@ -774,6 +774,13 @@ simulateClick("点击展开/关闭极境尊享权益保障弹窗 (handleTogglePr
   if (carDetailPage.data.privilegeModalVisible) throw new Error("权益保障弹窗未关闭")
 })
 
+simulateClick("点击切换租期试算天数:「3天」(handleTrialDaysChange: 3)", () => {
+  carDetailPage.handleTrialDaysChange(makeEvent({ days: 3 }))
+  if (carDetailPage.data.trialDays !== 3) throw new Error("试算租期未切换为 3 天")
+  carDetailPage.handleTrialDaysChange(makeEvent({ days: 1 }))
+  if (carDetailPage.data.trialDays !== 1) throw new Error("试算租期未恢复为 1 天")
+})
+
 simulateClick("点击展开/折叠价格说明手风琴 (handleTogglePricing)", () => {
   const prev = carDetailPage.data.pricingExpanded
   carDetailPage.handleTogglePricing()

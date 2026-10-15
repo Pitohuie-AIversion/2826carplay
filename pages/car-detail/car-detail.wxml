@@ -172,6 +172,25 @@
     <view class="pricing-discount-tiers" wx:if="{{pricingOverview.discountTiers.length}}">
       <view class="pricing-tier-chip" wx:for="{{pricingOverview.discountTiers}}" wx:key="minDays"><text class="pricing-tier-tag">连租满{{item.minDays}}天</text><text class="pricing-tier-rate">{{item.discountText}}</text></view>
     </view>
+    <view class="pricing-trial-section" wx:if="{{trialPricing}}">
+      <view class="pricing-trial-header">
+        <text class="pricing-trial-title">快捷租期试算</text>
+        <view class="pricing-trial-chips">
+          <view class="pricing-trial-chip {{trialDays === 1 ? 'pricing-trial-chip-active' : ''}}" data-days="1" bindtap="handleTrialDaysChange" aria-role="button" aria-label="试算1天费用">1天</view>
+          <view class="pricing-trial-chip {{trialDays === 3 ? 'pricing-trial-chip-active' : ''}}" data-days="3" bindtap="handleTrialDaysChange" aria-role="button" aria-label="试算3天费用">3天</view>
+          <view class="pricing-trial-chip {{trialDays === 7 ? 'pricing-trial-chip-active' : ''}}" data-days="7" bindtap="handleTrialDaysChange" aria-role="button" aria-label="试算7天费用">7天</view>
+          <view class="pricing-trial-chip {{trialDays === 30 ? 'pricing-trial-chip-active' : ''}}" data-days="30" bindtap="handleTrialDaysChange" aria-role="button" aria-label="试算30天费用">30天</view>
+        </view>
+      </view>
+      <view class="pricing-trial-result">
+        <view class="pricing-trial-estimate">
+          <text class="pricing-trial-count">{{trialPricing.days}}天预估：</text>
+          <text class="pricing-trial-amount">{{trialPricing.rateText}}</text>
+          <text wx:if="{{trialPricing.savingsText}}" class="pricing-trial-savings">{{trialPricing.savingsText}}</text>
+        </view>
+        <view wx:if="{{trialPricing.discountLabel}}" class="pricing-trial-tier-badge">{{trialPricing.discountLabel}}</view>
+      </view>
+    </view>
     <button wx:if="{{pricingOverview.feeItems.length}}" class="disclosure-button" bindtap="handleTogglePricing" hover-class="disclosure-button-pressed" aria-expanded="{{pricingExpanded}}">
       <text>{{pricingExpanded ? '收起费用说明' : '查看保障与其他费用'}}</text>
       <view class="disclosure-chevron {{pricingExpanded ? 'disclosure-chevron-open' : ''}}" aria-hidden="true"></view>

@@ -1,5 +1,6 @@
 const { createPerformanceHelpers } = require('../../shared/performance');
 const { formatToastTitle } = require("../../shared/uiFeedback")
+const { triggerHapticFeedback } = require("../../shared/hapticFeedback")
 const { buildVehicleDisplayIdentity } = require("../../shared/vehicle")
 const {
   activatePageNativeActions,
@@ -336,6 +337,7 @@ Page({
     ) {
       return
     }
+    triggerHapticFeedback("light")
     this.applyBookingList(this.data.list, {
       filter
     })
@@ -343,6 +345,7 @@ Page({
 
   handleShowAllBookings() {
     if (this.data.currentFilter !== "all") {
+      triggerHapticFeedback("light")
       this.applyBookingList(this.data.list, {
         filter: "all"
       })
@@ -537,5 +540,12 @@ Page({
       return
     }
     this.loadList()
+  },
+
+  onShareAppMessage() {
+    return {
+      title: "极境车库 · 我的尊享自驾旅程",
+      path: "/pages/bookings/bookings?channel=wechat_share"
+    }
   }
 })

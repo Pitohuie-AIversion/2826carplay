@@ -183,6 +183,59 @@ function isRemoteUrl(url) {
   return typeof url === "string" && (url.indexOf("http://") === 0 || url.indexOf("https://") === 0)
 }
 
+/**
+ * 为支持腾讯云数据万象 (CI) 的图片 URL 注入动态裁剪与 WebP 参数
+ * @param {string} url 原始图片地址
+ * @param {object} [options] 处理参数
+ * @param {number} [options.width] 目标宽度 (px)
+ * @param {number} [options.height] 目标高度 (px)
+ * @param {number} [options.quality=82] 压缩质量 (1-100)
+ * @param {string} [options.format='webp'] 目标格式 ('webp', 'jpg' 等)
+ * @param {string} [options.mode='thumbnail'] 缩放模式 ('thumbnail' | 'cut')
+ * @returns {string} 优化后的图片地址
+ */
+function formatOptimizedImageUrl(url, options = {}) {
+  if (!url || typeof url !== "string") return ""
+  if (
+    url.startsWith("wxfile://") ||
+    url.startsWith("http://usr/") ||
+    url.startsWith("http://tmp/") ||
+    url.startsWith("/") ||
+    url.startsWith("data:")
+  ) {
+    return url
+  }
+  if (url.includes("imageMogr2")) return url
+
+  const { width, height, quality = 82, format = "webp", mode = "thumbnail" } = options
+  const params = []
+
+  if (width && height) {
+    if (mode === "cut") {
+      params.push(`cut/${width}x${height}`)
+    } else {
+      params.push(`thumbnail/${width}x${height}`)
+    }
+  } else if (width) {
+    params.push(`thumbnail/${width}x`)
+  } else if (height) {
+    params.push(`thumbnail/x${height}`)
+  }
+
+  if (format) {
+    params.push(`format/${format}`)
+  }
+  if (quality) {
+    params.push(`quality/${quality}`)
+  }
+
+  if (params.length === 0) return url
+
+  const mogr = `imageMogr2/${params.join("/")}`
+  const separator = url.includes("?") ? "&" : "?"
+  return `${url}${separator}${mogr}`
+}
+
 function shouldCache(url) {
   return isCloudUrl(url) || isRemoteUrl(url)
 }
@@ -327,8 +380,10 @@ function executeDownload(url, options) {
 
     if (isRemoteUrl(url)) {
       try {
+        const downloadUrl =
+          options && options.imageTransform ? formatOptimizedImageUrl(url, options.imageTransform) : url
         wx.downloadFile({
-          url,
+          url: downloadUrl,
           success: (res) => {
             if (res && res.statusCode === 200 && res.tempFilePath) {
               handleSuccess(res.tempFilePath)
@@ -523,6 +578,7 @@ function unmarkImageLoaded(url) {
 }
 
 module.exports = {
+  formatOptimizedImageUrl,
   resolveImage,
   preloadImages,
   getCachedPath,

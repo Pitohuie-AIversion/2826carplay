@@ -315,6 +315,7 @@
         <view class="handover-record-head"><text>{{item.stageText}} v{{item.version}}</text><text>{{item.statusText}}</text></view>
         <view class="handover-record-meta">{{item.mileageKm}} km · {{item.energyText}} · 提交 {{item.submittedAtText || '—'}}</view>
         <view class="handover-record-note">已知损伤：{{item.damageNote || '—'}}</view>
+        <view wx:if="{{item.scratchSummary}}" class="handover-record-note">环检记录：{{item.scratchSummary}}</view>
         <view wx:if="{{item.additionalNote}}" class="handover-record-note">补充：{{item.additionalNote}}</view>
         <view wx:if="{{item.confirmedAtText}}" class="handover-confirmed">用户核对于 {{item.confirmedAtText}}</view>
         <view wx:if="{{item.photos.length}}" class="handover-photo-grid handover-photo-grid-readonly">

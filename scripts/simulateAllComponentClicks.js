@@ -675,6 +675,13 @@ simulateClick("点击排序切换:「价格从低到高」(handleSortChange)", (
   }
 })
 
+simulateClick("点击特色筛选芯片:「免押金」(handleQuickFilterTap)", () => {
+  garagePage.handleQuickFilterTap(makeEvent({ filter: "free_deposit" }))
+  if (garagePage.data.quickFilter !== "free_deposit") throw new Error("特色筛选未切换为 free_deposit")
+  garagePage.handleQuickFilterTap(makeEvent({ filter: "all" }))
+  if (garagePage.data.quickFilter !== "all") throw new Error("特色筛选未恢复为 all")
+})
+
 simulateClick("在车型搜索框中输入关键字并实时过滤 (handleSearchInput)", () => {
   garagePage.handleSearchInput(makeEvent({}, { value: "保时捷" }))
   if (garagePage.data.searchKeyword !== "保时捷") throw new Error("搜索关键字未保存")

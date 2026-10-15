@@ -243,6 +243,27 @@
       </view>
     </view>
   </view>
+  <view
+    wx:if="{{((!initialLoading && !loadingCars) || cars.length) && categorySummary.total}}"
+    class="garage-quick-chips-bar"
+  >
+    <view class="quick-chips-label">特色：</view>
+    <view class="quick-chips-list">
+      <view
+        wx:for="{{quickFilterOptions}}"
+        wx:key="id"
+        class="quick-chip {{quickFilter === item.id ? 'quick-chip-active' : ''}}"
+        data-filter="{{item.id}}"
+        bindtap="handleQuickFilterTap"
+        hover-class="quick-chip-pressed"
+        aria-role="button"
+        aria-pressed="{{quickFilter === item.id}}"
+        aria-label="按{{item.label}}快速筛选"
+      >
+        <text>{{item.label}}</text>
+      </view>
+    </view>
+  </view>
   <view wx:if="{{contentGuides.length}}" class="garage-guides ui-card">
     <view class="list-heading">
       <view><view class="list-kicker">SCENARIO GUIDES</view><view class="list-title">真实用车场景</view></view>

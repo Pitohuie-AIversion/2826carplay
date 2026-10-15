@@ -52,10 +52,49 @@ App({
     } catch (error) {
       return
     }
+
+    // 微信数据预拉取 (WeChat Background Fetch / Pre-fetch)
+    try {
+      if (typeof wx !== "undefined" && typeof wx.getBackgroundFetchData === "function") {
+        wx.getBackgroundFetchData({
+          fetchType: "pre",
+          success: (res) => {
+            if (res && res.fetchedData) {
+              try {
+                const parsed = typeof res.fetchedData === "string" ? JSON.parse(res.fetchedData) : res.fetchedData
+                if (parsed && (Array.isArray(parsed.list) || Array.isArray(parsed))) {
+                  this.globalData._prefetchedGarageList = parsed
+                  if (typeof this.onPrefetchGarageReady === "function") {
+                    this.onPrefetchGarageReady(parsed)
+                  }
+                }
+              } catch (e) {}
+            }
+          },
+          fail: () => {}
+        })
+      }
+      if (typeof wx !== "undefined" && typeof wx.onBackgroundFetchData === "function") {
+        wx.onBackgroundFetchData((res) => {
+          if (res && res.fetchedData) {
+            try {
+              const parsed = typeof res.fetchedData === "string" ? JSON.parse(res.fetchedData) : res.fetchedData
+              if (parsed && (Array.isArray(parsed.list) || Array.isArray(parsed))) {
+                this.globalData._prefetchedGarageList = parsed
+                if (typeof this.onPrefetchGarageReady === "function") {
+                  this.onPrefetchGarageReady(parsed)
+                }
+              }
+            } catch (e) {}
+          }
+        })
+      }
+    } catch (error) {}
   },
 
   globalData: {
     cloudEnvId: "cloud1-d8gtmns36320e045e",
-    nativeActionAppVisible: true
+    nativeActionAppVisible: true,
+    _prefetchedGarageList: null
   }
 })

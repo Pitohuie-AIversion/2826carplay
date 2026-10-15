@@ -778,7 +778,10 @@ Page({
       const item = items[entry.index]
       if (!item || !item.src) return
       if (item.displaySrc && item.displaySrc !== item.src) return
-      resolveImage(item.src, { priority: entry.priority })
+      resolveImage(item.src, {
+        priority: entry.priority,
+        imageTransform: { width: 1200, quality: 88, format: "webp" }
+      })
         .then((result) => {
           if (this._imageResolveSerial !== serial || !result || !result.localPath) return
           const car = this.data.car
@@ -937,6 +940,8 @@ Page({
       return
     }
 
+    triggerHapticFeedback("light")
+    const prevFavorited = this.data.favorited
     const nextFavorited = !this.data.favorited
     const vehicleId = String(this.data.carId || "").trim()
     const updateSerial = Number(this._favoriteUpdateSerial || 0) + 1
@@ -944,7 +949,10 @@ Page({
     this._favoriteStatusRequestId = Number(this._favoriteStatusRequestId || 0) + 1
     this.clearFavoriteStatusTimer()
     this.clearFavoriteUpdateTimer()
-    this.setData({ favoriteLoading: true })
+    this.setData({
+      favoriteLoading: true,
+      favorited: nextFavorited
+    })
 
     let settled = false
     const finishRequest = () => {
@@ -959,7 +967,10 @@ Page({
       if (!finishRequest()) {
         return
       }
-      this.setData({ favoriteLoading: false })
+      this.setData({
+        favoriteLoading: false,
+        favorited: prevFavorited
+      })
       wx.showToast({
         title: formatToastTitle(message, "收藏操作失败"),
         icon: "none"
@@ -982,7 +993,10 @@ Page({
         }
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
-          this.setData({ favoriteLoading: false })
+          this.setData({
+            favoriteLoading: false,
+            favorited: prevFavorited
+          })
           wx.showToast({
             title: formatToastTitle(result && result.message, "收藏操作失败"),
             icon: "none"
@@ -996,7 +1010,6 @@ Page({
         if (result.favorited) {
           trackEvent("favorite_add", vehicleId)
         }
-        triggerHapticFeedback("light")
         wx.showToast({
           title: result.favorited ? "已加入收藏" : "已取消收藏",
           icon: "success"

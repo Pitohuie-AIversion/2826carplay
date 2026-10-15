@@ -1972,6 +1972,11 @@ simulateClick("修改已开放的服务时间配置", () => {
   if (cmPage.data.form.serviceHoursText !== "每日 10:00–18:00") throw new Error("服务时间未编辑")
 })
 
+simulateClick("修改首页热搜推荐词配置 (handleInput: hotSearchKeywordsText)", () => {
+  cmPage.handleInput(makeEvent({ field: "hotSearchKeywordsText" }, { value: "迈凯伦、兰博基尼、阿斯顿马丁" }))
+  if (cmPage.data.form.hotSearchKeywordsText !== "迈凯伦、兰博基尼、阿斯顿马丁") throw new Error("热搜推荐词未编辑")
+})
+
 simulateClick("新增服务网点并编辑城市地址坐标和类型", () => {
   const count = cmPage.data.form.serviceHubs.length
   cmPage.handleAddServiceHub()

@@ -130,6 +130,11 @@
       <view class="field-meta"><view class="form-tip">显示在车库首页顶部的显目通告条，留空自动隐藏。</view><view class="field-counter">{{form.announcementText.length}} / 120</view></view>
     </view>
     <view class="form-item">
+      <view class="form-label">热搜推荐词</view>
+      <input class="form-input ui-input" value="{{form.hotSearchKeywordsText}}" data-field="hotSearchKeywordsText" disabled="{{loading || saving}}" bindinput="handleInput" maxlength="100" confirm-type="done" placeholder="例如 保时捷、法拉利、劳斯莱斯、敞篷、免押金" aria-label="首页热搜推荐词" />
+      <view class="form-tip">显示在车库首页搜索框下方，用顿号、逗号或空格隔开，留空恢复默认推荐词。</view>
+    </view>
+    <view class="form-item">
       <view class="form-label">城市列表</view>
       <textarea class="form-textarea ui-input" value="{{form.cityOptionsText}}" data-field="cityOptionsText" disabled="{{loading || saving}}" bindinput="handleInput" maxlength="300" placeholder="每行填写一个城市" aria-label="城市列表" />
       <view class="field-meta"><view class="form-tip">每行一个城市，最多20个，每项限20字；留空可清除城市列表。</view><view class="field-counter">{{form.cityOptionsText.length}} / 300</view></view>

@@ -28,6 +28,7 @@ const DEFAULT_CONFIG = {
   garagePageSubtitle: "甄选座驾，为每一次出发预留专属席位",
   announcementText: "",
   cityOptions: ["杭州", "上海"],
+  hotSearchKeywords: ["保时捷", "法拉利", "劳斯莱斯", "敞篷", "免押金"],
   faqContent: "",
   rulesContent: "",
   bookingStatusTemplateId: "",
@@ -65,6 +66,9 @@ function buildForm(config) {
     garagePageTitle: source.garagePageTitle || DEFAULT_CONFIG.garagePageTitle,
     garagePageSubtitle: normalizeGarageSubtitle(source.garagePageSubtitle),
     announcementText: source.announcementText || "",
+    hotSearchKeywordsText: Array.isArray(source.hotSearchKeywords) && source.hotSearchKeywords.length
+      ? source.hotSearchKeywords.join("、")
+      : DEFAULT_CONFIG.hotSearchKeywords.join("、"),
     cityOptionsText: Array.isArray(source.cityOptions) ? source.cityOptions.join("\n") : DEFAULT_CONFIG.cityOptions.join("\n"),
     faqContent: source.faqContent || DEFAULT_CONFIG.faqContent,
     rulesContent: source.rulesContent || DEFAULT_CONFIG.rulesContent,
@@ -101,6 +105,15 @@ function buildSubmitConfig(form) {
     garagePageTitle: source.garagePageTitle || "",
     garagePageSubtitle: source.garagePageSubtitle || "",
     announcementText: String(source.announcementText || "").trim(),
+    hotSearchKeywords: (() => {
+      const parsed = String(source.hotSearchKeywordsText || "")
+        .split(/[,，、\s]+/)
+        .map((item) => String(item || "").trim())
+        .filter(Boolean)
+        .filter((item, index, list) => list.indexOf(item) === index)
+        .slice(0, 10)
+      return parsed.length ? parsed : DEFAULT_CONFIG.hotSearchKeywords.slice()
+    })(),
     cityOptions,
     faqContent: source.faqContent || "",
     rulesContent: source.rulesContent || "",

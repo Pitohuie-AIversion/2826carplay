@@ -31,6 +31,7 @@ const DEFAULT_CONFIG = {
   garagePageSubtitle: "甄选座驾，为每一次出发预留专属席位",
   announcementText: "",
   cityOptions: ["杭州", "上海"],
+  hotSearchKeywords: ["保时捷", "法拉利", "劳斯莱斯", "敞篷", "免押金"],
   faqContent: "",
   rulesContent: "",
   bookingStatusTemplateId: "",
@@ -83,6 +84,12 @@ function normalizeConfig(raw) {
         : garagePageSubtitle,
     announcementText: normalizeText(input.announcementText, 120),
     cityOptions,
+    hotSearchKeywords: Array.isArray(input.hotSearchKeywords)
+      ? input.hotSearchKeywords
+          .map((item) => normalizeText(item, 20))
+          .filter(Boolean)
+          .slice(0, 10)
+      : DEFAULT_CONFIG.hotSearchKeywords.slice(),
     faqContent: normalizeText(input.faqContent, 1000) || DEFAULT_CONFIG.faqContent,
     rulesContent: normalizeText(input.rulesContent, 1000) || DEFAULT_CONFIG.rulesContent,
     bookingStatusTemplateId: normalizeText(input.bookingStatusTemplateId, 128),

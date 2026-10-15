@@ -356,6 +356,58 @@
       </view>
     </view>
   </view>
+  <view wx:if="{{booking.status === 'completed'}}" class="customer-satisfaction-card ui-card">
+    <view class="section-heading">
+      <view>
+        <view class="section-kicker">JOURNEY EXPERIENCE</view>
+        <view class="section-title">用车体验评价</view>
+      </view>
+      <view class="section-index">{{reviewSubmitted ? '已评价' : '期待您的反馈'}}</view>
+    </view>
+    <view class="satisfaction-body">
+      <view class="satisfaction-stars-row" aria-label="评分星级">
+        <block wx:for="{{[1, 2, 3, 4, 5]}}" wx:key="*this">
+          <view
+            class="satisfaction-star {{satisfactionRating >= item ? 'satisfaction-star-active' : ''}}"
+            data-rating="{{item}}"
+            bindtap="handleRatingTap"
+            aria-role="button"
+            aria-label="{{item}}星"
+          >★</view>
+        </block>
+        <text class="satisfaction-score-label">{{satisfactionRating === 5 ? '极其满意 · 尊享典范' : satisfactionRating === 4 ? '满意 · 品质出众' : satisfactionRating === 3 ? '良好 · 符合预期' : '需要提升'}}</text>
+      </view>
+      <view class="satisfaction-tags-list" wx:if="{{!reviewSubmitted}}">
+        <view
+          wx:for="{{satisfactionTags}}"
+          wx:key="*this"
+          class="satisfaction-tag {{selectedSatisfactionTags.includes(item) ? 'satisfaction-tag-active' : ''}}"
+          data-tag="{{item}}"
+          bindtap="handleSatisfactionTagTap"
+        >{{item}}</view>
+      </view>
+      <textarea
+        wx:if="{{!reviewSubmitted}}"
+        class="satisfaction-textarea"
+        maxlength="150"
+        value="{{satisfactionNote}}"
+        bindinput="handleSatisfactionNoteInput"
+        placeholder="分享您的驾驶体验与服务建议（选填）"
+        placeholder-class="input-placeholder"
+        aria-label="体验评价内容"
+      />
+      <view wx:if="{{reviewSubmitted}}" class="satisfaction-done-banner">
+        <view class="satisfaction-done-icon">✓</view>
+        <view class="satisfaction-done-text">感谢您的评价！我们将持续打磨尊享出行体验</view>
+      </view>
+      <button
+        wx:if="{{!reviewSubmitted}}"
+        class="satisfaction-submit-btn ui-btn ui-btn-primary"
+        loading="{{reviewSubmitting}}"
+        bindtap="handleSubmitSatisfactionReview"
+      >提交尊享评价</button>
+    </view>
+  </view>
   <view class="detail-actions-card ui-card">
     <view class="section-heading">
       <view>

@@ -155,6 +155,12 @@ Page({
     readinessExpanded: false,
     showVoucherModal: false,
     pickupLocationDisplay: "",
+    satisfactionRating: 5,
+    satisfactionTags: ["车况极佳", "管家专业", "准时交付", "体验尊享", "手续便捷"],
+    selectedSatisfactionTags: ["车况极佳", "体验尊享"],
+    satisfactionNote: "",
+    reviewSubmitted: false,
+    reviewSubmitting: false,
     editForm: {
       userName: "",
       phone: "",
@@ -305,6 +311,12 @@ Page({
     const quote = normalizeQuote(latestQuote)
     const pickupHandover = normalizeHandover(handovers && handovers.pickup)
     const returnHandover = normalizeHandover(handovers && handovers.return)
+    let savedReview = null
+    if (booking && booking.id && typeof wx !== "undefined" && typeof wx.getStorageSync === "function") {
+      try {
+        savedReview = wx.getStorageSync(`booking_review_${booking.id}`)
+      } catch (e) {}
+    }
     this.applyState({
       booking,
       initialLoading: false,
@@ -335,6 +347,10 @@ Page({
       readinessCard: getVehicleReadinessCard({ name: booking.vehicleName, category: booking.category }),
       bookingOccupancyTooLong: (Date.parse(`${booking.endDate}T00:00:00.000Z`) - Date.parse(`${booking.startDate}T00:00:00.000Z`)) / 86400000 + 1 > 47,
       pickupLocationDisplay: formatLocationDisplay(booking.pickupLocation || booking.location, booking.city),
+      reviewSubmitted: Boolean(savedReview && savedReview.rating),
+      satisfactionRating: (savedReview && savedReview.rating) || 5,
+      selectedSatisfactionTags: (savedReview && Array.isArray(savedReview.tags)) ? savedReview.tags : ["车况极佳", "体验尊享"],
+      satisfactionNote: (savedReview && savedReview.note) || "",
       editForm: {
         userName: booking.userName,
         phone: booking.phone,
@@ -1402,6 +1418,62 @@ Page({
   },
   handleCloseVoucherCard() {
     this.setData({ showVoucherModal: false })
+  },
+  handleRatingTap(event) {
+    if (this.data.reviewSubmitted) return
+    const rating = Math.max(1, Math.min(5, Number((event && event.currentTarget && event.currentTarget.dataset && event.currentTarget.dataset.rating) || 5)))
+    triggerHapticFeedback("light")
+    this.setData({ satisfactionRating: rating })
+  },
+  handleSatisfactionTagTap(event) {
+    if (this.data.reviewSubmitted) return
+    const tag = String((event && event.currentTarget && event.currentTarget.dataset && event.currentTarget.dataset.tag) || "").trim()
+    if (!tag) return
+    triggerHapticFeedback("selection")
+    const current = Array.isArray(this.data.selectedSatisfactionTags) ? [...this.data.selectedSatisfactionTags] : []
+    const idx = current.indexOf(tag)
+    if (idx >= 0) {
+      current.splice(idx, 1)
+    } else {
+      current.push(tag)
+    }
+    this.setData({ selectedSatisfactionTags: current })
+  },
+  handleSatisfactionNoteInput(event) {
+    if (this.data.reviewSubmitted) return
+    this.setData({ satisfactionNote: String((event && event.detail && event.detail.value) || "").slice(0, 150) })
+  },
+  handleSubmitSatisfactionReview() {
+    if (this.data.reviewSubmitted || this.data.reviewSubmitting) return
+    triggerHapticFeedback("medium")
+    const id = this.data.id || (this.data.booking && this.data.booking.id)
+    if (!id) return
+    this.setData({ reviewSubmitting: true })
+    const reviewPayload = {
+      rating: this.data.satisfactionRating,
+      tags: this.data.selectedSatisfactionTags,
+      note: this.data.satisfactionNote,
+      submittedAt: new Date().toISOString()
+    }
+    try {
+      if (typeof wx !== "undefined" && typeof wx.setStorageSync === "function") {
+        wx.setStorageSync(`booking_review_${id}`, reviewPayload)
+      }
+    } catch (e) {}
+
+    setTimeout(() => {
+      if (this._bookingDetailUnloaded) return
+      this.setData({
+        reviewSubmitting: false,
+        reviewSubmitted: true
+      })
+      if (typeof wx !== "undefined" && typeof wx.showToast === "function") {
+        wx.showToast({
+          title: "感谢您的尊享评价",
+          icon: "success"
+        })
+      }
+    }, 200)
   },
   isBookingDetailActive() {
     return this._bookingDetailUnloaded !== true

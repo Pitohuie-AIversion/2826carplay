@@ -1020,6 +1020,27 @@ simulateClick("点击网络重试加载单据 (handleRetryLoad)", () => {
   bookingDetailPage.handleRetryLoad()
 })
 
+simulateClick("点击用车体验星级评分 (handleRatingTap)", () => {
+  bookingDetailPage.setData({ reviewSubmitted: false })
+  bookingDetailPage.handleRatingTap(makeEvent({ rating: 5 }))
+  if (bookingDetailPage.data.satisfactionRating !== 5) throw new Error("评分未更新")
+})
+
+simulateClick("点击用车体验快捷标签 (handleSatisfactionTagTap)", () => {
+  bookingDetailPage.handleSatisfactionTagTap(makeEvent({ tag: "管家专业" }))
+  if (!bookingDetailPage.data.selectedSatisfactionTags.includes("管家专业")) throw new Error("标签未勾选")
+})
+
+simulateClick("输入用车体验评价建议 (handleSatisfactionNoteInput)", () => {
+  bookingDetailPage.handleSatisfactionNoteInput(makeEvent({}, { value: "车辆很新，服务贴心" }))
+  if (bookingDetailPage.data.satisfactionNote !== "车辆很新，服务贴心") throw new Error("评价输入未更新")
+})
+
+simulateClick("点击提交用车体验尊享评价 (handleSubmitSatisfactionReview)", () => {
+  bookingDetailPage.handleSubmitSatisfactionReview()
+  if (!bookingDetailPage.data.reviewSubmitting && !bookingDetailPage.data.reviewSubmitted) throw new Error("评价提交未触发")
+})
+
 logSuite("8. 主包页面: pages/favorites/favorites (我的收藏)")
 const favoritesPage = loadPage("pages/favorites/favorites")
 

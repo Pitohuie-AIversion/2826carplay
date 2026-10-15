@@ -14,6 +14,7 @@ const {
 } = require("../../shared/pageNativeAction")
 const { onNetworkReconnect } = require("../../shared/networkStatus")
 const { clearUnsaved, markUnsaved } = require("../../shared/unsavedChanges")
+const { calculateDynamicRentalPricing } = require("../../shared/rentalPricing")
 const LAST_BOOKING_CONTACT_KEY = "lastBookingContact"
 const BOOKING_CAR_LOAD_TIMEOUT_MS = 15 * 1000
 const AVAILABILITY_CHECK_TIMEOUT_MS = 12 * 1000
@@ -148,22 +149,43 @@ function buildBookingSummary(form, carName) {
   }
 }
 
-function calculateRentalEstimate(startDate, endDate, priceDay) {
+function calculateRentalEstimate(startDate, endDate, priceDay, options) {
   const hasDates = Boolean(startDate && endDate && endDate >= startDate)
   if (!hasDates) {
-    return { rentalDays: 0, estimateTotal: 0, estimateText: "" }
+    return { rentalDays: 0, estimateTotal: 0, estimateText: "", hasDiscount: false, savingsAmount: 0 }
   }
   const start = new Date(`${startDate}T00:00:00`)
   const end = new Date(`${endDate}T00:00:00`)
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) {
-    return { rentalDays: 0, estimateTotal: 0, estimateText: "" }
+    return { rentalDays: 0, estimateTotal: 0, estimateText: "", hasDiscount: false, savingsAmount: 0 }
   }
   const diffDays = Math.round((end.getTime() - start.getTime()) / 86400000)
   const rentalDays = Math.max(diffDays, 1)
   const dailyRate = Number(priceDay) || 0
-  const estimateTotal = dailyRate > 0 ? rentalDays * dailyRate : 0
-  const estimateText = estimateTotal > 0 ? `预估参考 ￥${estimateTotal}` : ""
-  return { rentalDays, estimateTotal, estimateText }
+  if (dailyRate <= 0) {
+    return { rentalDays, estimateTotal: 0, estimateText: "", hasDiscount: false, savingsAmount: 0 }
+  }
+
+  const tiers = Array.isArray(options && options.tiers) ? options.tiers : []
+  if (tiers.length > 0) {
+    const dynamic = calculateDynamicRentalPricing(dailyRate, startDate, endDate, { tiers })
+    if (dynamic && dynamic.hasDiscount && dynamic.savingsAmount > 0) {
+      const discountText = dynamic.discountLabel ? dynamic.discountLabel.replace(/^连租满\d+天\s*/, "") : ""
+      return {
+        rentalDays,
+        estimateTotal: dynamic.discountedTotal,
+        originalTotal: dynamic.originalTotal,
+        hasDiscount: true,
+        savingsAmount: dynamic.savingsAmount,
+        discountLabel: dynamic.discountLabel,
+        estimateText: `预估参考 ￥${dynamic.discountedTotal}（已享${discountText}，省 ￥${dynamic.savingsAmount}）`
+      }
+    }
+  }
+
+  const estimateTotal = rentalDays * dailyRate
+  const estimateText = `预估参考 ￥${estimateTotal}`
+  return { rentalDays, estimateTotal, estimateText, hasDiscount: false, savingsAmount: 0 }
 }
 
 Page({
@@ -488,6 +510,7 @@ Page({
     const carName = car ? car.name || "" : ""
     const priceDay = car ? Number(car.priceDay) || 0 : 0
     this._carPriceDay = priceDay
+    this._rentalDiscountTiers = car && Array.isArray(car.rentalDiscountTiers) ? car.rentalDiscountTiers : []
     const city = this._cityEdited ? this.data.form.city : this._initialCity || (car ? car.location || "" : "")
     const nextForm = {
       ...this.data.form,
@@ -501,7 +524,7 @@ Page({
       "form.city": nextForm.city,
       formProgress: buildFormProgress(nextForm, this.data.privacyAgreed),
       bookingSummary: buildBookingSummary(nextForm, carName),
-      rentalEstimate: calculateRentalEstimate(nextForm.startDate, nextForm.endDate, priceDay)
+      rentalEstimate: calculateRentalEstimate(nextForm.startDate, nextForm.endDate, priceDay, { tiers: this._rentalDiscountTiers })
     })
 
     this.syncCitySelection()
@@ -593,7 +616,7 @@ Page({
 
       nextData.formProgress = buildFormProgress(nextForm, this.data.privacyAgreed)
       nextData.bookingSummary = buildBookingSummary(nextForm, this.data.carName)
-      nextData.rentalEstimate = calculateRentalEstimate(nextForm.startDate, nextForm.endDate, this.data.priceDay || this._carPriceDay)
+      nextData.rentalEstimate = calculateRentalEstimate(nextForm.startDate, nextForm.endDate, this.data.priceDay || this._carPriceDay, { tiers: this._rentalDiscountTiers })
       this.setData(nextData)
       this.checkVehicleAvailability()
       return
@@ -608,7 +631,7 @@ Page({
       submitRequestId: "",
       formProgress: buildFormProgress(nextForm, this.data.privacyAgreed),
       bookingSummary: buildBookingSummary(nextForm, this.data.carName),
-      rentalEstimate: calculateRentalEstimate(nextForm.startDate, nextForm.endDate, this.data.priceDay || this._carPriceDay)
+      rentalEstimate: calculateRentalEstimate(nextForm.startDate, nextForm.endDate, this.data.priceDay || this._carPriceDay, { tiers: this._rentalDiscountTiers })
     })
     markUnsaved(this)
     this.checkVehicleAvailability()
@@ -640,7 +663,7 @@ Page({
       submitRequestId: "",
       formProgress: buildFormProgress(nextForm, this.data.privacyAgreed),
       bookingSummary: buildBookingSummary(nextForm, this.data.carName),
-      rentalEstimate: calculateRentalEstimate(nextForm.startDate, nextForm.endDate, this.data.priceDay || this._carPriceDay)
+      rentalEstimate: calculateRentalEstimate(nextForm.startDate, nextForm.endDate, this.data.priceDay || this._carPriceDay, { tiers: this._rentalDiscountTiers })
     }, () => this.checkVehicleAvailability())
     markUnsaved(this)
   },

@@ -176,7 +176,7 @@ function calculateDynamicRentalPricing(baseDailyRate, startDate, endDate, option
       rate
     })
 
-    currentDate = addDays(currentDate, 1)
+    currentDate = internalAddDays(currentDate, 1)
   }
 
   const discountInfo = calculateRentalDiscount(originalTotal, daysCount, tiers)

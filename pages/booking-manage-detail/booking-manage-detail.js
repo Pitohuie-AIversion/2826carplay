@@ -258,6 +258,7 @@ Page({
     createdAtText: "",
     updatedAtText: "",
     adminRemarkUpdatedAtText: "",
+    customerReview: null,
     conflicts: [],
     conflictTotal: 0,
     conflictsTruncated: false,
@@ -439,11 +440,19 @@ Page({
       label: tier.label,
       discountPercent: Math.round((1 - tier.discountRate) * 100)
     } : null
+    let customerReview = booking.customerReview || null
+    if (!customerReview && booking.id && typeof wx !== "undefined" && typeof wx.getStorageSync === "function") {
+      try {
+        const stored = wx.getStorageSync(`booking_review_${booking.id}`)
+        if (stored && stored.rating) customerReview = stored
+      } catch (e) {}
+    }
     this.applyState({
       booking,
       rentalDays,
       quoteDateRangeTooLong: rentalDays > 47,
       recommendedDiscount,
+      customerReview,
       remarkDirty: false,
       initialLoading: false,
       loading: false,

@@ -697,6 +697,13 @@ simulateClick("点击搜索框清空按钮 (handleClearSearch)", () => {
   if (garagePage.data.searchKeyword !== "") throw new Error("搜索关键字未清空")
 })
 
+simulateClick("点击车库热搜推荐词芯片 (handleHotSearchTap)", () => {
+  garagePage.handleHotSearchTap(makeEvent({ keyword: "911" }))
+  if (garagePage.data.searchKeyword !== "911") throw new Error("热搜词未应用到 searchKeyword")
+  garagePage.handleClearSearch()
+  if (garagePage.data.searchKeyword !== "") throw new Error("搜索词未清空")
+})
+
 simulateClick("点击推荐场景指南入口 (handleContentGuideTap)", () => {
   garagePage.handleContentGuideTap(makeEvent({ slug: "weekend-short-trip-prep-2026" }))
 })

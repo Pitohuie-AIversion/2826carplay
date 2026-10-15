@@ -14,6 +14,10 @@
     </view>
     <view class="page-desc">{{pageSubtitle}}</view>
   </view>
+  <view wx:if="{{isOffline}}" class="garage-offline-banner">
+    <view class="offline-badge-dot" aria-hidden="true"></view>
+    <text>网络已断开，当前正在浏览离线缓存车源</text>
+  </view>
   <view wx:if="{{(!initialLoading && !loadingCars) || cars.length}}" class="garage-search ui-card">
     <view class="search-symbol" aria-hidden="true"></view>
     <input
@@ -34,6 +38,23 @@
       hover-class="search-clear-pressed"
       aria-label="清空车辆搜索关键词"
     ><view class="search-clear-icon" aria-hidden="true"></view></button>
+  </view>
+  <view wx:if="{{((!initialLoading && !loadingCars) || cars.length) && !searchKeyword && hotSearchKeywords.length}}" class="garage-hot-tags">
+    <view class="hot-tags-label">热搜：</view>
+    <view class="hot-tags-list">
+      <view
+        wx:for="{{hotSearchKeywords}}"
+        wx:key="*this"
+        class="hot-tag-chip"
+        data-keyword="{{item}}"
+        bindtap="handleHotSearchTap"
+        hover-class="hot-tag-chip-pressed"
+        aria-role="button"
+        aria-label="快速搜索{{item}}"
+      >
+        <text>{{item}}</text>
+      </view>
+    </view>
   </view>
   <view wx:if="{{((!initialLoading && !loadingCars) || cars.length) && cityOptions.length}}" class="garage-city-bar">
     <view class="city-chips-label">交付中心：</view>

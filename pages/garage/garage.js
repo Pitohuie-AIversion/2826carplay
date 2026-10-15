@@ -9,7 +9,7 @@ const {
   isPageNativeActionActive
 } = require("../../shared/pageNativeAction")
 const { preloadImages, clearExpiredCache } = require("../../shared/imageCache")
-const { onNetworkReconnect } = require("../../shared/networkStatus")
+const { onNetworkReconnect, onNetworkStatusChange, getNetworkState } = require("../../shared/networkStatus")
 const { triggerHapticFeedback } = require("../../shared/hapticFeedback")
 const { createPerformanceHelpers } = require("../../shared/performance")
 const {
@@ -262,6 +262,8 @@ Page({
     searchKeyword: "",
     searchResultCount: 0,
     searchDebouncing: false,
+    isOffline: false,
+    hotSearchKeywords: ["保时捷", "法拉利", "劳斯莱斯", "敞篷", "免押金"],
     categories: [],
     cars: [],
     filteredCars: [],
@@ -343,7 +345,19 @@ Page({
       } catch (error) {}
     }
 
+    try {
+      const net = getNetworkState()
+      if (net && net.isConnected === false) {
+        this.setData({ isOffline: true })
+      }
+    } catch (e) {}
+
+    this._unsubscribeNetworkStatus = onNetworkStatusChange((res) => {
+      this.setData({ isOffline: !res.isConnected })
+    })
+
     this._unsubscribeNetwork = onNetworkReconnect(() => {
+      this.setData({ isOffline: false })
       if (this.data.loadError) {
         this.loadCars()
       }
@@ -488,6 +502,9 @@ Page({
         }
         if (Array.isArray(config.cityOptions)) {
           nextState.cityOptions = config.cityOptions
+        }
+        if (Array.isArray(config.hotSearchKeywords) && config.hotSearchKeywords.length) {
+          nextState.hotSearchKeywords = config.hotSearchKeywords
         }
         const resetCity = Array.isArray(config.cityOptions) && this.data.selectedCity &&
           !config.cityOptions.includes(this.data.selectedCity)
@@ -655,6 +672,10 @@ Page({
   },
 
   onUnload() {
+    if (typeof this._unsubscribeNetworkStatus === "function") {
+      this._unsubscribeNetworkStatus()
+      this._unsubscribeNetworkStatus = null
+    }
     const app = typeof getApp === "function" ? getApp() : null
     if (app && app.onPrefetchGarageReady) {
       app.onPrefetchGarageReady = null
@@ -1003,6 +1024,26 @@ Page({
       this.data.sortBy,
       filterId
     )
+  },
+
+  handleHotSearchTap(event) {
+    const keyword = String((event && event.currentTarget && event.currentTarget.dataset && event.currentTarget.dataset.keyword) || "").trim()
+    if (!keyword) return
+    triggerHapticFeedback("light")
+    this.setData({ searchKeyword: keyword, searchDebouncing: false })
+    this.filterCars(
+      this.data.currentCategory,
+      this.data.availableOnly,
+      keyword,
+      null,
+      false,
+      this.data.selectedCity,
+      this.data.sortBy,
+      this.data.quickFilter
+    )
+    if (canLoadGarageRemotely()) {
+      this.loadCars({ force: true, keyword, sortBy: this.data.sortBy })
+    }
   },
 
   handleLoadMore() {

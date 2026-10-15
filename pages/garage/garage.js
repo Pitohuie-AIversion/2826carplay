@@ -1168,6 +1168,23 @@ Page({
     this.setData({ announcementDismissed: true })
   },
 
+  handleResetAllFilters() {
+    triggerHapticFeedback("selection")
+    this.clearSearchDebounce()
+    this.applyState({
+      currentCategory: "all",
+      selectedCity: "",
+      quickFilter: "all",
+      availableOnly: false,
+      sortBy: "default",
+      searchKeyword: ""
+    })
+    this.filterCars("all", false, "", null, false, "", "default", "all")
+    if (canLoadGarageRemotely()) {
+      this.loadCars({ force: true, category: "all", city: "", keyword: "", availableOnly: false, sortBy: "default", quickFilter: "all" })
+    }
+  },
+
   onShareAppMessage() {
     trackEvent("share")
     const params = ["channel=wechat_share"]
@@ -1177,6 +1194,18 @@ Page({
     return {
       title: "极境车库",
       path: `/pages/garage/garage?${params.join("&")}`
+    }
+  },
+
+  onShareTimeline() {
+    trackEvent("share")
+    const params = ["channel=timeline_share"]
+    if (this.data.currentCategory && this.data.currentCategory !== "all") params.push(`category=${encodeURIComponent(this.data.currentCategory)}`)
+    if (this.data.selectedCity) params.push(`city=${encodeURIComponent(this.data.selectedCity)}`)
+    if (this.data.sortBy && this.data.sortBy !== "default") params.push(`sortBy=${encodeURIComponent(this.data.sortBy)}`)
+    return {
+      title: `${this.data.pageTitle || "极境车库"} · ${this.data.pageSubtitle || "甄选座驾，为每一次出发预留专属席位"}`,
+      query: params.join("&")
     }
   }
 })

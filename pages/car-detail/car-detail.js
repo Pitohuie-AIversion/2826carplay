@@ -1273,19 +1273,42 @@ Page({
 
   onShareAppMessage() {
     const car = this.data.car
-
     trackEvent("share", car && car.id)
 
     if (!car) {
       return {
-        title: "极境车库",
+        title: "极境车库 · 尊享豪华座驾",
         path: "/pages/garage/garage"
       }
     }
 
+    const titleParts = [car.brand, car.name].filter(Boolean)
+    const title = titleParts.length ? titleParts.join(" ") : "极境尊享座驾"
+    const priceText = car.priceText || (car.priceDay ? `￥${car.priceDay}/天` : "")
+    const shareTitle = priceText ? `${title} | ${priceText}` : title
+    const imageUrl = car.cover || (car.images && car.images[0]) || ""
+
     return {
-      title: `${car.nickname} ${car.name}`,
-      path: `/pages/car-detail/car-detail?${buildQuery({ ...this.data.attribution, channel: "wechat_share", vehicleId: car.id })}`
+      title: shareTitle,
+      path: `/pages/car-detail/car-detail?${buildQuery({ ...this.data.attribution, channel: "wechat_share", vehicleId: car.id })}`,
+      imageUrl: imageUrl || undefined
+    }
+  },
+
+  onShareTimeline() {
+    const car = this.data.car
+    if (!car) {
+      return {
+        title: "极境车库 · 尊享豪华座驾",
+        query: ""
+      }
+    }
+    const title = [car.brand, car.name].filter(Boolean).join(" ") || "极境尊享座驾"
+    const priceText = car.priceText || (car.priceDay ? `￥${car.priceDay}/天` : "")
+    return {
+      title: priceText ? `${title} | ${priceText} - 极境车库` : `${title} - 极境车库`,
+      query: buildQuery({ ...this.data.attribution, channel: "timeline_share", vehicleId: car.id }),
+      imageUrl: car.cover || (car.images && car.images[0]) || ""
     }
   },
 

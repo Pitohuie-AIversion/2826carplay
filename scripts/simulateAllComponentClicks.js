@@ -720,6 +720,14 @@ simulateClick("点击关闭车库公告栏 (handleDismissAnnouncement)", () => {
   if (!garagePage.data.announcementDismissed) throw new Error("公告未被成功关闭")
 })
 
+simulateClick("点击空态「重置全部筛选」(handleResetAllFilters)", () => {
+  garagePage.setData({ currentCategory: "supercar", selectedCity: "上海", quickFilter: "under_2000" })
+  garagePage.handleResetAllFilters()
+  if (garagePage.data.currentCategory !== "all" || garagePage.data.selectedCity !== "" || garagePage.data.quickFilter !== "all") {
+    throw new Error("筛选重置未恢复默认状态")
+  }
+})
+
 simulateClick("点击推荐场景指南入口 (handleContentGuideTap)", () => {
   garagePage.handleContentGuideTap(makeEvent({ slug: "weekend-short-trip-prep-2026" }))
 })

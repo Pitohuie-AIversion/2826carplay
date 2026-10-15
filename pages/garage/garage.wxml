@@ -362,6 +362,13 @@
     >
       <view class="garage-action-content"><view class="garage-action-native-icon garage-status-native-icon" aria-hidden="true"></view><text>查看全部状态</text></view>
     </button>
+    <button
+      wx:elif="{{quickFilter !== 'all' || selectedCity || currentCategory !== 'all'}}"
+      class="ui-btn ui-btn-ghost empty-secondary-action"
+      bindtap="handleResetAllFilters"
+    >
+      <view class="garage-action-content"><view class="garage-action-native-icon garage-clear-native-icon" aria-hidden="true"></view><text>重置全部筛选</text></view>
+    </button>
   </view>
   <core-nav active-key="garage" />
 </view>

@@ -2,6 +2,7 @@ const { createPerformanceHelpers } = require('../../shared/performance');
 const { trackEvent } = require("../../shared/analytics")
 const { sanitizeAttribution } = require("../../shared/contentAttribution")
 const { formatToastTitle } = require("../../shared/uiFeedback")
+const { triggerHapticFeedback } = require("../../shared/hapticFeedback")
 const { requestOperationConfig } = require("../../shared/operationConfigRequest")
 const { getCityHubs, normalizeCity } = require("../../shared/locations")
 const { normalizeServiceConfig } = require("../../shared/serviceConfig")
@@ -217,6 +218,8 @@ Page({
     pickerCityIndex: 0,
     pickupHubs: [],
     serviceHubs: [],
+    servicePhone: "",
+    serviceHoursText: "",
     operationConfigLoading: false,
     operationConfigFailed: false,
     pickupHubIndex: 0,
@@ -368,7 +371,7 @@ Page({
       const form = this.data.form || {}
       const selectedHub = getCityHubs(form.city, this.data.serviceHubs).find((hub) => hub.name === form.pickupLocation)
       if (selectedHub) this._pendingPickupSelection = { city: normalizeCity(form.city), id: selectedHub.id }
-      this.setData({ operationConfigLoading: false, operationConfigFailed: true, cityOptions: [], serviceHubs: [], bookingStatusTemplateId: "", subscriptionEnabled: false })
+      this.setData({ operationConfigLoading: false, operationConfigFailed: true, cityOptions: [], serviceHubs: [], servicePhone: "", serviceHoursText: "", bookingStatusTemplateId: "", subscriptionEnabled: false })
       this.syncCitySelection()
     }
     this._cancelOperationConfigRequest = requestOperationConfig({
@@ -380,6 +383,8 @@ Page({
           privacyTip: config.bookingPrivacyTip || this.data.privacyTip,
           cityOptions: Array.isArray(config.cityOptions) ? config.cityOptions : [],
           serviceHubs: normalizeServiceConfig(config).serviceHubs,
+          servicePhone: String(config.servicePhone || "").trim(),
+          serviceHoursText: String(config.serviceHoursText || "").trim(),
           bookingStatusTemplateId: String(config.bookingStatusTemplateId || "").trim(),
           subscriptionEnabled: Boolean(String(config.bookingStatusTemplateId || "").trim())
         })
@@ -1277,5 +1282,36 @@ Page({
       return
     }
     this.loadBookingCar(this.data.carId)
+  },
+
+  handleCallServicePhone() {
+    const phone = String(this.data.servicePhone || "").trim()
+    if (!phone) {
+      wx.showToast({
+        title: "专属管家电话暂未提供",
+        icon: "none"
+      })
+      return
+    }
+    triggerHapticFeedback("light")
+    trackEvent("booking_consult_call", this.data.carId)
+    const action = beginPageNativeAction(this, { requireCurrent: true })
+    wx.makePhoneCall({
+      phoneNumber: phone,
+      fail: (error) => {
+        if (!isPageNativeActionActive(this, action)) {
+          return
+        }
+        const message = error && (error.errMsg || error.message)
+        if (message && String(message).includes("cancel")) {
+          return
+        }
+        wx.showModal({
+          title: "拨号失败",
+          content: `请联系专属管家：${phone}`,
+          showCancel: false
+        })
+      }
+    })
   }
 })

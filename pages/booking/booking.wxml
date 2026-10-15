@@ -91,6 +91,10 @@
       </view>
     </view>
   </view>
+  <button wx:if="{{servicePhone}}" class="success-concierge-btn ui-btn ui-btn-ghost action-with-icon" bindtap="handleCallServicePhone" aria-label="致电专属管家咨询 {{servicePhone}}">
+    <view class="success-action-icon success-action-phone" aria-hidden="true"><view class="success-phone-handle"></view></view>
+    <text>致电专属管家 · {{servicePhone}}</text>
+  </button>
   <button class="success-primary ui-btn ui-btn-primary action-with-icon" bindtap="handleViewSubmittedBooking">
     <view class="success-action-icon success-action-document" aria-hidden="true"><view class="success-action-document-line"></view></view>
     <text>查看我的预约</text>
@@ -388,6 +392,16 @@
       <view class="confirmation-tip-dot"></view>
       <view>请确认以上信息。提交后可在“我的预约”查看进度，进行中可修改联系方式。</view>
     </view>
+  </view>
+  <view wx:if="{{servicePhone}}" class="booking-concierge-card ui-card" bindtap="handleCallServicePhone" hover-class="booking-card-pressed" aria-role="button" aria-label="致电专属管家咨询 {{servicePhone}}">
+    <view class="concierge-icon-wrap" aria-hidden="true">
+      <view class="concierge-phone-icon"></view>
+    </view>
+    <view class="concierge-content">
+      <view class="concierge-title">特殊行程定制 / 疑问咨询 · 致电专属管家</view>
+      <view class="concierge-desc">{{servicePhone}}<text wx:if="{{serviceHoursText}}"> · {{serviceHoursText}}</text></view>
+    </view>
+    <view class="concierge-arrow" aria-hidden="true"></view>
   </view>
   <view class="submit-section">
     <view wx:if="{{submitErrorText}}" class="field-hint">{{submitErrorText}}</view>

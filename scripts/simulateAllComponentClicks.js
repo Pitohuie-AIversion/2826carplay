@@ -932,6 +932,13 @@ simulateClick("点击返回车库主页 (handleBackGarage)", () => {
   bookingPage.handleBackGarage()
 })
 
+simulateClick("点击致电专属管家电话咨询 (handleCallServicePhone)", () => {
+  bookingPage.handleCallServicePhone()
+  if (!wx._lastPhoneCall || wx._lastPhoneCall.phoneNumber !== "18800001111") {
+    throw new Error("未正确拨打专属管家咨询电话")
+  }
+})
+
 logSuite("6. 主包页面: pages/bookings/bookings (我的预约列表)")
 const bookingsPage = loadPage("pages/bookings/bookings")
 

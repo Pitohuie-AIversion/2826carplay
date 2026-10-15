@@ -1933,6 +1933,18 @@ simulateClick("点击运营概览空路由容错 (handleRouteTap: empty)", () =>
   ooPage.handleRouteTap(makeEvent({ url: "" }))
 })
 
+simulateClick("点击快捷运维通道: 录入新车 (handleRouteTap: quickVehicleCreate)", () => {
+  ooPage.handleRouteTap(makeEvent({ url: "/pages-admin/vehicle-create/vehicle-create" }))
+})
+
+simulateClick("点击快捷运维通道: 参数配置 (handleRouteTap: quickConfigManage)", () => {
+  ooPage.handleRouteTap(makeEvent({ url: "/pages-admin/config-manage/config-manage" }))
+})
+
+simulateClick("点击快捷运维通道: 健康巡检 (handleRouteTap: quickSystemHealth)", () => {
+  ooPage.handleRouteTap(makeEvent({ url: "/pages-admin/system-health/system-health" }))
+})
+
 logSuite("21. 分包页面: pages-admin/analytics-manage/analytics-manage (数据分析与指标统计)")
 const amPage = loadPage("pages-admin/analytics-manage/analytics-manage")
 amPage.setData({ loading: false, cleanupLoading: false, pageAuthorized: true })

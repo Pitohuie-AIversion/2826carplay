@@ -8,6 +8,7 @@ const {
 const { STATUS_TEXT_MAP: BOOKING_STATUS_LABELS } = require("../../shared/bookingStatus")
 const { formatShortTime } = require("../../shared/formatTime")
 const { computeAlerts } = require("../../shared/operationAlerts")
+const { triggerHapticFeedback } = require("../../shared/hapticFeedback")
 const VEHICLE_STATUS_LABELS = {
   idle: "可预约",
   active: "使用中",
@@ -172,6 +173,7 @@ Page({
   },
   handleRefresh() {
     if (!this.data.loading && !this.data.refreshing) {
+      triggerHapticFeedback("light")
       this.loadOverview({ refreshing: true })
     }
   },

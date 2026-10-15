@@ -114,19 +114,28 @@ function buildPerformanceHighlights(car) {
   const rawPerf = source.performance && typeof source.performance === "object" ? source.performance : {}
 
   const fallbackHighlights = ["具体配置以车辆实车为准", "建议到店体验后确认功能"]
+  const fallbackCabinHighlights = [
+    "尊享奢华级座舱包覆与精细工艺",
+    "多区域独立自动恒温空调系统",
+    "多向电动调节与人体工程学运动座椅",
+    "高保真殿堂级环绕声学音响系统",
+    "全景泊车影像辅助与主动安全护航"
+  ]
 
   const rawAcceleration = String(rawPerf.acceleration != null ? rawPerf.acceleration : source.acceleration == null ? "" : source.acceleration).trim()
   const rawHorsepower = String(rawPerf.horsepower != null ? rawPerf.horsepower : source.horsepower == null ? "" : source.horsepower).trim()
   const rawDrivetrain = String(rawPerf.drivetrain != null ? rawPerf.drivetrain : source.drivetrain == null ? "" : source.drivetrain).trim()
   const rawTorque = String(rawPerf.torque != null ? rawPerf.torque : source.torque == null ? "" : source.torque).trim()
   const rawHighlights = Array.isArray(rawPerf.highlights) && rawPerf.highlights.length ? rawPerf.highlights.slice() : null
+  const rawCabinHighlights = Array.isArray(rawPerf.cabinHighlights) && rawPerf.cabinHighlights.length ? rawPerf.cabinHighlights.slice() : fallbackCabinHighlights.slice()
 
   return {
     acceleration: rawAcceleration || "—",
     horsepower: rawHorsepower || "—",
     drivetrain: rawDrivetrain || "—",
     torque: rawTorque || "—",
-    highlights: rawHighlights || fallbackHighlights.slice()
+    highlights: rawHighlights || fallbackHighlights.slice(),
+    cabinHighlights: rawCabinHighlights
   }
 }
 
@@ -276,6 +285,7 @@ Page({
     pricingExpanded: false,
     rulesExpanded: false,
     trustExpanded: false,
+    specTab: "perf",
     carId: "",
     car: null,
     detailVerified: false,
@@ -1086,6 +1096,13 @@ Page({
       this._trustProfileViewTracked = true
       trackEvent("trusted_profile_view", this.data.carId)
     }
+  },
+
+  handleSpecTabChange(event) {
+    const tab = String((event && event.currentTarget && event.currentTarget.dataset && event.currentTarget.dataset.tab) || "perf")
+    if (this.data.specTab === tab) return
+    triggerHapticFeedback("selection")
+    this.setData({ specTab: tab })
   },
 
   handleOpenCustomerService() {

@@ -256,11 +256,36 @@
         <view class="perf-metric-value">{{car.performance.torque}}</view>
       </view>
     </view>
-    <view class="perf-highlights-box">
+    <view class="perf-tabs-row" aria-role="tablist">
+      <view
+        class="perf-tab-btn {{specTab === 'perf' ? 'perf-tab-btn-active' : ''}}"
+        data-tab="perf"
+        bindtap="handleSpecTabChange"
+        aria-role="tab"
+        aria-selected="{{specTab === 'perf'}}"
+      >动力驾控</view>
+      <view
+        class="perf-tab-btn {{specTab === 'cabin' ? 'perf-tab-btn-active' : ''}}"
+        data-tab="cabin"
+        bindtap="handleSpecTabChange"
+        aria-role="tab"
+        aria-selected="{{specTab === 'cabin'}}"
+      >奢享座舱</view>
+    </view>
+    <view class="perf-highlights-box" wx:if="{{specTab === 'perf'}}">
       <view class="perf-highlights-title">核心驾控配置</view>
       <view class="perf-tag-list">
         <view class="perf-tag-item" wx:for="{{car.performance.highlights}}" wx:key="*this">
           <view class="perf-tag-dot" aria-hidden="true"></view>
+          <text>{{item}}</text>
+        </view>
+      </view>
+    </view>
+    <view class="perf-highlights-box" wx:if="{{specTab === 'cabin'}}">
+      <view class="perf-highlights-title">奢适座舱体验</view>
+      <view class="perf-tag-list">
+        <view class="perf-tag-item" wx:for="{{car.performance.cabinHighlights}}" wx:key="*this">
+          <view class="perf-tag-dot perf-tag-dot-gold" aria-hidden="true"></view>
           <text>{{item}}</text>
         </view>
       </view>

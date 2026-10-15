@@ -35,6 +35,13 @@ function garageQueryKey(filters) {
 function matchesQuickFilter(car, filterId) {
   if (!filterId || filterId === "all") return true
   const source = car && typeof car === "object" ? car : {}
+  const price = Number(source.priceDay) || 0
+  if (filterId === "under_2000") {
+    return price > 0 && price <= 2000
+  }
+  if (filterId === "high_end") {
+    return price >= 3000
+  }
   const tags = Array.isArray(source.tags) ? source.tags.map((t) => String(t || "").toLowerCase()) : []
   const name = String(source.name || "").toLowerCase()
   const nickname = String(source.nickname || "").toLowerCase()
@@ -253,9 +260,11 @@ Page({
     quickFilterOptions: [
       { id: "all", label: "全部特色" },
       { id: "free_deposit", label: "免押金" },
+      { id: "under_2000", label: "￥2000内" },
       { id: "new_energy", label: "纯电/混动" },
       { id: "convertible", label: "敞篷跑车" },
-      { id: "track", label: "赛道性能" }
+      { id: "track", label: "赛道性能" },
+      { id: "high_end", label: "尊享超跑" }
     ],
     cityOptions: [],
     selectedCity: "",

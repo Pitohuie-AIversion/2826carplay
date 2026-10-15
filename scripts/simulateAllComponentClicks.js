@@ -682,6 +682,13 @@ simulateClick("点击特色筛选芯片:「免押金」(handleQuickFilterTap)", 
   if (garagePage.data.quickFilter !== "all") throw new Error("特色筛选未恢复为 all")
 })
 
+simulateClick("点击特色筛选芯片:「￥2000内」(handleQuickFilterTap: under_2000)", () => {
+  garagePage.handleQuickFilterTap(makeEvent({ filter: "under_2000" }))
+  if (garagePage.data.quickFilter !== "under_2000") throw new Error("特色筛选未切换为 under_2000")
+  garagePage.handleQuickFilterTap(makeEvent({ filter: "all" }))
+  if (garagePage.data.quickFilter !== "all") throw new Error("特色筛选未恢复为 all")
+})
+
 simulateClick("在车型搜索框中输入关键字并实时过滤 (handleSearchInput)", () => {
   garagePage.handleSearchInput(makeEvent({}, { value: "保时捷" }))
   if (garagePage.data.searchKeyword !== "保时捷") throw new Error("搜索关键字未保存")
@@ -742,6 +749,13 @@ simulateClick("头图加载异常重试点击 (handleRetryHeroImage)", () => {
 
 simulateClick("点击收藏/取消收藏按钮 (handleFavoriteTap)", () => {
   carDetailPage.handleFavoriteTap()
+})
+
+simulateClick("点击切换车型配置参数模态:「奢享座舱」(handleSpecTabChange: cabin)", () => {
+  carDetailPage.handleSpecTabChange(makeEvent({ tab: "cabin" }))
+  if (carDetailPage.data.specTab !== "cabin") throw new Error("配置卡片未切换至奢享座舱")
+  carDetailPage.handleSpecTabChange(makeEvent({ tab: "perf" }))
+  if (carDetailPage.data.specTab !== "perf") throw new Error("配置卡片未恢复至动力驾控")
 })
 
 simulateClick("点击展开/折叠价格说明手风琴 (handleTogglePricing)", () => {

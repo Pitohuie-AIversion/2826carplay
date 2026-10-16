@@ -176,7 +176,20 @@
           <view class="compare-modal-kicker">BENCHMARK MATRIX</view>
           <view class="compare-modal-title">心仪车型参数对比</view>
         </view>
-        <view class="compare-modal-close" bindtap="handleCloseCompareModal" hover-class="compare-modal-close-hover" aria-role="button" aria-label="关闭对比">✕</view>
+        <view class="compare-header-right">
+          <button
+            class="compare-diff-toggle {{compareDiffOnly ? 'compare-diff-toggle-active' : ''}}"
+            bindtap="handleToggleCompareDiffOnly"
+            hover-class="filter-button-pressed"
+            aria-role="switch"
+            aria-checked="{{compareDiffOnly}}"
+            aria-label="切换只看差异项，当前{{compareDiffOnly ? '开启' : '关闭'}}"
+          >
+            <text class="compare-diff-icon">⚡</text>
+            <text>{{compareDiffOnly ? '只看差异' : '对比全部'}}</text>
+          </button>
+          <view class="compare-modal-close" bindtap="handleCloseCompareModal" hover-class="compare-modal-close-hover" aria-role="button" aria-label="关闭对比">✕</view>
+        </view>
       </view>
 
       <view class="compare-matrix-body">
@@ -191,31 +204,55 @@
             </view>
           </view>
 
-          <!-- 日租金 -->
-          <view class="compare-matrix-row">
-            <view class="compare-col-label">参考日租金</view>
-            <view class="compare-col-car" wx:for="{{compareCars}}" wx:key="id">
-              <view class="compare-price-val">{{item.priceText}}</view>
-            </view>
+          <!-- 当只看差异且两车无差异时的友好提示 -->
+          <view wx:if="{{compareHasNoDiff}}" class="compare-matrix-empty-diff">
+            <view class="compare-empty-diff-icon">✨</view>
+            <view class="compare-empty-diff-title">两款车型核心参数高度一致</view>
+            <view class="compare-empty-diff-desc">在租金、排挡、动力与服务上均为尊享顶格配置，可切换“对比全部”或根据车身设计偏好选择。</view>
+            <button class="compare-empty-diff-btn ui-btn ui-btn-ghost" bindtap="handleToggleCompareDiffOnly">查看完整对比</button>
           </view>
 
-          <!-- 驱动与排挡 -->
-          <view class="compare-matrix-row">
-            <view class="compare-col-label">传动/排挡</view>
-            <view class="compare-col-car" wx:for="{{compareCars}}" wx:key="id">
-              <view class="compare-spec-val">{{item.nickname || '—'}}</view>
-            </view>
-          </view>
-
-          <!-- 核心特色标签 -->
-          <view class="compare-matrix-row">
-            <view class="compare-col-label">特色亮点</view>
-            <view class="compare-col-car" wx:for="{{compareCars}}" wx:key="id">
-              <view class="compare-tags-wrap">
-                <text class="compare-tag-chip" wx:for="{{item.tags}}" wx:for-item="tag" wx:key="*this">{{tag}}</text>
+          <!-- 动态多维对比行（支持只看差异与差异高亮） -->
+          <block wx:else>
+            <view class="compare-matrix-row {{row.isDiff ? 'compare-matrix-row-diff' : ''}}" wx:for="{{compareRows}}" wx:for-item="row" wx:key="key">
+              <view class="compare-col-label">
+                <text class="compare-row-title">{{row.label}}</text>
+                <text wx:if="{{row.isDiff}}" class="compare-diff-tag">异</text>
+              </view>
+              <view class="compare-col-car {{row.isDiff ? 'compare-col-car-diff' : ''}}">
+                <block wx:if="{{row.type === 'price'}}">
+                  <view class="compare-price-val">{{row.val1}}</view>
+                </block>
+                <block wx:elif="{{row.type === 'status'}}">
+                  <view class="compare-car-status {{row.val1Class}}">{{row.val1}}</view>
+                </block>
+                <block wx:elif="{{row.type === 'tags'}}">
+                  <view class="compare-tags-wrap">
+                    <text class="compare-tag-chip" wx:for="{{row.tags1}}" wx:key="*this">{{item}}</text>
+                  </view>
+                </block>
+                <block wx:else>
+                  <view class="compare-spec-val">{{row.val1}}</view>
+                </block>
+              </view>
+              <view class="compare-col-car {{row.isDiff ? 'compare-col-car-diff' : ''}}">
+                <block wx:if="{{row.type === 'price'}}">
+                  <view class="compare-price-val">{{row.val2}}</view>
+                </block>
+                <block wx:elif="{{row.type === 'status'}}">
+                  <view class="compare-car-status {{row.val2Class}}">{{row.val2}}</view>
+                </block>
+                <block wx:elif="{{row.type === 'tags'}}">
+                  <view class="compare-tags-wrap">
+                    <text class="compare-tag-chip" wx:for="{{row.tags2}}" wx:key="*this">{{item}}</text>
+                  </view>
+                </block>
+                <block wx:else>
+                  <view class="compare-spec-val">{{row.val2}}</view>
+                </block>
               </view>
             </view>
-          </view>
+          </block>
         </view>
       </view>
 
@@ -237,24 +274,81 @@
       </view>
 
       <view class="compare-modal-actions">
+        <button class="compare-action-btn ui-btn ui-btn-primary action-with-icon" bindtap="handleOpenComparePosterModal" aria-label="生成双车对比海报">
+          <text class="compare-action-icon">🎨</text>
+          <text>生成对比海报</text>
+        </button>
+        <button class="compare-action-btn ui-btn ui-btn-primary action-with-icon" bindtap="handleCallConsultant" aria-label="一键致电专属管家咨询">
+          <text class="compare-action-icon">📞</text>
+          <text>致电管家核价</text>
+        </button>
         <button
-          class="compare-action-btn ui-btn ui-btn-primary"
+          class="compare-action-btn ui-btn ui-btn-ghost action-with-icon"
+          bindtap="handleCopyComparison"
+          aria-label="复制当前对比车型清单"
+        >
+          <text class="compare-action-icon">📋</text>
+          <text>复制对比清单</text>
+        </button>
+        <button
+          class="compare-action-btn ui-btn ui-btn-ghost"
           wx:for="{{compareCars}}"
           wx:key="id"
           data-id="{{item.id}}"
           bindtap="handleCompareCarDetail"
         >
-          查看 {{item.brand || item.name}} 详情
-        </button>
-        <button
-          class="compare-action-btn ui-btn ui-btn-ghost"
-          bindtap="handleCopyComparison"
-          aria-label="复制当前对比车型清单"
-        >
-          复制对比清单
+          {{item.brand || item.name}} 详情
         </button>
       </view>
     </view>
+  </view>
+
+  <!-- 尊享对比海报预览弹窗 -->
+  <view wx:if="{{comparePosterVisible}}" class="compare-poster-overlay" bindtap="handleCloseComparePosterModal" aria-modal="true" aria-role="dialog">
+    <view class="compare-poster-dialog ui-card" catchtap="true">
+      <view class="compare-poster-header">
+        <view class="compare-poster-title-wrap">
+          <view class="compare-poster-kicker">BENCHMARK POSTER</view>
+          <view class="compare-poster-title">心仪双车对比档案</view>
+        </view>
+        <view class="compare-modal-close" bindtap="handleCloseComparePosterModal" hover-class="compare-modal-close-hover" aria-role="button" aria-label="关闭海报">✕</view>
+      </view>
+      <view class="compare-poster-preview-frame">
+        <view wx:if="{{comparePosterGenerating}}" class="compare-poster-loading">
+          <view class="compare-poster-spinner"></view>
+          <view class="compare-poster-loading-text">正在绘制尊享对比海报…</view>
+        </view>
+        <image
+          wx:elif="{{comparePosterImagePath}}"
+          class="compare-poster-image"
+          src="{{comparePosterImagePath}}"
+          mode="aspectFit"
+          show-menu-by-longpress="{{true}}"
+          aria-label="双车对比海报预览"
+        />
+        <view wx:else class="compare-poster-fallback">
+          <text>海报生成完成</text>
+        </view>
+      </view>
+      <view class="compare-poster-actions">
+        <button
+          class="compare-poster-btn ui-btn ui-btn-primary"
+          disabled="{{comparePosterGenerating || !comparePosterImagePath}}"
+          bindtap="handleSaveComparePoster"
+          aria-label="保存海报至手机相册"
+        >
+          保存海报至手机相册
+        </button>
+        <button class="compare-poster-btn ui-btn ui-btn-ghost" bindtap="handleCloseComparePosterModal">
+          关闭
+        </button>
+      </view>
+    </view>
+  </view>
+
+  <!-- 离屏海报 Canvas 节点 -->
+  <view class="compare-poster-canvas-wrap" aria-hidden="true">
+    <canvas type="2d" id="comparePosterCanvas" class="compare-poster-canvas"></canvas>
   </view>
   <core-nav active-key="favorites" />
 </view>

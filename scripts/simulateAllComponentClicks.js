@@ -1134,6 +1134,44 @@ simulateClick("点击复制心仪车型对比清单 (handleCopyComparison)", () 
   favoritesPage.handleCloseCompareModal()
 })
 
+simulateClick("点击切换对比矩阵只看差异模式 (handleToggleCompareDiffOnly)", () => {
+  favoritesPage.handleOpenCompareModal()
+  favoritesPage.handleToggleCompareDiffOnly()
+  if (!favoritesPage.data.compareDiffOnly) throw new Error("只看差异模式未激活")
+  favoritesPage.handleToggleCompareDiffOnly()
+  if (favoritesPage.data.compareDiffOnly) throw new Error("只看差异模式未关闭")
+  favoritesPage.handleCloseCompareModal()
+})
+
+simulateClick("点击快速替换对比车辆 (handleSwitchCompareCar)", () => {
+  favoritesPage.handleOpenCompareModal()
+  favoritesPage.handleSwitchCompareCar(makeEvent({}, { carid: "car-panamera" }))
+  favoritesPage.handleCloseCompareModal()
+})
+
+simulateClick("点击生成双车对比精美海报 (handleOpenComparePosterModal)", () => {
+  favoritesPage.handleOpenCompareModal()
+  favoritesPage.handleOpenComparePosterModal()
+  if (!favoritesPage.data.comparePosterVisible) throw new Error("海报预览弹窗未开启")
+})
+
+simulateClick("点击保存双车对比海报至相册 (handleSaveComparePoster)", () => {
+  favoritesPage.setData({ comparePosterImagePath: "wxfile://saved_poster_test.png" })
+  favoritesPage.handleSaveComparePoster()
+})
+
+simulateClick("点击关闭双车对比海报预览 (handleCloseComparePosterModal)", () => {
+  favoritesPage.handleCloseComparePosterModal()
+  if (favoritesPage.data.comparePosterVisible) throw new Error("海报预览弹窗未关闭")
+  favoritesPage.handleCloseCompareModal()
+})
+
+simulateClick("点击致电专属管家咨询对比方案 (handleCallConsultant)", () => {
+  favoritesPage.handleOpenCompareModal()
+  favoritesPage.handleCallConsultant()
+  favoritesPage.handleCloseCompareModal()
+})
+
 simulateClick("点击「去车库逛逛」入口 (handleBrowseGarage)", () => {
   favoritesPage.handleBrowseGarage()
 })

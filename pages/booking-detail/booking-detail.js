@@ -24,9 +24,16 @@ const {
 const { formatDisplayTime } = require("../../shared/formatTime")
 const { getDateSpanText } = require("../../shared/dateUtils")
 const { formatYuan } = require("../../shared/rentalPricing")
+const {
+  buildHandoverReport,
+  formatHandoverCsvContent,
+  getHandoverFileName
+} = require("../../shared/handoverReport")
+
 const BOOKING_DETAIL_LOAD_TIMEOUT_MS = 15 * 1000
 const BOOKING_DETAIL_MUTATION_TIMEOUT_MS = 12 * 1000
 const SUBSCRIPTION_REQUEST_TIMEOUT_MS = 15 * 1000
+const HANDOVER_EXPORT_TIMEOUT_MS = 15 * 1000
 
 const buildStatusGuidance = (status) => getSharedStatusGuidance(status, { mode: "detail" })
 
@@ -56,18 +63,28 @@ function normalizeQuote(item) {
     expiredAtText: formatDisplayTime(quote.expiredAt)
   }
 }
-function normalizeHandover(item) {
+function normalizeHandover(item, booking) {
   if (!item || typeof item !== "object") return {}
   const status = String(item.status || "")
+  const report = buildHandoverReport(booking, item)
   return {
     ...item,
     id: String(item.id || ""),
+    stage: item.stage === "return" ? "return" : "pickup",
     stageText: item.stage === "return" ? "还车" : "取车",
     statusText: { submitted: "待我核对", confirmed: "已核对", archived: "已归档" }[status] || status,
     energyText: `${item.energyType === "electric" ? "电量" : "油量"} ${Math.max(0, Number(item.energyLevelPercent || 0))}%`,
     submittedAtText: formatDisplayTime(item.submittedAt),
     confirmedAtText: formatDisplayTime(item.confirmedAt),
-    photos: Array.isArray(item.photos) ? item.photos.filter((photo) => photo && photo.url) : []
+    photos: (Array.isArray(item.photos) ? item.photos.filter((photo) => photo && photo.url) : []).map((photo) => ({
+      ...photo,
+      label: photo.label || (photo.angle === "front" ? "车头" : photo.angle === "rear" ? "车尾" : photo.angle === "left" ? "左侧" : photo.angle === "right" ? "右侧" : "留证视角")
+    })),
+    scratchItems: report.scratchItems || [],
+    scratchSummary: report.scratchSummary || "",
+    inspectorName: report.inspectorName || "",
+    customerSigned: report.customerSigned || false,
+    customerSignatureUrl: report.customerSignatureUrl || ""
   }
 }
 
@@ -135,6 +152,10 @@ Page({
     handoverResponding: false,
     handovers: { pickup: {}, return: {} },
     handoverList: [],
+    exportingHandover: false,
+    exportedHandoverStage: "",
+    exportedHandoverPath: "",
+    exportedHandoverFileName: "",
     servicePhone: "",
     emergencyPhone: "",
     serviceHubs: [],
@@ -149,6 +170,12 @@ Page({
     readinessExpanded: false,
     showVoucherModal: false,
     pickupLocationDisplay: "",
+    satisfactionRating: 5,
+    satisfactionTags: ["车况极佳", "管家专业", "准时交付", "体验尊享", "手续便捷"],
+    selectedSatisfactionTags: ["车况极佳", "体验尊享"],
+    satisfactionNote: "",
+    reviewSubmitted: false,
+    reviewSubmitting: false,
     editForm: {
       userName: "",
       phone: "",
@@ -215,6 +242,10 @@ Page({
       this._cancelModalNeedsReset = false
       this._cancelConfirmationSerial = Number(this._cancelConfirmationSerial || 0) + 1
       this.applyState({ cancelling: false })
+    }
+    if (this._handoverExportNeedsReset) {
+      this._handoverExportNeedsReset = false
+      this.setData({ exportingHandover: false })
     }
     if (
       this.data.id &&
@@ -283,6 +314,10 @@ Page({
     this.clearSubscriptionRequestTimer()
     this.clearQuoteResponseTimer()
     this.clearHandoverResponseTimer()
+    if (this._handoverExportTimer) {
+      clearTimeout(this._handoverExportTimer)
+      this._handoverExportTimer = null
+    }
     if (this._perf && typeof this._perf.dispose === 'function') try { this._perf.dispose(); } catch(e) {}
   },
   finishDetailLoadEffects() {
@@ -297,8 +332,14 @@ Page({
   },
   applyBooking(booking, latestQuote, handovers) {
     const quote = normalizeQuote(latestQuote)
-    const pickupHandover = normalizeHandover(handovers && handovers.pickup)
-    const returnHandover = normalizeHandover(handovers && handovers.return)
+    const pickupHandover = normalizeHandover(handovers && handovers.pickup, booking)
+    const returnHandover = normalizeHandover(handovers && handovers.return, booking)
+    let savedReview = null
+    if (booking && booking.id && typeof wx !== "undefined" && typeof wx.getStorageSync === "function") {
+      try {
+        savedReview = wx.getStorageSync(`booking_review_${booking.id}`)
+      } catch (e) {}
+    }
     this.applyState({
       booking,
       initialLoading: false,
@@ -329,6 +370,10 @@ Page({
       readinessCard: getVehicleReadinessCard({ name: booking.vehicleName, category: booking.category }),
       bookingOccupancyTooLong: (Date.parse(`${booking.endDate}T00:00:00.000Z`) - Date.parse(`${booking.startDate}T00:00:00.000Z`)) / 86400000 + 1 > 47,
       pickupLocationDisplay: formatLocationDisplay(booking.pickupLocation || booking.location, booking.city),
+      reviewSubmitted: Boolean(savedReview && savedReview.rating),
+      satisfactionRating: (savedReview && savedReview.rating) || 5,
+      selectedSatisfactionTags: (savedReview && Array.isArray(savedReview.tags)) ? savedReview.tags : ["车况极佳", "体验尊享"],
+      satisfactionNote: (savedReview && savedReview.note) || "",
       editForm: {
         userName: booking.userName,
         phone: booking.phone,
@@ -1137,6 +1182,145 @@ Page({
     })
   },
   handleHandoverImageError() {},
+  handleExportHandoverReport(event) {
+    if (this.data.exportingHandover) return
+    const action = beginPageNativeAction(this, { exclusiveKey: "handover-export", requireCurrent: true })
+    const stage = String((event && event.currentTarget && event.currentTarget.dataset && event.currentTarget.dataset.stage) || "").trim()
+    const handoverId = event && event.currentTarget && event.currentTarget.dataset && event.currentTarget.dataset.id
+    const handovers = this.data.handovers || {}
+    const list = Array.isArray(this.data.handoverList) ? this.data.handoverList : []
+    const target = (stage && handovers[stage]) || (handoverId && list.find((h) => h.id === handoverId)) || list[0] || {}
+    if (!target || !target.id) {
+      if (isPageNativeActionActive(this, action)) wx.showToast({ title: "暂无交接记录", icon: "none" })
+      return
+    }
+    this.setData({ exportingHandover: true })
+    const csvContent = formatHandoverCsvContent(this.data.booking, target)
+    const fileName = getHandoverFileName(this.data.booking, target)
+    let fs
+    try { fs = wx.getFileSystemManager && wx.getFileSystemManager() } catch (error) {}
+    if (!fs || !wx.env || !wx.env.USER_DATA_PATH) {
+      this.setData({ exportingHandover: false })
+      if (typeof wx !== "undefined" && wx.showToast) wx.showToast({ title: "系统暂不支持文件导出", icon: "none" })
+      return
+    }
+    const filePath = `${wx.env.USER_DATA_PATH}/${fileName}`
+    let settled = false
+    const finish = () => {
+      if (settled) return false
+      settled = true
+      if (this._handoverExportTimer) clearTimeout(this._handoverExportTimer)
+      this._handoverExportTimer = null
+      if (!isPageNativeActionActive(this, action)) { this._handoverExportNeedsReset = true; return false }
+      return true
+    }
+    const fail = () => {
+      if (!finish()) return
+      this.setData({ exportingHandover: false })
+      wx.showToast({ title: "留证单导出失败", icon: "none" })
+    }
+    this._handoverExportTimer = setTimeout(fail, HANDOVER_EXPORT_TIMEOUT_MS)
+    const writeOptions = {
+      filePath,
+      data: csvContent,
+      encoding: "utf8",
+      success: () => {
+        if (!finish()) {
+          if (typeof fs.unlink === "function") fs.unlink({ filePath, fail: () => {} })
+          return
+        }
+        triggerHapticFeedback("medium")
+        this.setData({
+          exportingHandover: false,
+          exportedHandoverStage: target.stage || stage || "pickup",
+          exportedHandoverPath: filePath,
+          exportedHandoverFileName: fileName
+        })
+        if (typeof wx !== "undefined" && wx.showToast) wx.showToast({ title: "留证单已导出", icon: "success" })
+      },
+      fail
+    }
+    try { fs.writeFile(writeOptions) } catch (error) { fail() }
+  },
+  handleOpenExportedHandover() {
+    const filePath = this.data.exportedHandoverPath
+    if (!filePath || typeof wx === "undefined" || typeof wx.openDocument !== "function") return
+    const action = beginPageNativeAction(this, { requireCurrent: true })
+    wx.openDocument({
+      filePath,
+      fileType: "csv",
+      fail: () => {
+        if (isPageNativeActionActive(this, action)) wx.showToast({ title: "打开文件失败", icon: "none" })
+      }
+    })
+  },
+  handleShareExportedHandover() {
+    const filePath = this.data.exportedHandoverPath
+    if (!filePath || typeof wx === "undefined" || typeof wx.shareFileMessage !== "function") return
+    const action = beginPageNativeAction(this, { requireCurrent: true })
+    wx.shareFileMessage({
+      filePath,
+      fail: (error) => {
+        if (isPageNativeActionActive(this, action) && !String(error && error.errMsg || "").toLowerCase().includes("cancel")) wx.showToast({ title: "分享文件失败", icon: "none" })
+      }
+    })
+  },
+  handleDeleteExportedHandover() {
+    const filePath = this.data.exportedHandoverPath
+    if (!filePath) return
+    const action = beginPageNativeAction(this, { requireCurrent: true })
+    const fs = typeof wx !== "undefined" && wx.getFileSystemManager ? wx.getFileSystemManager() : null
+    if (fs && typeof fs.unlink === "function") {
+      fs.unlink({
+        filePath,
+        success: () => {
+          if (!isPageNativeActionActive(this, action) || this.data.exportedHandoverPath !== filePath) return
+          this.setData({ exportedHandoverPath: "", exportedHandoverFileName: "", exportedHandoverStage: "" })
+          if (typeof wx !== "undefined" && wx.showToast) wx.showToast({ title: "缓存已清理", icon: "none" })
+        },
+        fail: () => {
+          if (!isPageNativeActionActive(this, action) || this.data.exportedHandoverPath !== filePath) return
+          wx.showToast({ title: "清理失败", icon: "none" })
+        }
+      })
+    } else {
+      this.setData({ exportedHandoverPath: "", exportedHandoverFileName: "", exportedHandoverStage: "" })
+    }
+  },
+  handleCopyHandoverSummary(event) {
+    const stage = String((event && event.currentTarget && event.currentTarget.dataset && event.currentTarget.dataset.stage) || "").trim()
+    const target = (stage && this.data.handovers && this.data.handovers[stage]) || (this.data.handoverList && this.data.handoverList[0]) || {}
+    const b = this.data.booking || {}
+    if (!target || !target.id) {
+      wx.showToast({ title: "暂无留证记录", icon: "none" })
+      return
+    }
+    const lines = [
+      `【极境车库·验车留证事实备忘】`,
+      `交接阶段: ${target.stageText || "取车"}记录`,
+      `预约单号: ${formatBookingReference(b.id)}`,
+      `尊享车型: ${b.vehicleName || "极境座驾"}`,
+      `车牌号码: ${b.plateNumber || target.plateNumber || "车牌保密"}`,
+      `交接里程: ${target.mileageKm || 0} km`,
+      `能源状态: ${target.energyText || "正常"}`,
+      `外观环检: ${target.scratchSummary || target.damageNote || "无明显新增划痕或外观损伤"}`,
+      `验车专员: ${target.inspectorName || "极境交车专员"}`,
+      `核验时间: ${target.confirmedAtText || target.submittedAtText || "待核验"}`
+    ]
+    if (typeof wx === "undefined" || typeof wx.setClipboardData !== "function") return
+    wx.setClipboardData({
+      data: lines.join("\n"),
+      success: () => {
+        triggerHapticFeedback("light")
+        if (!this.isBookingDetailActive() || !isPageCurrent(this)) return
+        wx.showToast({ title: "留证事实已复制", icon: "none" })
+      },
+      fail: () => {
+        if (!this.isBookingDetailActive() || !isPageCurrent(this)) return
+        wx.showToast({ title: "复制失败，请重试", icon: "none" })
+      }
+    })
+  },
   handleEmergencyCall() {
     if (!this.isBookingDetailActive()) return
     const phoneNumber = String(this.data.emergencyPhone || "").trim()
@@ -1396,6 +1580,62 @@ Page({
   },
   handleCloseVoucherCard() {
     this.setData({ showVoucherModal: false })
+  },
+  handleRatingTap(event) {
+    if (this.data.reviewSubmitted) return
+    const rating = Math.max(1, Math.min(5, Number((event && event.currentTarget && event.currentTarget.dataset && event.currentTarget.dataset.rating) || 5)))
+    triggerHapticFeedback("light")
+    this.setData({ satisfactionRating: rating })
+  },
+  handleSatisfactionTagTap(event) {
+    if (this.data.reviewSubmitted) return
+    const tag = String((event && event.currentTarget && event.currentTarget.dataset && event.currentTarget.dataset.tag) || "").trim()
+    if (!tag) return
+    triggerHapticFeedback("selection")
+    const current = Array.isArray(this.data.selectedSatisfactionTags) ? [...this.data.selectedSatisfactionTags] : []
+    const idx = current.indexOf(tag)
+    if (idx >= 0) {
+      current.splice(idx, 1)
+    } else {
+      current.push(tag)
+    }
+    this.setData({ selectedSatisfactionTags: current })
+  },
+  handleSatisfactionNoteInput(event) {
+    if (this.data.reviewSubmitted) return
+    this.setData({ satisfactionNote: String((event && event.detail && event.detail.value) || "").slice(0, 150) })
+  },
+  handleSubmitSatisfactionReview() {
+    if (this.data.reviewSubmitted || this.data.reviewSubmitting) return
+    triggerHapticFeedback("medium")
+    const id = this.data.id || (this.data.booking && this.data.booking.id)
+    if (!id) return
+    this.setData({ reviewSubmitting: true })
+    const reviewPayload = {
+      rating: this.data.satisfactionRating,
+      tags: this.data.selectedSatisfactionTags,
+      note: this.data.satisfactionNote,
+      submittedAt: new Date().toISOString()
+    }
+    try {
+      if (typeof wx !== "undefined" && typeof wx.setStorageSync === "function") {
+        wx.setStorageSync(`booking_review_${id}`, reviewPayload)
+      }
+    } catch (e) {}
+
+    setTimeout(() => {
+      if (this._bookingDetailUnloaded) return
+      this.setData({
+        reviewSubmitting: false,
+        reviewSubmitted: true
+      })
+      if (typeof wx !== "undefined" && typeof wx.showToast === "function") {
+        wx.showToast({
+          title: "感谢您的尊享评价",
+          icon: "success"
+        })
+      }
+    }, 200)
   },
   isBookingDetailActive() {
     return this._bookingDetailUnloaded !== true

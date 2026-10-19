@@ -78,4 +78,24 @@ describe("handoverReport helper", () => {
     expect(typeof csv).toBe("string")
     expect(csv.startsWith("\uFEFF")).toBe(true)
   })
+
+  test("buildHandoverReport 正确处理环检损伤项与电子签名签署状态", () => {
+    const report = buildHandoverReport(mockBooking, {
+      ...mockHandover,
+      inspectorName: "王管家",
+      scratchItems: [
+        { part: "left", type: "scratch", description: "长约2cm浅划痕" },
+        { part: "wheel_fl", type: "wheel", description: "边缘微擦" }
+      ],
+      customerSigned: true,
+      customerSignatureUrl: "https://example.com/sig.png"
+    })
+
+    expect(report.inspectorName).toBe("王管家")
+    expect(report.customerSigned).toBe(true)
+    expect(report.customerSignatureUrl).toBe("https://example.com/sig.png")
+    expect(report.scratchItems).toHaveLength(2)
+    expect(report.scratchSummary).toContain("车身左侧/车门")
+    expect(report.scratchSummary).toContain("左前轮毂")
+  })
 })

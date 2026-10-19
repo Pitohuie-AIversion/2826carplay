@@ -188,3 +188,19 @@
 .recent-chevron{flex-shrink:0;margin-left:0;color:#5e718e;}
 @keyframes overview-spin{to{transform:rotate(360deg);}
 }
+.quick-ops-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14rpx;margin-top:20rpx;}
+.quick-op-item{display:flex;flex-direction:column;padding:20rpx;border-radius:18rpx;border:1rpx solid rgba(255,255,255,0.07);background:rgba(255,255,255,0.025);transition:opacity 120ms ease,transform 120ms ease;cursor:pointer;}
+.quick-op-pressed{opacity:0.72;transform:scale(0.98);}
+.quick-op-icon-wrap{width:44rpx;height:44rpx;border-radius:12rpx;display:flex;align-items:center;justify-content:center;background:rgba(84,143,255,0.1);border:1rpx solid rgba(84,143,255,0.22);color:#82b1fb;margin-bottom:12rpx;}
+.quick-op-icon{position:relative;width:22rpx;height:22rpx;}
+.quick-op-icon-add::before,.quick-op-icon-add::after{content:"";position:absolute;background:currentColor;border-radius:2rpx;}
+.quick-op-icon-add::before{top:3rpx;left:10rpx;width:2rpx;height:16rpx;}
+.quick-op-icon-add::after{top:10rpx;left:3rpx;width:16rpx;height:2rpx;}
+.quick-op-icon-bench{border:2rpx solid currentColor;border-radius:4rpx;width:20rpx;height:16rpx;top:2rpx;box-sizing:border-box;}
+.quick-op-icon-bench::after{content:"";position:absolute;top:4rpx;left:3rpx;width:10rpx;height:2rpx;background:currentColor;}
+.quick-op-icon-cfg{border:2rpx solid currentColor;border-radius:50%;width:18rpx;height:18rpx;top:1rpx;box-sizing:border-box;}
+.quick-op-icon-cfg::after{content:"";position:absolute;top:4rpx;left:4rpx;width:6rpx;height:6rpx;background:currentColor;border-radius:50%;}
+.quick-op-icon-health{border:2rpx solid currentColor;border-radius:50%;width:18rpx;height:18rpx;top:1rpx;box-sizing:border-box;}
+.quick-op-icon-health::after{content:"";position:absolute;top:3rpx;left:5rpx;width:6rpx;height:3rpx;border-bottom:2rpx solid currentColor;border-left:2rpx solid currentColor;transform:rotate(-45deg);}
+.quick-op-name{font-size:22rpx;font-weight:600;color:#ecf0f6;}
+.quick-op-sub{font-size:17rpx;color:#788494;margin-top:4rpx;}

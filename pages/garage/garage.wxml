@@ -14,6 +14,18 @@
     </view>
     <view class="page-desc">{{pageSubtitle}}</view>
   </view>
+  <view wx:if="{{isOffline}}" class="garage-offline-banner">
+    <view class="offline-badge-dot" aria-hidden="true"></view>
+    <text>网络已断开，当前正在浏览离线缓存车源</text>
+  </view>
+  <view wx:if="{{announcementText && !announcementDismissed}}" class="garage-announcement-bar ui-card" aria-role="alert">
+    <view class="announcement-bell-dot" aria-hidden="true"></view>
+    <view class="announcement-content">
+      <text class="announcement-badge">公告</text>
+      <text class="announcement-text">{{announcementText}}</text>
+    </view>
+    <view class="announcement-close-btn" bindtap="handleDismissAnnouncement" hover-class="announcement-close-pressed" aria-role="button" aria-label="关闭公告">✕</view>
+  </view>
   <view wx:if="{{(!initialLoading && !loadingCars) || cars.length}}" class="garage-search ui-card">
     <view class="search-symbol" aria-hidden="true"></view>
     <input
@@ -34,6 +46,23 @@
       hover-class="search-clear-pressed"
       aria-label="清空车辆搜索关键词"
     ><view class="search-clear-icon" aria-hidden="true"></view></button>
+  </view>
+  <view wx:if="{{((!initialLoading && !loadingCars) || cars.length) && !searchKeyword && hotSearchKeywords.length}}" class="garage-hot-tags">
+    <view class="hot-tags-label">热搜：</view>
+    <view class="hot-tags-list">
+      <view
+        wx:for="{{hotSearchKeywords}}"
+        wx:key="*this"
+        class="hot-tag-chip"
+        data-keyword="{{item}}"
+        bindtap="handleHotSearchTap"
+        hover-class="hot-tag-chip-pressed"
+        aria-role="button"
+        aria-label="快速搜索{{item}}"
+      >
+        <text>{{item}}</text>
+      </view>
+    </view>
   </view>
   <view wx:if="{{((!initialLoading && !loadingCars) || cars.length) && cityOptions.length}}" class="garage-city-bar">
     <view class="city-chips-label">交付中心：</view>
@@ -243,6 +272,27 @@
       </view>
     </view>
   </view>
+  <view
+    wx:if="{{((!initialLoading && !loadingCars) || cars.length) && categorySummary.total}}"
+    class="garage-quick-chips-bar"
+  >
+    <view class="quick-chips-label">特色：</view>
+    <view class="quick-chips-list">
+      <view
+        wx:for="{{quickFilterOptions}}"
+        wx:key="id"
+        class="quick-chip {{quickFilter === item.id ? 'quick-chip-active' : ''}}"
+        data-filter="{{item.id}}"
+        bindtap="handleQuickFilterTap"
+        hover-class="quick-chip-pressed"
+        aria-role="button"
+        aria-pressed="{{quickFilter === item.id}}"
+        aria-label="按{{item.label}}快速筛选"
+      >
+        <text>{{item.label}}</text>
+      </view>
+    </view>
+  </view>
   <view wx:if="{{contentGuides.length}}" class="garage-guides ui-card">
     <view class="list-heading">
       <view><view class="list-kicker">SCENARIO GUIDES</view><view class="list-title">真实用车场景</view></view>
@@ -311,6 +361,13 @@
       bindtap="handleShowAllStatuses"
     >
       <view class="garage-action-content"><view class="garage-action-native-icon garage-status-native-icon" aria-hidden="true"></view><text>查看全部状态</text></view>
+    </button>
+    <button
+      wx:elif="{{quickFilter !== 'all' || selectedCity || currentCategory !== 'all'}}"
+      class="ui-btn ui-btn-ghost empty-secondary-action"
+      bindtap="handleResetAllFilters"
+    >
+      <view class="garage-action-content"><view class="garage-action-native-icon garage-clear-native-icon" aria-hidden="true"></view><text>重置全部筛选</text></view>
     </button>
   </view>
   <core-nav active-key="garage" />

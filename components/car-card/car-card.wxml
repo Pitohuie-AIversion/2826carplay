@@ -41,7 +41,10 @@
         <view class="car-edition">EXTREME SELECTION</view>
         <view class="car-nickname">{{car.name}}</view>
       </view>
-      <view class="car-status ui-status {{car.statusClass}}">{{car.statusText}}</view>
+      <view class="car-status-badges-group">
+        <text wx:for="{{marketingBadges}}" wx:key="key" class="car-marketing-badge {{item.color}}">{{item.label}}</text>
+        <view class="car-status ui-status {{car.statusClass}}">{{car.statusText}}</view>
+      </view>
     </view>
     <view class="car-bottom">
       <view class="car-meta">

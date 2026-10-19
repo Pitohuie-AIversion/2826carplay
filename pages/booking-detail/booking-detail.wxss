@@ -249,15 +249,36 @@
 .handover-boundary, .emergency-boundary { margin-top: 18rpx; border-radius: 14rpx; padding: 18rpx; color: #aeb7c5; background: rgba(82,143,255,.08); font-size: 22rpx; line-height: 1.6; }
 .customer-handover-record { margin-top: 22rpx; border: 1rpx solid rgba(255,255,255,.09); border-radius: 18rpx; padding: 20rpx; background: rgba(255,255,255,.025); }
 .handover-record-head { display: flex; align-items: center; justify-content: space-between; color: #eef2f8; font-size: 25rpx; font-weight: 600; }
+.handover-badges { display: flex; align-items: center; gap: 10rpx; }
+.handover-signed-badge { padding: 4rpx 14rpx; border-radius: 999rpx; border: 1rpx solid rgba(230, 197, 135, 0.4); background: rgba(230, 197, 135, 0.12); color: #f2e2be; font-size: 19rpx; font-weight: 550; }
 .handover-status { color: #f5c87a; font-size: 21rpx; }
 .handover-status-confirmed { color: #84d3ae; }
-.handover-record-meta { margin-top: 12rpx; color: #9aa4b3; font-size: 22rpx; }
+.handover-record-meta { margin-top: 12rpx; color: #9aa4b3; font-size: 22rpx; display: flex; align-items: center; justify-content: space-between; }
+.handover-inspector-text { color: #8bb2f0; font-size: 20rpx; }
 .handover-record-note { margin-top: 16rpx; color: #dce2ec; font-size: 23rpx; line-height: 1.6; }
 .handover-record-note text { display: block; margin-bottom: 5rpx; color: #818b9a; font-size: 20rpx; }
+.handover-scratch-list { display: flex; flex-wrap: wrap; gap: 8rpx; margin-top: 10rpx; }
+.handover-scratch-tag { display: inline-flex; align-items: center; padding: 4rpx 12rpx; border-radius: 8rpx; border: 1rpx solid rgba(230, 197, 135, 0.25); background: rgba(230, 197, 135, 0.06); color: #f2e2be; font-size: 19rpx; line-height: 1.4; }
+.scratch-part { color: #d4af6e; font-weight: 600; margin-right: 6rpx; }
+.scratch-type { color: #cbd5e1; }
+.scratch-desc { margin-left: 6rpx; color: #94a3b8; font-size: 18rpx; }
 .customer-handover-photos { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10rpx; margin-top: 18rpx; }
-.customer-handover-photos image { width: 100%; height: 128rpx; border-radius: 12rpx; background: #151a22; }
+.handover-photo-wrap { position: relative; overflow: hidden; border-radius: 12rpx; background: #151a22; }
+.handover-photo-wrap image { width: 100%; height: 128rpx; display: block; }
+.handover-photo-label { position: absolute; right: 6rpx; bottom: 6rpx; padding: 2rpx 8rpx; border-radius: 6rpx; background: rgba(0, 0, 0, 0.72); color: #f1f5f9; font-size: 18rpx; line-height: 1.2; backdrop-filter: blur(4rpx); }
 .handover-confirm-btn, .emergency-call-btn { margin-top: 20rpx; }
 .handover-confirmed-time { margin-top: 16rpx; color: #84d3ae; font-size: 22rpx; }
+.handover-report-actions { margin-top: 20rpx; }
+.handover-report-buttons { display: flex; gap: 12rpx; }
+.handover-action-btn { flex: 1; height: 68rpx; margin: 0; padding: 0 16rpx; border-radius: 16rpx; font-size: 21rpx; font-weight: 550; line-height: 66rpx; border: 1rpx solid rgba(255, 255, 255, 0.12); background: rgba(255, 255, 255, 0.04); color: #dce2ec; display: flex; align-items: center; justify-content: center; transition: all 140ms ease; }
+.handover-action-btn:active { opacity: 0.75; transform: scale(0.98); }
+.handover-btn-icon { margin-right: 8rpx; font-size: 20rpx; }
+.handover-exported-card { margin-top: 14rpx; padding: 16rpx 20rpx; border-radius: 16rpx; border: 1rpx solid rgba(132, 211, 174, 0.3); background: rgba(132, 211, 174, 0.06); display: flex; flex-direction: column; gap: 12rpx; }
+.handover-exported-meta { display: flex; align-items: center; justify-content: space-between; }
+.handover-exported-name { color: #e2e8f0; font-size: 21rpx; font-weight: 550; max-width: 460rpx; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.handover-exported-badge { padding: 2rpx 10rpx; border-radius: 999rpx; background: rgba(132, 211, 174, 0.2); color: #84d3ae; font-size: 18rpx; font-weight: 600; }
+.handover-exported-btn-row { display: flex; gap: 10rpx; }
+.handover-file-btn { flex: 1; height: 56rpx; margin: 0; padding: 0; border-radius: 12rpx; font-size: 20rpx; line-height: 54rpx; }
 .emergency-boundary { color: #c3a7a7; background: rgba(212,104,104,.08); }
 .checklist-card { margin-top: 24rpx; border-color: rgba(91, 148, 235, 0.22); background: linear-gradient(160deg, rgba(20, 27, 39, 0.95), rgba(13, 17, 24, 0.98)); }
 .checklist-heading { display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
@@ -300,3 +321,22 @@
 .voucher-modal-actions { display: flex; gap: 16rpx; margin-top: 28rpx; }
 .voucher-modal-actions .ui-btn { flex: 1; height: 76rpx; font-size: 21rpx; line-height: 1; border-radius: 16rpx; }
 .voucher-close-btn { flex: 0 0 140rpx; }
+
+/* 用车体验尊享评价 */
+.customer-satisfaction-card { margin-top: 24rpx; border-color: rgba(212, 175, 110, 0.28); background: linear-gradient(160deg, rgba(29, 33, 43, 0.96), rgba(16, 19, 25, 0.98)); }
+.satisfaction-body { margin-top: 20rpx; }
+.satisfaction-stars-row { display: flex; align-items: center; gap: 12rpx; margin-bottom: 20rpx; }
+.satisfaction-star { font-size: 40rpx; color: rgba(255, 255, 255, 0.2); line-height: 1; transition: color 150ms ease, transform 150ms ease; cursor: pointer; }
+.satisfaction-star:active { transform: scale(1.15); }
+.satisfaction-star-active { color: #e6c587; text-shadow: 0 0 16rpx rgba(230, 197, 135, 0.4); }
+.satisfaction-score-label { margin-left: 12rpx; font-size: 20rpx; color: #d4af6e; font-weight: 600; }
+.satisfaction-tags-list { display: flex; flex-wrap: wrap; gap: 12rpx; margin-bottom: 20rpx; }
+.satisfaction-tag { padding: 8rpx 20rpx; border-radius: 999rpx; border: 1rpx solid rgba(255, 255, 255, 0.1); background: rgba(255, 255, 255, 0.03); color: #9aa4b3; font-size: 20rpx; transition: all 160ms ease; }
+.satisfaction-tag:active { opacity: 0.8; }
+.satisfaction-tag-active { border-color: rgba(212, 175, 110, 0.5); background: rgba(212, 175, 110, 0.12); color: #f2e2be; font-weight: 550; }
+.satisfaction-textarea { width: 100%; height: 120rpx; padding: 16rpx 20rpx; border-radius: 16rpx; border: 1rpx solid rgba(255, 255, 255, 0.08); background: rgba(0, 0, 0, 0.25); color: #e2e8f2; font-size: 21rpx; line-height: 1.5; box-sizing: border-box; margin-bottom: 22rpx; }
+.satisfaction-done-banner { display: flex; align-items: center; padding: 18rpx 24rpx; border-radius: 16rpx; border: 1rpx solid rgba(132, 211, 174, 0.3); background: rgba(132, 211, 174, 0.08); margin-bottom: 12rpx; }
+.satisfaction-done-icon { width: 32rpx; height: 32rpx; border-radius: 50%; background: #65d6a4; color: #0b1510; display: flex; align-items: center; justify-content: center; font-size: 18rpx; font-weight: 700; margin-right: 14rpx; flex-shrink: 0; }
+.satisfaction-done-text { color: #bbf0d6; font-size: 21rpx; line-height: 1.4; }
+.satisfaction-submit-btn { width: 100%; height: 76rpx; border-radius: 16rpx; font-size: 22rpx; line-height: 1; }
+

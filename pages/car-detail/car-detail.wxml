@@ -135,6 +135,21 @@
       <text wx:for="{{car.tags}}" wx:key="*this" class="tag-item">{{item}}</text>
     </view>
   </view>
+  <view class="vip-privilege-strip ui-card" bindtap="handleTogglePrivilegeModal" hover-class="vip-strip-pressed" aria-role="button" aria-label="极境车库尊享权益保障，点击查看详情">
+    <view class="vip-strip-left">
+      <view class="vip-strip-icon-crown" aria-hidden="true">👑</view>
+      <view class="vip-strip-items">
+        <text class="vip-strip-tag">100%实车保真</text>
+        <text class="vip-strip-dot">·</text>
+        <text class="vip-strip-tag">36项整备</text>
+        <text class="vip-strip-dot">·</text>
+        <text class="vip-strip-tag">满油/满电交付</text>
+        <text class="vip-strip-dot">·</text>
+        <text class="vip-strip-tag">专属管家</text>
+      </view>
+    </view>
+    <view class="vip-strip-arrow">权益保障 ›</view>
+  </view>
   <view class="pricing-card ui-card">
     <view class="section-heading pricing-heading">
       <view class="section-heading-copy">
@@ -156,6 +171,25 @@
     <view wx:if="{{pricingOverview.includedText}}" class="pricing-included">{{pricingOverview.includedText}}</view>
     <view class="pricing-discount-tiers" wx:if="{{pricingOverview.discountTiers.length}}">
       <view class="pricing-tier-chip" wx:for="{{pricingOverview.discountTiers}}" wx:key="minDays"><text class="pricing-tier-tag">连租满{{item.minDays}}天</text><text class="pricing-tier-rate">{{item.discountText}}</text></view>
+    </view>
+    <view class="pricing-trial-section" wx:if="{{trialPricing}}">
+      <view class="pricing-trial-header">
+        <text class="pricing-trial-title">快捷租期试算</text>
+        <view class="pricing-trial-chips">
+          <view class="pricing-trial-chip {{trialDays === 1 ? 'pricing-trial-chip-active' : ''}}" data-days="1" bindtap="handleTrialDaysChange" hover-class="filter-button-pressed" aria-role="button" aria-label="试算1天费用">1天</view>
+          <view class="pricing-trial-chip {{trialDays === 3 ? 'pricing-trial-chip-active' : ''}}" data-days="3" bindtap="handleTrialDaysChange" hover-class="filter-button-pressed" aria-role="button" aria-label="试算3天费用">3天</view>
+          <view class="pricing-trial-chip {{trialDays === 7 ? 'pricing-trial-chip-active' : ''}}" data-days="7" bindtap="handleTrialDaysChange" hover-class="filter-button-pressed" aria-role="button" aria-label="试算7天费用">7天</view>
+          <view class="pricing-trial-chip {{trialDays === 30 ? 'pricing-trial-chip-active' : ''}}" data-days="30" bindtap="handleTrialDaysChange" hover-class="filter-button-pressed" aria-role="button" aria-label="试算30天费用">30天</view>
+        </view>
+      </view>
+      <view class="pricing-trial-result">
+        <view class="pricing-trial-estimate">
+          <text class="pricing-trial-count">{{trialPricing.days}}天预估：</text>
+          <text class="pricing-trial-amount">{{trialPricing.rateText}}</text>
+          <text wx:if="{{trialPricing.savingsText}}" class="pricing-trial-savings">{{trialPricing.savingsText}}</text>
+        </view>
+        <view wx:if="{{trialPricing.discountLabel}}" class="pricing-trial-tier-badge">{{trialPricing.discountLabel}}</view>
+      </view>
     </view>
     <button wx:if="{{pricingOverview.feeItems.length}}" class="disclosure-button" bindtap="handleTogglePricing" hover-class="disclosure-button-pressed" aria-expanded="{{pricingExpanded}}">
       <text>{{pricingExpanded ? '收起费用说明' : '查看保障与其他费用'}}</text>
@@ -256,11 +290,38 @@
         <view class="perf-metric-value">{{car.performance.torque}}</view>
       </view>
     </view>
-    <view class="perf-highlights-box">
+    <view class="perf-tabs-row" aria-role="tablist">
+      <view
+        class="perf-tab-btn {{specTab === 'perf' ? 'perf-tab-btn-active' : ''}}"
+        data-tab="perf"
+        bindtap="handleSpecTabChange"
+        hover-class="filter-button-pressed"
+        aria-role="tab"
+        aria-selected="{{specTab === 'perf'}}"
+      >动力驾控</view>
+      <view
+        class="perf-tab-btn {{specTab === 'cabin' ? 'perf-tab-btn-active' : ''}}"
+        data-tab="cabin"
+        bindtap="handleSpecTabChange"
+        hover-class="filter-button-pressed"
+        aria-role="tab"
+        aria-selected="{{specTab === 'cabin'}}"
+      >奢享座舱</view>
+    </view>
+    <view class="perf-highlights-box" wx:if="{{specTab === 'perf'}}">
       <view class="perf-highlights-title">核心驾控配置</view>
       <view class="perf-tag-list">
         <view class="perf-tag-item" wx:for="{{car.performance.highlights}}" wx:key="*this">
           <view class="perf-tag-dot" aria-hidden="true"></view>
+          <text>{{item}}</text>
+        </view>
+      </view>
+    </view>
+    <view class="perf-highlights-box" wx:if="{{specTab === 'cabin'}}">
+      <view class="perf-highlights-title">奢适座舱体验</view>
+      <view class="perf-tag-list">
+        <view class="perf-tag-item" wx:for="{{car.performance.cabinHighlights}}" wx:key="*this">
+          <view class="perf-tag-dot perf-tag-dot-gold" aria-hidden="true"></view>
           <text>{{item}}</text>
         </view>
       </view>
@@ -371,6 +432,27 @@
         </button>
         <view class="poster-modal-subtip">保存后可分享到微信朋友圈或车友群</view>
       </view>
+    </view>
+  </view>
+  <view wx:if="{{privilegeModalVisible}}" class="privilege-modal-overlay" bindtap="handleClosePrivilegeModal" hover-class="none" aria-modal="true" aria-role="dialog">
+    <view class="privilege-modal-dialog ui-card" catchtap="true">
+      <view class="privilege-modal-header">
+        <view class="privilege-modal-title-wrap">
+          <view class="privilege-modal-badge">VIP GUARANTEE</view>
+          <view class="privilege-modal-title">极境车库 · 尊享权益保障</view>
+        </view>
+        <view class="privilege-modal-close" bindtap="handleClosePrivilegeModal" hover-class="privilege-modal-close-hover" aria-role="button" aria-label="关闭权益说明">✕</view>
+      </view>
+      <view class="privilege-list">
+        <view class="privilege-item" wx:for="{{vipPrivileges}}" wx:key="key">
+          <view class="privilege-item-icon">{{item.icon}}</view>
+          <view class="privilege-item-body">
+            <view class="privilege-item-title">{{item.title}}</view>
+            <view class="privilege-item-desc">{{item.desc}}</view>
+          </view>
+        </view>
+      </view>
+      <button class="privilege-confirm-btn ui-btn ui-btn-primary" bindtap="handleClosePrivilegeModal">我知道了</button>
     </view>
   </view>
 </view>

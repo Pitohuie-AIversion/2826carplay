@@ -1,4 +1,4 @@
-﻿<view wx:if="{{pageAuthorized}}" class="overview-page management-page">
+<view wx:if="{{pageAuthorized}}" class="overview-page management-page">
   <view class="page-glow"></view>
   <view class="hero-card ui-card ui-card-gradient">
     <view class="hero-top">
@@ -103,6 +103,69 @@
           <view class="alert-action" aria-hidden="true">
             <view class="alert-action-label">{{item.actionLabel}}</view><view class="alert-chevron"></view>
           </view>
+        </view>
+      </view>
+    </view>
+    <view class="section-card ui-card">
+      <view class="section-heading">
+        <view class="section-heading-icon-wrap">
+          <view class="section-native-icon action-section-native-icon" aria-hidden="true"></view>
+          <view><view class="section-eyebrow">QUICK ACCESS</view><view class="section-title">快捷运维通道</view></view>
+        </view>
+        <view class="section-index">SHORTCUTS</view>
+      </view>
+      <view class="quick-ops-grid">
+        <view
+          wx:if="{{canManageVehicles}}"
+          class="quick-op-item"
+          data-url="/pages-admin/vehicle-create/vehicle-create"
+          bindtap="handleRouteTap"
+          hover-class="quick-op-pressed"
+          aria-role="button"
+          aria-label="快速录入新座驾"
+        >
+          <view class="quick-op-icon-wrap"><view class="quick-op-icon quick-op-icon-add"></view></view>
+          <view class="quick-op-name">录入新车</view>
+          <view class="quick-op-sub">新增车库座驾</view>
+        </view>
+        <view
+          wx:if="{{canManageBookings}}"
+          class="quick-op-item"
+          data-url="/pages/booking-workbench/booking-workbench"
+          bindtap="handleRouteTap"
+          hover-class="quick-op-pressed"
+          aria-role="button"
+          aria-label="进入预约调度工作台"
+        >
+          <view class="quick-op-icon-wrap"><view class="quick-op-icon quick-op-icon-bench"></view></view>
+          <view class="quick-op-name">调度工作台</view>
+          <view class="quick-op-sub">排期跟进处理</view>
+        </view>
+        <view
+          wx:if="{{canManageRoles}}"
+          class="quick-op-item"
+          data-url="/pages-admin/config-manage/config-manage"
+          bindtap="handleRouteTap"
+          hover-class="quick-op-pressed"
+          aria-role="button"
+          aria-label="配置系统参数与服务网点"
+        >
+          <view class="quick-op-icon-wrap"><view class="quick-op-icon quick-op-icon-cfg"></view></view>
+          <view class="quick-op-name">参数配置</view>
+          <view class="quick-op-sub">公告/网点/电话</view>
+        </view>
+        <view
+          wx:if="{{canManageRoles}}"
+          class="quick-op-item"
+          data-url="/pages-admin/system-health/system-health"
+          bindtap="handleRouteTap"
+          hover-class="quick-op-pressed"
+          aria-role="button"
+          aria-label="执行系统健康体检"
+        >
+          <view class="quick-op-icon-wrap"><view class="quick-op-icon quick-op-icon-health"></view></view>
+          <view class="quick-op-name">健康巡检</view>
+          <view class="quick-op-sub">云函数与数据库</view>
         </view>
       </view>
     </view>

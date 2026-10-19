@@ -344,6 +344,13 @@
       "installDependency": true,
       "ignore": [
         "node_modules/**"
+      ],
+      "triggers": [
+        {
+          "name": "warmupKeepAlive",
+          "type": "timer",
+          "config": "0 */10 8-23 * * * *"
+        }
       ]
     },
     {

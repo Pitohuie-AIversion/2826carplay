@@ -174,7 +174,7 @@ describe("shared/versionMigration 版本迁移与热更新管理器", () => {
       confirmColor: "#528fff"
     })
     expect(modalOptions.content).toContain(RELEASE_NOTES.title)
-    expect(modalOptions.content).toContain("交付中心")
+    expect(modalOptions.content).toContain(RELEASE_NOTES.highlights[0])
     expect(onConfirm).toHaveBeenCalledTimes(1)
   })
 

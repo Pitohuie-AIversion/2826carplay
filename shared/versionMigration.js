@@ -1,18 +1,18 @@
-const CURRENT_VERSION = "1.0.1"
+const CURRENT_VERSION = "1.2.0"
 const STORAGE_KEY_VERSION = "app_current_version"
 const STORAGE_KEY_MIGRATED_AT = "app_version_migrated_at"
 const STORAGE_KEY_RELEASE_NOTES = "app_latest_release_notes"
 
 const RELEASE_NOTES = {
   version: CURRENT_VERSION,
-  releaseDate: "2026-09-18",
-  title: "极境车库 v1.0.1 体验更新",
+  releaseDate: "2026-10-19",
+  title: "极境车库 v1.2.0 尊享对比矩阵与交验车留证闭环升级",
   highlights: [
-    "【城市筛选】首页车库与管理端新增取车交付中心城市即时过滤，支持本地与云端联动查询",
-    "【偏好记忆】待协调工作台排序偏好及我的收藏「只看可预约」状态支持本地记忆与自动恢复",
-    "【海报生成】车辆详情支持生成专属分享海报，优化相册权限提示文案与拦截引导",
-    "【交互体验】全站核心数据页面接入微信原生下拉刷新，优化网络同步与按压微动画",
-    "【热更新】引入客户端新版本就绪自动提示与启动数据平滑迁移机制"
+    "【验车留证】预约详情全面支持客户专属交验车留证事实备忘复制、环检损伤结构化呈现与留证单 (CSV) 导出、查看及分享",
+    "【心仪对比】心仪收藏夹引入车型对比矩阵、参数差异高亮过滤（只看差异）、生成尊享对比长图海报与管家一键核价闭环",
+    "【预约触感】预约列表与预约工作台全流程接入分类轻量震动触感反馈与页面卡片分享能力",
+    "【大盘运维】运营管理端大盘新增新车录入、全局参数配置与系统健康巡检一键运维通道",
+    "【专属管家】预约详情与全流程支持一键致电专属管家与紧急救援通道"
   ]
 }
 

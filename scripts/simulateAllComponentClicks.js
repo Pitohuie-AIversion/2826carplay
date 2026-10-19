@@ -250,7 +250,10 @@ global.wx = {
       } else if (name === "favoriteMyList") {
         result = {
           ok: true,
-          list: [{ id: "car-911", name: "保时捷 911 Carrera S", priceDay: 2800, status: "available" }],
+          list: [
+            { id: "car-911", name: "保时捷 911 Carrera S", brand: "保时捷", priceDay: 2800, priceText: "今日 ￥2800 / 24小时", status: "available", cover: "https://example.com/911.jpg" },
+            { id: "car-panamera", name: "保时捷 Panamera", brand: "保时捷", priceDay: 2200, priceText: "今日 ￥2200 / 24小时", status: "available", cover: "https://example.com/panamera.jpg" }
+          ],
           hasMore: false
         }
       } else if (name === "bookingCreate") {
@@ -675,6 +678,20 @@ simulateClick("点击排序切换:「价格从低到高」(handleSortChange)", (
   }
 })
 
+simulateClick("点击特色筛选芯片:「免押金」(handleQuickFilterTap)", () => {
+  garagePage.handleQuickFilterTap(makeEvent({ filter: "free_deposit" }))
+  if (garagePage.data.quickFilter !== "free_deposit") throw new Error("特色筛选未切换为 free_deposit")
+  garagePage.handleQuickFilterTap(makeEvent({ filter: "all" }))
+  if (garagePage.data.quickFilter !== "all") throw new Error("特色筛选未恢复为 all")
+})
+
+simulateClick("点击特色筛选芯片:「￥2000内」(handleQuickFilterTap: under_2000)", () => {
+  garagePage.handleQuickFilterTap(makeEvent({ filter: "under_2000" }))
+  if (garagePage.data.quickFilter !== "under_2000") throw new Error("特色筛选未切换为 under_2000")
+  garagePage.handleQuickFilterTap(makeEvent({ filter: "all" }))
+  if (garagePage.data.quickFilter !== "all") throw new Error("特色筛选未恢复为 all")
+})
+
 simulateClick("在车型搜索框中输入关键字并实时过滤 (handleSearchInput)", () => {
   garagePage.handleSearchInput(makeEvent({}, { value: "保时捷" }))
   if (garagePage.data.searchKeyword !== "保时捷") throw new Error("搜索关键字未保存")
@@ -688,6 +705,27 @@ simulateClick("在车型搜索框软键盘确认检索 (handleSearchConfirm)", (
 simulateClick("点击搜索框清空按钮 (handleClearSearch)", () => {
   garagePage.handleClearSearch()
   if (garagePage.data.searchKeyword !== "") throw new Error("搜索关键字未清空")
+})
+
+simulateClick("点击车库热搜推荐词芯片 (handleHotSearchTap)", () => {
+  garagePage.handleHotSearchTap(makeEvent({ keyword: "911" }))
+  if (garagePage.data.searchKeyword !== "911") throw new Error("热搜词未应用到 searchKeyword")
+  garagePage.handleClearSearch()
+  if (garagePage.data.searchKeyword !== "") throw new Error("搜索词未清空")
+})
+
+simulateClick("点击关闭车库公告栏 (handleDismissAnnouncement)", () => {
+  garagePage.setData({ announcementText: "系统维护测试公告", announcementDismissed: false })
+  garagePage.handleDismissAnnouncement()
+  if (!garagePage.data.announcementDismissed) throw new Error("公告未被成功关闭")
+})
+
+simulateClick("点击空态「重置全部筛选」(handleResetAllFilters)", () => {
+  garagePage.setData({ currentCategory: "supercar", selectedCity: "上海", quickFilter: "under_2000" })
+  garagePage.handleResetAllFilters()
+  if (garagePage.data.currentCategory !== "all" || garagePage.data.selectedCity !== "" || garagePage.data.quickFilter !== "all") {
+    throw new Error("筛选重置未恢复默认状态")
+  }
 })
 
 simulateClick("点击推荐场景指南入口 (handleContentGuideTap)", () => {
@@ -728,6 +766,27 @@ simulateClick("头图加载异常重试点击 (handleRetryHeroImage)", () => {
 
 simulateClick("点击收藏/取消收藏按钮 (handleFavoriteTap)", () => {
   carDetailPage.handleFavoriteTap()
+})
+
+simulateClick("点击切换车型配置参数模态:「奢享座舱」(handleSpecTabChange: cabin)", () => {
+  carDetailPage.handleSpecTabChange(makeEvent({ tab: "cabin" }))
+  if (carDetailPage.data.specTab !== "cabin") throw new Error("配置卡片未切换至奢享座舱")
+  carDetailPage.handleSpecTabChange(makeEvent({ tab: "perf" }))
+  if (carDetailPage.data.specTab !== "perf") throw new Error("配置卡片未恢复至动力驾控")
+})
+
+simulateClick("点击展开/关闭极境尊享权益保障弹窗 (handleTogglePrivilegeModal)", () => {
+  carDetailPage.handleTogglePrivilegeModal()
+  if (!carDetailPage.data.privilegeModalVisible) throw new Error("权益保障弹窗未开启")
+  carDetailPage.handleClosePrivilegeModal()
+  if (carDetailPage.data.privilegeModalVisible) throw new Error("权益保障弹窗未关闭")
+})
+
+simulateClick("点击切换租期试算天数:「3天」(handleTrialDaysChange: 3)", () => {
+  carDetailPage.handleTrialDaysChange(makeEvent({ days: 3 }))
+  if (carDetailPage.data.trialDays !== 3) throw new Error("试算租期未切换为 3 天")
+  carDetailPage.handleTrialDaysChange(makeEvent({ days: 1 }))
+  if (carDetailPage.data.trialDays !== 1) throw new Error("试算租期未恢复为 1 天")
 })
 
 simulateClick("点击展开/折叠价格说明手风琴 (handleTogglePricing)", () => {
@@ -873,6 +932,13 @@ simulateClick("点击返回车库主页 (handleBackGarage)", () => {
   bookingPage.handleBackGarage()
 })
 
+simulateClick("点击致电专属管家电话咨询 (handleCallServicePhone)", () => {
+  bookingPage.handleCallServicePhone()
+  if (!wx._lastPhoneCall || wx._lastPhoneCall.phoneNumber !== "18800001111") {
+    throw new Error("未正确拨打专属管家咨询电话")
+  }
+})
+
 logSuite("6. 主包页面: pages/bookings/bookings (我的预约列表)")
 const bookingsPage = loadPage("pages/bookings/bookings")
 
@@ -958,6 +1024,37 @@ simulateClick("点击查看交接单验车照片大图 (handlePreviewHandoverPho
   bookingDetailPage.handlePreviewHandoverPhoto(makeEvent({ url: "https://example.com/handover.jpg" }))
 })
 
+simulateClick("点击核对确认车辆交接记录 (handleConfirmHandover)", () => {
+  bookingDetailPage.setData({
+    handovers: {
+      pickup: { id: "ho-p-01", stage: "pickup", stageText: "取车", status: "submitted" }
+    }
+  })
+  bookingDetailPage.handleConfirmHandover(makeEvent({ stage: "pickup" }))
+})
+
+simulateClick("点击一键复制交接留证事实备忘 (handleCopyHandoverSummary)", () => {
+  bookingDetailPage.handleCopyHandoverSummary(makeEvent({ stage: "pickup" }))
+})
+
+simulateClick("点击导出客户专属验车留证单 (handleExportHandoverReport)", () => {
+  bookingDetailPage.handleExportHandoverReport(makeEvent({ stage: "pickup" }))
+})
+
+simulateClick("点击打开已导出的验车留证单 (handleOpenExportedHandover)", () => {
+  bookingDetailPage.setData({ exportedHandoverPath: "wxfile://user/report.csv" })
+  bookingDetailPage.handleOpenExportedHandover()
+})
+
+simulateClick("点击转发分享验车留证单 (handleShareExportedHandover)", () => {
+  bookingDetailPage.handleShareExportedHandover()
+})
+
+simulateClick("点击清理已导出留证单缓存 (handleDeleteExportedHandover)", () => {
+  bookingDetailPage.handleDeleteExportedHandover()
+  if (bookingDetailPage.data.exportedHandoverPath) throw new Error("留证单缓存路径未清空")
+})
+
 simulateClick("点击接受最新报价明细 (handleConfirmQuote)", () => {
   bookingDetailPage.handleConfirmQuote()
 })
@@ -1006,6 +1103,27 @@ simulateClick("点击网络重试加载单据 (handleRetryLoad)", () => {
   bookingDetailPage.handleRetryLoad()
 })
 
+simulateClick("点击用车体验星级评分 (handleRatingTap)", () => {
+  bookingDetailPage.setData({ reviewSubmitted: false })
+  bookingDetailPage.handleRatingTap(makeEvent({ rating: 5 }))
+  if (bookingDetailPage.data.satisfactionRating !== 5) throw new Error("评分未更新")
+})
+
+simulateClick("点击用车体验快捷标签 (handleSatisfactionTagTap)", () => {
+  bookingDetailPage.handleSatisfactionTagTap(makeEvent({ tag: "管家专业" }))
+  if (!bookingDetailPage.data.selectedSatisfactionTags.includes("管家专业")) throw new Error("标签未勾选")
+})
+
+simulateClick("输入用车体验评价建议 (handleSatisfactionNoteInput)", () => {
+  bookingDetailPage.handleSatisfactionNoteInput(makeEvent({}, { value: "车辆很新，服务贴心" }))
+  if (bookingDetailPage.data.satisfactionNote !== "车辆很新，服务贴心") throw new Error("评价输入未更新")
+})
+
+simulateClick("点击提交用车体验尊享评价 (handleSubmitSatisfactionReview)", () => {
+  bookingDetailPage.handleSubmitSatisfactionReview()
+  if (!bookingDetailPage.data.reviewSubmitting && !bookingDetailPage.data.reviewSubmitted) throw new Error("评价提交未触发")
+})
+
 logSuite("8. 主包页面: pages/favorites/favorites (我的收藏)")
 const favoritesPage = loadPage("pages/favorites/favorites")
 
@@ -1026,6 +1144,63 @@ simulateClick("点击移除收藏项 (handleRemove)", () => {
 
 simulateClick("点击撤销刚刚的移除收藏操作 (handleUndoRemove)", () => {
   favoritesPage.handleUndoRemove()
+})
+
+simulateClick("点击打开心仪车型对比矩阵 (handleOpenCompareModal)", () => {
+  favoritesPage.handleOpenCompareModal()
+  if (!favoritesPage.data.compareModalVisible) throw new Error("车型对比弹窗未开启")
+  if (favoritesPage.data.compareCars.length < 2) throw new Error("对比车辆数不足2辆")
+  favoritesPage.handleCloseCompareModal()
+  if (favoritesPage.data.compareModalVisible) throw new Error("车型对比弹窗未关闭")
+})
+
+simulateClick("点击从对比矩阵中跳转车辆详情 (handleCompareCarDetail)", () => {
+  favoritesPage.handleOpenCompareModal()
+  favoritesPage.handleCompareCarDetail(makeEvent({ id: "car-911" }))
+})
+
+simulateClick("点击复制心仪车型对比清单 (handleCopyComparison)", () => {
+  favoritesPage.handleOpenCompareModal()
+  favoritesPage.handleCopyComparison()
+  favoritesPage.handleCloseCompareModal()
+})
+
+simulateClick("点击切换对比矩阵只看差异模式 (handleToggleCompareDiffOnly)", () => {
+  favoritesPage.handleOpenCompareModal()
+  favoritesPage.handleToggleCompareDiffOnly()
+  if (!favoritesPage.data.compareDiffOnly) throw new Error("只看差异模式未激活")
+  favoritesPage.handleToggleCompareDiffOnly()
+  if (favoritesPage.data.compareDiffOnly) throw new Error("只看差异模式未关闭")
+  favoritesPage.handleCloseCompareModal()
+})
+
+simulateClick("点击快速替换对比车辆 (handleSwitchCompareCar)", () => {
+  favoritesPage.handleOpenCompareModal()
+  favoritesPage.handleSwitchCompareCar(makeEvent({}, { carid: "car-panamera" }))
+  favoritesPage.handleCloseCompareModal()
+})
+
+simulateClick("点击生成双车对比精美海报 (handleOpenComparePosterModal)", () => {
+  favoritesPage.handleOpenCompareModal()
+  favoritesPage.handleOpenComparePosterModal()
+  if (!favoritesPage.data.comparePosterVisible) throw new Error("海报预览弹窗未开启")
+})
+
+simulateClick("点击保存双车对比海报至相册 (handleSaveComparePoster)", () => {
+  favoritesPage.setData({ comparePosterImagePath: "wxfile://saved_poster_test.png" })
+  favoritesPage.handleSaveComparePoster()
+})
+
+simulateClick("点击关闭双车对比海报预览 (handleCloseComparePosterModal)", () => {
+  favoritesPage.handleCloseComparePosterModal()
+  if (favoritesPage.data.comparePosterVisible) throw new Error("海报预览弹窗未关闭")
+  favoritesPage.handleCloseCompareModal()
+})
+
+simulateClick("点击致电专属管家咨询对比方案 (handleCallConsultant)", () => {
+  favoritesPage.handleOpenCompareModal()
+  favoritesPage.handleCallConsultant()
+  favoritesPage.handleCloseCompareModal()
 })
 
 simulateClick("点击「去车库逛逛」入口 (handleBrowseGarage)", () => {
@@ -1827,6 +2002,18 @@ simulateClick("点击运营概览空路由容错 (handleRouteTap: empty)", () =>
   ooPage.handleRouteTap(makeEvent({ url: "" }))
 })
 
+simulateClick("点击快捷运维通道: 录入新车 (handleRouteTap: quickVehicleCreate)", () => {
+  ooPage.handleRouteTap(makeEvent({ url: "/pages-admin/vehicle-create/vehicle-create" }))
+})
+
+simulateClick("点击快捷运维通道: 参数配置 (handleRouteTap: quickConfigManage)", () => {
+  ooPage.handleRouteTap(makeEvent({ url: "/pages-admin/config-manage/config-manage" }))
+})
+
+simulateClick("点击快捷运维通道: 健康巡检 (handleRouteTap: quickSystemHealth)", () => {
+  ooPage.handleRouteTap(makeEvent({ url: "/pages-admin/system-health/system-health" }))
+})
+
 logSuite("21. 分包页面: pages-admin/analytics-manage/analytics-manage (数据分析与指标统计)")
 const amPage = loadPage("pages-admin/analytics-manage/analytics-manage")
 amPage.setData({ loading: false, cleanupLoading: false, pageAuthorized: true })
@@ -1885,6 +2072,11 @@ const cmPage = loadPage("pages-admin/config-manage/config-manage")
 simulateClick("修改已开放的服务时间配置", () => {
   cmPage.handleInput(makeEvent({ field: "serviceHoursText" }, { value: "每日 10:00–18:00" }))
   if (cmPage.data.form.serviceHoursText !== "每日 10:00–18:00") throw new Error("服务时间未编辑")
+})
+
+simulateClick("修改首页热搜推荐词配置 (handleInput: hotSearchKeywordsText)", () => {
+  cmPage.handleInput(makeEvent({ field: "hotSearchKeywordsText" }, { value: "迈凯伦、兰博基尼、阿斯顿马丁" }))
+  if (cmPage.data.form.hotSearchKeywordsText !== "迈凯伦、兰博基尼、阿斯顿马丁") throw new Error("热搜推荐词未编辑")
 })
 
 simulateClick("新增服务网点并编辑城市地址坐标和类型", () => {

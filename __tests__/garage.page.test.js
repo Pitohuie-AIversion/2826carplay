@@ -576,7 +576,7 @@ describe("pages/garage 首页车辆筛选", () => {
 
   test("冷启动时优先从 storage 恢复 garage_last_snapshot 实现秒开", () => {
     const mockCars = [{ id: "c1", name: "Porsche 911", brand: "保时捷", priceDay: 3000, status: "available" }]
-    const filters = { category: "all", city: "", keyword: "", availableOnly: false, sortBy: "default" }
+    const filters = { category: "all", city: "", keyword: "", availableOnly: false, sortBy: "default", quickFilter: "all" }
     global.wx = {
       getStorageSync: jest.fn((key) => {
         if (key === "garage_last_snapshot") {

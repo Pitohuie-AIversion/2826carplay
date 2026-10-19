@@ -95,6 +95,10 @@ function createHandoverForm() {
 function normalizeHandover(item) {
   const record = item && typeof item === "object" ? item : {}
   const status = String(record.status || "")
+  const scratchItems = Array.isArray(record.scratchItems) ? record.scratchItems : []
+  const scratchSummary = scratchItems.length > 0
+    ? scratchItems.map((s) => `${s.partLabel || s.part || "部位"}: ${s.typeLabel || s.type || "损伤"}${s.description ? `(${s.description})` : ""}`).join("; ")
+    : ""
   return {
     ...record,
     id: String(record.id || ""),
@@ -103,7 +107,8 @@ function normalizeHandover(item) {
     energyText: `${record.energyType === "electric" ? "电量" : "油量"} ${Math.max(0, Number(record.energyLevelPercent || 0))}%`,
     submittedAtText: formatDisplayTime(record.submittedAt),
     confirmedAtText: formatDisplayTime(record.confirmedAt),
-    photos: Array.isArray(record.photos) ? record.photos : []
+    photos: Array.isArray(record.photos) ? record.photos : [],
+    scratchSummary: scratchSummary || record.scratchSummary || ""
   }
 }
 function normalizeBooking(item) {
@@ -196,6 +201,7 @@ Page({
     createdAtText: "",
     updatedAtText: "",
     adminRemarkUpdatedAtText: "",
+    customerReview: null,
     conflicts: [],
     conflictTotal: 0,
     conflictsTruncated: false,
@@ -377,11 +383,19 @@ Page({
       label: tier.label,
       discountPercent: Math.round((1 - tier.discountRate) * 100)
     } : null
+    let customerReview = booking.customerReview || null
+    if (!customerReview && booking.id && typeof wx !== "undefined" && typeof wx.getStorageSync === "function") {
+      try {
+        const stored = wx.getStorageSync(`booking_review_${booking.id}`)
+        if (stored && stored.rating) customerReview = stored
+      } catch (e) {}
+    }
     this.applyState({
       booking,
       rentalDays,
       quoteDateRangeTooLong: rentalDays > 47,
       recommendedDiscount,
+      customerReview,
       remarkDirty: false,
       initialLoading: false,
       loading: false,

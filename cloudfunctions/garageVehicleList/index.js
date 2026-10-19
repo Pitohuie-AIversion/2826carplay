@@ -660,6 +660,12 @@ async function runNativeOptimized(page, pageSize, keyword, category, availableOn
 exports.main = async (event) => {
   try {
     const payload = event && typeof event === "object" ? event : {}
+    // 定时预热触发器快速响应，维持容器活跃状态与预热数据库连接
+    if (payload.Type === "Timer" || payload.isWarmup === true) {
+      clearStatsProjectionCache()
+      await countTotalActive().catch(() => null)
+      return { ok: true, warmup: true, timestamp: Date.now() }
+    }
     const pageRaw = Number(payload.page)
     const pageSizeRaw = Number(payload.pageSize)
     const page = Number.isFinite(pageRaw) && pageRaw > 0 ? Math.floor(pageRaw) : 0

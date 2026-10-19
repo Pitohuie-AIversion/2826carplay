@@ -1,5 +1,5 @@
 const { trackEvent } = require("../../shared/analytics")
-const { normalizeRentalDiscountTiers } = require("../../shared/rentalPricing")
+const { normalizeRentalDiscountTiers, calculateRentalDiscount } = require("../../shared/rentalPricing")
 const { sanitizeAttribution, buildQuery, hasAttribution, isShareLanding } = require("../../shared/contentAttribution")
 const { formatToastTitle } = require("../../shared/uiFeedback")
 const { requestOperationConfig } = require("../../shared/operationConfigRequest")
@@ -40,6 +40,23 @@ function normalizeRentalTerms(raw) {
     result[key] = String(input[key] || "").trim()
     return result
   }, {})
+}
+
+function buildTrialPricing(baseDailyRate, days, discountTiers) {
+  const rate = Number(baseDailyRate) || 0
+  const count = Number(days) || 1
+  if (!rate || count <= 0) return null
+  const originalTotal = rate * count
+  const discountRes = calculateRentalDiscount(originalTotal, count, discountTiers)
+  return {
+    days: count,
+    originalTotal,
+    discountedTotal: discountRes.discountedTotal,
+    savingsAmount: discountRes.savingsAmount,
+    discountLabel: discountRes.discountTier ? discountRes.discountTier.label : "",
+    rateText: `￥${discountRes.discountedTotal}`,
+    savingsText: discountRes.savingsAmount > 0 ? `省 ￥${discountRes.savingsAmount}` : ""
+  }
 }
 
 function buildPricingOverview(car, rentalTermsInput) {
@@ -114,19 +131,28 @@ function buildPerformanceHighlights(car) {
   const rawPerf = source.performance && typeof source.performance === "object" ? source.performance : {}
 
   const fallbackHighlights = ["具体配置以车辆实车为准", "建议到店体验后确认功能"]
+  const fallbackCabinHighlights = [
+    "尊享奢华级座舱包覆与精细工艺",
+    "多区域独立自动恒温空调系统",
+    "多向电动调节与人体工程学运动座椅",
+    "高保真殿堂级环绕声学音响系统",
+    "全景泊车影像辅助与主动安全护航"
+  ]
 
   const rawAcceleration = String(rawPerf.acceleration != null ? rawPerf.acceleration : source.acceleration == null ? "" : source.acceleration).trim()
   const rawHorsepower = String(rawPerf.horsepower != null ? rawPerf.horsepower : source.horsepower == null ? "" : source.horsepower).trim()
   const rawDrivetrain = String(rawPerf.drivetrain != null ? rawPerf.drivetrain : source.drivetrain == null ? "" : source.drivetrain).trim()
   const rawTorque = String(rawPerf.torque != null ? rawPerf.torque : source.torque == null ? "" : source.torque).trim()
   const rawHighlights = Array.isArray(rawPerf.highlights) && rawPerf.highlights.length ? rawPerf.highlights.slice() : null
+  const rawCabinHighlights = Array.isArray(rawPerf.cabinHighlights) && rawPerf.cabinHighlights.length ? rawPerf.cabinHighlights.slice() : fallbackCabinHighlights.slice()
 
   return {
     acceleration: rawAcceleration || "—",
     horsepower: rawHorsepower || "—",
     drivetrain: rawDrivetrain || "—",
     torque: rawTorque || "—",
-    highlights: rawHighlights || fallbackHighlights.slice()
+    highlights: rawHighlights || fallbackHighlights.slice(),
+    cabinHighlights: rawCabinHighlights
   }
 }
 
@@ -273,9 +299,12 @@ Page({
     wxKfReady: false,
     rentalTerms: normalizeRentalTerms(),
     pricingOverview: buildPricingOverview(null),
+    trialDays: 1,
+    trialPricing: null,
     pricingExpanded: false,
     rulesExpanded: false,
     trustExpanded: false,
+    specTab: "perf",
     carId: "",
     car: null,
     detailVerified: false,
@@ -295,7 +324,15 @@ Page({
     ],
     posterModalVisible: false,
     posterGenerating: false,
-    posterImagePath: ""
+    posterImagePath: "",
+    privilegeModalVisible: false,
+    vipPrivileges: [
+      { key: "real_car", icon: "👑", title: "100% 实车保真", desc: "车牌、配置与实拍图严格一致，杜绝任何虚假车源" },
+      { key: "inspection", icon: "🛡️", title: "36项交付整备", desc: "交付前完成全车36道安全性能点检与舱内深层无菌除味" },
+      { key: "full_energy", icon: "🚗", title: "满油/满电交付", desc: "专属交付中心满能量交付，支持同等返还或便捷代充" },
+      { key: "concierge", icon: "💎", title: "1对1管家陪同", desc: "尊享顾问交付教学、全程线路指引与24小时全国道路救援" },
+      { key: "deposit_free", icon: "⚡", title: "信用尊享免押", desc: "优质信用资质客户免收全额车辆押金，退款秒级对账" }
+    ]
   },
 
   onLoad(options) {
@@ -733,10 +770,13 @@ Page({
     const nextImageIndex = isSameCar
       ? Math.min(Math.max(Number(this.data.currentImageIndex) || 0, 0), Math.max((viewModel.imageItems.length || 1) - 1, 0))
       : 0
+    const baseDailyRate = Number(targetCar.priceDay) || 0
+    const trialPricing = buildTrialPricing(baseDailyRate, this.data.trialDays || 1, targetCar.rentalDiscountTiers)
     this.setData({
       car: viewModel,
       detailVerified: Boolean(options && options.verified),
       pricingOverview: buildPricingOverview(targetCar, this.data.rentalTerms),
+      trialPricing,
       currentImageIndex: nextImageIndex,
       trustExpanded: false,
       loading: false,
@@ -778,7 +818,10 @@ Page({
       const item = items[entry.index]
       if (!item || !item.src) return
       if (item.displaySrc && item.displaySrc !== item.src) return
-      resolveImage(item.src, { priority: entry.priority })
+      resolveImage(item.src, {
+        priority: entry.priority,
+        imageTransform: { width: 1200, quality: 88, format: "webp" }
+      })
         .then((result) => {
           if (this._imageResolveSerial !== serial || !result || !result.localPath) return
           const car = this.data.car
@@ -937,6 +980,8 @@ Page({
       return
     }
 
+    triggerHapticFeedback("light")
+    const prevFavorited = this.data.favorited
     const nextFavorited = !this.data.favorited
     const vehicleId = String(this.data.carId || "").trim()
     const updateSerial = Number(this._favoriteUpdateSerial || 0) + 1
@@ -944,7 +989,10 @@ Page({
     this._favoriteStatusRequestId = Number(this._favoriteStatusRequestId || 0) + 1
     this.clearFavoriteStatusTimer()
     this.clearFavoriteUpdateTimer()
-    this.setData({ favoriteLoading: true })
+    this.setData({
+      favoriteLoading: true,
+      favorited: nextFavorited
+    })
 
     let settled = false
     const finishRequest = () => {
@@ -959,7 +1007,10 @@ Page({
       if (!finishRequest()) {
         return
       }
-      this.setData({ favoriteLoading: false })
+      this.setData({
+        favoriteLoading: false,
+        favorited: prevFavorited
+      })
       wx.showToast({
         title: formatToastTitle(message, "收藏操作失败"),
         icon: "none"
@@ -982,7 +1033,10 @@ Page({
         }
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
-          this.setData({ favoriteLoading: false })
+          this.setData({
+            favoriteLoading: false,
+            favorited: prevFavorited
+          })
           wx.showToast({
             title: formatToastTitle(result && result.message, "收藏操作失败"),
             icon: "none"
@@ -996,7 +1050,6 @@ Page({
         if (result.favorited) {
           trackEvent("favorite_add", vehicleId)
         }
-        triggerHapticFeedback("light")
         wx.showToast({
           title: result.favorited ? "已加入收藏" : "已取消收藏",
           icon: "success"
@@ -1032,8 +1085,11 @@ Page({
     this.updateServiceHub()
     const city = (this.data.serviceHub && this.data.serviceHub.city) || this.data.car.location || ""
     const query = buildQuery(attribution)
-    const cityParam = city ? `${query ? "&" : ""}city=${encodeURIComponent(city)}` : ""
-    const fullQuery = [query, cityParam].filter(Boolean).join("")
+    const params = []
+    if (query) params.push(query)
+    if (city) params.push(`city=${encodeURIComponent(city)}`)
+    if (this.data.trialDays && this.data.trialDays > 1) params.push(`days=${this.data.trialDays}`)
+    const fullQuery = params.join("&")
     wx.navigateTo({
       url: `/pages/booking/booking?${fullQuery}`,
       fail: () => {
@@ -1045,6 +1101,18 @@ Page({
           icon: "none"
         })
       }
+    })
+  },
+
+  handleTrialDaysChange(event) {
+    const days = Number(event && event.currentTarget && event.currentTarget.dataset && event.currentTarget.dataset.days) || 1
+    if (days === this.data.trialDays) return
+    triggerHapticFeedback("selection")
+    const priceDay = (this.data.car && Number(this.data.car.priceDay)) || 0
+    const tiers = (this.data.car && this.data.car.rentalDiscountTiers) || []
+    this.setData({
+      trialDays: days,
+      trialPricing: buildTrialPricing(priceDay, days, tiers)
     })
   },
 
@@ -1073,6 +1141,23 @@ Page({
       this._trustProfileViewTracked = true
       trackEvent("trusted_profile_view", this.data.carId)
     }
+  },
+
+  handleSpecTabChange(event) {
+    const tab = String((event && event.currentTarget && event.currentTarget.dataset && event.currentTarget.dataset.tab) || "perf")
+    if (this.data.specTab === tab) return
+    triggerHapticFeedback("selection")
+    this.setData({ specTab: tab })
+  },
+
+  handleTogglePrivilegeModal() {
+    triggerHapticFeedback("light")
+    const privilegeModalVisible = !this.data.privilegeModalVisible
+    this.setData({ privilegeModalVisible })
+  },
+
+  handleClosePrivilegeModal() {
+    this.setData({ privilegeModalVisible: false })
   },
 
   handleOpenCustomerService() {
@@ -1188,19 +1273,42 @@ Page({
 
   onShareAppMessage() {
     const car = this.data.car
-
     trackEvent("share", car && car.id)
 
     if (!car) {
       return {
-        title: "极境车库",
+        title: "极境车库 · 尊享豪华座驾",
         path: "/pages/garage/garage"
       }
     }
 
+    const titleParts = [car.brand, car.name].filter(Boolean)
+    const title = titleParts.length ? titleParts.join(" ") : "极境尊享座驾"
+    const priceText = car.priceText || (car.priceDay ? `￥${car.priceDay}/天` : "")
+    const shareTitle = priceText ? `${title} | ${priceText}` : title
+    const imageUrl = car.cover || (car.images && car.images[0]) || ""
+
     return {
-      title: `${car.nickname} ${car.name}`,
-      path: `/pages/car-detail/car-detail?${buildQuery({ ...this.data.attribution, channel: "wechat_share", vehicleId: car.id })}`
+      title: shareTitle,
+      path: `/pages/car-detail/car-detail?${buildQuery({ ...this.data.attribution, channel: "wechat_share", vehicleId: car.id })}`,
+      imageUrl: imageUrl || undefined
+    }
+  },
+
+  onShareTimeline() {
+    const car = this.data.car
+    if (!car) {
+      return {
+        title: "极境车库 · 尊享豪华座驾",
+        query: ""
+      }
+    }
+    const title = [car.brand, car.name].filter(Boolean).join(" ") || "极境尊享座驾"
+    const priceText = car.priceText || (car.priceDay ? `￥${car.priceDay}/天` : "")
+    return {
+      title: priceText ? `${title} | ${priceText} - 极境车库` : `${title} - 极境车库`,
+      query: buildQuery({ ...this.data.attribution, channel: "timeline_share", vehicleId: car.id }),
+      imageUrl: car.cover || (car.images && car.images[0]) || ""
     }
   },
 

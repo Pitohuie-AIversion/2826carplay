@@ -168,7 +168,7 @@ describe("用户主流程原生图标", () => {
     const textareaCounterExpressions = {
       "pages/booking/booking.wxml": ["form.note.length"],
       "pages/booking-calendar/booking-calendar.wxml": ["blockForm.reason.length", "priceForm.reason.length"],
-      "pages/booking-detail/booking-detail.wxml": ["editForm.note.length", "adjustmentNote.length"],
+      "pages/booking-detail/booking-detail.wxml": ["editForm.note.length", "adjustmentNote.length", "satisfactionNote.length"],
       "pages/booking-manage/booking-manage.wxml": ["item.adminRemarkDraft.length"],
       "pages/booking-manage-detail/booking-manage-detail.wxml": ["booking.adminRemarkDraft.length", "quoteForm.depositText.length", "quoteForm.customerNote.length", "handoverForm.damageNote.length", "handoverForm.additionalNote.length"],
       "pages/booking-workbench/booking-workbench.wxml": ["remarkDraft.length"],
@@ -190,6 +190,7 @@ describe("用户主流程原生图标", () => {
         "form.rentalEnergyText.length",
         "form.rentalEstimateDisclaimer.length",
         "form.serviceHoursText.length",
+        "form.announcementText.length",
         "item.address.length",
         "item.feeText.length"
       ],
@@ -241,9 +242,9 @@ describe("用户主流程原生图标", () => {
       })
     })
 
-    expect(inputControlCount).toBe(105)
-    expect(singleLineInputCount).toBe(59)
-    expect(textareaCount).toBe(46)
+    expect(inputControlCount).toBe(108)
+    expect(singleLineInputCount).toBe(60)
+    expect(textareaCount).toBe(48)
     expect(Object.values(textareaCounterExpressions).flat()).toHaveLength(textareaCount)
     Object.entries(textareaCounterExpressions).forEach(([relativePath, expressions]) => {
       const source = read(relativePath)
@@ -365,7 +366,7 @@ describe("用户主流程原生图标", () => {
       })
     })
 
-    expect(dynamicImageCount).toBe(8)
+    expect(dynamicImageCount).toBe(10)
   })
 
   test("高频文字链接与图标操作保留最小点击热区", () => {
@@ -479,7 +480,7 @@ describe("用户主流程原生图标", () => {
       })
     })
 
-    expect(horizontalScrollCount).toBe(11)
+    expect(horizontalScrollCount).toBe(12)
   })
 
   test("全站用户可见缺省值不使用技术双短横或 N/A", () => {
@@ -632,7 +633,7 @@ describe("用户主流程原生图标", () => {
       })
     })
 
-    expect(infoModalCount).toBe(20)
+    expect(infoModalCount).toBe(23)
   })
 
   test("动态轻提示保留短消息并为长消息使用业务回退", () => {
@@ -679,7 +680,7 @@ describe("用户主流程原生图标", () => {
       })
     })
 
-    expect(clipboardCount).toBe(7)
+    expect(clipboardCount).toBe(10)
   })
 
   test("轻量系统反馈只在操作来源仍是当前页面时展示", () => {
@@ -695,7 +696,7 @@ describe("用户主流程原生图标", () => {
     )
     const bookingDetailSource = read("pages/booking-detail/booking-detail.js")
 
-    expect(currentOnlyActionCount).toBe(94)
+    expect(currentOnlyActionCount).toBe(99)
     expect(bookingDetailSource).toContain("isPageCurrent(this)")
     expect(read("app.js")).toContain("nativeActionAppVisible = false")
     expect(read("app.js")).toContain("nativeActionAppVisible = true")
@@ -731,7 +732,7 @@ describe("用户主流程原生图标", () => {
       expect(source).toContain('title: "拨号失败"')
     })
 
-    expect(phoneCallCount).toBe(8)
+    expect(phoneCallCount).toBe(10)
   })
 
   test("全站页面跳转、返回兜底、滚动定位和图片预览入口均提供失败反馈", () => {

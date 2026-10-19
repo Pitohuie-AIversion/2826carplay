@@ -64,6 +64,22 @@
       <button class="quick-contact-btn quick-contact-btn-last ui-btn ui-btn-ghost action-with-icon" disabled="{{loading || coordinationLoading}}" data-field="openid" bindtap="handleCopyContact"><view class="identity-native-icon" aria-hidden="true"><view class="identity-native-dot"></view></view><text>复制 OpenID</text></button>
     </view>
   </view>
+  <view wx:if="{{customerReview}}" class="review-manage-card ui-card">
+    <view class="section-heading">
+      <view>
+        <view class="section-kicker">CUSTOMER FEEDBACK</view>
+        <view class="section-title">客户尊享评价</view>
+      </view>
+      <view class="review-stars-score">
+        <text class="review-stars">{{customerReview.rating === 5 ? '★★★★★' : customerReview.rating === 4 ? '★★★★☆' : customerReview.rating === 3 ? '★★★☆☆' : '★★☆☆☆'}}</text>
+        <text class="review-rating-num">{{customerReview.rating}} / 5 分</text>
+      </view>
+    </view>
+    <view class="review-tags" wx:if="{{customerReview.tags && customerReview.tags.length}}">
+      <text class="review-tag" wx:for="{{customerReview.tags}}" wx:key="*this">{{item}}</text>
+    </view>
+    <view class="review-note" wx:if="{{customerReview.note}}">{{customerReview.note}}</view>
+  </view>
   <view class="coordination-card ui-card">
     <view class="coordination-heading">
       <view>
@@ -315,6 +331,7 @@
         <view class="handover-record-head"><text>{{item.stageText}} v{{item.version}}</text><text>{{item.statusText}}</text></view>
         <view class="handover-record-meta">{{item.mileageKm}} km · {{item.energyText}} · 提交 {{item.submittedAtText || '—'}}</view>
         <view class="handover-record-note">已知损伤：{{item.damageNote || '—'}}</view>
+        <view wx:if="{{item.scratchSummary}}" class="handover-record-note">环检记录：{{item.scratchSummary}}</view>
         <view wx:if="{{item.additionalNote}}" class="handover-record-note">补充：{{item.additionalNote}}</view>
         <view wx:if="{{item.confirmedAtText}}" class="handover-confirmed">用户核对于 {{item.confirmedAtText}}</view>
         <view wx:if="{{item.photos.length}}" class="handover-photo-grid handover-photo-grid-readonly">

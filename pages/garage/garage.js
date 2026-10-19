@@ -9,7 +9,7 @@ const {
   isPageNativeActionActive
 } = require("../../shared/pageNativeAction")
 const { preloadImages, clearExpiredCache } = require("../../shared/imageCache")
-const { onNetworkReconnect } = require("../../shared/networkStatus")
+const { onNetworkReconnect, onNetworkStatusChange, getNetworkState } = require("../../shared/networkStatus")
 const { triggerHapticFeedback } = require("../../shared/hapticFeedback")
 const { createPerformanceHelpers } = require("../../shared/performance")
 const {
@@ -28,8 +28,48 @@ const SNAPSHOT_MAX_AGE_MS = 60 * 1000
 function garageQueryKey(filters) {
   return JSON.stringify([
     filters.category || "all", filters.city || "", filters.keyword || "",
-    filters.availableOnly === true, filters.sortBy || "default"
+    filters.availableOnly === true, filters.sortBy || "default",
+    filters.quickFilter || "all"
   ])
+}
+
+function matchesQuickFilter(car, filterId) {
+  if (!filterId || filterId === "all") return true
+  const source = car && typeof car === "object" ? car : {}
+  const price = Number(source.priceDay) || 0
+  if (filterId === "under_2000") {
+    return price > 0 && price <= 2000
+  }
+  if (filterId === "high_end") {
+    return price >= 3000
+  }
+  const tags = Array.isArray(source.tags) ? source.tags.map((t) => String(t || "").toLowerCase()) : []
+  const name = String(source.name || "").toLowerCase()
+  const nickname = String(source.nickname || "").toLowerCase()
+  const category = String(source.category || "").toLowerCase()
+  const combined = [name, nickname, category, ...tags].join(" ")
+
+  if (filterId === "free_deposit") {
+    return tags.some((t) => t.includes("免押") || t.includes("0押金")) ||
+      combined.includes("免押") || combined.includes("信用免押")
+  }
+  if (filterId === "new_energy") {
+    return category === "electric" || category === "hybrid" ||
+      combined.includes("纯电") || combined.includes("混动") || combined.includes("新能源") ||
+      combined.includes("ev") || combined.includes("taycan") || combined.includes("model")
+  }
+  if (filterId === "convertible") {
+    return category === "convertible" ||
+      combined.includes("敞篷") || combined.includes("cabriolet") ||
+      combined.includes("spyder") || combined.includes("roadster")
+  }
+  if (filterId === "track") {
+    return category === "supercar" ||
+      combined.includes("赛道") || combined.includes("gt3") || combined.includes("turbo") ||
+      combined.includes("v8") || combined.includes("v10") || combined.includes("v12") ||
+      combined.includes("百公里") || combined.includes("性能")
+  }
+  return true
 }
 
 const CATEGORY_LABEL_MAP = Object.assign({}, BASE_CATEGORY_LABEL_MAP)
@@ -189,6 +229,8 @@ Page({
   data: {
     pageTitle: "极境车库",
     pageSubtitle: DEFAULT_GARAGE_SUBTITLE,
+    announcementText: "",
+    announcementDismissed: false,
     emptyText: "当前分类暂无车辆，更多车型即将入库",
     loadError: false,
     loadErrorText: "车辆列表加载失败，请稍后重试",
@@ -201,11 +243,23 @@ Page({
     currentCategory: "all",
     availableOnly: false,
     sortBy: "default",
+    quickFilter: "all",
+    quickFilterOptions: [
+      { id: "all", label: "全部特色" },
+      { id: "free_deposit", label: "免押金" },
+      { id: "under_2000", label: "￥2000内" },
+      { id: "new_energy", label: "纯电/混动" },
+      { id: "convertible", label: "敞篷跑车" },
+      { id: "track", label: "赛道性能" },
+      { id: "high_end", label: "尊享超跑" }
+    ],
     cityOptions: [],
     selectedCity: "",
     searchKeyword: "",
     searchResultCount: 0,
     searchDebouncing: false,
+    isOffline: false,
+    hotSearchKeywords: ["保时捷", "法拉利", "劳斯莱斯", "敞篷", "免押金"],
     categories: [],
     cars: [],
     filteredCars: [],
@@ -261,11 +315,13 @@ Page({
     const initCategory = String((options && options.category) || "").trim()
     const initCity = String((options && options.city) || "").trim()
     const initSortBy = String((options && options.sortBy) || "").trim()
-    if (initCategory || initCity || initSortBy) {
+    const initQuickFilter = String((options && options.quickFilter) || "").trim()
+    if (initCategory || initCity || initSortBy || initQuickFilter) {
       this.setData({
         currentCategory: initCategory || this.data.currentCategory,
         selectedCity: initCity || this.data.selectedCity,
-        sortBy: initSortBy || this.data.sortBy
+        sortBy: initSortBy || this.data.sortBy,
+        quickFilter: initQuickFilter || this.data.quickFilter
       })
     }
     const app = typeof getApp === "function" ? getApp() : null
@@ -285,17 +341,66 @@ Page({
       } catch (error) {}
     }
 
+    try {
+      const net = getNetworkState()
+      if (net && net.isConnected === false) {
+        this.setData({ isOffline: true })
+      }
+    } catch (e) {}
+
+    this._unsubscribeNetworkStatus = onNetworkStatusChange((res) => {
+      this.setData({ isOffline: !res.isConnected })
+    })
+
     this._unsubscribeNetwork = onNetworkReconnect(() => {
+      this.setData({ isOffline: false })
       if (this.data.loadError) {
         this.loadCars()
       }
     })
 
+    // 1. 优先尝试从微信数据预拉取 (WeChat Background Fetch / Pre-fetch) 挂载车源
+    const prefetched = app && app.globalData && app.globalData._prefetchedGarageList
+    if (prefetched && (!this.data.cars || this.data.cars.length === 0)) {
+      const list = Array.isArray(prefetched) ? prefetched : prefetched.list
+      if (Array.isArray(list) && list.length > 0) {
+        const filters = {
+          category: this.data.currentCategory,
+          city: this.data.selectedCity,
+          keyword: this.data.searchKeyword,
+          availableOnly: this.data.availableOnly,
+          sortBy: this.data.sortBy,
+          quickFilter: this.data.quickFilter
+        }
+        this.applyCars(list, prefetched.pagination || { total: list.length }, filters, { persist: false })
+      }
+    }
+
+    if (app) {
+      app.onPrefetchGarageReady = (data) => {
+        if (!this.data.cars || this.data.cars.length === 0) {
+          const list = Array.isArray(data) ? data : data.list
+          if (Array.isArray(list) && list.length > 0) {
+            const filters = {
+              category: this.data.currentCategory,
+              city: this.data.selectedCity,
+              keyword: this.data.searchKeyword,
+              availableOnly: this.data.availableOnly,
+              sortBy: this.data.sortBy,
+              quickFilter: this.data.quickFilter
+            }
+            this.applyCars(list, data.pagination || { total: list.length }, filters, { persist: false })
+          }
+        }
+      }
+    }
+
     try {
       if (typeof wx !== "undefined" && typeof wx.getStorageSync === "function") {
         const snapshot = wx.getStorageSync("garage_last_snapshot")
         const filters = { category: this.data.currentCategory, city: this.data.selectedCity,
-          keyword: this.data.searchKeyword, availableOnly: this.data.availableOnly, sortBy: this.data.sortBy }
+          keyword: this.data.searchKeyword, availableOnly: this.data.availableOnly, sortBy: this.data.sortBy,
+          quickFilter: this.data.quickFilter }
         const age = snapshot && Date.now() - Number(snapshot.savedAt)
         if (snapshot && Array.isArray(snapshot.cars) && age >= 0 && age < SNAPSHOT_MAX_AGE_MS &&
             snapshot.filters && garageQueryKey(snapshot.filters) === garageQueryKey(filters)) {
@@ -386,13 +491,18 @@ Page({
     this._cancelOperationConfigRequest = requestOperationConfig({
       force: Boolean(options && options.force),
       onSuccess: (config) => {
+        const announcementText = String(config.announcementText || "").trim()
         const nextState = {
           pageTitle: config.garagePageTitle || this.data.pageTitle,
           pageSubtitle: normalizeGarageSubtitle(config.garagePageSubtitle, this.data.pageSubtitle),
-          servicePhone: String(config.servicePhone || "").trim()
+          servicePhone: String(config.servicePhone || "").trim(),
+          announcementText
         }
         if (Array.isArray(config.cityOptions)) {
           nextState.cityOptions = config.cityOptions
+        }
+        if (Array.isArray(config.hotSearchKeywords) && config.hotSearchKeywords.length) {
+          nextState.hotSearchKeywords = config.hotSearchKeywords
         }
         const resetCity = Array.isArray(config.cityOptions) && this.data.selectedCity &&
           !config.cityOptions.includes(this.data.selectedCity)
@@ -560,6 +670,14 @@ Page({
   },
 
   onUnload() {
+    if (typeof this._unsubscribeNetworkStatus === "function") {
+      this._unsubscribeNetworkStatus()
+      this._unsubscribeNetworkStatus = null
+    }
+    const app = typeof getApp === "function" ? getApp() : null
+    if (app && app.onPrefetchGarageReady) {
+      app.onPrefetchGarageReady = null
+    }
     if (this._cancelContentGuidesRequest) this._cancelContentGuidesRequest()
     cancelPageNativeActions(this)
     this._carsRequestId = Number(this._carsRequestId || 0) + 1
@@ -643,6 +761,7 @@ Page({
     const searchKeyword = typeof params.keyword === "string" ? params.keyword : (this.data.searchKeyword || "")
     const selectedCity = typeof params.city === "string" ? params.city : (this.data.selectedCity || "")
     const sortBy = typeof params.sortBy === "string" ? params.sortBy : (this.data.sortBy || "default")
+    const quickFilter = typeof params.quickFilter === "string" ? params.quickFilter : (this.data.quickFilter || "all")
 
     const categoryCars =
       currentCategory === "all"
@@ -654,7 +773,9 @@ Page({
     const cityCars = selectedCity
       ? statusCars.filter((car) => String((car && car.location) || "").toLowerCase().includes(selectedCity.toLowerCase()))
       : statusCars
-    let filteredCars = cityCars.filter((car) => matchesCarSearch(car, searchKeyword))
+    let filteredCars = cityCars
+      .filter((car) => matchesQuickFilter(car, quickFilter))
+      .filter((car) => matchesCarSearch(car, searchKeyword))
     if (sortBy === "price_asc") {
       filteredCars.sort((a, b) => (Number(a.priceDay) || 0) - (Number(b.priceDay) || 0))
     } else if (sortBy === "price_desc") {
@@ -688,6 +809,7 @@ Page({
       searchKeyword,
       searchResultCount,
       sortBy,
+      quickFilter,
       categorySummary,
       searchDebouncing: false,
       page: Number.isInteger(nextPagination.page) ? nextPagination.page : 0,
@@ -707,14 +829,14 @@ Page({
         wx.setStorageSync("garage_last_snapshot", {
           cars: sortedCars,
           pagination: serverSummary,
-          filters: { category: currentCategory, city: selectedCity, keyword: searchKeyword, availableOnly, sortBy },
+          filters: { category: currentCategory, city: selectedCity, keyword: searchKeyword, availableOnly, sortBy, quickFilter },
           savedAt: this._carsSnapshotSavedAt
         })
       } catch (e) {}
     }
   },
 
-  filterCars(categoryId, availableOnlyInput, searchKeywordInput, serverSummary, keepSearchDebouncing, selectedCityInput, sortByInput) {
+  filterCars(categoryId, availableOnlyInput, searchKeywordInput, serverSummary, keepSearchDebouncing, selectedCityInput, sortByInput, quickFilterInput) {
     const nextCategory = categoryId || "all"
     const availableOnly =
       typeof availableOnlyInput === "boolean" ? availableOnlyInput : this.data.availableOnly
@@ -724,6 +846,8 @@ Page({
       typeof selectedCityInput === "string" ? selectedCityInput : this.data.selectedCity
     const sortBy =
       typeof sortByInput === "string" ? sortByInput : (this.data.sortBy || "default")
+    const quickFilter =
+      typeof quickFilterInput === "string" ? quickFilterInput : (this.data.quickFilter || "all")
     const categoryCars =
       nextCategory === "all"
         ? this.data.cars.slice()
@@ -734,7 +858,9 @@ Page({
     const cityCars = selectedCity
       ? statusCars.filter((car) => String((car && car.location) || "").toLowerCase().includes(selectedCity.toLowerCase()))
       : statusCars
-    const filteredCars = cityCars.filter((car) => matchesCarSearch(car, searchKeyword))
+    const filteredCars = cityCars
+      .filter((car) => matchesQuickFilter(car, quickFilter))
+      .filter((car) => matchesCarSearch(car, searchKeyword))
     let sortedCars = filteredCars.slice()
     if (sortBy === "price_asc") {
       sortedCars.sort((a, b) => (Number(a.priceDay) || 0) - (Number(b.priceDay) || 0))
@@ -748,6 +874,7 @@ Page({
       searchKeyword,
       selectedCity,
       sortBy,
+      quickFilter,
       searchResultCount: serverSummary && Number.isFinite(serverSummary.total)
         ? serverSummary.total
         : sortedCars.length,
@@ -870,10 +997,50 @@ Page({
       null,
       false,
       this.data.selectedCity,
-      sort
+      sort,
+      this.data.quickFilter
     )
     if (canLoadGarageRemotely()) {
       this.loadCars({ force: true, sortBy: sort })
+    }
+  },
+
+  handleQuickFilterTap(event) {
+    const filterId = String((event && event.currentTarget && event.currentTarget.dataset && event.currentTarget.dataset.filter) || "all").trim()
+    if (filterId === this.data.quickFilter) {
+      return
+    }
+    triggerHapticFeedback("light")
+    this.setData({ quickFilter: filterId })
+    this.filterCars(
+      this.data.currentCategory,
+      this.data.availableOnly,
+      this.data.searchKeyword,
+      null,
+      false,
+      this.data.selectedCity,
+      this.data.sortBy,
+      filterId
+    )
+  },
+
+  handleHotSearchTap(event) {
+    const keyword = String((event && event.currentTarget && event.currentTarget.dataset && event.currentTarget.dataset.keyword) || "").trim()
+    if (!keyword) return
+    triggerHapticFeedback("light")
+    this.setData({ searchKeyword: keyword, searchDebouncing: false })
+    this.filterCars(
+      this.data.currentCategory,
+      this.data.availableOnly,
+      keyword,
+      null,
+      false,
+      this.data.selectedCity,
+      this.data.sortBy,
+      this.data.quickFilter
+    )
+    if (canLoadGarageRemotely()) {
+      this.loadCars({ force: true, keyword, sortBy: this.data.sortBy })
     }
   },
 
@@ -981,6 +1148,28 @@ Page({
     this.loadCars()
   },
 
+  handleDismissAnnouncement() {
+    triggerHapticFeedback("light")
+    this.setData({ announcementDismissed: true })
+  },
+
+  handleResetAllFilters() {
+    triggerHapticFeedback("selection")
+    this.clearSearchDebounce()
+    this.applyState({
+      currentCategory: "all",
+      selectedCity: "",
+      quickFilter: "all",
+      availableOnly: false,
+      sortBy: "default",
+      searchKeyword: ""
+    })
+    this.filterCars("all", false, "", null, false, "", "default", "all")
+    if (canLoadGarageRemotely()) {
+      this.loadCars({ force: true, category: "all", city: "", keyword: "", availableOnly: false, sortBy: "default", quickFilter: "all" })
+    }
+  },
+
   onShareAppMessage() {
     trackEvent("share")
     const params = ["channel=wechat_share"]
@@ -990,6 +1179,18 @@ Page({
     return {
       title: "极境车库",
       path: `/pages/garage/garage?${params.join("&")}`
+    }
+  },
+
+  onShareTimeline() {
+    trackEvent("share")
+    const params = ["channel=timeline_share"]
+    if (this.data.currentCategory && this.data.currentCategory !== "all") params.push(`category=${encodeURIComponent(this.data.currentCategory)}`)
+    if (this.data.selectedCity) params.push(`city=${encodeURIComponent(this.data.selectedCity)}`)
+    if (this.data.sortBy && this.data.sortBy !== "default") params.push(`sortBy=${encodeURIComponent(this.data.sortBy)}`)
+    return {
+      title: `${this.data.pageTitle || "极境车库"} · ${this.data.pageSubtitle || "甄选座驾，为每一次出发预留专属席位"}`,
+      query: params.join("&")
     }
   }
 })

@@ -6,6 +6,7 @@ const {
   unmarkImageLoaded
 } = require("../../shared/imageCache")
 const { triggerHapticFeedback } = require("../../shared/hapticFeedback")
+const { resolveMarketingBadges } = require("../../shared/vehicleLabels")
 
 Component({
   properties: {
@@ -18,10 +19,16 @@ Component({
   data: {
     imageLoading: false,
     imageFailed: false,
-    displayCover: ""
+    displayCover: "",
+    marketingBadges: []
   },
 
   observers: {
+    "car"(car) {
+      this.setData({
+        marketingBadges: resolveMarketingBadges(car)
+      })
+    },
     "car.cover"(cover) {
       this.cancelPendingCoverResolve()
       const currentDisplay = this.data.displayCover
@@ -50,7 +57,7 @@ Component({
       const serial = Number(this._coverSerial || 0) + 1
       this._coverSerial = serial
       const priority = 10
-      resolveImage(cover, { priority })
+      resolveImage(cover, { priority, imageTransform: { width: 600, quality: 82, format: "webp" } })
         .then((result) => {
           if (this._coverSerial !== serial || !result || !result.localPath) {
             return

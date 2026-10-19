@@ -147,11 +147,15 @@
 .perf-metric-item { padding: 20rpx 18rpx; border: 1rpx solid rgba(56, 189, 248, 0.12); border-radius: 16rpx; background: rgba(56, 189, 248, 0.035); box-sizing: border-box; }
 .perf-metric-label { color: #7e8c9f; font-size: 18rpx; line-height: 1.4; }
 .perf-metric-value { margin-top: 8rpx; color: #f0f6fc; font-size: 28rpx; font-weight: 700; line-height: 1.3; letter-spacing: 0.5rpx; }
-.perf-highlights-box { margin-top: 20rpx; padding-top: 18rpx; border-top: 1rpx solid rgba(255, 255, 255, 0.065); }
+.perf-highlights-box { margin-top: 16rpx; padding-top: 16rpx; border-top: 1rpx solid rgba(255, 255, 255, 0.065); }
+.perf-tabs-row { display: flex; gap: 12rpx; margin-top: 20rpx; padding: 6rpx; border-radius: 999rpx; background: rgba(0, 0, 0, 0.28); border: 1rpx solid rgba(255, 255, 255, 0.06); }
+.perf-tab-btn { flex: 1; text-align: center; padding: 10rpx 0; font-size: 20rpx; color: #8896a8; border-radius: 999rpx; transition: all 160ms ease; cursor: pointer; }
+.perf-tab-btn-active { background: linear-gradient(135deg, rgba(56, 189, 248, 0.25), rgba(2, 132, 199, 0.28)); color: #e0f2fe; font-weight: 600; border: 1rpx solid rgba(56, 189, 248, 0.5); }
 .perf-highlights-title { color: #94a3b8; font-size: 18rpx; font-weight: 600; letter-spacing: 1rpx; }
 .perf-tag-list { display: flex; flex-wrap: wrap; gap: 12rpx; margin-top: 12rpx; }
 .perf-tag-item { display: inline-flex; align-items: center; padding: 8rpx 16rpx; border: 1rpx solid rgba(255, 255, 255, 0.08); border-radius: 999rpx; background: rgba(255, 255, 255, 0.03); color: #cbd5e1; font-size: 19rpx; line-height: 1.3; }
 .perf-tag-dot { width: 8rpx; height: 8rpx; margin-right: 10rpx; border-radius: 50%; background: #38bdf8; box-shadow: 0 0 6rpx rgba(56, 189, 248, 0.6); }
+.perf-tag-dot-gold { background: #e6c587; box-shadow: 0 0 6rpx rgba(230, 197, 135, 0.6); }
 .detail-bottom-bar { position: fixed; right: calc(24rpx + env(safe-area-inset-right)); bottom: calc(20rpx + env(safe-area-inset-bottom)); left: calc(24rpx + env(safe-area-inset-left)); z-index: 20; display: flex; flex-direction: column; padding: 12rpx; border: 1rpx solid rgba(255, 255, 255, 0.09); border-radius: 28rpx; background: rgba(19, 22, 27, 0.95); box-shadow: 0 22rpx 60rpx rgba(0, 0, 0, 0.42); box-sizing: border-box; }
 .bottom-action-meta,
 .bottom-action-buttons,
@@ -264,4 +268,44 @@
 .poster-modal-footer { margin-top: 24rpx; }
 .poster-save-action { width: 100%; height: 76rpx; background: linear-gradient(135deg, #d09e5a, #b3823d); color: #0b0d10; font-weight: 700; font-size: 26rpx; border-radius: 16rpx; }
 .poster-modal-subtip { margin-top: 14rpx; text-align: center; color: #7b889b; font-size: 19rpx; }
+
+.vip-privilege-strip { display: flex; align-items: center; justify-content: space-between; margin-top: 18rpx; padding: 18rpx 22rpx; border: 1rpx solid rgba(230, 197, 135, 0.28); border-radius: 20rpx; background: linear-gradient(135deg, rgba(230, 197, 135, 0.08), rgba(0, 0, 0, 0.35)); cursor: pointer; transition: all 140ms ease; }
+.vip-strip-pressed { opacity: 0.8; transform: scale(0.98); }
+.vip-strip-left { display: flex; align-items: center; gap: 12rpx; flex: 1; min-width: 0; }
+.vip-strip-icon-crown { font-size: 24rpx; line-height: 1; }
+.vip-strip-items { display: flex; align-items: center; gap: 8rpx; flex-wrap: wrap; }
+.vip-strip-tag { color: #eed4a7; font-size: 20rpx; font-weight: 500; line-height: 1.3; }
+.vip-strip-dot { color: rgba(230, 197, 135, 0.4); font-size: 18rpx; }
+.vip-strip-arrow { flex-shrink: 0; margin-left: 14rpx; color: #eed4a7; font-size: 19rpx; font-weight: 600; opacity: 0.9; }
+
+.privilege-modal-overlay { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 1000; display: flex; align-items: flex-end; justify-content: center; background: rgba(0, 0, 0, 0.76); }
+.privilege-modal-dialog { width: 100%; max-height: 82vh; padding: 36rpx 32rpx calc(36rpx + env(safe-area-inset-bottom)); border: 1rpx solid rgba(230, 197, 135, 0.25); border-radius: 36rpx 36rpx 0 0; background: #13171e; box-shadow: 0 -20rpx 60rpx rgba(0, 0, 0, 0.5); display: flex; flex-direction: column; box-sizing: border-box; }
+.privilege-modal-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 28rpx; }
+.privilege-modal-title-wrap { display: flex; flex-direction: column; gap: 6rpx; }
+.privilege-modal-badge { color: #b89255; font-size: 16rpx; font-weight: 700; letter-spacing: 2rpx; }
+.privilege-modal-title { color: #f7f3eb; font-size: 32rpx; font-weight: 700; }
+.privilege-modal-close { display: flex; align-items: center; justify-content: center; width: 44rpx; height: 44rpx; border-radius: 50%; background: rgba(255, 255, 255, 0.06); color: #94a3b8; font-size: 24rpx; cursor: pointer; }
+.privilege-modal-close-hover { background: rgba(255, 255, 255, 0.14); color: #ffffff; }
+.privilege-list { display: flex; flex-direction: column; gap: 20rpx; margin-bottom: 32rpx; overflow-y: auto; max-height: 52vh; }
+.privilege-item { display: flex; align-items: flex-start; gap: 18rpx; padding: 18rpx 20rpx; border-radius: 18rpx; background: rgba(255, 255, 255, 0.03); border: 1rpx solid rgba(255, 255, 255, 0.05); }
+.privilege-item-icon { font-size: 32rpx; line-height: 1.2; flex-shrink: 0; }
+.privilege-item-body { flex: 1; min-width: 0; }
+.privilege-item-title { color: #f5dfb8; font-size: 24rpx; font-weight: 600; line-height: 1.3; }
+.privilege-item-desc { margin-top: 6rpx; color: #94a3b8; font-size: 20rpx; line-height: 1.45; }
+.privilege-confirm-btn { width: 100%; height: 80rpx; border-radius: 999rpx; font-size: 26rpx; font-weight: 600; }
+
+/* 快捷租期试算面板 */
+.pricing-trial-section { margin-top: 22rpx; padding: 20rpx 22rpx; border: 1rpx solid rgba(82, 143, 255, 0.22); border-radius: 20rpx; background: rgba(82, 143, 255, 0.05); }
+.pricing-trial-header { display: flex; align-items: center; justify-content: space-between; }
+.pricing-trial-title { color: #8faeff; font-size: 21rpx; font-weight: 600; letter-spacing: 1rpx; }
+.pricing-trial-chips { display: flex; align-items: center; gap: 10rpx; }
+.pricing-trial-chip { padding: 6rpx 16rpx; border: 1rpx solid rgba(255, 255, 255, 0.12); border-radius: 999rpx; background: rgba(255, 255, 255, 0.03); color: #94a3b8; font-size: 20rpx; transition: all 120ms ease; cursor: pointer; }
+.pricing-trial-chip-active { border-color: #528fff; background: rgba(82, 143, 255, 0.18); color: #ffffff; font-weight: 600; }
+.pricing-trial-result { display: flex; align-items: center; justify-content: space-between; margin-top: 14rpx; padding-top: 14rpx; border-top: 1rpx solid rgba(82, 143, 255, 0.12); }
+.pricing-trial-estimate { display: flex; align-items: baseline; gap: 8rpx; }
+.pricing-trial-count { color: #8ea1b8; font-size: 20rpx; }
+.pricing-trial-amount { color: #f5f7fa; font-size: 28rpx; font-weight: 700; }
+.pricing-trial-savings { padding: 2rpx 10rpx; border-radius: 6rpx; background: rgba(242, 153, 74, 0.18); color: #f5b46e; font-size: 18rpx; font-weight: 600; }
+.pricing-trial-tier-badge { padding: 4rpx 12rpx; border-radius: 8rpx; background: rgba(82, 143, 255, 0.16); color: #7cb2ff; font-size: 19rpx; font-weight: 500; }
+
 

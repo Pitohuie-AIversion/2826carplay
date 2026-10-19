@@ -211,6 +211,37 @@ function buildLabels(values, map = FIELD_LABEL_MAP) {
   return values.map((value) => (map && map[value]) || value)
 }
 
+const MARKETING_BADGE_PRESETS = [
+  { key: "new_arrival", label: "新车到店", color: "badge-cyan" },
+  { key: "zero_deposit", label: "免押金", color: "badge-emerald" },
+  { key: "featured_hot", label: "特惠爆款", color: "badge-amber" },
+  { key: "track_ready", label: "赛道级性能", color: "badge-purple" },
+  { key: "convertible", label: "敞篷体验", color: "badge-rose" },
+  { key: "carplay_ready", label: "CarPlay", color: "badge-blue" },
+  { key: "long_term_deal", label: "长租特惠", color: "badge-gold" }
+]
+
+function resolveMarketingBadges(car) {
+  if (!car || typeof car !== "object") return []
+  const badges = []
+  if (Array.isArray(car.badges)) {
+    car.badges.forEach((b) => {
+      if (typeof b === "string" && b.trim()) {
+        const found = MARKETING_BADGE_PRESETS.find((p) => p.key === b || p.label === b)
+        badges.push(found ? { ...found } : { key: b, label: b, color: "badge-default" })
+      } else if (b && typeof b === "object" && b.label) {
+        badges.push({
+          key: b.key || b.label,
+          label: b.label,
+          color: b.color || "badge-default"
+        })
+      }
+    })
+  }
+  return badges
+
+}
+
 module.exports = {
   VEHICLE_TYPE_LABEL_MAP,
   STATUS_LABEL_MAP,
@@ -225,6 +256,10 @@ module.exports = {
   CLIENT_VEHICLE_STATUS_CLASS_MAP,
   FAVORITE_VEHICLE_STATUS_MAP,
   FIELD_LABEL_MAP,
+
+  MARKETING_BADGE_PRESETS,
+  resolveMarketingBadges,
+
   normalizeFavoriteVehicleStatus,
   getVehicleTypeLabel,
   getVehicleStatusLabel,

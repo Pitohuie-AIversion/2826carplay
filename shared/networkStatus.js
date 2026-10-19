@@ -10,12 +10,21 @@ let isConnected = true
 let networkType = "unknown"
 let statusRevision = 0
 const reconnectListeners = new Set()
+const statusChangeListeners = new Set()
 
 function handleNetworkStatusChange(res) {
   statusRevision += 1
   const previousConnected = isConnected
   isConnected = Boolean(res && res.isConnected)
   networkType = String((res && res.networkType) || "unknown")
+
+  statusChangeListeners.forEach((callback) => {
+    try {
+      if (typeof callback === "function") {
+        callback({ isConnected, networkType, previousConnected })
+      }
+    } catch (error) {}
+  })
 
   // 从无网恢复为有网时，触发所有重连监听
   if (!previousConnected && isConnected) {
@@ -63,6 +72,15 @@ function onNetworkReconnect(callback) {
   }
 }
 
+function onNetworkStatusChange(callback) {
+  if (typeof callback !== "function") return () => {}
+  initNetworkStatusListener()
+  statusChangeListeners.add(callback)
+  return () => {
+    statusChangeListeners.delete(callback)
+  }
+}
+
 function offNetworkReconnect(callback) {
   if (typeof callback === "function") {
     reconnectListeners.delete(callback)
@@ -84,6 +102,7 @@ function _resetForTesting() {
   isConnected = true
   networkType = "unknown"
   reconnectListeners.clear()
+  statusChangeListeners.clear()
 }
 
 function _simulateStatusChange(res) {
@@ -103,6 +122,7 @@ function notifyNetworkReconnectForTest(payload = { isConnected: true, networkTyp
 module.exports = {
   initNetworkStatusListener,
   onNetworkReconnect,
+  onNetworkStatusChange,
   offNetworkReconnect,
   getNetworkState,
   _resetForTesting,

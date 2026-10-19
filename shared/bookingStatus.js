@@ -366,6 +366,47 @@ function maskPhone(value) {
     : phone || "—"
 }
 
+const SUBSCRIBE_MESSAGE_TEMPLATES = {
+  BOOKING_STATUS_CHANGE: "BOOKING_STATUS_TEMPLATE_ID",
+  PICKUP_REMINDER: "PICKUP_REMINDER_TEMPLATE_ID",
+  RETURN_INSPECTION: "RETURN_INSPECTION_TEMPLATE_ID"
+}
+
+/**
+ * 安全唤起微信服务通知订阅授权
+ * @param {Array<string>} [templateIds] 模板 ID 列表
+ * @returns {Promise<object>} 授权结果字典
+ */
+function requestBookingSubscription(templateIds) {
+  if (typeof wx === "undefined" || typeof wx.requestSubscribeMessage !== "function") {
+    return Promise.resolve({ supported: false, accepted: [] })
+  }
+  const defaultTemplates = Object.values(SUBSCRIBE_MESSAGE_TEMPLATES).filter(
+    (id) => id && !id.endsWith("_TEMPLATE_ID")
+  )
+  const targetIds = Array.isArray(templateIds) && templateIds.length > 0 ? templateIds : defaultTemplates
+  if (!targetIds.length) {
+    return Promise.resolve({ supported: true, accepted: [], skipped: true })
+  }
+  return new Promise((resolve) => {
+    try {
+      wx.requestSubscribeMessage({
+        tmplIds: targetIds,
+        success: (res) => {
+          const accepted = targetIds.filter((id) => res[id] === "accept")
+          resolve({ supported: true, accepted, result: res })
+        },
+        fail: (err) => {
+          resolve({ supported: true, accepted: [], error: err })
+        }
+      })
+    } catch (e) {
+      resolve({ supported: false, accepted: [], error: e })
+    }
+  })
+
+}
+
 module.exports = {
   STATUS_TEXT_MAP,
   STATUS_CLASS_MAP,
@@ -375,6 +416,8 @@ module.exports = {
   WORKBENCH_PRIORITY_OPTIONS,
   COORDINATION_TEXT_MAP,
   COORDINATION_OPTIONS,
+  SUBSCRIBE_MESSAGE_TEMPLATES,
+  requestBookingSubscription,
   mapStatusText,
   mapStatusClass,
   mapPriorityText,

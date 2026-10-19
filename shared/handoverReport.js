@@ -9,6 +9,30 @@ const ANGLE_LABELS = {
   right: "右侧"
 }
 
+const DAMAGE_TYPE_LABELS = {
+  scratch: "划痕/擦伤",
+  dent: "凹坑/变形",
+  wear: "正常磨损",
+  paint: "漆面损伤",
+  glass: "玻璃破损",
+  wheel: "轮毂损伤",
+  other: "其他损伤"
+}
+
+const PART_LABELS = {
+  front: "车头/前保险杠",
+  rear: "车尾/后保险杠",
+  left: "车身左侧/车门",
+  right: "车身右侧/车门",
+  roof: "车顶/天窗",
+  wheel_fl: "左前轮毂",
+  wheel_fr: "右前轮毂",
+  wheel_rl: "左后轮毂",
+  wheel_rr: "右后轮毂",
+  interior: "座舱内饰",
+  other: "其他部位"
+}
+
 function escapeCsvCell(value) {
   const text = String(value === undefined || value === null ? "" : value).replace(/\r\n/g, " ").replace(/[\r\n]/g, " ")
   if (text.includes(",") || text.includes('"')) {
@@ -41,6 +65,22 @@ function buildHandoverReport(bookingInput, handoverInput) {
   const energyType = handover.energyType === "electric" ? "electric" : "fuel"
   const energyTypeText = energyType === "electric" ? "纯电" : "燃油"
 
+  const scratchItems = (Array.isArray(handover.scratchItems) ? handover.scratchItems : []).map((item) => ({
+    part: item.part || "other",
+    partLabel: PART_LABELS[item.part] || item.part || "其他部位",
+    type: item.type || "scratch",
+    typeLabel: DAMAGE_TYPE_LABELS[item.type] || item.type || "损伤",
+    description: String(item.description || item.desc || "").trim()
+  }))
+
+  const scratchSummary = scratchItems.length > 0
+    ? scratchItems.map((s) => `[${s.partLabel}] ${s.typeLabel}${s.description ? `(${s.description})` : ""}`).join("; ")
+    : ""
+
+  const inspectorName = String(handover.inspectorName || booking.adminRemarkAuthor || "极境交车专员").trim()
+  const customerSigned = Boolean(handover.confirmedAt || handover.customerSigned)
+  const customerSignatureUrl = String(handover.customerSignatureUrl || handover.signatureUrl || "").trim()
+
   return {
     bookingId: String(booking.id || booking.bookingId || "—"),
     vehicleName: String(booking.vehicleName || "极境座驾"),
@@ -57,7 +97,12 @@ function buildHandoverReport(bookingInput, handoverInput) {
     energyType,
     energyTypeText,
     energyLevelPercent: Math.max(0, Math.min(100, Number(handover.energyLevelPercent) || 0)),
-    damageNote: String(handover.damageNote || "无明显新增划痕或外观损伤"),
+    damageNote: String(handover.damageNote || (scratchSummary || "无明显新增划痕或外观损伤")),
+    scratchItems,
+    scratchSummary: scratchSummary || "未发现新增环检损伤",
+    inspectorName,
+    customerSigned,
+    customerSignatureUrl,
     additionalNote: String(handover.additionalNote || "无特殊补充约定"),
     photos,
     disclaimer: "本验车留证单为车况及交接事实记录，双方核验留存。"
@@ -83,7 +128,9 @@ function formatHandoverCsvContent(bookingInput, handoverInput) {
     "车头留证照片",
     "车尾留证照片",
     "左侧留证照片",
-    "右侧留证照片"
+    "右侧留证照片",
+    "验车服务专员",
+    "客户核验签署状态"
   ]
 
   const getPhotoLocation = (angle) => {
@@ -108,7 +155,9 @@ function formatHandoverCsvContent(bookingInput, handoverInput) {
     getPhotoLocation("front"),
     getPhotoLocation("rear"),
     getPhotoLocation("left"),
-    getPhotoLocation("right")
+    getPhotoLocation("right"),
+    report.inspectorName,
+    report.customerSigned ? "已签署核验" : "待核验"
   ]
 
   const bom = "\uFEFF"
@@ -127,5 +176,7 @@ function getHandoverFileName(bookingInput, handoverInput) {
 module.exports = {
   buildHandoverReport,
   formatHandoverCsvContent,
-  getHandoverFileName
+  getHandoverFileName,
+  DAMAGE_TYPE_LABELS,
+  PART_LABELS
 }

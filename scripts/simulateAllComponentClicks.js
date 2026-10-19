@@ -1024,6 +1024,37 @@ simulateClick("点击查看交接单验车照片大图 (handlePreviewHandoverPho
   bookingDetailPage.handlePreviewHandoverPhoto(makeEvent({ url: "https://example.com/handover.jpg" }))
 })
 
+simulateClick("点击核对确认车辆交接记录 (handleConfirmHandover)", () => {
+  bookingDetailPage.setData({
+    handovers: {
+      pickup: { id: "ho-p-01", stage: "pickup", stageText: "取车", status: "submitted" }
+    }
+  })
+  bookingDetailPage.handleConfirmHandover(makeEvent({ stage: "pickup" }))
+})
+
+simulateClick("点击一键复制交接留证事实备忘 (handleCopyHandoverSummary)", () => {
+  bookingDetailPage.handleCopyHandoverSummary(makeEvent({ stage: "pickup" }))
+})
+
+simulateClick("点击导出客户专属验车留证单 (handleExportHandoverReport)", () => {
+  bookingDetailPage.handleExportHandoverReport(makeEvent({ stage: "pickup" }))
+})
+
+simulateClick("点击打开已导出的验车留证单 (handleOpenExportedHandover)", () => {
+  bookingDetailPage.setData({ exportedHandoverPath: "wxfile://user/report.csv" })
+  bookingDetailPage.handleOpenExportedHandover()
+})
+
+simulateClick("点击转发分享验车留证单 (handleShareExportedHandover)", () => {
+  bookingDetailPage.handleShareExportedHandover()
+})
+
+simulateClick("点击清理已导出留证单缓存 (handleDeleteExportedHandover)", () => {
+  bookingDetailPage.handleDeleteExportedHandover()
+  if (bookingDetailPage.data.exportedHandoverPath) throw new Error("留证单缓存路径未清空")
+})
+
 simulateClick("点击接受最新报价明细 (handleConfirmQuote)", () => {
   bookingDetailPage.handleConfirmQuote()
 })

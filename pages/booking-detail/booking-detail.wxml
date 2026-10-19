@@ -248,15 +248,63 @@
     </view>
     <view class="handover-boundary">确认仅表示你核对了页面展示的车辆现状，不是电子签章、合同签署、自动定损、扣款或维修报价。</view>
     <view class="customer-handover-record" wx:for="{{handoverList}}" wx:key="id">
-      <view class="handover-record-head"><text>{{item.stageText}}记录 v{{item.version}}</text><text class="handover-status handover-status-{{item.status}}">{{item.statusText}}</text></view>
-      <view class="handover-record-meta">{{item.mileageKm}} km · {{item.energyText}} · {{item.submittedAtText || '—'}}</view>
-      <view class="handover-record-note"><text>已知损伤</text><view>{{item.damageNote || '—'}}</view></view>
-      <view wx:if="{{item.additionalNote}}" class="handover-record-note"><text>补充说明</text><view>{{item.additionalNote}}</view></view>
+      <view class="handover-record-head">
+        <text>{{item.stageText}}记录 v{{item.version}}</text>
+        <view class="handover-badges">
+          <text wx:if="{{item.customerSigned}}" class="handover-signed-badge">已签署留证</text>
+          <text class="handover-status handover-status-{{item.status}}">{{item.statusText}}</text>
+        </view>
+      </view>
+      <view class="handover-record-meta">
+        <text>{{item.mileageKm}} km · {{item.energyText}} · {{item.submittedAtText || '—'}}</text>
+        <text wx:if="{{item.inspectorName}}" class="handover-inspector-text">专员: {{item.inspectorName}}</text>
+      </view>
+      <view class="handover-record-note">
+        <text>已知损伤与环检事实</text>
+        <view>{{item.damageNote || '—'}}</view>
+        <view wx:if="{{item.scratchItems && item.scratchItems.length}}" class="handover-scratch-list">
+          <view wx:for="{{item.scratchItems}}" wx:for-item="scratch" wx:key="part" class="handover-scratch-tag">
+            <text class="scratch-part">[{{scratch.partLabel}}]</text>
+            <text class="scratch-type">{{scratch.typeLabel}}</text>
+            <text wx:if="{{scratch.description}}" class="scratch-desc">({{scratch.description}})</text>
+          </view>
+        </view>
+      </view>
+      <view wx:if="{{item.additionalNote}}" class="handover-record-note">
+        <text>补充说明</text>
+        <view>{{item.additionalNote}}</view>
+      </view>
       <view wx:if="{{item.photos.length}}" class="customer-handover-photos">
-        <image wx:for="{{item.photos}}" wx:for-item="photo" wx:key="angle" src="{{photo.url}}" mode="aspectFill" lazy-load="{{true}}" fade-in="{{true}}" binderror="handleHandoverImageError" data-stage="{{item.stage}}" data-url="{{photo.url}}" bindtap="handlePreviewHandoverPhoto" hover-class="detail-action-pressed" aria-role="button" />
+        <view wx:for="{{item.photos}}" wx:for-item="photo" wx:key="angle" class="handover-photo-wrap">
+          <image src="{{photo.url}}" mode="aspectFill" lazy-load="{{true}}" fade-in="{{true}}" binderror="handleHandoverImageError" data-stage="{{item.stage}}" data-url="{{photo.url}}" bindtap="handlePreviewHandoverPhoto" hover-class="detail-action-pressed" aria-role="button" />
+          <text class="handover-photo-label">{{photo.label || photo.angle}}</text>
+        </view>
       </view>
       <button wx:if="{{item.status === 'submitted'}}" class="ui-btn ui-btn-primary handover-confirm-btn" loading="{{handoverResponding}}" disabled="{{loading || handoverResponding}}" data-stage="{{item.stage}}" bindtap="handleConfirmHandover">我已核对{{item.stageText}}记录</button>
       <view wx:if="{{item.confirmedAtText}}" class="handover-confirmed-time">已于 {{item.confirmedAtText}} 完成内容核对</view>
+      <view class="handover-report-actions">
+        <view class="handover-report-buttons">
+          <button class="ui-btn ui-btn-ghost handover-action-btn" data-stage="{{item.stage}}" bindtap="handleCopyHandoverSummary">
+            <text class="handover-btn-icon">📋</text>
+            <text>复制留证摘要</text>
+          </button>
+          <button class="ui-btn ui-btn-ghost handover-action-btn" loading="{{exportingHandover}}" disabled="{{exportingHandover}}" data-stage="{{item.stage}}" bindtap="handleExportHandoverReport">
+            <text class="handover-btn-icon">📑</text>
+            <text>{{exportingHandover ? '正在导出' : '导出留证单 (CSV)'}}</text>
+          </button>
+        </view>
+        <view wx:if="{{exportedHandoverPath && exportedHandoverStage === item.stage}}" class="handover-exported-card">
+          <view class="handover-exported-meta">
+            <text class="handover-exported-name">{{exportedHandoverFileName || '验车留证单.csv'}}</text>
+            <text class="handover-exported-badge">已就绪</text>
+          </view>
+          <view class="handover-exported-btn-row">
+            <button class="ui-btn ui-btn-primary-ghost handover-file-btn" bindtap="handleOpenExportedHandover">打开查看</button>
+            <button class="ui-btn ui-btn-ghost handover-file-btn" bindtap="handleShareExportedHandover">转发分享</button>
+            <button class="ui-btn ui-btn-danger-ghost handover-file-btn" bindtap="handleDeleteExportedHandover">清理</button>
+          </view>
+        </view>
+      </view>
     </view>
     <button wx:if="{{emergencyPhone}}" class="ui-btn ui-btn-danger-ghost emergency-call-btn" bindtap="handleEmergencyCall">一键拨打救援 / 紧急联系电话</button>
     <view class="emergency-boundary">电话将接通人工服务渠道；本页面不提供实时调度、定位跟踪或到达时间承诺。紧急人身危险请直接拨打 110 / 119 / 120。</view>

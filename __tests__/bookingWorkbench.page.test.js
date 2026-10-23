@@ -1089,4 +1089,46 @@ describe("pages/booking-workbench", () => {
     expect(page.data.queue.length).toBe(1)
     expect(page.data.queue[0].vehicleName).toBe("保时捷 911")
   })
+
+  test("工作台客户画像标签筛选与重置联动", () => {
+    const page = createPage(loadPageDefinition(), {
+      allBookings: [
+        { id: "b1", vehicleName: "保时捷 911", userName: "张三", phone: "13800000001", status: "pending", tags: ["老客户"] },
+        { id: "b2", vehicleName: "法拉利 F8", userName: "李四", phone: "13800000002", status: "pending", tags: ["高意向"] }
+      ]
+    })
+    page.applyWorkbench("todo")
+    expect(page.data.queue.length).toBe(2)
+
+    page.handleTagFilter({ currentTarget: { dataset: { tag: "老客户" } } })
+    expect(page.data.selectedTag).toBe("老客户")
+    expect(page.data.queue.length).toBe(1)
+    expect(page.data.queue[0].id).toBe("b1")
+    expect(page.data.viewCustomized).toBe(true)
+
+    page.handleTagFilter({ currentTarget: { dataset: { tag: "老客户" } } })
+    expect(page.data.selectedTag).toBe("")
+    expect(page.data.queue.length).toBe(2)
+
+    page.handleTagFilter({ currentTarget: { dataset: { tag: "老客户" } } })
+    expect(page.data.selectedTag).toBe("老客户")
+    page.handleResetView()
+    expect(page.data.selectedTag).toBe("")
+    expect(page.data.viewCustomized).toBe(false)
+    expect(page.data.queue.length).toBe(2)
+  })
+
+  test("工作台模板包含客户标签结构契约", () => {
+    const pageDir = path.resolve(__dirname, "../pages/booking-workbench")
+    const wxml = fs.readFileSync(path.join(pageDir, "booking-workbench.wxml"), "utf8")
+    const wxss = fs.readFileSync(path.join(pageDir, "booking-workbench.wxss"), "utf8")
+
+    expect(wxml).toContain("tag-filter-shell")
+    expect(wxml).toContain("handleTagFilter")
+    expect(wxml).toContain("queue-tags-row")
+    expect(wxml).toContain("queue-tag-pill")
+    expect(wxss).toContain(".tag-filter-shell")
+    expect(wxss).toContain(".queue-tags-row")
+    expect(wxss).toContain(".queue-tag-pill")
+  })
 })

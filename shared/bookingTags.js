@@ -73,11 +73,34 @@ function deriveBookingDurationTags(startDate, endDate) {
   return tags
 }
 
+function deriveBookingIntelligentTags(booking) {
+  if (!booking || typeof booking !== "object") return []
+  const tags = []
+  const durationTags = deriveBookingDurationTags(booking.startDate, booking.endDate)
+  tags.push(...durationTags)
+
+  const textCorpus = [
+    booking.pickupLocation,
+    booking.returnLocation,
+    booking.location,
+    booking.note
+  ].filter(Boolean).join(" ")
+
+  if (Number(booking.deliveryFeeAmount) > 0 || /送车|上门送|机场送|送机|高铁送|专人送/.test(textCorpus)) {
+    tags.push("需要送车")
+  }
+  if (/跨城|异地|出省|自驾游|跑长途/.test(textCorpus)) {
+    tags.push("跨城用车")
+  }
+
+  return tags
+}
+
 function autoTagBooking(booking) {
   if (!booking || typeof booking !== "object") return []
   const existing = Array.isArray(booking.tags) ? booking.tags : normalizeTags(booking.tags)
-  const durationTags = deriveBookingDurationTags(booking.startDate, booking.endDate)
-  return normalizeTags([...existing, ...durationTags])
+  const intelligentTags = deriveBookingIntelligentTags(booking)
+  return normalizeTags([...existing, ...intelligentTags])
 }
 
 module.exports = {
@@ -86,5 +109,6 @@ module.exports = {
   hasMatchingTag,
   getTagStyle,
   deriveBookingDurationTags,
+  deriveBookingIntelligentTags,
   autoTagBooking
 }

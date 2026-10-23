@@ -90,6 +90,23 @@ describe("bookingTags helper", () => {
     }
     expect(autoTagBooking(shortBooking)).toEqual(["需要送车"])
 
+    // 智能识别送车需求与跨城需求
+    const deliveryBooking = {
+      startDate: "2026-10-01",
+      endDate: "2026-10-02",
+      pickupLocation: "虹桥机场T2到达层专人送车",
+      tags: []
+    }
+    expect(autoTagBooking(deliveryBooking)).toEqual(["需要送车"])
+
+    const crossCityLongRent = {
+      startDate: "2026-10-01",
+      endDate: "2026-10-08",
+      note: "国庆准备一家人自驾游跨城用车",
+      tags: ["老客户"]
+    }
+    expect(autoTagBooking(crossCityLongRent)).toEqual(["老客户", "长租意向", "跨城用车"])
+
     // 空对象防御
     expect(autoTagBooking(null)).toEqual([])
   })

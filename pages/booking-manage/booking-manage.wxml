@@ -204,6 +204,9 @@
             <view class="booking-plan-pill {{item.priorityClass}}"><view class="booking-plan-dot"></view><text>{{item.schedulePriorityText}}</text></view>
             <view class="booking-plan-pill {{item.coordinationClass}}"><view class="booking-plan-dot"></view><text>{{item.coordinationStatusText}}</text></view>
           </view>
+          <view wx:if="{{item.tags && item.tags.length}}" class="booking-tags-row">
+            <text wx:for="{{item.tags}}" wx:for-item="tag" wx:key="*this" class="booking-tag-pill">{{tag}}</text>
+          </view>
         </view>
         <view class="booking-status ui-status ui-status-lg {{item.statusClass}}">{{item.statusText}}</view>
       </view>

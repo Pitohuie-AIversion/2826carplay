@@ -120,7 +120,7 @@
         >候补</button>
       </view>
     </view>
-    <view class="coordination-group coordination-group-last">
+    <view class="coordination-group">
       <view class="coordination-label">协调进度</view>
       <view class="coordination-options">
         <button
@@ -150,6 +150,24 @@
           hover-class="{{loading || coordinationLoading || remarkDirty || !coordinationEditable ? 'none' : 'coordination-option-pressed'}}"
           aria-pressed="{{booking.coordinationStatus === 'resolved'}}"
         >已协调</button>
+      </view>
+    </view>
+    <view class="coordination-group coordination-group-last coordination-group-tags">
+      <view class="coordination-label-row">
+        <view class="coordination-label">客户画像标签</view>
+        <view class="coordination-tags-count">{{booking.tags.length || 0}} / 5</view>
+      </view>
+      <view class="coordination-tags-wrap">
+        <button
+          wx:for="{{presetTags}}"
+          wx:key="*this"
+          class="coordination-tag-btn {{booking.tagMap && booking.tagMap[item] ? 'coordination-tag-btn-active' : ''}}"
+          data-tag="{{item}}"
+          disabled="{{loading || coordinationLoading || remarkDirty || !coordinationEditable}}"
+          bindtap="handleToggleCustomerTag"
+          hover-class="{{loading || coordinationLoading || remarkDirty || !coordinationEditable ? 'none' : 'coordination-tag-pressed'}}"
+          aria-pressed="{{booking.tagMap && booking.tagMap[item] ? true : false}}"
+        >{{item}}</button>
       </view>
     </view>
     <view wx:if="{{coordinationEditable}}" class="coordination-help">

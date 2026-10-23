@@ -18,6 +18,7 @@ const {
   isPageCurrent
 } = require("../../shared/pageNativeAction")
 const { formatDisplayTime } = require("../../shared/formatTime")
+const { normalizeTags, autoTagBooking } = require("../../shared/bookingTags")
 const {
   STATUS_OPTIONS,
   STATUS_TEXT_MAP,
@@ -1030,6 +1031,7 @@ Page({
             schedulePriority,
             schedulePriorityText: PRIORITY_TEXT_MAP[schedulePriority],
             priorityClass: `priority-${schedulePriority}`,
+            tags: Array.isArray(item.tags) ? normalizeTags(item.tags) : autoTagBooking(item),
             coordinationStatus,
             coordinationStatusText: COORDINATION_TEXT_MAP[coordinationStatus],
             coordinationClass: `coordination-${coordinationStatus}`,

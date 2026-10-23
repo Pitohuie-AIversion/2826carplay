@@ -138,6 +138,7 @@ function normalizeBooking(item) {
     adminRemarkDraft: booking.adminRemark || "",
     adminRemarkUpdatedAt: booking.adminRemarkUpdatedAt || "",
     tags: Array.isArray(booking.tags) ? normalizeTags(booking.tags) : autoTagBooking(booking),
+    tagMap: (Array.isArray(booking.tags) ? normalizeTags(booking.tags) : autoTagBooking(booking)).reduce((acc, t) => { acc[t] = true; return acc }, {}),
     schedulePriority: PRIORITY_TEXT_MAP[booking.schedulePriority]
       ? booking.schedulePriority
       : "normal",
@@ -1264,7 +1265,7 @@ Page({
   },
   handleToggleCustomerTag(event) {
     const tag = String((event && event.currentTarget && event.currentTarget.dataset && event.currentTarget.dataset.tag) || "").trim()
-    if (!tag || this.isBookingDetailInteractionBusy()) return
+    if (!tag || !this.data.coordinationEditable || this.isBookingDetailInteractionBusy()) return
     const booking = this.data.booking || {}
     const currentTags = Array.isArray(booking.tags) ? [...booking.tags] : []
     const idx = currentTags.indexOf(tag)
@@ -1292,7 +1293,13 @@ Page({
           wx.showToast({ title: formatToastTitle(result && result.message, "标签保存失败"), icon: "none" })
           return
         }
-        this.setData({ "booking.tags": normalizeTags(result.tags || nextTags) })
+        wx.showToast({ title: "标签已更新", icon: "none" })
+        const savedTags = normalizeTags(result.tags || nextTags)
+        const tagMap = savedTags.reduce((acc, t) => { acc[t] = true; return acc }, {})
+        this.setData({
+          "booking.tags": savedTags,
+          "booking.tagMap": tagMap
+        })
       }
     })
   },

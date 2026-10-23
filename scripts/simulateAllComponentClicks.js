@@ -1436,6 +1436,13 @@ simulateClick("点击工作台列表排序:「创建时间倒序」(handleSortTa
   wbPage.handleSortTap(makeEvent({ sort: "created_desc" }))
 })
 
+simulateClick("点击按客户画像标签筛选 (handleTagFilter: 老客户)", () => {
+  wbPage.handleTagFilter(makeEvent({ tag: "老客户" }))
+  if (wbPage.data.selectedTag !== "老客户") throw new Error("标签筛选状态未保存")
+  wbPage.handleTagFilter(makeEvent({ tag: "老客户" }))
+  if (wbPage.data.selectedTag !== "") throw new Error("标签筛选状态未重置")
+})
+
 simulateClick("在工作台搜索框输入客户/单号并查询 (handleKeywordInput)", () => {
   wbPage.handleKeywordInput(makeEvent({}, { value: "张先生" }))
   if (wbPage.data.keyword !== "张先生") throw new Error("搜索关键字未保存")
@@ -1601,6 +1608,11 @@ simulateClick("流转更新单据状态 (handleUpdateStatus: in_progress)", () =
 
 simulateClick("流转更新车辆调度状态 (handleUpdateCoordination: coordinating)", () => {
   bmdPage.handleUpdateCoordination(makeEvent({ field: "coordinationStatus", value: "coordinating" }))
+})
+
+simulateClick("点击点选客户画像标签 (handleToggleCustomerTag: 老客户)", () => {
+  bmdPage.setData({ coordinationEditable: true })
+  bmdPage.handleToggleCustomerTag(makeEvent({ tag: "老客户" }))
 })
 
 simulateClick("外呼客户联系电话 (handleCallPhone)", () => {

@@ -92,11 +92,18 @@ async function canManage(openid) {
 }
 
 function parseAmountToCents(value) {
+  if (typeof value !== "number" && typeof value !== "string") return null
   const text = String(value === undefined || value === null ? "" : value).trim()
   if (!/^(0|[1-9]\d{0,7})(\.\d{1,2})?$/.test(text)) return null
   const parts = text.split(".")
   const cents = Number(parts[0]) * 100 + Number((parts[1] || "").padEnd(2, "0"))
   return Number.isSafeInteger(cents) && cents <= MAX_AMOUNT_CENTS ? cents : null
+}
+
+function parseExpectedVersion(value) {
+  if (value === undefined) return 0
+  if ((typeof value !== "number" && typeof value !== "string") || (typeof value === "string" && !value.trim())) return NaN
+  return Number(value)
 }
 
 function calculateRentalDays(startDate, endDate) {
@@ -137,8 +144,8 @@ function normalizeInput(event) {
     bookingId: String(payload.bookingId || payload.id || "").trim(),
     quoteId: String(payload.quoteId || "").trim(),
     requestId: String(payload.requestId || "").trim(),
-    expectedQuoteVersion: Number(payload.expectedQuoteVersion || 0),
-    expectedDraftRevision: Number(payload.expectedDraftRevision || 0),
+    expectedQuoteVersion: parseExpectedVersion(payload.expectedQuoteVersion),
+    expectedDraftRevision: parseExpectedVersion(payload.expectedDraftRevision),
     amounts: {
       baseRentalCents: parseAmountToCents(payload.baseRentalAmount),
       protectionCents: parseAmountToCents(payload.protectionAmount),
@@ -185,6 +192,15 @@ function buildQuoteData(input, booking, version, status) {
     version,
     status
   }
+}
+
+function matchesSavedDraftRequest(draft, input) {
+  // A request ID identifies the original content and revision baseline. Retrying
+  // with edited amounts must not report the previous draft as successfully saved.
+  return Number(draft.version || 0) === input.expectedQuoteVersion + 1 &&
+    Number(draft.revision || 0) === input.expectedDraftRevision + 1 &&
+    AMOUNT_KEYS.every((key) => draft[key] === input.amounts[key]) &&
+    ["depositText", "validUntil", "customerNote"].every((key) => String(draft[key] || "") === input[key])
 }
 
 function formatTime(value) {
@@ -314,6 +330,9 @@ async function saveDraft(input, openid) {
     const draftId = `${input.bookingId}__draft`
     const existing = await getDocOrNull(transaction.collection("booking_quotes"), draftId)
     if (input.requestId && existing && existing.saveRequestId === input.requestId) {
+      if (!matchesSavedDraftRequest(existing, input)) {
+        return createError("IDEMPOTENCY_CONFLICT", "请求标识与原报价内容不一致，请刷新后重新保存")
+      }
       return { ok: true, duplicate: true, existing: true, draftId, version: existing.version, quoteData: existing }
     }
     if (Number(booking.latestQuoteVersion || 0) !== input.expectedQuoteVersion ||
@@ -349,6 +368,9 @@ async function sendQuote(input, openid) {
     const quoteId = `${input.bookingId}__v${input.expectedQuoteVersion + 1}`
     const existing = await getDocOrNull(transaction.collection("booking_quotes"), quoteId)
     if (existing && String(existing.sendRequestId || "") === input.requestId) {
+      if (Number(existing.revision || 0) !== input.expectedDraftRevision) {
+        return { error: createError("IDEMPOTENCY_CONFLICT", "请求标识与原报价草稿不一致，请刷新后核对") }
+      }
       return { duplicate: true, booking, quote: mapQuote(existing) }
     }
     if (!SENDABLE_STATUSES.includes(status)) return { error: createError("STATUS_NOT_ALLOWED", "请先完成联系，或等待用户提出调整后再发送报价") }
@@ -364,7 +386,6 @@ async function sendQuote(input, openid) {
     if (Number(draft.revision || 0) !== input.expectedDraftRevision) return { error: createError("VERSION_CONFLICT", "报价草稿已更新，请核对") }
     if (String(draft.validUntil || "") < todayInChina()) return { error: createError("QUOTE_EXPIRED", "报价有效期不能早于今天") }
     if (existing) {
-      if (String(existing.sendRequestId || "") === input.requestId) return { duplicate: true, booking, quote: mapQuote(existing) }
       return { error: createError("VERSION_CONFLICT", "该报价版本已经存在") }
     }
     const { _id: draftDocumentId, ...draftData } = draft

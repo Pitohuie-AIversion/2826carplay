@@ -377,7 +377,7 @@ describe("pages/privacy-request 用户申请流程", () => {
     expect(wx.cloud.callFunction).not.toHaveBeenCalled()
   })
 
-  test("申请说明输入触发防误触离开保护并在清空或卸载时解除", () => {
+  test("申请说明输入启用提醒，清空时关闭，卸载只清理本页状态", () => {
     global.wx = {
       enableAlertBeforeUnload: jest.fn(),
       disableAlertBeforeUnload: jest.fn()
@@ -394,7 +394,8 @@ describe("pages/privacy-request 用户申请流程", () => {
 
     page.handleDescriptionInput({ detail: { value: "再次输入" } })
     page.onUnload()
-    expect(wx.disableAlertBeforeUnload).toHaveBeenCalledTimes(2)
+    expect(page._hasUnsavedChanges).toBe(false)
+    expect(wx.disableAlertBeforeUnload).toHaveBeenCalledTimes(1)
   })
 
   test("支持 onReachBottom 触底翻页并从 storage 恢复快照秒开", () => {

@@ -62,9 +62,11 @@ async function isAdminOpenid(openid) {
 function normalizeEvent(event) {
   const payload = event && typeof event === "object" ? event : {}
   return {
-    id: String(payload.id || "").trim(),
-    status: String(payload.status || "").trim(),
-    resolutionNote: String(payload.resolutionNote || "").trim()
+    id: typeof payload.id === "string" ? payload.id.trim() : "",
+    status: typeof payload.status === "string" ? payload.status.trim() : "",
+    resolutionNote: typeof payload.resolutionNote === "string" ? payload.resolutionNote.trim() : "",
+    invalidFieldType: [payload.id, payload.status, payload.resolutionNote]
+      .some((value) => value !== undefined && typeof value !== "string")
   }
 }
 
@@ -98,6 +100,9 @@ exports.main = async (event) => {
   try {
     if (!(await isAdminOpenid(openid))) {
       return createError("FORBIDDEN", "权限不足")
+    }
+    if (input.invalidFieldType) {
+      return createError("VALIDATION_ERROR", "申请 ID、状态和处理说明必须为文本")
     }
     if (!input.id) {
       return createError("VALIDATION_ERROR", "申请 ID 不能为空")
@@ -166,6 +171,19 @@ exports.main = async (event) => {
     })
     const updatedCount = Number(updateRes && updateRes.stats && updateRes.stats.updated) || 0
     if (updatedCount < 1) {
+      const latestRes = await db.collection("privacy_requests").doc(input.id)
+        .field(PRIVACY_REQUEST_STATUS_FIELDS).get()
+      const latest = latestRes && latestRes.data
+      if (latest && latest.type === current.type && latest.status === input.status &&
+          String(latest.resolutionNote || "").trim() === input.resolutionNote) {
+        return {
+          ok: true,
+          id: input.id,
+          status: input.status,
+          updated: false,
+          message: "申请状态未变化"
+        }
+      }
       return createError("STATUS_CONFLICT", "申请状态已发生变化，请刷新后重试")
     }
 

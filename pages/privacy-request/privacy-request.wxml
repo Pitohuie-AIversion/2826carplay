@@ -63,12 +63,12 @@
     <button
       class="submit-btn ui-btn ui-btn-primary"
       loading="{{submitting}}"
-      disabled="{{submitting || !formReady}}"
+      disabled="{{submitting || cancellingId || !formReady}}"
       bindtap="handleSubmit"
       hover-class="privacy-submit-pressed"
-      aria-label="{{submitting ? '正在提交个人信息申请' : formReady ? '提交个人信息申请' : '申请说明尚未填写完整'}}"
+      aria-label="{{submitting ? '正在提交个人信息申请' : cancellingId ? '正在撤回个人信息申请，请稍候' : formReady ? '提交个人信息申请' : '申请说明尚未填写完整'}}"
     >
-      <view class="privacy-action-content"><view wx:if="{{!submitting}}" class="privacy-action-native-icon privacy-submit-native-icon" aria-hidden="true"></view><text>{{submitting ? '正在提交' : formReady ? '提交申请' : '填写说明后提交'}}</text></view>
+      <view class="privacy-action-content"><view wx:if="{{!submitting}}" class="privacy-action-native-icon privacy-submit-native-icon" aria-hidden="true"></view><text>{{submitting ? '正在提交' : cancellingId ? '撤回处理中' : formReady ? '提交申请' : '填写说明后提交'}}</text></view>
     </button>
     <view class="form-tip"><view class="form-tip-native-icon" aria-hidden="true"></view><text>申请不会自动删除业务记录；工作人员核验身份与保留义务后处理，并在下方反馈结果。</text></view>
   </view>

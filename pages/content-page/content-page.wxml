@@ -140,20 +140,20 @@
       </view>
     </view>
     <view class="support-actions">
-      <button wx:if="{{wxKfReady}}" class="support-button ui-btn ui-btn-primary" bindtap="handleOpenCustomerService" hover-class="content-control-pressed" aria-label="联系极境车库在线客服">
+      <button wx:if="{{wxKfReady}}" class="support-button ui-btn ui-btn-primary" bindtap="handleOpenCustomerService" hover-class="content-control-pressed" aria-label="联系爱迦租车在线客服">
         <view class="content-action-content"><view class="content-action-native-icon support-chat-native-icon" aria-hidden="true"></view><text>在线客服</text></view>
       </button>
-      <button wx:else class="support-button ui-btn ui-btn-primary" open-type="contact" hover-class="content-control-pressed" aria-label="联系极境车库在线客服">
+      <button wx:else class="support-button ui-btn ui-btn-primary" open-type="contact" hover-class="content-control-pressed" aria-label="联系爱迦租车在线客服">
         <view class="content-action-content"><view class="content-action-native-icon support-chat-native-icon" aria-hidden="true"></view><text>在线客服</text></view>
       </button>
-      <button class="support-button support-button-last ui-btn ui-btn-ghost" bindtap="handlePhoneCall" hover-class="content-control-pressed" aria-label="拨打极境车库咨询电话">
+      <button class="support-button support-button-last ui-btn ui-btn-ghost" bindtap="handlePhoneCall" hover-class="content-control-pressed" aria-label="拨打爱迦租车咨询电话">
         <view class="content-action-content"><view class="content-action-native-icon support-phone-native-icon" aria-hidden="true"></view><text>电话咨询</text></view>
       </button>
     </view>
   </view>
   <view class="document-footer">
     <view class="footer-line"></view>
-    <view class="footer-text">EXTREME GARAGE · OFFICIAL</view>
+    <view class="footer-text">AIJIA CAR RENTAL · OFFICIAL</view>
     <view class="footer-line"></view>
   </view>
 </view>

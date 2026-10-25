@@ -1,5 +1,5 @@
 /**
- * 极境车库小程序 - 全组件与全页面用户交互点击自动化仿真系统
+ * 爱迦租车小程序 - 全组件与全页面用户交互点击自动化仿真系统
  *
  * 覆盖范围：
  * 1. 全部自定义组件（2 个）：
@@ -551,7 +551,7 @@ function makeEvent(dataset = {}, detail = {}) {
 
 async function runSimulation() {
 console.log(`${c.bold}${c.magenta}========================================================================${c.reset}`)
-console.log(`${c.bold}${c.magenta}   极境车库小程序 - 全量组件与 26 页面交互点击自动化仿真套件   ${c.reset}`)
+console.log(`${c.bold}${c.magenta}   爱迦租车小程序 - 全量组件与 26 页面交互点击自动化仿真套件   ${c.reset}`)
 console.log(`${c.bold}${c.magenta}========================================================================${c.reset}`)
 
 // ========================================================================
@@ -775,7 +775,7 @@ simulateClick("点击切换车型配置参数模态:「奢享座舱」(handleSpe
   if (carDetailPage.data.specTab !== "perf") throw new Error("配置卡片未恢复至动力驾控")
 })
 
-simulateClick("点击展开/关闭极境尊享权益保障弹窗 (handleTogglePrivilegeModal)", () => {
+simulateClick("点击展开/关闭爱迦尊享权益保障弹窗 (handleTogglePrivilegeModal)", () => {
   carDetailPage.handleTogglePrivilegeModal()
   if (!carDetailPage.data.privilegeModalVisible) throw new Error("权益保障弹窗未开启")
   carDetailPage.handleClosePrivilegeModal()
@@ -2335,7 +2335,7 @@ if (failedCount > 0) {
   console.error(`\n${c.red}${c.bold}存在未通过项，请排查以上错误日志。${c.reset}`)
   process.exit(1)
 } else {
-  console.log(`\n${c.green}${c.bold}✓ 极境车库小程序所有自定义组件及 26 个页面全量交互点击均正常工作！${c.reset}\n`)
+  console.log(`\n${c.green}${c.bold}✓ 爱迦租车小程序所有自定义组件及 26 个页面全量交互点击均正常工作！${c.reset}\n`)
 }
 }
 

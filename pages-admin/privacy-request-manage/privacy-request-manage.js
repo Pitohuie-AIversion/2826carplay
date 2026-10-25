@@ -93,6 +93,12 @@ Page({
     })
   },
   onShow() {
+    if (typeof this._privacyManageDeferredResult === "function") {
+      const resume = this._privacyManageDeferredResult
+      this._privacyManageDeferredResult = null
+      resume()
+      return
+    }
     if (
       this.data.pageAuthorized &&
       this.data.hasLoaded &&
@@ -112,6 +118,7 @@ Page({
     this.finishPrivacyManageListEffects()
     this.clearPrivacyManageWriteTimer()
     this._privacyManageWriteActive = false
+    this._privacyManageDeferredResult = null
   },
   onPullDownRefresh() {
     if (!this.data.pageAuthorized || this.data.updatingId) {
@@ -135,7 +142,7 @@ Page({
       currentType: value,
       currentTypeLabel: getOptionLabel(TYPE_OPTIONS, value, "全部类型")
     })
-    this.fetchList()
+    this.fetchList({ type: value })
   },
   handleStatusTap(event) {
     const value = String(event.currentTarget.dataset.value || "")
@@ -150,7 +157,7 @@ Page({
       currentStatus: value,
       currentStatusLabel: getOptionLabel(STATUS_OPTIONS, value, "全部状态")
     })
-    this.fetchList()
+    this.fetchList({ status: value })
   },
   handleKeywordInput(event) {
     this.setData({
@@ -161,13 +168,8 @@ Page({
     if (!this.data.keyword || this.data.updatingId) {
       return
     }
-    const listRequestId = Number(this._privacyManageListRequestId || 0)
-    this.setData({ keyword: "" }, () => {
-      if (listRequestId !== Number(this._privacyManageListRequestId || 0)) {
-        return
-      }
-      this.fetchList()
-    })
+    this.setData({ keyword: "" })
+    this.fetchList({ keyword: "" })
   },
   handleSearch() {
     if (this.data.updatingId) {
@@ -190,19 +192,14 @@ Page({
     ) {
       return
     }
-    const listRequestId = Number(this._privacyManageListRequestId || 0)
     this.setData({
       keyword: "",
       currentType: "all",
       currentStatus: "pending",
       currentTypeLabel: "全部类型",
       currentStatusLabel: "待处理"
-    }, () => {
-      if (listRequestId !== Number(this._privacyManageListRequestId || 0)) {
-        return
-      }
-      this.fetchList()
     })
+    this.fetchList({ keyword: "", type: "all", status: "pending" })
   },
   handleLoadMore() {
     if (!this.data.loading && !this.data.updatingId && this.data.hasMore) {
@@ -387,10 +384,20 @@ Page({
     const requestId = Number(this._privacyManageWriteRequestId || 0) + 1
     this._privacyManageWriteRequestId = requestId
     this._privacyManageWriteActive = true
+    const nativeAction = beginPageNativeAction(this, { requireCurrent: true })
+    this._privacyManageDeferredResult = null
     this.clearPrivacyManageWriteTimer()
     this.setData({ updatingId: String(input.updatingId || "") })
     let settled = false
     const isCurrent = () => this._privacyManageWriteRequestId === requestId
+    const deliverResult = (callback) => {
+      if (!isCurrent()) return
+      if (!isPageNativeActionActive(this, nativeAction)) {
+        this._privacyManageDeferredResult = () => deliverResult(callback)
+        return
+      }
+      callback()
+    }
     const finishRequest = () => {
       if (settled || !isCurrent()) {
         return false
@@ -404,10 +411,12 @@ Page({
       if (!finishRequest()) {
         return
       }
-      this.setData({ updatingId: "" })
-      wx.showToast({
-        title: formatToastTitle(message, input.failureFallback || "操作失败"),
-        icon: "none"
+      deliverResult(() => {
+        this.setData({ updatingId: "" })
+        wx.showToast({
+          title: formatToastTitle(message, input.failureFallback || "操作失败"),
+          icon: "none"
+        })
       })
     }
     this._privacyManageWriteTimer = setTimeout(() => {
@@ -421,9 +430,11 @@ Page({
           return
         }
         const result = res && res.result ? res.result : null
-        if (typeof input.onResult === "function") {
-          input.onResult(result, isCurrent)
-        }
+        deliverResult(() => {
+          if (typeof input.onResult === "function") {
+            input.onResult(result, isCurrent)
+          }
+        })
       },
       fail: (error) => {
         handleFailure(error && (error.errMsg || error.message))
@@ -438,8 +449,7 @@ Page({
   },
   fetchList(options) {
     const input = options && typeof options === "object" ? options : {}
-    const append = Boolean(input.append)
-    const nextPage = append ? this.data.page + 1 : 0
+    let append = Boolean(input.append)
     this.finishPrivacyManageListEffects()
     const requestId = Number(this._privacyManageListRequestId || 0) + 1
     this._privacyManageListRequestId = requestId
@@ -459,13 +469,25 @@ Page({
       this.finishPrivacyManageListEffects()
       return
     }
-    const filters = {
-      page: nextPage,
-      pageSize: this.data.pageSize,
-      type: this.data.currentType === "all" ? "" : this.data.currentType,
-      status: this.data.currentStatus === "all" ? "" : this.data.currentStatus,
-      keyword: String(input.keyword !== undefined ? input.keyword : this.data.keyword || "")
+    const baseFilters = append && this._privacyManageListFilters ? this._privacyManageListFilters : {
+      type: this.data.currentType,
+      status: this.data.currentStatus,
+      keyword: this.data.keyword
     }
+    const query = {}
+    Object.keys(baseFilters).forEach((key) => {
+      query[key] = input[key] !== undefined ? input[key] : baseFilters[key]
+    })
+    query.type = query.type === "all" ? "" : query.type
+    query.status = query.status === "all" ? "" : query.status
+    query.keyword = String(query.keyword || "").trim()
+    if (append && this._privacyManageListFilters &&
+      Object.keys(query).some((key) => query[key] !== this._privacyManageListFilters[key])) {
+      append = false
+    }
+    const nextPage = append ? this.data.page + 1 : 0
+    if (!append) this._privacyManageListFilters = null
+    const filters = { ...query, page: nextPage, pageSize: this.data.pageSize }
     this.setData({ loading: true })
     let settled = false
     const finishRequest = () => {
@@ -546,6 +568,7 @@ Page({
               }
             })
           : []
+        this._privacyManageListFilters = query
         this.setData({
           initialLoading: false,
           loading: false,

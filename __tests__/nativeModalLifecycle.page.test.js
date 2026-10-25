@@ -249,21 +249,25 @@ describe("native callback lifecycle", () => {
     ["audit log management", "../pages-admin/audit-log-manage/audit-log-manage"],
     ["error log management", "../pages-admin/error-log-manage/error-log-manage"],
     ["privacy request management", "../pages-admin/privacy-request-manage/privacy-request-manage"]
-  ])("does not reload %s after a delayed clear-search render callback", (_label, modulePath) => {
-    global.wx = {}
+  ])("%s search clear starts immediately and ignores late work after unload", (_label, modulePath) => {
+    const requests = []
+    global.wx = { cloud: { callFunction: jest.fn((request) => requests.push(request)) }, showToast: jest.fn() }
     const page = createPage(loadPageDefinition(modulePath), { keyword: "待清空" })
     let renderCallback
     page.setData = jest.fn((patch, done) => {
       Object.assign(page.data, patch)
       renderCallback = done
     })
-    page.fetchList = jest.fn()
-
     page.handleClearKeyword()
+    expect(requests).toHaveLength(1)
+    expect(requests[0].data.keyword).toBe("")
     page.onUnload()
-    renderCallback()
-
-    expect(page.fetchList).not.toHaveBeenCalled()
+    page.setData.mockClear()
+    if (typeof renderCallback === "function") renderCallback()
+    requests[0].success({ result: { ok: true, list: [{ id: "late" }] } })
+    expect(requests).toHaveLength(1)
+    expect(page.setData).not.toHaveBeenCalled()
+    expect(wx.showToast).not.toHaveBeenCalled()
   })
 
   test("booking management immediately requests an empty keyword and ignores its result after unload", () => {
@@ -879,20 +883,24 @@ describe("native callback lifecycle", () => {
       { keyword: "申请", currentType: "delete", currentStatus: "completed" },
       "handleResetFilters"
     ]
-  ])("does not reload %s after a delayed reset callback unloads", (_label, modulePath, data, handler) => {
-    global.wx = {}
+  ])("%s reset starts immediately and discards its response after unload", (_label, modulePath, data, handler) => {
+    const requests = []
+    global.wx = { cloud: { callFunction: jest.fn((request) => requests.push(request)) }, showToast: jest.fn() }
     const page = createPage(loadPageDefinition(modulePath), data)
     let renderCallback
     page.setData = jest.fn((patch, done) => {
       Object.assign(page.data, patch)
       renderCallback = done
     })
-    page.fetchList = jest.fn()
-
     page[handler]()
+    expect(requests).toHaveLength(1)
+    expect(requests[0].data.keyword).toBe("")
     page.onUnload()
-    renderCallback()
-
-    expect(page.fetchList).not.toHaveBeenCalled()
+    page.setData.mockClear()
+    if (typeof renderCallback === "function") renderCallback()
+    requests[0].success({ result: { ok: true, list: [{ id: "late" }] } })
+    expect(requests).toHaveLength(1)
+    expect(page.setData).not.toHaveBeenCalled()
+    expect(wx.showToast).not.toHaveBeenCalled()
   })
 })

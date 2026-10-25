@@ -34,6 +34,12 @@ const BOOKING_DETAIL_LOAD_TIMEOUT_MS = 15 * 1000
 const BOOKING_DETAIL_MUTATION_TIMEOUT_MS = 12 * 1000
 const SUBSCRIPTION_REQUEST_TIMEOUT_MS = 15 * 1000
 const HANDOVER_EXPORT_TIMEOUT_MS = 15 * 1000
+const SATISFACTION_TAGS = ["车况极佳", "管家专业", "准时交付", "体验尊享", "手续便捷"]
+const DEFAULT_SATISFACTION_TAGS = ["车况极佳", "体验尊享"]
+
+function buildSatisfactionTags(selectedTags) {
+  return SATISFACTION_TAGS.map((label) => ({ label, selected: selectedTags.includes(label) }))
+}
 
 const buildStatusGuidance = (status) => getSharedStatusGuidance(status, { mode: "detail" })
 
@@ -63,6 +69,10 @@ function normalizeQuote(item) {
     expiredAtText: formatDisplayTime(quote.expiredAt)
   }
 }
+function getAdjustmentDraftKey(bookingId, quote) {
+  if (!bookingId || !quote || !quote.id) return ""
+  return JSON.stringify([String(bookingId), String(quote.id), Number(quote.version || 0)])
+}
 function normalizeHandover(item, booking) {
   if (!item || typeof item !== "object") return {}
   const status = String(item.status || "")
@@ -73,7 +83,8 @@ function normalizeHandover(item, booking) {
     stage: item.stage === "return" ? "return" : "pickup",
     stageText: item.stage === "return" ? "还车" : "取车",
     statusText: { submitted: "待我核对", confirmed: "已核对", archived: "已归档" }[status] || status,
-    energyText: `${item.energyType === "electric" ? "电量" : "油量"} ${Math.max(0, Number(item.energyLevelPercent || 0))}%`,
+    mileageText: report.mileageKm === null ? "里程未记录" : `${report.mileageKm} km`,
+    energyText: report.energyLevelPercent === null || !report.energyType ? "能源未记录" : `${report.energyType === "electric" ? "电量" : "油量"} ${report.energyLevelPercent}%`,
     submittedAtText: formatDisplayTime(item.submittedAt),
     confirmedAtText: formatDisplayTime(item.confirmedAt),
     photos: (Array.isArray(item.photos) ? item.photos.filter((photo) => photo && photo.url) : []).map((photo) => ({
@@ -83,8 +94,7 @@ function normalizeHandover(item, booking) {
     scratchItems: report.scratchItems || [],
     scratchSummary: report.scratchSummary || "",
     inspectorName: report.inspectorName || "",
-    customerSigned: report.customerSigned || false,
-    customerSignatureUrl: report.customerSignatureUrl || ""
+    customerConfirmed: report.customerConfirmed
   }
 }
 
@@ -171,8 +181,8 @@ Page({
     showVoucherModal: false,
     pickupLocationDisplay: "",
     satisfactionRating: 5,
-    satisfactionTags: ["车况极佳", "管家专业", "准时交付", "体验尊享", "手续便捷"],
-    selectedSatisfactionTags: ["车况极佳", "体验尊享"],
+    satisfactionTags: buildSatisfactionTags(DEFAULT_SATISFACTION_TAGS),
+    selectedSatisfactionTags: DEFAULT_SATISFACTION_TAGS.slice(),
     satisfactionNote: "",
     reviewSubmitted: false,
     reviewSubmitting: false,
@@ -247,6 +257,17 @@ Page({
       this._handoverExportNeedsReset = false
       this.setData({ exportingHandover: false })
     }
+    const quoteConflict = this._quoteResponseConflictPending
+    if (quoteConflict) {
+      if (quoteConflict === getAdjustmentDraftKey(this.data.id, this.data.latestQuote) && this.data.booking.status === "quoted") {
+        if (isPageCurrent(this)) {
+          this._quoteResponseConflictPending = ""
+          wx.showToast({ title: "申请已更新，请核对", icon: "none" })
+        }
+        return
+      }
+      this._quoteResponseConflictPending = ""
+    }
     if (
       this.data.id &&
       !this.data.loading &&
@@ -305,6 +326,7 @@ Page({
     this._cancelRequestSerial = Number(this._cancelRequestSerial || 0) + 1
     this._subscriptionRequestId = Number(this._subscriptionRequestId || 0) + 1
     this._quoteResponseRequestId = Number(this._quoteResponseRequestId || 0) + 1
+    this._quoteResponseConflictPending = ""
     this._handoverResponseRequestId = Number(this._handoverResponseRequestId || 0) + 1
     this.cancelOperationConfigRequest()
     this.finishDetailLoadEffects()
@@ -332,6 +354,14 @@ Page({
   },
   applyBooking(booking, latestQuote, handovers) {
     const quote = normalizeQuote(latestQuote)
+    this._quoteResponseConflictPending = ""
+    const adjustmentDraftKey = getAdjustmentDraftKey(booking.id, quote)
+    const preserveAdjustmentDraft = Boolean(adjustmentDraftKey) && booking.status === "quoted" && quote.status === "sent" &&
+      this._adjustmentDraftQuoteKey === adjustmentDraftKey
+    const adjustmentNote = preserveAdjustmentDraft
+      ? this.data.adjustmentNote
+      : quote.status === "adjustment_requested" ? quote.adjustmentNote : ""
+    if (!preserveAdjustmentDraft) this._adjustmentDraftQuoteKey = ""
     const pickupHandover = normalizeHandover(handovers && handovers.pickup, booking)
     const returnHandover = normalizeHandover(handovers && handovers.return, booking)
     let savedReview = null
@@ -340,6 +370,15 @@ Page({
         savedReview = wx.getStorageSync(`booking_review_${booking.id}`)
       } catch (e) {}
     }
+    const hasSavedReview = Boolean(savedReview && savedReview.rating)
+    const preserveReviewDraft = Boolean(booking.id) && !hasSavedReview && !this.data.reviewSubmitted &&
+      this._satisfactionDraftBookingId === String(booking.id || "")
+    const selectedSatisfactionTags = hasSavedReview && Array.isArray(savedReview.tags)
+      ? savedReview.tags.filter((tag) => SATISFACTION_TAGS.includes(tag))
+      : preserveReviewDraft
+        ? this.data.selectedSatisfactionTags.slice()
+        : DEFAULT_SATISFACTION_TAGS.slice()
+    if (!preserveReviewDraft) this._satisfactionDraftBookingId = ""
     this.applyState({
       booking,
       initialLoading: false,
@@ -366,14 +405,15 @@ Page({
         return: returnHandover
       },
       handoverList: [pickupHandover, returnHandover].filter((item) => item.id),
-      adjustmentNote: quote.status === "adjustment_requested" ? quote.adjustmentNote : "",
+      adjustmentNote,
       readinessCard: getVehicleReadinessCard({ name: booking.vehicleName, category: booking.category }),
       bookingOccupancyTooLong: (Date.parse(`${booking.endDate}T00:00:00.000Z`) - Date.parse(`${booking.startDate}T00:00:00.000Z`)) / 86400000 + 1 > 47,
       pickupLocationDisplay: formatLocationDisplay(booking.pickupLocation || booking.location, booking.city),
-      reviewSubmitted: Boolean(savedReview && savedReview.rating),
-      satisfactionRating: (savedReview && savedReview.rating) || 5,
-      selectedSatisfactionTags: (savedReview && Array.isArray(savedReview.tags)) ? savedReview.tags : ["车况极佳", "体验尊享"],
-      satisfactionNote: (savedReview && savedReview.note) || "",
+      reviewSubmitted: hasSavedReview,
+      satisfactionRating: hasSavedReview ? savedReview.rating : preserveReviewDraft ? this.data.satisfactionRating : 5,
+      selectedSatisfactionTags,
+      satisfactionTags: buildSatisfactionTags(selectedSatisfactionTags),
+      satisfactionNote: hasSavedReview ? (savedReview.note || "") : preserveReviewDraft ? this.data.satisfactionNote : "",
       editForm: {
         userName: booking.userName,
         phone: booking.phone,
@@ -632,6 +672,7 @@ Page({
   },
   handleAdjustmentInput(event) {
     if (this.data.quoteResponding || this.data.loading) return
+    this._adjustmentDraftQuoteKey = getAdjustmentDraftKey(this.data.id, this.data.latestQuote)
     this.setData({ adjustmentNote: String(event.detail && event.detail.value || "").slice(0, 200) })
   },
   handleConfirmQuote() {
@@ -673,6 +714,7 @@ Page({
     const adjustmentNote = action === "requestAdjustment" ? String(this.data.adjustmentNote || "").trim() : ""
     const requestId = Number(this._quoteResponseRequestId || 0) + 1
     this._quoteResponseRequestId = requestId
+    this._quoteResponseConflictPending = ""
     this.clearQuoteResponseTimer()
     this.applyState({ quoteResponding: true })
     let settled = false
@@ -703,12 +745,19 @@ Page({
           const result = res && res.result
           if (!result || !result.ok) {
             this.applyState({ quoteResponding: false })
-            if (isPageCurrent(this)) wx.showToast({ title: formatToastTitle(result && result.message, "报价操作失败"), icon: "none" })
+            if (result && result.code === "VERSION_CONFLICT" && !isPageCurrent(this)) {
+              this._quoteResponseConflictPending = getAdjustmentDraftKey(bookingId, this.data.latestQuote)
+            }
+            if (isPageCurrent(this)) wx.showToast({
+              title: result && result.code === "VERSION_CONFLICT" ? "申请已更新，请核对" : formatToastTitle(result && result.message, "报价操作失败"),
+              icon: "none"
+            })
             if (isPageCurrent(this) && result && ["QUOTE_EXPIRED", "QUOTE_INVALID", "STATUS_NOT_ALLOWED"].includes(result.code)) this.loadDetail()
             return
           }
           const status = result.bookingStatus || (action === "confirm" ? "confirmed" : "adjustment_requested")
-          this.applyBooking({ ...this.data.booking, status }, { ...this.data.latestQuote, status, ...(action === "requestAdjustment" ? { adjustmentNote } : {}) }, this.data.handovers)
+          const savedAdjustmentNote = typeof result.adjustmentNote === "string" ? result.adjustmentNote : adjustmentNote
+          this.applyBooking({ ...this.data.booking, status }, { ...this.data.latestQuote, status, ...(action === "requestAdjustment" ? { adjustmentNote: savedAdjustmentNote } : {}) }, this.data.handovers)
           if (isPageCurrent(this)) {
             wx.showToast({ title: action === "confirm" ? "档期已保留，尚未付款" : "调整申请已提交", icon: "none" })
             this.loadDetail()
@@ -1206,6 +1255,7 @@ Page({
     }
     const filePath = `${wx.env.USER_DATA_PATH}/${fileName}`
     let settled = false
+    let writeSuccessHandled = false
     const finish = () => {
       if (settled) return false
       settled = true
@@ -1225,10 +1275,13 @@ Page({
       data: csvContent,
       encoding: "utf8",
       success: () => {
+        if (writeSuccessHandled) return
+        writeSuccessHandled = true
         if (!finish()) {
           if (typeof fs.unlink === "function") fs.unlink({ filePath, fail: () => {} })
           return
         }
+        const previousPath = this.data.exportedHandoverPath
         triggerHapticFeedback("medium")
         this.setData({
           exportingHandover: false,
@@ -1236,6 +1289,9 @@ Page({
           exportedHandoverPath: filePath,
           exportedHandoverFileName: fileName
         })
+        if (previousPath && previousPath !== filePath && typeof fs.unlink === "function") {
+          try { fs.unlink({ filePath: previousPath, fail: () => {} }) } catch (error) {}
+        }
         if (typeof wx !== "undefined" && wx.showToast) wx.showToast({ title: "留证单已导出", icon: "success" })
       },
       fail
@@ -1295,24 +1351,26 @@ Page({
       wx.showToast({ title: "暂无留证记录", icon: "none" })
       return
     }
+    const report = buildHandoverReport(b, target)
     const lines = [
-      `【极境车库·验车留证事实备忘】`,
+      `【爱迦租车·验车留证事实备忘】`,
       `交接阶段: ${target.stageText || "取车"}记录`,
       `预约单号: ${formatBookingReference(b.id)}`,
-      `尊享车型: ${b.vehicleName || "极境座驾"}`,
+      `尊享车型: ${b.vehicleName || "爱迦座驾"}`,
       `车牌号码: ${b.plateNumber || target.plateNumber || "车牌保密"}`,
-      `交接里程: ${target.mileageKm || 0} km`,
-      `能源状态: ${target.energyText || "正常"}`,
-      `外观环检: ${target.scratchSummary || target.damageNote || "无明显新增划痕或外观损伤"}`,
-      `验车专员: ${target.inspectorName || "极境交车专员"}`,
+      `交接里程: ${report.mileageKm === null ? "未记录" : `${report.mileageKm} km`}`,
+      `能源状态: ${report.energyLevelPercent === null || !report.energyType ? "未记录" : `${report.energyTypeText} ${report.energyLevelPercent}%`}`,
+      `外观环检: ${report.damageNote}`,
+      `验车专员: ${report.inspectorName || "未记录"}`,
       `核验时间: ${target.confirmedAtText || target.submittedAtText || "待核验"}`
     ]
+    if (report.scratchSummary && report.scratchSummary !== report.damageNote) lines.push(`补充环检: ${report.scratchSummary}`)
     if (typeof wx === "undefined" || typeof wx.setClipboardData !== "function") return
     wx.setClipboardData({
       data: lines.join("\n"),
       success: () => {
-        triggerHapticFeedback("light")
         if (!this.isBookingDetailActive() || !isPageCurrent(this)) return
+        triggerHapticFeedback("light")
         wx.showToast({ title: "留证事实已复制", icon: "none" })
       },
       fail: () => {
@@ -1353,7 +1411,7 @@ Page({
     const isVoucher = Boolean(event && event.currentTarget && event.currentTarget.dataset && event.currentTarget.dataset.type === "voucher")
     const b = this.data.booking || {}
     const servicePhone = String(this.data.servicePhone || "").trim()
-    const voucherText = `【极境出行凭证】\n预约单号：${this.data.bookingReference || b.id}\n专属座驾：${b.vehicleName || "预约车辆"}\n用车日期：${b.startDate} 至 ${b.endDate}\n取车网点：${this.data.pickupLocationDisplay || "取车地点待确认"}\n出行人：${b.userName} (${b.phone})${servicePhone ? `\n客服专线：${servicePhone}` : ""}`
+    const voucherText = `【爱迦出行凭证】\n预约单号：${this.data.bookingReference || b.id}\n专属座驾：${b.vehicleName || "预约车辆"}\n用车日期：${b.startDate} 至 ${b.endDate}\n取车网点：${this.data.pickupLocationDisplay || "取车地点待确认"}\n出行人：${b.userName} (${b.phone})${servicePhone ? `\n客服专线：${servicePhone}` : ""}`
     const id = isVoucher ? voucherText : String((b && b.id) || "").trim()
     if (!id || typeof wx.setClipboardData !== "function") {
       wx.showToast({
@@ -1440,7 +1498,7 @@ Page({
     const bookingRef = this.data.bookingReference || booking.id || ""
     const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.addPhoneCalendar({
-      title: `极境车库用车 · ${vehicleName}`,
+      title: `爱迦租车用车 · ${vehicleName}`,
       startTime,
       endTime,
       location: (this.data.pickupHub && this.data.pickupHub.address) || booking.pickupLocation || booking.location || this.data.pickupLocationDisplay || "取车地点待确认",
@@ -1585,12 +1643,13 @@ Page({
     if (this.data.reviewSubmitted) return
     const rating = Math.max(1, Math.min(5, Number((event && event.currentTarget && event.currentTarget.dataset && event.currentTarget.dataset.rating) || 5)))
     triggerHapticFeedback("light")
+    this.markSatisfactionDraft()
     this.setData({ satisfactionRating: rating })
   },
   handleSatisfactionTagTap(event) {
     if (this.data.reviewSubmitted) return
     const tag = String((event && event.currentTarget && event.currentTarget.dataset && event.currentTarget.dataset.tag) || "").trim()
-    if (!tag) return
+    if (!SATISFACTION_TAGS.includes(tag)) return
     triggerHapticFeedback("selection")
     const current = Array.isArray(this.data.selectedSatisfactionTags) ? [...this.data.selectedSatisfactionTags] : []
     const idx = current.indexOf(tag)
@@ -1599,14 +1658,22 @@ Page({
     } else {
       current.push(tag)
     }
-    this.setData({ selectedSatisfactionTags: current })
+    this.markSatisfactionDraft()
+    this.setData({
+      selectedSatisfactionTags: current,
+      satisfactionTags: buildSatisfactionTags(current)
+    })
   },
   handleSatisfactionNoteInput(event) {
     if (this.data.reviewSubmitted) return
+    this.markSatisfactionDraft()
     this.setData({ satisfactionNote: String((event && event.detail && event.detail.value) || "").slice(0, 150) })
   },
+  markSatisfactionDraft() {
+    this._satisfactionDraftBookingId = String((this.data.booking && this.data.booking.id) || this.data.id || "")
+  },
   handleSubmitSatisfactionReview() {
-    if (this.data.reviewSubmitted || this.data.reviewSubmitting) return
+    if (!this.isBookingDetailActive() || !isPageCurrent(this) || this.data.reviewSubmitted || this.data.reviewSubmitting) return
     triggerHapticFeedback("medium")
     const id = this.data.id || (this.data.booking && this.data.booking.id)
     if (!id) return
@@ -1618,24 +1685,22 @@ Page({
       submittedAt: new Date().toISOString()
     }
     try {
-      if (typeof wx !== "undefined" && typeof wx.setStorageSync === "function") {
-        wx.setStorageSync(`booking_review_${id}`, reviewPayload)
+      if (typeof wx === "undefined" || typeof wx.setStorageSync !== "function") {
+        throw new Error("Review storage unavailable")
       }
-    } catch (e) {}
-
-    setTimeout(() => {
-      if (this._bookingDetailUnloaded) return
-      this.setData({
-        reviewSubmitting: false,
-        reviewSubmitted: true
-      })
+      wx.setStorageSync(`booking_review_${id}`, reviewPayload)
+    } catch (error) {
+      this.setData({ reviewSubmitting: false })
       if (typeof wx !== "undefined" && typeof wx.showToast === "function") {
-        wx.showToast({
-          title: "感谢您的尊享评价",
-          icon: "success"
-        })
+        wx.showToast({ title: "评价保存失败，请重试", icon: "none" })
       }
-    }, 200)
+      return
+    }
+    this._satisfactionDraftBookingId = ""
+    this.setData({ reviewSubmitting: false, reviewSubmitted: true })
+    if (typeof wx.showToast === "function") {
+      wx.showToast({ title: "感谢您的尊享评价", icon: "success" })
+    }
   },
   isBookingDetailActive() {
     return this._bookingDetailUnloaded !== true

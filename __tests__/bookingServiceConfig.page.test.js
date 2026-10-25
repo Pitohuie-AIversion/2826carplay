@@ -101,6 +101,78 @@ describe("预约已保存服务配置闭环", () => {
     page.onUnload()
   })
 
+  test.each(["unchanged", "switch-hub", "switch-city", "clear-city"])("配置成功刷新改名时按响应前当前选择恢复网点：%s", (action) => {
+    const requests = []
+    global.wx = { cloud: { callFunction: jest.fn((request) => requests.push(request)) } }
+    const page = createPage("booking")
+    const second = { ...savedHubs[0], id: "sh-second", name: "上海第二网点" }
+    const third = { ...savedHubs[0], id: "sh-third", name: "上海第三网点" }
+    const hangzhouSecond = { ...savedHubs[1], id: "hz-second", name: "杭州第二网点" }
+    const hubs = [savedHubs[0], second, third, savedHubs[1], hangzhouSecond]
+    page.data.form.city = "上海市"
+    page.data.cityOptions = ["上海", "杭州"]
+    page.data.serviceHubs = hubs
+    page.syncCitySelection()
+    page.handlePickupHubChange({ detail: { value: 1 } })
+    page.loadOperationConfig({ force: true })
+    if (action === "switch-hub") page.handlePickupHubChange({ detail: { value: 2 } })
+    if (action === "switch-city") {
+      page.handleCityChange({ detail: { value: 1 } })
+      page.handlePickupHubChange({ detail: { value: 1 } })
+    }
+    if (action === "clear-city") page.handleInput({ currentTarget: { dataset: { field: "city" } }, detail: { value: "" } })
+    const current = action === "switch-city" ? hangzhouSecond : action === "switch-hub" ? third : second
+    const updatedHubs = hubs.map((hub) => ({ ...hub, name: `${hub.name}新名称` }))
+
+    requests[0].success({ result: { ok: true, config: { cityOptions: ["上海", "杭州"], serviceHubs: updatedHubs } } })
+
+    expect(page.data.form.city).toBe(action === "clear-city" ? "" : action === "switch-city" ? "杭州" : "上海市")
+    expect(page.data.form.pickupLocation).toBe(action === "clear-city" ? "" : `${current.name}新名称`)
+    if (action === "clear-city") expect(page.data.pickupHubs).toEqual([])
+    else expect(page.data.pickupHubs[page.data.pickupHubIndex].id).toBe(current.id)
+    expect(page._pendingPickupSelection).toBeNull()
+    page.onUnload()
+  })
+
+  test.each([false, true])("配置直接成功删除已选网点时遵循剩余网点选择语义：全部删除=%s", (deleteAll) => {
+    const requests = []
+    global.wx = { cloud: { callFunction: jest.fn((request) => requests.push(request)) } }
+    const page = createPage("booking")
+    const second = { ...savedHubs[0], id: "second", name: "同城第二网点" }
+    page.data.form.city = "上海"
+    page.data.serviceHubs = [savedHubs[0], second]
+    page.syncCitySelection()
+    page.handlePickupHubChange({ detail: { value: 1 } })
+    page.loadOperationConfig({ force: true })
+
+    requests[0].success({ result: { ok: true, config: { serviceHubs: deleteAll ? [] : [savedHubs[0]] } } })
+
+    expect(page.data.form.pickupLocation).toBe(deleteAll ? "" : savedHubs[0].name)
+    expect(page.data.pickupHubs).toEqual(deleteAll ? [] : [savedHubs[0]])
+    expect(page.data.pickupHubIndex).toBe(0)
+    page.onUnload()
+  })
+
+  test("配置失败重试期间用户切换城市，不恢复旧城市的暂存网点", () => {
+    const requests = []
+    global.wx = { cloud: { callFunction: jest.fn((request) => requests.push(request)) } }
+    const page = createPage("booking")
+    page.data.form.city = "上海"
+    page.data.serviceHubs = savedHubs
+    page.syncCitySelection()
+    page.loadOperationConfig({ force: true })
+    requests[0].fail({ errMsg: "temporary failure" })
+    page.handleRetryServiceConfig()
+    page.handleInput({ currentTarget: { dataset: { field: "city" } }, detail: { value: "杭州" } })
+
+    requests[1].success({ result: { ok: true, config: { serviceHubs: savedHubs } } })
+
+    expect(page.data.form.city).toBe("杭州")
+    expect(page.data.form.pickupLocation).toBe(savedHubs[1].name)
+    expect(page.data.pickupHubs[page.data.pickupHubIndex].id).toBe(savedHubs[1].id)
+    page.onUnload()
+  })
+
   test.each(["booking", "booking-detail"])("%s 活动配置请求失效立即撤销旧入口，预约加载状态可重试", (route) => {
     const requests = []
     global.wx = { cloud: { callFunction: jest.fn((request) => requests.push(request)) } }

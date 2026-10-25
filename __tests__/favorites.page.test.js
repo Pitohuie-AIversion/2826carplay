@@ -34,6 +34,74 @@ function createPage(definition) {
 }
 
 describe("pages/favorites 收藏车辆视图", () => {
+  test.each(["empty", "missing", "network", "timeout", "invalidated"])("配置 %s 后不再拨打或复制旧客服电话", (outcome) => {
+    jest.useFakeTimers()
+    const requests = []
+    global.wx = {
+      cloud: { callFunction: jest.fn((options) => requests.push(options)) },
+      makePhoneCall: jest.fn(), setClipboardData: jest.fn(), showModal: jest.fn()
+    }
+    const page = createPage(loadPageDefinition())
+    page.data.compareCars = [{ id: "a", name: "A" }, { id: "b", name: "B" }]
+    page.loadOperationConfig({ force: true })
+    requests[0].success({ result: { ok: true, config: { servicePhone: "18800001111" } } })
+    page.loadOperationConfig({ force: true })
+    if (outcome === "network") requests[1].fail(new Error("offline"))
+    else if (outcome === "timeout") jest.advanceTimersByTime(10000)
+    else if (outcome === "invalidated") require("../shared/operationConfigRequest").clearOperationConfigCache()
+    else requests[1].success({ result: { ok: true, config: outcome === "empty" ? { servicePhone: "" } : {} } })
+    expect(page.data.servicePhone).toBe("")
+    page.handleCallConsultant()
+    page.handleCopyComparison()
+    expect(wx.makePhoneCall).not.toHaveBeenCalled()
+    expect(wx.setClipboardData.mock.calls.every(([args]) => !args.data.includes("18800001111"))).toBe(true)
+    page.onUnload()
+    expect(jest.getTimerCount()).toBe(0)
+  })
+
+  test("返回收藏页读取最新配置并关闭包含已撤销电话的旧海报", () => {
+    const requests = []
+    global.wx = { nextTick: (callback) => callback(), cloud: { callFunction: jest.fn((options) => requests.push(options)) } }
+    const page = createPage(loadPageDefinition())
+    page.fetchList = jest.fn()
+    page.onLoad()
+    page.onShow()
+    expect(requests).toHaveLength(1)
+    requests[0].success({ result: { ok: true, revision: 1, config: { servicePhone: "18800001111" } } })
+    page.data.comparePosterVisible = true
+    page.data.comparePosterImagePath = "wxfile://old-phone.png"
+    page.onHide()
+    require("../shared/operationConfigRequest").requestOperationConfig({ force: true })
+    requests[1].success({ result: { ok: true, revision: 2, config: { servicePhone: "" } } })
+    page.onShow()
+    expect(page.data.servicePhone).toBe("")
+    expect(page.data.comparePosterVisible).toBe(false)
+    expect(requests).toHaveLength(2)
+    page.onUnload()
+  })
+
+  test("下拉刷新强制更新客服配置，迟到请求及卸载后回调不能回写", () => {
+    jest.useFakeTimers()
+    const requests = []
+    global.wx = { stopPullDownRefresh: jest.fn(), cloud: { callFunction: jest.fn((options) => requests.push(options)) } }
+    const page = createPage(loadPageDefinition())
+    page.fetchList = jest.fn(({ done }) => done())
+    page.loadOperationConfig()
+    page.onPullDownRefresh()
+    expect(requests).toHaveLength(2)
+    requests[1].success({ result: { ok: true, config: { servicePhone: "18800002222" } } })
+    requests[0].success({ result: { ok: true, config: { servicePhone: "18800001111" } } })
+    expect(page.data.servicePhone).toBe("18800002222")
+    expect(wx.stopPullDownRefresh).toHaveBeenCalledTimes(1)
+    page.onPullDownRefresh()
+    expect(requests).toHaveLength(3)
+    page.onUnload()
+    page.setData.mockClear()
+    requests[2].success({ result: { ok: true, config: { servicePhone: "18800003333" } } })
+    expect(page.setData).not.toHaveBeenCalled()
+    expect(jest.getTimerCount()).toBe(0)
+  })
+
   test.each(["network", "timeout", "server"])("撤销在%s失败后保留新的重试窗口", (failure) => {
     jest.useFakeTimers()
     const requests = []

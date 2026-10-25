@@ -1,5 +1,5 @@
 /**
- * 极境车库 - 交接留证报告与车况凭证生成器
+ * 爱迦租车 - 交接留证报告与车况凭证生成器
  */
 
 const ANGLE_LABELS = {
@@ -33,20 +33,29 @@ const PART_LABELS = {
   other: "其他部位"
 }
 
+const REPORT_SESSION_ID = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
+let reportExportSerial = 0
+
 function escapeCsvCell(value) {
-  const text = String(value === undefined || value === null ? "" : value).replace(/\r\n/g, " ").replace(/[\r\n]/g, " ")
-  if (text.includes(",") || text.includes('"')) {
-    return `"${text.replace(/"/g, '""')}"`
-  }
-  return text
+  const text = String(value === undefined || value === null ? "" : value).replace(/\r\n/g, "\n").replace(/\r/g, "\n")
+  const formulaPrefix = /^[\t\n\u0000]|^[\s\u0000]*[=+\-@\uFF1D\uFF0B\uFF0D\uFF20]/
+  const safeText = formulaPrefix.test(text) ? `'${text}` : text
+  const escaped = safeText.replace(/"/g, '""')
+  return /[",\n]/.test(escaped) ? `"${escaped}"` : escaped
 }
 
 function formatTime(timestamp) {
   if (!timestamp) return ""
   const d = new Date(timestamp)
-  if (Number.isNaN(d.getTime())) return String(timestamp)
+  if (typeof timestamp === "boolean" || Number.isNaN(d.getTime())) return ""
   const pad = (n) => String(n).padStart(2, "0")
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function recordedNumber(value, max) {
+  if ((typeof value !== "number" && typeof value !== "string") || (typeof value === "string" && !value.trim())) return null
+  const number = Number(value)
+  return Number.isInteger(number) && number >= 0 && number <= max ? number : null
 }
 
 function buildHandoverReport(bookingInput, handoverInput) {
@@ -55,17 +64,17 @@ function buildHandoverReport(bookingInput, handoverInput) {
   const stage = String(handover.stage || "pickup") === "return" ? "return" : "pickup"
   const stageText = stage === "return" ? "还车交验" : "取车交验"
 
-  const photos = (Array.isArray(handover.photos) ? handover.photos : []).map((p) => ({
+  const photos = (Array.isArray(handover.photos) ? handover.photos : []).filter((p) => p && typeof p === "object" && !Array.isArray(p)).map((p) => ({
     angle: p.angle || "unknown",
     label: ANGLE_LABELS[p.angle] || p.angle || "其他视角",
     fileId: p.fileId || "",
     url: p.url || ""
   }))
 
-  const energyType = handover.energyType === "electric" ? "electric" : "fuel"
-  const energyTypeText = energyType === "electric" ? "纯电" : "燃油"
+  const energyType = ["electric", "fuel"].includes(handover.energyType) ? handover.energyType : ""
+  const energyTypeText = energyType === "electric" ? "纯电" : energyType === "fuel" ? "燃油" : "未记录"
 
-  const scratchItems = (Array.isArray(handover.scratchItems) ? handover.scratchItems : []).map((item) => ({
+  const scratchItems = (Array.isArray(handover.scratchItems) ? handover.scratchItems : []).filter((item) => item && typeof item === "object" && !Array.isArray(item)).map((item) => ({
     part: item.part || "other",
     partLabel: PART_LABELS[item.part] || item.part || "其他部位",
     type: item.type || "scratch",
@@ -77,15 +86,14 @@ function buildHandoverReport(bookingInput, handoverInput) {
     ? scratchItems.map((s) => `[${s.partLabel}] ${s.typeLabel}${s.description ? `(${s.description})` : ""}`).join("; ")
     : ""
 
-  const inspectorName = String(handover.inspectorName || booking.adminRemarkAuthor || "极境交车专员").trim()
-  const customerSigned = Boolean(handover.confirmedAt || handover.customerSigned)
-  const customerSignatureUrl = String(handover.customerSignatureUrl || handover.signatureUrl || "").trim()
+  const inspectorName = String(handover.inspectorName || "").trim()
+  const customerConfirmed = Boolean(formatTime(handover.confirmedAt)) || handover.status === "confirmed"
 
   return {
     bookingId: String(booking.id || booking.bookingId || "—"),
-    vehicleName: String(booking.vehicleName || "极境座驾"),
+    vehicleName: String(booking.vehicleName || "爱迦座驾"),
     plateNumber: String(booking.plateNumber || "车牌保密"),
-    userName: String(booking.userName || "体验客户"),
+    userName: String(booking.userName || "未记录"),
     phone: String(booking.phone || "—"),
     stage,
     stageText,
@@ -93,19 +101,18 @@ function buildHandoverReport(bookingInput, handoverInput) {
     submittedAtText: formatTime(handover.submittedAt) || "待提交",
     confirmedAt: handover.confirmedAt || null,
     confirmedAtText: formatTime(handover.confirmedAt) || "待确认",
-    mileageKm: Number.isFinite(Number(handover.mileageKm)) ? Number(handover.mileageKm) : 0,
+    mileageKm: recordedNumber(handover.mileageKm, 5000000),
     energyType,
     energyTypeText,
-    energyLevelPercent: Math.max(0, Math.min(100, Number(handover.energyLevelPercent) || 0)),
-    damageNote: String(handover.damageNote || (scratchSummary || "无明显新增划痕或外观损伤")),
+    energyLevelPercent: recordedNumber(handover.energyLevelPercent, 100),
+    damageNote: String(handover.damageNote || "").trim() || scratchSummary || "车况未记录",
     scratchItems,
-    scratchSummary: scratchSummary || "未发现新增环检损伤",
+    scratchSummary,
     inspectorName,
-    customerSigned,
-    customerSignatureUrl,
-    additionalNote: String(handover.additionalNote || "无特殊补充约定"),
+    customerConfirmed,
+    additionalNote: String(handover.additionalNote || "").trim(),
     photos,
-    disclaimer: "本验车留证单为车况及交接事实记录，双方核验留存。"
+    disclaimer: "本验车留证单为车况及交接事实记录，确认仅表示内容核对，不是电子签章或合同签署。"
   }
 }
 
@@ -130,7 +137,7 @@ function formatHandoverCsvContent(bookingInput, handoverInput) {
     "左侧留证照片",
     "右侧留证照片",
     "验车服务专员",
-    "客户核验签署状态"
+    "客户内容核对状态"
   ]
 
   const getPhotoLocation = (angle) => {
@@ -147,17 +154,17 @@ function formatHandoverCsvContent(bookingInput, handoverInput) {
     report.phone,
     report.submittedAtText,
     report.confirmedAtText,
-    String(report.mileageKm),
+    report.mileageKm === null ? "未记录" : String(report.mileageKm),
     report.energyTypeText,
-    `${report.energyLevelPercent}%`,
+    report.energyLevelPercent === null ? "未记录" : `${report.energyLevelPercent}%`,
     report.damageNote,
-    report.additionalNote,
+    report.additionalNote || "未记录",
     getPhotoLocation("front"),
     getPhotoLocation("rear"),
     getPhotoLocation("left"),
     getPhotoLocation("right"),
-    report.inspectorName,
-    report.customerSigned ? "已签署核验" : "待核验"
+    report.inspectorName || "未记录",
+    report.customerConfirmed ? "已核对" : "待核对"
   ]
 
   const bom = "\uFEFF"
@@ -168,9 +175,10 @@ function getHandoverFileName(bookingInput, handoverInput) {
   const booking = bookingInput && typeof bookingInput === "object" ? bookingInput : {}
   const handover = handoverInput && typeof handoverInput === "object" ? handoverInput : {}
   const stage = String(handover.stage || "pickup") === "return" ? "还车" : "取车"
-  const bookingId = String(booking.id || "bk").slice(-6).toUpperCase()
+  const bookingId = String(booking.id || "bk").replace(/[^a-z0-9_-]/gi, "").slice(-6).toUpperCase() || "BK"
   const today = new Date().toISOString().slice(0, 10).replace(/-/g, "")
-  return `验车留证单_${stage}_${bookingId}_${today}.csv`
+  reportExportSerial += 1
+  return `验车留证单_${stage}_${bookingId}_${today}_${REPORT_SESSION_ID}_${reportExportSerial}.csv`
 }
 
 module.exports = {

@@ -144,6 +144,11 @@ Page({
       }
     })
   },
+  onShow() {
+    if (this._manualReviewDay !== formatDayKey()) {
+      this.restoreManualChecks()
+    }
+  },
   onPullDownRefresh() {
     if (!this.data.pageAuthorized) {
       wx.stopPullDownRefresh()
@@ -165,16 +170,18 @@ Page({
     }
   },
   restoreManualChecks() {
+    const day = formatDayKey()
     let completedKeys = []
     try {
       const stored =
         typeof wx.getStorageSync === "function"
           ? wx.getStorageSync(MANUAL_REVIEW_STORAGE_KEY)
           : null
-      if (stored && stored.day === formatDayKey() && Array.isArray(stored.completedKeys)) {
+      if (stored && stored.day === day && Array.isArray(stored.completedKeys)) {
         completedKeys = stored.completedKeys
       }
     } catch (error) {}
+    this._manualReviewDay = day
     const manualChecks = buildManualChecks(completedKeys)
     const manualCompletedCount = manualChecks.filter((item) => item.checked).length
     this.setData({
@@ -191,6 +198,9 @@ Page({
     const key = String(event.currentTarget.dataset.key || "")
     if (!key) {
       return
+    }
+    if (this._manualReviewDay !== formatDayKey()) {
+      this.restoreManualChecks()
     }
     const manualChecks = this.data.manualChecks.map((item) =>
       item.key === key ? { ...item, checked: !item.checked } : item

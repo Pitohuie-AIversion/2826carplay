@@ -134,6 +134,28 @@ describe("网络重连与触感反馈全链路体验优化", () => {
   })
 
   describe("3. 核心页面弱网重连自愈机制", () => {
+    test.each([false, true])("车库首次离线读取立即展示断网状态（同步回调：%s）", (synchronous) => {
+      jest.isolateModules(() => {
+        let definition
+        let initialRead
+        global.Page = (def) => { definition = def }
+        global.getApp = () => ({ globalData: {} })
+        global.wx = {
+          getNetworkType: jest.fn(({ success }) => {
+            initialRead = success
+            if (synchronous) success({ networkType: "none" })
+          }),
+          onNetworkStatusChange: jest.fn()
+        }
+        require("../pages/garage/garage")
+        const page = createMockPage(definition)
+        page.onLoad({})
+        if (!synchronous) initialRead({ networkType: "none" })
+        expect(page.data.isOffline).toBe(true)
+        page.onUnload()
+      })
+    })
+
     test("车库页 garage 在 loadError 状态下收到重连通知自动重试加载", () => {
       jest.isolateModules(() => {
         let definition
@@ -299,18 +321,18 @@ describe("网络重连与触感反馈全链路体验优化", () => {
         expect(page.data.form.city).toBe("杭州")
         expect(page.data.cityIndex).toBe(0)
 
-        // 选择 3 天跨度
+        // 选择 3 天快捷行程
         page.handleDateShortcut({
           currentTarget: { dataset: { action: "three-days" } }
         })
 
         const summary = page.data.bookingSummary
-        expect(summary.durationText).toBe("3 天跨度")
+        expect(summary.durationText).toBe("2 天跨度")
         const estimate = page.data.rentalEstimate
-        // 兜底预估与服务端价格卡一致：按含起止日的日期数计价（3 天跨度 = 4 个日期）
-        expect(estimate.rentalDays).toBe(4)
-        expect(estimate.estimateTotal).toBe(6000)
-        expect(estimate.estimateText).toBe("预估参考 ￥6000")
+        // 兜底预估与服务端价格卡一致：安排 3 天行程为 3 个租赁日期
+        expect(estimate.rentalDays).toBe(3)
+        expect(estimate.estimateTotal).toBe(4500)
+        expect(estimate.estimateText).toBe("预估参考 ￥4500")
       })
     })
   })

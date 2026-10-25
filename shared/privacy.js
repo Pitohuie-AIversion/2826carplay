@@ -1,5 +1,5 @@
 /**
- * 极境车库 - 个人隐私合规与数据权利领域模型 (Privacy Domain Model)
+ * 爱迦租车 - 个人隐私合规与数据权利领域模型 (Privacy Domain Model)
  *
  * 规范化管理用户个人信息主体权利申请 (查询 access、更正 correction、删除 deletion)
  * 及其生命周期状态机、展示字典、文案提示与阶段流程计算。

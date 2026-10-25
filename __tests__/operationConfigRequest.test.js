@@ -6,6 +6,59 @@ const {
 } = require("../shared/operationConfigRequest")
 
 describe("shared/operationConfigRequest", () => {
+  test("旧云端品牌文案在交付和缓存前更新，保留业务配置且不改写原对象", () => {
+    const legacy = Object.freeze({
+      brandName: "极境车库 · 西湖店", garagePageTitle: "极境车库",
+      mineUserDesc: "极境会员服务", garagePageSubtitle: "欢迎来到极境车库",
+      announcementText: "极境服务正常营业", faqContent: "极境预约说明",
+      rulesContent: "定制规则", bookingPrivacyTip: "极境车库仅用于预约沟通",
+      rentalTerms: Object.freeze({ includedText: "以极境客服确认为准", depositText: "定制押金说明" }),
+      servicePhone: "18800000000", wxKfExtInfo: "https://example.test/极境车库",
+      hotSearchKeywords: ["极境版车型"], serviceAddress: "极境路 1 号"
+    })
+    global.wx = {
+      nextTick: (callback) => callback(),
+      cloud: { callFunction: jest.fn(({ success }) => success({ result: { ok: true, config: legacy } })) }
+    }
+    const firstSuccess = jest.fn()
+    const cachedSuccess = jest.fn()
+    requestOperationConfig({ onSuccess: firstSuccess })
+    requestOperationConfig({ onSuccess: cachedSuccess })
+    const expected = {
+      ...legacy, brandName: "爱迦租车 · 西湖店", garagePageTitle: "爱迦租车",
+      mineUserDesc: "爱迦会员服务", garagePageSubtitle: "欢迎来到爱迦租车",
+      announcementText: "爱迦服务正常营业", faqContent: "爱迦预约说明",
+      bookingPrivacyTip: "爱迦租车仅用于预约沟通",
+      rentalTerms: { includedText: "以爱迦客服确认为准", depositText: "定制押金说明" }
+    }
+    expect(firstSuccess).toHaveBeenCalledWith(expected)
+    expect(cachedSuccess).toHaveBeenCalledWith(expected)
+    expect(wx.cloud.callFunction).toHaveBeenCalledTimes(1)
+    expect(require("../shared/cloudDataCache").getCached("operation_config_v1")).toEqual(expected)
+    expect(legacy.brandName).toBe("极境车库 · 西湖店")
+    expect(legacy.rentalTerms.includedText).toBe("以极境客服确认为准")
+  })
+
+  test.each(["cached", "older-success", "older-failure"])("旧品牌缓存经 %s 交付时仍归一化", (mode) => {
+    const requests = []
+    const onSuccess = jest.fn()
+    global.wx = { nextTick: (callback) => callback(), cloud: { callFunction: jest.fn((options) => requests.push(options)) } }
+    requestOperationConfig({ onSuccess: mode === "cached" ? undefined : onSuccess })
+    requestOperationConfig({ force: true })
+    requests[1].success({ result: { ok: true, revision: 2, config: { brandName: "爱迦租车" } } })
+    require("../shared/cloudDataCache").setCache("operation_config_v1", { brandName: "极境车库", garagePageTitle: "定制首页" })
+    if (mode === "cached") {
+      requestOperationConfig({ onSuccess })
+      requests[0].success({ result: { ok: true, revision: 1, config: {} } })
+    } else if (mode === "older-success") {
+      requests[0].success({ result: { ok: true, revision: 1, config: { brandName: "过期配置" } } })
+    } else {
+      requests[0].fail(new Error("late network failure"))
+    }
+    expect(onSuccess).toHaveBeenCalledTimes(1)
+    expect(onSuccess).toHaveBeenCalledWith({ brandName: "爱迦租车", garagePageTitle: "定制首页" })
+  })
+
   test.each([false, true])("缓存排期跨过有效期后重新读取，取消状态=%s仍有效", (cancelled) => {
     jest.useFakeTimers()
     const requests = []

@@ -34,10 +34,10 @@ function createMockDb({ roles = [], bookings = {}, handovers = {}, failQueueWrit
       const store = name === "bookings" ? bookings : handovers
       return {
         doc: (id) => ({
-          field: () => ({
+          field: (fields) => ({
             get: jest.fn(async () => {
               if (!store[id]) throw new Error("document not found")
-              return { data: { _id: id, ...store[id] } }
+              return { data: { _id: id, ...Object.fromEntries(Object.entries(store[id]).filter(([key]) => fields[key])) } }
             })
           }),
           set: jest.fn(async ({ data }) => { store[id] = { ...data }; return { _id: id } }),
@@ -167,6 +167,41 @@ describe("cloudfunctions/bookingHandover integration", () => {
     expect(mocks.audits.filter((item) => item.action === "bookingHandoverSubmit")).toHaveLength(1)
   })
 
+  test.each([
+    "r".repeat(81),
+    ["request_12345678"],
+    12345678
+  ])("提交拒绝截断或强转请求标识 %p", async (requestId) => {
+    const mocks = createMockDb({
+      roles: [{ openid: "admin", role: "admin" }],
+      bookings: { booking_1: { openid: "user", status: "confirmed" } }
+    })
+    const mod = await loadFunction("admin", mocks)
+    const result = await mod.main(validSubmit({ requestId }))
+    expect(result).toMatchObject({ ok: false, code: "VALIDATION_ERROR" })
+    expect(result.details.errors).toEqual(expect.arrayContaining([expect.objectContaining({ field: "requestId" })]))
+    expect(mocks.db.runTransaction).not.toHaveBeenCalled()
+    expect(mocks.handovers).toEqual({})
+    expect(mocks.audits).toHaveLength(0)
+    expect(require("wx-server-sdk").openapi.subscribeMessage.send).not.toHaveBeenCalled()
+  })
+
+  test("80 位请求标识仍可幂等重试，增加后缀不得误报同一请求成功", async () => {
+    const mocks = createMockDb({
+      roles: [{ openid: "admin", role: "admin" }],
+      bookings: { booking_1: { openid: "user", status: "confirmed" } }
+    })
+    const mod = await loadFunction("admin", mocks)
+    const requestId = "r".repeat(80)
+    expect(await mod.main(validSubmit({ requestId }))).toMatchObject({ ok: true, duplicate: false })
+    expect(await mod.main(validSubmit({ requestId }))).toMatchObject({ ok: true, duplicate: true })
+    expect(await mod.main(validSubmit({ requestId: `${requestId}_another` }))).toMatchObject({ ok: false, code: "VALIDATION_ERROR" })
+    expect(mocks.handovers.booking_1__pickup__v1.submitRequestId).toBe(requestId)
+    expect(Object.keys(mocks.handovers)).toHaveLength(1)
+    expect(mocks.audits).toHaveLength(1)
+    expect(require("wx-server-sdk").openapi.subscribeMessage.send).toHaveBeenCalledTimes(1)
+  })
+
   test("照片、里程和能源校验在服务端执行", async () => {
     const mocks = createMockDb({ roles: [{ openid: "admin", role: "admin" }], bookings: { booking_1: { openid: "user", status: "confirmed" } } })
     const mod = await loadFunction("admin", mocks)
@@ -177,6 +212,70 @@ describe("cloudfunctions/bookingHandover integration", () => {
     expect(result.details.errors.map((item) => item.field)).toEqual(expect.arrayContaining(["mileageKm", "energyLevelPercent", "photos"]))
     const emptyNumbers = await mod.main(validSubmit({ requestId: "request_empty_1", mileageKm: "", energyLevelPercent: "" }))
     expect(emptyNumbers.details.errors.map((item) => item.field)).toEqual(expect.arrayContaining(["mileageKm", "energyLevelPercent"]))
+  })
+
+  test.each([false, true, [], [10], {}, "   "])("拒绝将非法数字类型或空白 %p 强制转换为里程、能源和版本", async (value) => {
+    const mocks = createMockDb({ roles: [{ openid: "admin", role: "admin" }], bookings: { booking_1: { openid: "user", status: "confirmed" } } })
+    const mod = await loadFunction("admin", mocks)
+    const result = await mod.main(validSubmit({ mileageKm: value, energyLevelPercent: value, expectedVersion: value }))
+    expect(result).toMatchObject({ ok: false, code: "VALIDATION_ERROR" })
+    expect(result.details.errors.map((item) => item.field)).toEqual(expect.arrayContaining(["mileageKm", "energyLevelPercent", "expectedVersion"]))
+    expect(mocks.db.runTransaction).not.toHaveBeenCalled()
+    expect(mocks.handovers).toEqual({})
+  })
+
+  test("表单合法数字字符串与零值仍能提交", async () => {
+    const mocks = createMockDb({ roles: [{ openid: "admin", role: "admin" }], bookings: { booking_1: { openid: "user", status: "confirmed" } } })
+    const mod = await loadFunction("admin", mocks)
+    expect(await mod.main(validSubmit({ mileageKm: " 12000 ", energyLevelPercent: "0", expectedVersion: "0" }))).toMatchObject({ ok: true, version: 1 })
+    expect(mocks.handovers.booking_1__pickup__v1).toMatchObject({ mileageKm: 12000, energyLevelPercent: 0 })
+  })
+
+  test.each([
+    { mileageKm: 12100 },
+    { energyType: "electric" },
+    { energyLevelPercent: 60 },
+    { damageNote: "右侧划痕" },
+    { additionalNote: "钥匙两把" },
+    { photos: validSubmit().photos.map((photo) => ({ ...photo, fileId: photo.fileId.replace(".jpg", "_new.jpg") })) },
+    { expectedVersion: 1 }
+  ])("复用请求标识但修改提交内容或版本 %p 时拒绝虚假成功", async (changes) => {
+    const mocks = createMockDb({ roles: [{ openid: "admin", role: "admin" }], bookings: { booking_1: { openid: "user", status: "confirmed" } } })
+    const mod = await loadFunction("admin", mocks)
+    const original = validSubmit({ expectedVersion: 0 })
+    expect(await mod.main(original)).toMatchObject({ ok: true, duplicate: false })
+    expect(await mod.main({ ...original, ...changes })).toMatchObject({ ok: false, code: "VERSION_CONFLICT" })
+    expect(mocks.handovers.booking_1__pickup__v1).toMatchObject({ mileageKm: 12000, energyType: "fuel", energyLevelPercent: 80, damageNote: original.damageNote, additionalNote: original.additionalNote, photos: original.photos })
+    expect(Object.keys(mocks.handovers)).toHaveLength(1)
+    expect(mocks.audits).toHaveLength(1)
+    expect(require("wx-server-sdk").openapi.subscribeMessage.send).toHaveBeenCalledTimes(1)
+  })
+
+  test("照片顺序不同仍视为相同重试，归档清图后仍校验原提交内容", async () => {
+    const mocks = createMockDb({ roles: [{ openid: "admin", role: "admin" }], bookings: { booking_1: { openid: "user", status: "confirmed" } } })
+    const mod = await loadFunction("admin", mocks)
+    const original = validSubmit()
+    const saved = await mod.main(original)
+    expect(await mod.main({ ...original, photos: [...original.photos].reverse() })).toMatchObject({ ok: true, duplicate: true })
+    expect(await mod.main({ action: "archive", bookingId: "booking_1", stage: "pickup", handoverId: saved.handoverId })).toMatchObject({ ok: true })
+    expect(mocks.handovers[saved.handoverId].photos).toEqual([])
+    expect(await mod.main(original)).toMatchObject({ ok: true, duplicate: true })
+    expect(await mod.main({ ...original, damageNote: "新增划痕" })).toMatchObject({ ok: false, code: "VERSION_CONFLICT" })
+    expect(mocks.handovers[saved.handoverId].status).toBe("archived")
+  })
+
+  test("无提交指纹的历史记录按原始内容判断重试", async () => {
+    const original = validSubmit()
+    const handoverId = "booking_1__pickup__v1"
+    const mocks = createMockDb({
+      roles: [{ openid: "admin", role: "admin" }],
+      bookings: { booking_1: { openid: "user", status: "confirmed", latestPickupHandoverId: handoverId, latestPickupHandoverVersion: 1 } },
+      handovers: { [handoverId]: { ...original, status: "submitted", version: 1, submitRequestId: original.requestId } }
+    })
+    const mod = await loadFunction("admin", mocks)
+    expect(await mod.main(original)).toMatchObject({ ok: true, duplicate: true })
+    expect(await mod.main({ ...original, mileageKm: 13000 })).toMatchObject({ ok: false, code: "VERSION_CONFLICT" })
+    expect(mocks.audits).toHaveLength(0)
   })
 
   test("同版本旧提交不能覆盖新记录，旧成功请求在新版后重试仍幂等", async () => {

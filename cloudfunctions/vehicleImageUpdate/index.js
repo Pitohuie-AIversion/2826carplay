@@ -113,11 +113,17 @@ function buildImageState(vehicle) {
 
 function normalizeEvent(event) {
   const payload = event && typeof event === "object" ? event : {}
+  const invalidField = ["id", "action", "fileId"].find(
+    (field) => payload[field] !== undefined && typeof payload[field] !== "string"
+  ) || (payload.fileIds !== undefined && (
+    !Array.isArray(payload.fileIds) || payload.fileIds.some((fileId) => typeof fileId !== "string")
+  ) ? "fileIds" : "")
   return {
-    id: String(payload.id || "").trim(),
-    action: String(payload.action || "").trim(),
-    fileId: String(payload.fileId || "").trim(),
-    fileIds: normalizeStringArray(payload.fileIds)
+    id: typeof payload.id === "string" ? payload.id.trim() : "",
+    action: typeof payload.action === "string" ? payload.action.trim() : "",
+    fileId: typeof payload.fileId === "string" ? payload.fileId.trim() : "",
+    fileIds: invalidField ? [] : normalizeStringArray(payload.fileIds),
+    invalidField
   }
 }
 
@@ -208,6 +214,12 @@ exports.main = async (event) => {
     const allowed = await hasOpenidCapability(openid, "vehicle_manage")
     if (!allowed) {
       return createError("FORBIDDEN", "权限不足")
+    }
+
+    if (input.invalidField) {
+      return createError("VALIDATION_ERROR", "图片操作参数类型不正确", {
+        errors: [{ field: input.invalidField, message: "编号和操作必须为字符串，图片清单必须为字符串数组" }]
+      })
     }
 
     if (!input.id) {

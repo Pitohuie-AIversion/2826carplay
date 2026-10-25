@@ -143,6 +143,11 @@ exports.main = async (event) => {
     if (input.tagsProvided && (!Array.isArray(input.tags) || input.tags.length > 5 || input.tags.some((tag) => !CUSTOMER_TAGS.includes(tag)))) {
       return createError("VALIDATION_ERROR", "客户标签不合法")
     }
+    const tagsBaselineProvided = input.tagsProvided && Object.prototype.hasOwnProperty.call(input.expectedValues, "tags")
+    if (tagsBaselineProvided && input.expectedValues.tags !== null &&
+        (!Array.isArray(input.expectedValues.tags) || input.expectedValues.tags.some((tag) => typeof tag !== "string"))) {
+      return createError("VALIDATION_ERROR", "客户标签基线不合法，请重新加载预约")
+    }
     if (input.tagsProvided) input.tags = [...new Set(input.tags)]
     if (input.priorityProvided && !PRIORITY_VALUES.includes(input.schedulePriority)) {
       return createError("VALIDATION_ERROR", "优先级不正确", {
@@ -185,6 +190,10 @@ exports.main = async (event) => {
     if (!input.priorityProvided) input.schedulePriority = fromPriority
     if (!input.coordinationProvided) input.coordinationStatus = fromCoordinationStatus
     const tagsChanged = input.tagsProvided && (!Array.isArray(current.tags) || JSON.stringify(current.tags) !== JSON.stringify(input.tags))
+    const currentTagsBaseline = Array.isArray(current.tags) ? current.tags : null
+    if (tagsChanged && tagsBaselineProvided && JSON.stringify(currentTagsBaseline) !== JSON.stringify(input.expectedValues.tags)) {
+      return createError("VERSION_CONFLICT", "客户标签已被修改，请刷新核对后重试")
+    }
 
     if (
       fromPriority === input.schedulePriority &&

@@ -70,6 +70,80 @@ describe("pages/config-manage 运营配置体验", () => {
     delete global.getCurrentPages
   })
 
+  test("旧云配置回填新品牌，保留自定义说明、电话及客服链接", () => {
+    const legacy = {
+      brandName: "极境车库 · 西湖店", garagePageTitle: "探索极境座驾",
+      mineUserDesc: "极境会员服务", garagePageSubtitle: "定制服务说明",
+      announcementText: "极境车库欢迎您", faqContent: "极境预约说明",
+      rulesContent: "自定义规则", bookingPrivacyTip: "极境车库仅用于预约沟通",
+      rentalTerms: { includedText: "由极境客服确认", depositText: "自定义押金说明" },
+      servicePhone: "18800000000", wxKfCorpId: "ww123456", wxKfExtInfo: "https://example.test/极境车库"
+    }
+    wx.cloud.callFunction.mockImplementation(({ success }) => success({ result: { ok: true, config: legacy, revision: 2 } }))
+    const page = createPage(loadPageDefinition())
+    page.fetchConfig()
+    expect(page.data.form).toMatchObject({
+      brandName: "爱迦租车 · 西湖店", garagePageTitle: "探索爱迦座驾",
+      mineUserDesc: "爱迦会员服务", garagePageSubtitle: "定制服务说明",
+      announcementText: "爱迦租车欢迎您", faqContent: "爱迦预约说明",
+      rulesContent: "自定义规则", bookingPrivacyTip: "爱迦租车仅用于预约沟通",
+      rentalIncludedText: "由爱迦客服确认", rentalDepositText: "自定义押金说明",
+      servicePhone: legacy.servicePhone, wxKfCorpId: legacy.wxKfCorpId, wxKfExtInfo: legacy.wxKfExtInfo
+    })
+    expect(legacy.brandName).toBe("极境车库 · 西湖店")
+    page.onUnload()
+  })
+
+  test("保存手工粘贴的旧品牌文案时提交新品牌且成功回填一致", () => {
+    wx.cloud.callFunction.mockImplementation(({ data, success }) => success({ result: { ok: true, config: data.config, revision: 3 } }))
+    const page = createPage(loadPageDefinition(), { loading: false, hasLoadedConfig: true, configRevision: 2 })
+    Object.assign(page.data.form, {
+      brandName: "极境车库", garagePageTitle: "探索极境座驾", rentalIncludedText: "以极境客服确认为准",
+      garagePageSubtitle: "自定义服务说明", servicePhone: "18800000000"
+    })
+    page.handleSubmit()
+    expect(wx.cloud.callFunction.mock.calls[0][0].data.config).toMatchObject({
+      brandName: "爱迦租车", garagePageTitle: "探索爱迦座驾", rentalTerms: { includedText: "以爱迦客服确认为准" },
+      garagePageSubtitle: "自定义服务说明", servicePhone: "18800000000"
+    })
+    expect(page.data.form).toMatchObject({ brandName: "爱迦租车", garagePageTitle: "探索爱迦座驾", rentalIncludedText: "以爱迦客服确认为准" })
+    page.onUnload()
+  })
+
+  test.each([[], "invalid config", true])("重新加载收到非对象配置 %j 时保留冲突草稿和版本", (config) => {
+    wx.disableAlertBeforeUnload = jest.fn()
+    wx.enableAlertBeforeUnload = jest.fn()
+    wx.cloud.callFunction.mockImplementation(({ success }) => success({ result: { ok: true, config, revision: 5 } }))
+    const page = createPage(loadPageDefinition(), { loading: false, hasLoadedConfig: true, configRevision: 4, saveConflict: true })
+    page.handleInput({ currentTarget: { dataset: { field: "brandName" } }, detail: { value: "尚未保存的品牌" } })
+
+    page.handleRetryLoad()
+
+    expect(page.data).toMatchObject({
+      loading: false, loadFailed: true, isDirty: true, saveConflict: true,
+      configRevision: 4, form: { brandName: "尚未保存的品牌" }
+    })
+    expect(page._hasUnsavedChanges).toBe(true)
+    expect(wx.disableAlertBeforeUnload).not.toHaveBeenCalled()
+    page.onUnload()
+  })
+
+  test.each([[], "invalid config", true])("保存收到非对象配置 %j 时保留草稿且不报告成功", (config) => {
+    wx.disableAlertBeforeUnload = jest.fn()
+    wx.enableAlertBeforeUnload = jest.fn()
+    wx.cloud.callFunction.mockImplementation(({ success }) => success({ result: { ok: true, config, revision: 5, message: "运营配置已保存" } }))
+    const page = createPage(loadPageDefinition(), { loading: false, hasLoadedConfig: true, configRevision: 4 })
+    page.handleInput({ currentTarget: { dataset: { field: "brandName" } }, detail: { value: "尚未保存的品牌" } })
+
+    page.handleSubmit()
+
+    expect(page.data).toMatchObject({ saving: false, isDirty: true, configRevision: 4, form: { brandName: "尚未保存的品牌" } })
+    expect(page._hasUnsavedChanges).toBe(true)
+    expect(wx.disableAlertBeforeUnload).not.toHaveBeenCalled()
+    expect(wx.showToast).toHaveBeenCalledWith({ title: "保存响应异常，请重试", icon: "none" })
+    page.onUnload()
+  })
+
   test.each(["network", "server", "timeout", "unavailable"])("冲突后重新加载%s失败仍保留草稿和离开提醒", (failure) => {
     jest.useFakeTimers()
     const requests = []
@@ -98,9 +172,11 @@ describe("pages/config-manage 运营配置体验", () => {
     expect(jest.getTimerCount()).toBe(0)
   })
 
-  test.each(["network", "server", "timeout", "success"])("保存%s回调到达后台时不弹提示或关闭其他页面加载框", (result) => {
+  test.each(["network", "server", "timeout", "success"])("保存%s回调到达后台时不影响其他页面提示，返回后同步草稿提醒", (result) => {
     jest.useFakeTimers()
     let request
+    wx.enableAlertBeforeUnload = jest.fn(({ success }) => success())
+    wx.disableAlertBeforeUnload = jest.fn(({ success }) => success())
     wx.cloud.callFunction.mockImplementation((options) => { request = options })
     const page = createPage(loadPageDefinition(), { loading: false, hasLoadedConfig: true })
     global.getCurrentPages = () => [page]
@@ -119,18 +195,23 @@ describe("pages/config-manage 运营配置体验", () => {
     expect(page.data.saving).toBe(false)
     expect(page.data.isDirty).toBe(result !== "success")
     if (result === "success") expect(page.data.configRevision).toBe(5)
+    expect(wx.disableAlertBeforeUnload).not.toHaveBeenCalled()
+    global.getCurrentPages = () => [page]
+    page.onShow()
+    expect(wx.disableAlertBeforeUnload).toHaveBeenCalledTimes(result === "success" ? 1 : 0)
+    expect(page._unsavedAlertEnabled).toBe(result !== "success")
     page.onUnload()
     expect(jest.getTimerCount()).toBe(0)
   })
 
-  test("未保存配置卸载时清理离开提醒", () => {
+  test("未保存配置卸载时仅清理本页状态，不修改其他页面离开提醒", () => {
     wx.enableAlertBeforeUnload = jest.fn()
     wx.disableAlertBeforeUnload = jest.fn()
     const page = createPage(loadPageDefinition(), { loading: false, hasLoadedConfig: true })
     page.handleInput({ currentTarget: { dataset: { field: "brandName" } }, detail: { value: "未保存" } })
     page.onUnload()
     expect(page._hasUnsavedChanges).toBe(false)
-    expect(wx.disableAlertBeforeUnload).toHaveBeenCalledTimes(1)
+    expect(wx.disableAlertBeforeUnload).not.toHaveBeenCalled()
   })
 
   test("恢复默认只生成空业务文案，清空后保存和回填不会恢复旧承诺", () => {
@@ -442,7 +523,7 @@ describe("pages/config-manage 运营配置体验", () => {
 
     page.data.isDirty = false
     page.handleReset()
-    expect(page.data.form.brandName).toBe("极境车库")
+    expect(page.data.form.brandName).toBe("爱迦租车")
     expect(page.data.isDirty).toBe(true)
   })
 

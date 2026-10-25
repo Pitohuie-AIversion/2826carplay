@@ -267,6 +267,12 @@ async function readBookingQuotes(bookingId) {
   }
 }
 
+function recordedHandoverNumber(value, max) {
+  if ((typeof value !== "number" && typeof value !== "string") || (typeof value === "string" && !value.trim())) return null
+  const number = Number(value)
+  return Number.isInteger(number) && number >= 0 && number <= max ? number : null
+}
+
 async function addHandoverPhotoUrls(records) {
   const list = Array.isArray(records) ? records : []
   const fileIds = [...new Set(list.flatMap((item) => Array.isArray(item.photos) ? item.photos.map((photo) => String(photo && photo.fileId || "").trim()) : []).filter(Boolean))]
@@ -287,9 +293,9 @@ async function addHandoverPhotoUrls(records) {
     stage: String(item.stage || ""),
     version: Math.max(0, Number(item.version || 0)),
     status: String(item.status || ""),
-    mileageKm: Math.max(0, Number(item.mileageKm || 0)),
+    mileageKm: recordedHandoverNumber(item.mileageKm, 5000000),
     energyType: String(item.energyType || ""),
-    energyLevelPercent: Math.max(0, Number(item.energyLevelPercent || 0)),
+    energyLevelPercent: recordedHandoverNumber(item.energyLevelPercent, 100),
     damageNote: String(item.damageNote || ""),
     additionalNote: String(item.additionalNote || ""),
     photos: (Array.isArray(item.photos) ? item.photos : []).map((photo) => ({ angle: String(photo.angle || ""), url: urlMap.get(String(photo.fileId || "")) || "" })),

@@ -26,6 +26,122 @@ function createPage(definition, overrides) {
 }
 
 describe("pages/booking-calendar", () => {
+  test("模块跨月复用时首次打开查询实际本月，首次显示不重复加载", () => {
+    jest.useFakeTimers().setSystemTime(new Date("2026-10-31T12:00:00.000Z"))
+    const definition = loadPageDefinition()
+    jest.setSystemTime(new Date("2026-11-01T12:00:00.000Z"))
+    const requests = []
+    global.wx = { cloud: { callFunction: (request) => {
+      if (request.name === "getMyPermissions") request.success({ result: { ok: true, canManageBookings: true } })
+      else requests.push(request)
+    } } }
+    const page = createPage(definition)
+    global.getCurrentPages = () => [page]
+    page.onLoad({})
+    page.onShow()
+    expect(page.data).toMatchObject({ monthKey: "2026-11", currentMonthKey: "2026-11", isCurrentMonth: true })
+    expect(requests).toHaveLength(1)
+    expect(requests[0].data).toEqual({ month: "2026-11" })
+    page.onUnload()
+    expect(jest.getTimerCount()).toBe(0)
+  })
+
+  test("返回日历刷新正在浏览的月份，更新已取消预约与占用且保留两张草稿", () => {
+    const requests = []
+    global.wx = { cloud: { callFunction: (request) => requests.push(request) } }
+    const booking = { id: "booking_1", vehicleId: "a", status: "confirmed", startDate: "2026-12-10", endDate: "2026-12-11" }
+    const block = { id: "booking_block", bookingId: "booking_1", vehicleId: "a", kind: "booking", startDate: booking.startDate, endDate: booking.endDate }
+    const blockForm = { vehicleId: "a", kind: "hold", startDate: "2026-12-20", endDate: "2026-12-21", reason: "尚未保存的档期说明" }
+    const priceForm = { vehicleId: "b", label: "待调整", dailyPrice: "1200", startDate: "2026-12-24", endDate: "2026-12-25", reason: "尚未保存的价格说明" }
+    const page = createPage(loadPageDefinition(), {
+      pageAuthorized: true, monthKey: "2026-12", selectedDate: "2026-12-10",
+      allBookings: [booking], allBlocks: [block], vehicles: [{ id: "a" }, { id: "b" }],
+      blockForm, priceForm, editingBlockId: "draft_block", editingBlockVersion: 4,
+      editingRuleId: "draft_rule", editingRuleVersion: 6
+    })
+    page.markCalendarFormDirty("blockForm")
+    page.markCalendarFormDirty("priceForm")
+    page.onShow()
+    expect(page.data.selectedBlocks).toHaveLength(1)
+    page.onShow()
+    expect(requests).toHaveLength(1)
+    expect(requests[0].data).toEqual({ month: "2026-12" })
+    requests[0].success({ result: { ok: true, list: [{ ...booking, status: "cancelled" }], blocks: [], vehicles: [{ id: "b" }, { id: "a" }] } })
+    expect(page.data).toMatchObject({
+      monthKey: "2026-12", selectedDate: "2026-12-10", selectedBookings: [], selectedBlocks: [],
+      blockForm, priceForm, blockVehicleIndex: 1, priceVehicleIndex: 0,
+      editingBlockId: "draft_block", editingBlockVersion: 4, editingRuleId: "draft_rule", editingRuleVersion: 6
+    })
+    expect(page._hasUnsavedChanges).toBe(true)
+    page.onUnload()
+  })
+
+  test("未授权时反复返回不会读取日历", () => {
+    global.wx = { cloud: { callFunction: jest.fn() } }
+    const page = createPage(loadPageDefinition(), { monthKey: "2026-10", pageAuthorized: false })
+    page.onShow()
+    page.onShow()
+    expect(wx.cloud.callFunction).not.toHaveBeenCalled()
+    page.onUnload()
+  })
+
+  test.each(["success", "network", "server", "timeout"])("保存中返回不插入读取，%s结算后补刷新并保留未提交草稿", (outcome) => {
+    jest.useFakeTimers()
+    const requests = []
+    global.wx = { showToast: jest.fn(), cloud: { callFunction: (request) => requests.push(request) } }
+    const blockForm = { vehicleId: "a", kind: "hold", startDate: "2026-12-20", endDate: "2026-12-21", reason: "本次提交" }
+    const priceForm = { vehicleId: "a", label: "待保存价格", dailyPrice: "1200", startDate: "2026-12-24", endDate: "2026-12-25", reason: "保留草稿" }
+    const page = createPage(loadPageDefinition(), { pageAuthorized: true, monthKey: "2026-12", vehicles: [{ id: "a" }], blockForm, priceForm })
+    global.getCurrentPages = () => [page]
+    page.markCalendarFormDirty("blockForm")
+    page.markCalendarFormDirty("priceForm")
+    page.onShow()
+    page.handleSaveBlock()
+    page.onShow()
+    expect(requests).toHaveLength(1)
+    expect(page.data.isSavingCalendar).toBe(true)
+    if (outcome === "success") requests[0].success({ result: { ok: true } })
+    else if (outcome === "server") requests[0].success({ result: { ok: false, message: "保存失败" } })
+    else if (outcome === "network") requests[0].fail({ errMsg: "offline" })
+    else jest.advanceTimersByTime(15000)
+    expect(requests).toHaveLength(2)
+    expect(requests[1]).toMatchObject({ name: "bookingCalendarList", data: { month: "2026-12" } })
+    requests[1].success({ result: { ok: true, vehicles: [{ id: "a" }], list: [], blocks: [] } })
+    expect(page.data.priceForm).toEqual(priceForm)
+    if (outcome !== "success") expect(page.data.blockForm).toEqual(blockForm)
+    expect(page._hasUnsavedChanges).toBe(true)
+    expect(page.data.isSavingCalendar).toBe(false)
+    if (outcome === "timeout") {
+      requests[0].success({ result: { ok: true } })
+      expect(requests).toHaveLength(2)
+      expect(page.data.blockForm).toEqual(blockForm)
+    }
+    page.onUnload()
+    expect(jest.getTimerCount()).toBe(0)
+  })
+
+  test("跨月返回保留浏览月份，本月入口采用新月份并拒绝旧月份迟到结果", () => {
+    jest.useFakeTimers().setSystemTime(new Date("2026-10-31T12:00:00.000Z"))
+    const requests = []
+    global.wx = { cloud: { callFunction: (request) => requests.push(request) } }
+    const page = createPage(loadPageDefinition(), { pageAuthorized: true, monthKey: "2026-10", currentMonthKey: "2026-10", selectedDate: "2026-10-31" })
+    page.onShow()
+    expect(page.data.calendarCells.find((cell) => cell.isToday).date).toBe("2026-10-31")
+    jest.setSystemTime(new Date("2026-11-01T12:00:00.000Z"))
+    page.onShow()
+    expect(page.data).toMatchObject({ monthKey: "2026-10", currentMonthKey: "2026-11", isCurrentMonth: false, selectedDate: "2026-10-31" })
+    expect(page.data.calendarCells.some((cell) => cell.isToday)).toBe(false)
+    expect(requests[0].data).toEqual({ month: "2026-10" })
+    page.handleCurrentMonth()
+    expect(requests[1].data).toEqual({ month: "2026-11" })
+    requests[1].success({ result: { ok: true, list: [{ id: "new_month", startDate: "2026-11-01", endDate: "2026-11-01" }] } })
+    requests[0].success({ result: { ok: true, list: [{ id: "stale_month", startDate: "2026-10-31", endDate: "2026-10-31" }] } })
+    expect(page.data).toMatchObject({ monthKey: "2026-11", currentMonthKey: "2026-11", isCurrentMonth: true })
+    expect(page.data.selectedBookings.map((booking) => booking.id)).toEqual(["new_month"])
+    page.onUnload()
+    expect(jest.getTimerCount()).toBe(0)
+  })
+
   test("校正超长车辆编号不会继续复用无效提交快照", () => {
     const requests = []
     global.wx = { showToast: jest.fn(), cloud: { callFunction: (request) => requests.push(request) } }
@@ -419,6 +535,7 @@ describe("pages/booking-calendar", () => {
   })
 
   test("离开当前月后可一键返回本月", () => {
+    jest.useFakeTimers().setSystemTime(new Date("2026-08-15T12:00:00.000Z"))
     global.wx = {}
     const page = createPage(loadPageDefinition(), {
       monthKey: "2026-12",

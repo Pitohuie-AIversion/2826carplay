@@ -70,8 +70,10 @@ describe("handoverReport helper", () => {
     const report = buildHandoverReport(null, null)
 
     expect(report.bookingId).toBe("—")
-    expect(report.mileageKm).toBe(0)
-    expect(report.damageNote).toContain("无明显新增划痕")
+    expect(report.mileageKm).toBeNull()
+    expect(report.energyLevelPercent).toBeNull()
+    expect(report.damageNote).toBe("车况未记录")
+    expect(report.scratchSummary).toBe("")
     expect(report.photos).toHaveLength(0)
 
     const csv = formatHandoverCsvContent(null, null)
@@ -79,7 +81,7 @@ describe("handoverReport helper", () => {
     expect(csv.startsWith("\uFEFF")).toBe(true)
   })
 
-  test("buildHandoverReport 正确处理环检损伤项与电子签名签署状态", () => {
+  test("buildHandoverReport 保留环检损伤项与内容核对状态", () => {
     const report = buildHandoverReport(mockBooking, {
       ...mockHandover,
       inspectorName: "王管家",
@@ -92,10 +94,62 @@ describe("handoverReport helper", () => {
     })
 
     expect(report.inspectorName).toBe("王管家")
-    expect(report.customerSigned).toBe(true)
-    expect(report.customerSignatureUrl).toBe("https://example.com/sig.png")
+    expect(report.customerConfirmed).toBe(true)
     expect(report.scratchItems).toHaveLength(2)
     expect(report.scratchSummary).toContain("车身左侧/车门")
     expect(report.scratchSummary).toContain("左前轮毂")
+  })
+
+  test("已登记损伤不会被默认无损伤环检文案遮盖", () => {
+    const report = buildHandoverReport(mockBooking, { ...mockHandover, scratchItems: [] })
+    expect(report.damageNote).toBe(mockHandover.damageNote)
+    expect(report.scratchSummary).toBe("")
+    const csv = formatHandoverCsvContent(mockBooking, { id: "draft", mileageKm: "", energyLevelPercent: "" })
+    expect(csv).toContain("车况未记录")
+    expect(csv).not.toContain("无明显新增划痕")
+    expect(csv).not.toContain("未发现新增")
+    expect(csv).not.toContain("0%")
+  })
+
+  test.each([null, "", "  ", false, [], {}, -1, Infinity])("异常里程与能源 %p 不转为已测量的零", (value) => {
+    const report = buildHandoverReport(mockBooking, { mileageKm: value, energyLevelPercent: value })
+    expect(report.mileageKm).toBeNull()
+    expect(report.energyLevelPercent).toBeNull()
+  })
+
+  test("合法零值保留，坏照片和环检条目不会中断导出", () => {
+    const report = buildHandoverReport(mockBooking, {
+      mileageKm: "0", energyLevelPercent: 0, energyType: "electric",
+      photos: [null, false, [], { angle: "front", fileId: "cloud://front" }],
+      scratchItems: [null, false, [], { part: "left", description: "轻微划痕" }]
+    })
+    expect(report.mileageKm).toBe(0)
+    expect(report.energyLevelPercent).toBe(0)
+    expect(report.photos).toHaveLength(1)
+    expect(report.scratchItems).toHaveLength(1)
+  })
+
+  test("内容核对与电子签署区分，任意旧布尔字段不伪造已核对", () => {
+    const report = buildHandoverReport(mockBooking, { customerSigned: "false", confirmedAt: "invalid" })
+    expect(report.customerConfirmed).toBe(false)
+    const csv = formatHandoverCsvContent(mockBooking, mockHandover)
+    expect(csv).toContain("客户内容核对状态")
+    expect(csv).toContain("已核对")
+    expect(csv).not.toContain("已签署")
+  })
+
+  test.each(["=1+1", "+SUM(1,1)", "-1+1", "  @SUM(1,1)", "＝1+1", "\t=1+1"])("用户文本 %p 在CSV中按文本保存", (value) => {
+    const csv = formatHandoverCsvContent({ ...mockBooking, userName: value }, { ...mockHandover, damageNote: value })
+    const escaped = value.replace(/"/g, '""')
+    expect(csv).toContain(`'${escaped}`)
+  })
+
+  test("同毫秒重复导出仍有独立安全文件名", () => {
+    const names = Array.from({ length: 3 }, () => getHandoverFileName({ id: "../a/b:c" }, mockHandover))
+    expect(new Set(names).size).toBe(3)
+    names.forEach((name) => {
+      expect(name).not.toMatch(/[\\/:]/)
+      expect(name).toMatch(/^验车留证单_取车_.+\.csv$/)
+    })
   })
 })

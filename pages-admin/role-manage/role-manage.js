@@ -1,6 +1,7 @@
 const { cancelPagePermissionCheck, clearPagePermissionCache, requirePagePermission } = require("../../shared/pageAuth")
 const { formatToastTitle, normalizeStringArray } = require("../../shared/uiFeedback")
-const { clearUnsaved, markUnsaved } = require("../../shared/unsavedChanges")
+const { clearUnsaved, disposeUnsavedChanges, markUnsaved, syncUnsavedChanges } = require("../../shared/unsavedChanges")
+const { isPageCurrent } = require("../../shared/pageNativeAction")
 const PERMISSION_OPTIONS = [
   {
     value: "vehicle_manage",
@@ -67,6 +68,9 @@ Page({
       }
     })
   },
+  onShow() {
+    syncUnsavedChanges(this)
+  },
   onPullDownRefresh() {
     if (!this.data.pageAuthorized || this.isRoleInteractionBusy()) {
       wx.stopPullDownRefresh()
@@ -76,12 +80,19 @@ Page({
       wx.stopPullDownRefresh()
     })
   },
+  onHide() {
+    this.hideRoleSaveLoading()
+  },
   onUnload() {
+    disposeUnsavedChanges(this)
     cancelPagePermissionCheck(this)
     this._roleListRequestId = Number(this._roleListRequestId || 0) + 1
     this._roleSaveRequestId = Number(this._roleSaveRequestId || 0) + 1
     this.finishRoleListRequestEffects()
     this.finishRoleSaveRequestEffects()
+  },
+  showRoleToast(options) {
+    if (isPageCurrent(this)) wx.showToast(options)
   },
   isRoleInteractionBusy() {
     return Boolean(
@@ -107,7 +118,7 @@ Page({
     this._roleListRequestId = requestId
     this.finishRoleListRequestEffects()
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
-      wx.showToast({
+      this.showRoleToast({
         title: "云能力未初始化",
         icon: "none"
       })
@@ -135,7 +146,7 @@ Page({
       if (!finishRequest()) {
         return
       }
-      wx.showToast({
+      this.showRoleToast({
         title: message,
         icon: "none"
       })
@@ -162,8 +173,8 @@ Page({
         }
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
-          wx.showToast({
-          title: formatToastTitle(result && result.message, "加载失败"),
+          this.showRoleToast({
+            title: formatToastTitle(result && result.message, "加载失败"),
             icon: "none"
           })
           this.setData({
@@ -245,7 +256,7 @@ Page({
       return
     }
     if (!OPENID_PATTERN.test(openid)) {
-      wx.showToast({
+      this.showRoleToast({
         title: "账号格式有误",
         icon: "none"
       })
@@ -277,14 +288,14 @@ Page({
     }
     const openid = String(this.data.formOpenid || "").trim()
     if (!openid) {
-      wx.showToast({
+      this.showRoleToast({
         title: "请先填写账号",
         icon: "none"
       })
       return
     }
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
-      wx.showToast({
+      this.showRoleToast({
         title: "云能力未初始化",
         icon: "none"
       })
@@ -295,6 +306,8 @@ Page({
     this._roleSaveRequestId = requestId
     this.finishRoleSaveRequestEffects()
     this.setData({ saving: true })
+    // The write can commit even if its response arrives after timeout or unload.
+    clearPagePermissionCache()
     wx.showLoading({
       title: "保存中…",
       mask: true
@@ -313,7 +326,7 @@ Page({
       if (!finishRequest()) {
         return
       }
-      wx.showToast({
+      this.showRoleToast({
         title: message,
         icon: "none"
       })
@@ -329,21 +342,21 @@ Page({
         permissions
       },
       success: (res) => {
+        const result = res && res.result ? res.result : null
+        if (result && result.ok) clearPagePermissionCache()
         if (!finishRequest()) {
           return
         }
-        const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
-          wx.showToast({
-          title: formatToastTitle(result && result.message, "保存失败"),
+          this.showRoleToast({
+            title: formatToastTitle(result && result.message, "保存失败"),
             icon: "none"
           })
           this.setData({ saving: false })
           return
         }
-        clearPagePermissionCache()
-        wx.showToast({
-        title: formatToastTitle(result.message, "保存成功"),
+        this.showRoleToast({
+          title: formatToastTitle(result.message, "保存成功"),
           icon: "success"
         })
         this.setData({ saving: false })
@@ -381,6 +394,9 @@ Page({
       clearTimeout(this._roleSaveRequestTimer)
       this._roleSaveRequestTimer = null
     }
+    this.hideRoleSaveLoading()
+  },
+  hideRoleSaveLoading() {
     if (this._roleSaveLoadingVisible) {
       this._roleSaveLoadingVisible = false
       wx.hideLoading()

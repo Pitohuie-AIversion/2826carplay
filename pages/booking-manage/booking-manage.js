@@ -250,9 +250,21 @@ Page({
   },
   onShow() {
     applyPageCsvFileRemoval(this)
+    if (typeof this._bookingMutationDeferredResult === "function") {
+      const deliverResult = this._bookingMutationDeferredResult
+      this._bookingMutationDeferredResult = null
+      deliverResult()
+    }
     if (this._bookingExportNeedsReset) {
       this._bookingExportNeedsReset = false
       this.setData({ loading: false })
+    }
+    if (this._bookingMutationNeedsRefresh) {
+      this._bookingMutationNeedsRefresh = false
+      this.setData({ loading: false })
+      if (this.data.pageAuthorized) {
+        this.fetchList()
+      }
     }
   },
   onPullDownRefresh() {
@@ -283,6 +295,7 @@ Page({
     this.cancelOperationConfigRequest()
     this._bookingListRequestId = Number(this._bookingListRequestId || 0) + 1
     this._bookingMutationRequestId = Number(this._bookingMutationRequestId || 0) + 1
+    this._bookingMutationDeferredResult = null
     this._bookingExportRequestId = Number(this._bookingExportRequestId || 0) + 1
     this.finishBookingListRequestEffects()
     this.clearBookingMutationTimer()
@@ -772,6 +785,7 @@ Page({
     }
     const statusText = STATUS_TEXT_MAP[status] || status
     const action = beginPageNativeAction(this, {
+      requireCurrent: true,
       exclusiveKey: "booking-status-confirmation"
     })
     wx.showModal({
@@ -845,6 +859,12 @@ Page({
           title: "备注已保存",
           icon: "none"
         })
+        this.setData({
+          loading: false,
+          list: this.data.list.map((item) => String(item.id || item._id || "") === id
+            ? { ...item, adminRemark }
+            : item)
+        })
         this.fetchList()
       }
     })
@@ -863,26 +883,48 @@ Page({
     }
     const requestId = Number(this._bookingMutationRequestId || 0) + 1
     this._bookingMutationRequestId = requestId
+    const nativeAction = beginPageNativeAction(this, { requireCurrent: true })
     this.clearBookingMutationTimer()
     this.setData({ loading: true })
     let settled = false
-    const isCurrent = () => this._bookingMutationRequestId === requestId
+    const isCurrent = () => {
+      if (this._bookingMutationRequestId !== requestId) {
+        return false
+      }
+      if (!isPageNativeActionActive(this, nativeAction)) {
+        this._bookingMutationNeedsRefresh = true
+        return false
+      }
+      return true
+    }
     const finishRequest = () => {
-      if (settled || !isCurrent()) {
+      if (settled || this._bookingMutationRequestId !== requestId) {
         return false
       }
       settled = true
       this.clearBookingMutationTimer()
       return true
     }
+    const deliverResult = (callback) => {
+      if (this._bookingMutationRequestId !== requestId) {
+        return
+      }
+      if (!isPageNativeActionActive(this, nativeAction)) {
+        this._bookingMutationDeferredResult = () => deliverResult(callback)
+        return
+      }
+      callback()
+    }
     const handleFailure = (message) => {
       if (!finishRequest()) {
         return
       }
-      this.setData({ loading: false })
-      wx.showToast({
-        title: formatToastTitle(message, input.failureFallback || "操作失败"),
-        icon: "none"
+      deliverResult(() => {
+        this.setData({ loading: false })
+        wx.showToast({
+          title: formatToastTitle(message, input.failureFallback || "操作失败"),
+          icon: "none"
+        })
       })
     }
     this._bookingMutationRequestTimer = setTimeout(() => {
@@ -897,7 +939,7 @@ Page({
         }
         const result = res && res.result ? res.result : null
         if (typeof input.onResult === "function") {
-          input.onResult(result, isCurrent)
+          deliverResult(() => input.onResult(result, isCurrent))
         }
       },
       fail: (error) => {
@@ -912,8 +954,7 @@ Page({
   },
   fetchList(input) {
     const done = typeof input === "function" ? input : input && input.done
-    const append = Boolean(input && typeof input === "object" && input.append)
-    const nextPage = append ? this.data.page + 1 : 0
+    let append = Boolean(input && typeof input === "object" && input.append)
     const pageSize = this.data.pageSize || DEFAULT_PAGE_SIZE
     const requestId = Number(this._bookingListRequestId || 0) + 1
     this._bookingListRequestId = requestId
@@ -928,22 +969,38 @@ Page({
       }
       return
     }
-    const targetStatus = input && typeof input.status === "string" ? input.status : this.data.currentStatus
-    const targetPriority = input && typeof input.schedulePriority === "string" ? input.schedulePriority : this.data.currentPriority
-    const targetCoordination = input && typeof input.coordinationStatus === "string" ? input.coordinationStatus : this.data.currentCoordination
-    const targetKeyword = String(input && typeof input.keyword === "string" ? input.keyword : (this.data.keyword || "")).trim()
-    const targetCity = input && typeof input.city === "string" ? input.city : this.data.currentCity
+    // Pagination belongs to the displayed result, while keyword input may still be an unsubmitted draft.
+    const baseFilters = append && this._bookingListFilters ? this._bookingListFilters : {
+      status: this.data.currentStatus,
+      schedulePriority: this.data.currentPriority,
+      coordinationStatus: this.data.currentCoordination,
+      keyword: this.data.keyword || "",
+      city: this.data.currentCity
+    }
+    const query = {}
+    Object.keys(baseFilters).forEach((key) => {
+      query[key] = input && typeof input[key] === "string" ? input[key] : baseFilters[key]
+    })
+    query.keyword = String(query.keyword || "").trim()
+    query.city = query.city && query.city !== "all" ? query.city : ""
+    if (append && this._bookingListFilters && Object.keys(query).some((key) => query[key] !== this._bookingListFilters[key])) {
+      append = false
+    }
+    const nextPage = append ? this.data.page + 1 : 0
+    if (!append) {
+      this._bookingListFilters = null
+    }
     const filters = {
-      status: targetStatus,
-      schedulePriority: targetPriority,
-      coordinationStatus: targetCoordination,
-      keyword: targetKeyword,
+      status: query.status,
+      schedulePriority: query.schedulePriority,
+      coordinationStatus: query.coordinationStatus,
+      keyword: query.keyword,
       limit: 2000,
       page: nextPage,
       pageSize
     }
-    if (targetCity && targetCity !== "all") {
-      filters.city = targetCity
+    if (query.city) {
+      filters.city = query.city
     }
     this._bookingListRequestDone = typeof done === "function" ? done : null
     this.setData({
@@ -1009,7 +1066,11 @@ Page({
           return
         }
         const list = Array.isArray(result.list) ? result.list : []
+        const previousById = new Map(this.data.list.map((item) => [String(item.id || item._id || ""), item]))
         const formatted = list.map((item) => {
+          const previous = previousById.get(String(item.id || item._id || ""))
+          const hasRemarkDraft = previous && typeof previous.adminRemarkDraft === "string" &&
+            normalizeRemark(previous.adminRemarkDraft) !== normalizeRemark(previous.adminRemark)
           const status = item.status || "pending"
           const schedulePriority = PRIORITY_TEXT_MAP[item.schedulePriority]
             ? item.schedulePriority
@@ -1026,7 +1087,7 @@ Page({
             statusClass: STATUS_CLASS_MAP[status] || "status-pending",
             createdAtText: formatDisplayTime(item.createdAt),
             adminRemark: item.adminRemark || "",
-            adminRemarkDraft: item.adminRemark || "",
+            adminRemarkDraft: hasRemarkDraft ? previous.adminRemarkDraft : item.adminRemark || "",
             adminRemarkUpdatedAtText: formatDisplayTime(item.adminRemarkUpdatedAt),
             schedulePriority,
             schedulePriorityText: PRIORITY_TEXT_MAP[schedulePriority],
@@ -1039,6 +1100,7 @@ Page({
           }
         })
         const nextList = append ? this.data.list.concat(formatted) : formatted
+        this._bookingListFilters = query
         this.setData({
           loading: false,
           page: Number.isInteger(result.page) ? result.page : nextPage,

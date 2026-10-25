@@ -253,13 +253,8 @@ Page({
     if (!this.data.keyword) {
       return
     }
-    const listRequestId = Number(this._auditListRequestId || 0)
-    this.setData({ keyword: "" }, () => {
-      if (listRequestId !== Number(this._auditListRequestId || 0)) {
-        return
-      }
-      this.fetchList()
-    })
+    this.setData({ keyword: "" })
+    this.fetchList({ keyword: "" })
   },
   handleSearch() {
     this.fetchList({ keyword: String(this.data.keyword || "") })
@@ -278,23 +273,18 @@ Page({
       currentAction: action,
       currentActionLabel: action === "all" ? "全部操作" : ACTION_LABEL_MAP[action] || "其他操作"
     })
-    this.fetchList()
+    this.fetchList({ action })
   },
   handleResetFilters() {
     if (!this.data.keyword && this.data.currentAction === "all") {
       return
     }
-    const listRequestId = Number(this._auditListRequestId || 0)
     this.setData({
       keyword: "",
       currentAction: "all",
       currentActionLabel: "全部操作"
-    }, () => {
-      if (listRequestId !== Number(this._auditListRequestId || 0)) {
-        return
-      }
-      this.fetchList()
     })
+    this.fetchList({ keyword: "", action: "all" })
   },
   handleLoadMore() {
     if (this.data.loading || !this.data.hasMore) {
@@ -313,8 +303,12 @@ Page({
       })
       return
     }
-    const filter = this.data.currentAction === "all" ? "" : this.data.currentAction
-    const keyword = String(this.data.keyword || "")
+    const query = this._auditListFilters || {
+      action: this.data.currentAction === "all" ? "" : this.data.currentAction,
+      keyword: String(this.data.keyword || "")
+    }
+    const filter = query.action
+    const keyword = query.keyword
     const exportSerial = Number(this._exportRequestSerial || 0) + 1
     this._exportRequestSerial = exportSerial
     const nativeAction = beginPageNativeAction(this, { requireCurrent: true })
@@ -515,11 +509,21 @@ Page({
   },
   fetchList(input) {
     const done = typeof input === "function" ? input : input && input.done
-    const append = Boolean(input && typeof input === "object" && input.append)
-    const nextPage = append ? this.data.page + 1 : 0
-    const selectedFilter = input && input.action !== undefined ? input.action : this.data.currentAction
+    let append = Boolean(input && typeof input === "object" && input.append)
+    // Pagination and export belong to the displayed query, not the search draft.
+    const baseFilters = append && this._auditListFilters ? this._auditListFilters : {
+      action: this.data.currentAction,
+      keyword: this.data.keyword
+    }
+    const selectedFilter = input && input.action !== undefined ? input.action : baseFilters.action
     const action = selectedFilter === "all" ? "" : selectedFilter
-    const keyword = String(input && input.keyword !== undefined ? input.keyword : this.data.keyword || "")
+    const keyword = String(input && input.keyword !== undefined ? input.keyword : baseFilters.keyword || "").trim()
+    if (append && this._auditListFilters &&
+      (action !== this._auditListFilters.action || keyword !== this._auditListFilters.keyword)) {
+      append = false
+    }
+    const nextPage = append ? this.data.page + 1 : 0
+    if (!append) this._auditListFilters = null
     const requestId = Number(this._auditListRequestId || 0) + 1
     this._auditListRequestId = requestId
     this.finishAuditListRequestEffects()
@@ -590,10 +594,10 @@ Page({
             initialLoading: false,
             loading: false,
             list: append ? this.data.list : [],
-            hasMore: false,
-            total: 0,
-            truncated: false,
-            page: 0
+            hasMore: append ? this.data.hasMore : false,
+            total: append ? this.data.total : 0,
+            truncated: append ? this.data.truncated : false,
+            page: append ? this.data.page : 0
           })
           return
         }
@@ -609,6 +613,7 @@ Page({
               }
             })
           : []
+        this._auditListFilters = { action, keyword }
         this.setData({
           initialLoading: false,
           loading: false,

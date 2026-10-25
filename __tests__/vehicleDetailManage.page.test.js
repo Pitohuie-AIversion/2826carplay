@@ -487,7 +487,7 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
     jest.advanceTimersByTime(40 * 1000)
 
     expect(uploadFile).toHaveBeenCalledTimes(2)
-    expect(global.wx.hideLoading).toHaveBeenCalled()
+    expect(global.wx.hideLoading).not.toHaveBeenCalled()
     expect(global.wx.showToast).toHaveBeenCalledWith({
       title: "网络异常，请重试",
       icon: "none"
@@ -578,7 +578,8 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
     expect(page.persistImageChange).toHaveBeenCalledWith(
       { action: "add", fileIds },
       fileIds,
-      1
+      1,
+      { allFilePaths: ["/tmp/one.jpg", "/tmp/two.png"], failedUploadPaths: [], uploadedCount: 2 }
     )
   })
 
@@ -626,7 +627,8 @@ describe("pages/vehicle-detail-manage 车辆详情管理视觉", () => {
     expect(page.persistImageChange).toHaveBeenCalledWith(
       { action: "add", fileIds },
       fileIds,
-      0
+      0,
+      { allFilePaths: localFiles, failedUploadPaths: [], uploadedCount: 9 }
     )
   })
 

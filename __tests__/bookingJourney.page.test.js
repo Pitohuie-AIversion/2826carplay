@@ -754,7 +754,7 @@ describe("我的预约旅程状态", () => {
     page.handleAddToCalendar()
     expect(global.wx.addPhoneCalendar).toHaveBeenCalledWith(
       expect.objectContaining({
-        title: "极境车库用车 · 保时捷 911 Carrera",
+        title: "爱迦租车用车 · 保时捷 911 Carrera",
         location: "已保存的门店地址",
         alarm: true
       })

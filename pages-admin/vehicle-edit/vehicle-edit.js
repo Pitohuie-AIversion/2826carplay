@@ -8,7 +8,7 @@ const {
 } = require("../../shared/vehicleFormProgress")
 const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
 const { formatToastTitle } = require("../../shared/uiFeedback")
-const { clearUnsaved, markUnsaved } = require("../../shared/unsavedChanges")
+const { clearUnsaved, disposeUnsavedChanges, markUnsaved, syncUnsavedChanges } = require("../../shared/unsavedChanges")
 const {
   activatePageNativeActions,
   beginPageNativeAction,
@@ -139,6 +139,17 @@ Page({
     })
   },
   onShow() {
+    if (this._vehicleEditNeedsClearUnsaved && isPageCurrent(this)) {
+      this._vehicleEditNeedsClearUnsaved = false
+      clearUnsaved(this)
+    }
+    syncUnsavedChanges(this)
+    const pending = this._vehicleEditDeferredResult
+    if (pending) {
+      this._vehicleEditDeferredResult = null
+      pending()
+      return
+    }
     const requestId = Number(this._vehicleEditPendingNavigationRequestId || 0)
     if (
       requestId &&
@@ -149,6 +160,7 @@ Page({
     }
   },
   onUnload() {
+    disposeUnsavedChanges(this)
     cancelPagePermissionCheck(this)
     cancelPageNativeActions(this)
     this._vehicleEditLoadRequestId =
@@ -156,11 +168,14 @@ Page({
     this._vehicleEditSubmitRequestId =
       Number(this._vehicleEditSubmitRequestId || 0) + 1
     this._vehicleEditPendingNavigationRequestId = 0
+    this._vehicleEditDeferredResult = null
+    this._vehicleEditNeedsClearUnsaved = false
     this.clearVehicleEditLoadTimer()
     this.clearVehicleEditSubmitTimer()
     this.clearVehicleEditNavigationTimer()
   },
   fetchDetail(id) {
+    this._vehicleEditNeedsClearUnsaved = false
     const vehicleId = String(id || "").trim()
     const requestId = Number(this._vehicleEditLoadRequestId || 0) + 1
     this._vehicleEditLoadRequestId = requestId
@@ -194,10 +209,12 @@ Page({
       if (!finishRequest()) {
         return
       }
-      wx.showToast({
-        title: formatToastTitle(message, "加载失败"),
-        icon: "none"
-      })
+      if (isPageCurrent(this)) {
+        wx.showToast({
+          title: formatToastTitle(message, "加载失败"),
+          icon: "none"
+        })
+      }
       this.setData({
         loading: false,
         loadFailed: true,
@@ -218,10 +235,12 @@ Page({
         }
         const result = res && res.result ? res.result : null
         if (!result || !result.ok || !result.detail) {
-          wx.showToast({
-            title: formatToastTitle(result && result.message, "加载失败"),
-            icon: "none"
-          })
+          if (isPageCurrent(this)) {
+            wx.showToast({
+              title: formatToastTitle(result && result.message, "加载失败"),
+              icon: "none"
+            })
+          }
           this.setData({
             loading: false,
             loadFailed: true,
@@ -314,7 +333,8 @@ Page({
             }
           }
         })
-        clearUnsaved(this)
+        if (isPageCurrent(this)) clearUnsaved(this)
+        else this._vehicleEditNeedsClearUnsaved = true
       },
       fail: (error) => {
         handleFailure(error && (error.errMsg || error.message))
@@ -689,6 +709,7 @@ Page({
     }
     const requestId = Number(this._vehicleEditSubmitRequestId || 0) + 1
     this._vehicleEditSubmitRequestId = requestId
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     this.clearVehicleEditSubmitTimer()
     this.clearVehicleEditNavigationTimer()
     this.setData({
@@ -704,16 +725,24 @@ Page({
       this.clearVehicleEditSubmitTimer()
       return true
     }
+    const deliverResult = (callback) => {
+      if (!isCurrent()) return
+      if (!isPageNativeActionActive(this, action)) {
+        this._vehicleEditDeferredResult = () => deliverResult(callback)
+        return
+      }
+      callback()
+    }
     const handleFailure = (message) => {
       if (!finishRequest()) {
         return
       }
-      wx.showToast({
-        title: formatToastTitle(message, "保存失败"),
-        icon: "none"
-      })
-      this.setData({
-        isSubmitting: false
+      deliverResult(() => {
+        wx.showToast({
+          title: formatToastTitle(message, "保存失败"),
+          icon: "none"
+        })
+        this.setData({ isSubmitting: false })
       })
     }
     this._vehicleEditSubmitTimer = setTimeout(() => {
@@ -726,38 +755,35 @@ Page({
         if (!finishRequest()) {
           return
         }
-        const result = res && res.result ? res.result : null
-        if (result && result.ok) {
-          if (Number.isSafeInteger(result.vehicleVersion) && result.vehicleVersion >= 0) {
-            this._vehicleVersion = result.vehicleVersion
+        deliverResult(() => {
+          const result = res && res.result ? res.result : null
+          if (result && result.ok) {
+            if (Number.isSafeInteger(result.vehicleVersion) && result.vehicleVersion >= 0) {
+              this._vehicleVersion = result.vehicleVersion
+            }
+            clearUnsaved(this)
+            wx.showToast({
+              title: "保存成功",
+              icon: "success",
+              duration: 1200
+            })
+            this.scheduleVehicleEditNavigation(requestId)
+            return
           }
-          clearUnsaved(this)
-          wx.showToast({
-            title: "保存成功",
-            icon: "success",
-            duration: 1200
-          })
-          this.scheduleVehicleEditNavigation(requestId)
-          return
-        }
-        if (result && result.code === "VERSION_CONFLICT") {
+          if (result && result.code === "VERSION_CONFLICT") {
+            this.setData({ isSubmitting: false })
+            this.confirmReloadVehicle()
+            return
+          }
+          const title =
+            result &&
+            result.code === "VALIDATION_ERROR" &&
+            result.details &&
+            result.details.errors
+              ? this.getValidationMessage(result)
+              : (result && result.message) || "保存失败"
+          wx.showToast({ title, icon: "none" })
           this.setData({ isSubmitting: false })
-          this.confirmReloadVehicle()
-          return
-        }
-        const title =
-          result &&
-          result.code === "VALIDATION_ERROR" &&
-          result.details &&
-          result.details.errors
-            ? this.getValidationMessage(result)
-            : (result && result.message) || "保存失败"
-        wx.showToast({
-          title,
-          icon: "none"
-        })
-        this.setData({
-          isSubmitting: false
         })
       },
       fail: (error) => {

@@ -37,6 +37,7 @@ function createMockDb({ roles, current, updateResult = { stats: { updated: 1 } }
       serverDate
     },
     privacyWhere,
+    privacyGet,
     privacyUpdate,
     privacyField,
     auditAdd,
@@ -59,6 +60,60 @@ async function loadModule(openid, mockDb) {
 }
 
 describe("cloudfunctions/privacyRequestUpdateStatus integration", () => {
+  test.each([
+    { resolutionNote: {} },
+    { resolutionNote: ["处理完成"] },
+    { resolutionNote: true },
+    { status: ["completed"] },
+    { id: ["p1"] },
+    { resolutionNote: { toString: null } }
+  ])("拒绝非字符串处理字段 %j", async (invalid) => {
+    const mocks = createMockDb({ roles: [{ openid: "admin", role: "admin" }], current: { type: "correction", status: "processing" } })
+    const mod = await loadModule("admin", mocks.db)
+    expect(await mod.main({ id: "p1", status: "completed", resolutionNote: "处理完成", ...invalid }))
+      .toMatchObject({ ok: false, code: "VALIDATION_ERROR" })
+    expect(mocks.privacyGet).not.toHaveBeenCalled()
+    expect(mocks.privacyUpdate).not.toHaveBeenCalled()
+    expect(mocks.auditAdd).not.toHaveBeenCalled()
+  })
+
+  test("相同处理请求并发重试时均成功且仅写一次状态和审计", async () => {
+    const current = { type: "correction", status: "processing", resolutionNote: "" }
+    const mocks = createMockDb({ roles: [{ openid: "admin", role: "admin" }], current })
+    mocks.privacyGet.mockImplementation(async () => ({ data: { ...current } }))
+    mocks.privacyWhere.mockImplementation((filter) => ({ update: async ({ data }) => {
+      if (current.status !== filter.status) return { stats: { updated: 0 } }
+      mocks.privacyUpdate({ data })
+      Object.assign(current, data)
+      return { stats: { updated: 1 } }
+    } }))
+    const mod = await loadModule("admin", mocks.db)
+    const payload = { id: "p1", status: "completed", resolutionNote: "处理完成" }
+    const results = await Promise.all([mod.main(payload), mod.main(payload)])
+    expect(results).toEqual(expect.arrayContaining([
+      expect.objectContaining({ ok: true, status: "completed", updated: true }),
+      expect.objectContaining({ ok: true, status: "completed", updated: false })
+    ]))
+    expect(mocks.privacyWhere).toHaveBeenCalledTimes(2)
+    expect(mocks.privacyUpdate).toHaveBeenCalledTimes(1)
+    expect(mocks.auditAdd).toHaveBeenCalledTimes(1)
+  })
+
+  test.each([
+    { type: "correction", status: "completed", resolutionNote: "另一处理结果" },
+    { type: "correction", status: "cancelled", resolutionNote: "处理完成" },
+    { type: "deletion", status: "completed", resolutionNote: "处理完成" },
+    null
+  ])("并发修改内容或记录后不误报本次保存成功 %j", async (latest) => {
+    const mocks = createMockDb({ roles: [{ openid: "admin", role: "admin" }], current: null, updateResult: { stats: { updated: 0 } } })
+    mocks.privacyGet.mockResolvedValueOnce({ data: { type: "correction", status: "processing" } })
+      .mockResolvedValueOnce({ data: latest })
+    const mod = await loadModule("admin", mocks.db)
+    expect(await mod.main({ id: "p1", status: "completed", resolutionNote: "处理完成" }))
+      .toMatchObject({ ok: false, code: "STATUS_CONFLICT" })
+    expect(mocks.auditAdd).not.toHaveBeenCalled()
+  })
+
   test("另一管理员已用不同说明处理完毕时不会把本次内容假报保存成功", async () => {
     const mocks = createMockDb({ roles: [{ openid: "admin", role: "admin" }], current: { type: "correction", status: "completed", resolutionNote: "已有处理结果" } })
     const mod = await loadModule("admin", mocks.db)

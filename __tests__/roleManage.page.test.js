@@ -35,6 +35,7 @@ describe("pages/role-manage 权限视觉与选择", () => {
     jest.useRealTimers()
     delete global.Page
     delete global.wx
+    delete global.getCurrentPages
   })
 
   test("权限选项包含功能图标与说明并可切换选中态", () => {
@@ -206,8 +207,106 @@ describe("pages/role-manage 权限视觉与选择", () => {
     page.fetchRoleList = jest.fn()
     page.handleSubmit()
     request.success({ result: { ok: true } })
-    expect(clearPagePermissionCache).toHaveBeenCalledTimes(1)
+    expect(clearPagePermissionCache).toHaveBeenCalledTimes(2)
     expect(page.fetchRoleList).toHaveBeenCalledTimes(1)
+  })
+
+  test.each(["network", "server", "timeout", "success"])("保存%s在切页后完成不会干扰新页面的反馈", (result) => {
+    jest.useFakeTimers()
+    const requests = []
+    global.wx = {
+      showLoading: jest.fn(), hideLoading: jest.fn(), showToast: jest.fn(),
+      cloud: { callFunction: jest.fn((request) => requests.push(request)) }
+    }
+    const page = createPage(loadPageDefinition(), {
+      initialLoading: false, formOpenid: "member_1", selectedPermissions: ["vehicle_manage"]
+    })
+    global.getCurrentPages = () => [page]
+    page.handleSubmit()
+    page.onHide()
+    expect(wx.hideLoading).toHaveBeenCalledTimes(1)
+    global.getCurrentPages = () => [page, {}]
+    wx.showLoading({ title: "新页面加载中" })
+    if (result === "network") requests[0].fail({ errMsg: "network" })
+    else if (result === "timeout") jest.advanceTimersByTime(20000)
+    else requests[0].success({ result: { ok: result === "success" } })
+    expect(wx.showToast).not.toHaveBeenCalled()
+    expect(wx.hideLoading).toHaveBeenCalledTimes(1)
+    expect(page.data.saving).toBe(false)
+    if (result !== "success") {
+      expect(page.data.formOpenid).toBe("member_1")
+      expect(page.data.selectedPermissions).toEqual(["vehicle_manage"])
+    }
+    page.onUnload()
+    expect(jest.getTimerCount()).toBe(0)
+  })
+
+  test.each(["network", "server", "timeout"])("列表%s在切页后完成不会在新页面弹出提示", (result) => {
+    jest.useFakeTimers()
+    let request
+    global.wx = { showToast: jest.fn(), cloud: { callFunction: jest.fn((options) => { request = options }) } }
+    const page = createPage(loadPageDefinition())
+    global.getCurrentPages = () => [page]
+    page.fetchRoleList()
+    global.getCurrentPages = () => [page, {}]
+    if (result === "network") request.fail({ errMsg: "network" })
+    else if (result === "server") request.success({ result: { ok: false } })
+    else jest.advanceTimersByTime(15000)
+    expect(wx.showToast).not.toHaveBeenCalled()
+    expect(page.data.loading).toBe(false)
+    page.onUnload()
+    expect(jest.getTimerCount()).toBe(0)
+  })
+
+  test.each(["timeout", "unload"])("权限写入%s后迟到成功仍清理权限缓存且不覆盖草稿", (end) => {
+    jest.useFakeTimers()
+    let request
+    global.wx = {
+      showLoading: jest.fn(), hideLoading: jest.fn(), showToast: jest.fn(),
+      cloud: { callFunction: jest.fn((options) => { request = options }) }
+    }
+    const page = createPage(loadPageDefinition(), { initialLoading: false, formOpenid: "member_1" })
+    const { clearPagePermissionCache } = require("../shared/pageAuth")
+    page.handleSubmit()
+    expect(clearPagePermissionCache).toHaveBeenCalledTimes(1)
+    if (end === "timeout") {
+      jest.advanceTimersByTime(20000)
+      page.handleOpenidInput({ detail: { value: "member_2" } })
+    } else page.onUnload()
+    const expectedOpenid = page.data.formOpenid
+    const setDataCount = page.setData.mock.calls.length
+    const toastCount = wx.showToast.mock.calls.length
+    request.success({ result: { ok: true } })
+    expect(clearPagePermissionCache).toHaveBeenCalledTimes(2)
+    expect(page.data.formOpenid).toBe(expectedOpenid)
+    expect(page.setData).toHaveBeenCalledTimes(setDataCount)
+    expect(wx.showToast).toHaveBeenCalledTimes(toastCount)
+    page.onUnload()
+    expect(jest.getTimerCount()).toBe(0)
+  })
+
+  test("旧保存迟到成功只失效缓存，不结束正在进行的新保存", () => {
+    jest.useFakeTimers()
+    const requests = []
+    global.wx = {
+      showLoading: jest.fn(), hideLoading: jest.fn(), showToast: jest.fn(),
+      cloud: { callFunction: jest.fn((options) => requests.push(options)) }
+    }
+    const page = createPage(loadPageDefinition(), { initialLoading: false, formOpenid: "member_1" })
+    const { clearPagePermissionCache } = require("../shared/pageAuth")
+    page.handleSubmit()
+    jest.advanceTimersByTime(20000)
+    page.handleOpenidInput({ detail: { value: "member_2" } })
+    page.handleSubmit()
+    const toastCount = wx.showToast.mock.calls.length
+    requests[0].success({ result: { ok: true } })
+    expect(clearPagePermissionCache).toHaveBeenCalledTimes(3)
+    expect(page.data.saving).toBe(true)
+    expect(page.data.formOpenid).toBe("member_2")
+    expect(wx.hideLoading).toHaveBeenCalledTimes(1)
+    expect(wx.showToast).toHaveBeenCalledTimes(toastCount)
+    page.onUnload()
+    expect(jest.getTimerCount()).toBe(0)
   })
 
   test("成员列表使用盾牌和成员图标而非字母头像", () => {

@@ -2,9 +2,11 @@ const { cancelPagePermissionCheck, requirePagePermission } = require("../../shar
 const { formatToastTitle } = require("../../shared/uiFeedback")
 const {
   activatePageCsvFileActions,
+  applyPageCsvFileRemoval,
   beginPageCsvFileAction,
   cancelPageCsvFileActions,
-  isPageCsvFileActionActive
+  isPageCsvFileActionActive,
+  markPageCsvFileRemoved
 } = require("../../shared/pageCsvFileActions")
 const {
   activatePageNativeActions,
@@ -260,13 +262,21 @@ Page({
     cancelPageNativeActions(this)
     this._inventoryRequestId = Number(this._inventoryRequestId || 0) + 1
     this._exportRequestSerial = Number(this._exportRequestSerial || 0) + 1
+    this._exportNeedsReset = false
+    this._exportDeferredResult = null
     this.finishInventoryRequestEffects()
     this.clearExportRequestTimer()
   },
   onShow() {
+    this.applyExportFileRemoval()
     if (this._exportNeedsReset) {
       this._exportNeedsReset = false
       this.setData({ exporting: false })
+    }
+    const deferredResult = this._exportDeferredResult
+    this._exportDeferredResult = null
+    if (typeof deferredResult === "function") {
+      deferredResult()
     }
   },
   onPullDownRefresh() {
@@ -367,6 +377,7 @@ Page({
       })
       return
     }
+    const inventoryRequestId = String(this.data.requestId || "").trim()
     const action = beginPageNativeAction(this, {
       requireCurrent: true,
       exclusiveKey: "privacy-inventory-export-confirmation"
@@ -384,10 +395,14 @@ Page({
         ) {
           return
         }
-        if (this.data.loading || this.data.refreshing || this.data.exporting) {
+        if (
+          this.data.loading || this.data.refreshing || this.data.exporting ||
+          this.data.partial || this.data.request.type !== "access" ||
+          ["cancelled", "rejected"].includes(this.data.request.status) ||
+          inventoryRequestId !== String(this.data.requestId || "").trim()
+        ) {
           return
         }
-        const inventoryRequestId = String(this.data.requestId || "").trim()
         const exportSerial = Number(this._exportRequestSerial || 0) + 1
         this._exportRequestSerial = exportSerial
         this.clearExportRequestTimer()
@@ -406,11 +421,12 @@ Page({
           if (!finishRequest()) {
             return
           }
-          if (!isPageNativeActionActive(this, action)) { this._exportNeedsReset = true; return }
-          this.setData({ exporting: false })
-          wx.showToast({
-            title: formatToastTitle(message, fallback),
-            icon: "none"
+          this.deliverExportResult(action, exportSerial, () => {
+            this.setData({ exporting: false })
+            wx.showToast({
+              title: formatToastTitle(message, fallback),
+              icon: "none"
+            })
           })
         }
         this._exportRequestTimer = setTimeout(() => {
@@ -465,9 +481,10 @@ Page({
                     const confirmed = confirmation && confirmation.result
                     if (!confirmed || !confirmed.ok) { handleFailure(confirmed && confirmed.message, "导出确认失败"); return }
                     if (!finishRequest()) return
-                    if (!isPageNativeActionActive(this, action)) { this._exportNeedsReset = true; return }
-                    this.setData({ exporting: false, exportConfirmationPending: false })
-                    wx.showToast({ title: "个人数据已生成", icon: "none" })
+                    this.deliverExportResult(action, exportSerial, () => {
+                      this.setData({ exporting: false, exportConfirmationPending: false })
+                      wx.showToast({ title: "个人数据已生成", icon: "none" })
+                    })
                   },
                   fail: () => handleFailure("导出确认失败")
                 })
@@ -544,14 +561,10 @@ Page({
         }
         removeCsvFile(filePath)
           .then(() => {
-            if ((!isPageCsvFileActionActive(this, action) || !isPageNativeActionActive(this, nativeAction))) {
+            if (!markPageCsvFileRemoved(this, action) || !isPageNativeActionActive(this, nativeAction)) {
               return
             }
-            this.setData({
-              exportFilePath: "",
-              exportFileName: "",
-              exportConfirmationPending: false
-            })
+            this.applyExportFileRemoval()
             wx.showToast({
               title: "本地文件已删除",
               icon: "none"
@@ -568,6 +581,23 @@ Page({
           })
       }
     })
+  },
+  applyExportFileRemoval() {
+    const hadPendingRemoval = Boolean(this._removedCsvFileAction)
+    applyPageCsvFileRemoval(this)
+    if (hadPendingRemoval && !this.data.exportFilePath && this.data.exportConfirmationPending) {
+      this.setData({ exportConfirmationPending: false })
+    }
+  },
+  deliverExportResult(action, exportSerial, callback) {
+    if (exportSerial !== this._exportRequestSerial || this._nativeActionsUnloaded) {
+      return
+    }
+    if (!isPageNativeActionActive(this, action)) {
+      this._exportDeferredResult = () => this.deliverExportResult(action, exportSerial, callback)
+      return
+    }
+    callback()
   },
   loadInventory(options) {
     const input = options && typeof options === "object" ? options : {}

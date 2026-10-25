@@ -180,7 +180,7 @@ describe("production security rules", () => {
       expect(uploadSource).toContain(`"${extension}"`)
     })
     expect(uploadSource).toContain(
-      "const cloudPath = `vehicle-images/${vehicleId}/${Date.now()}_${index}.${extension}`"
+      "const cloudPath = `vehicle-images/${vehicleId}/${Date.now()}_${sessionId}_${index}_${retryCount}.${extension}`"
     )
   })
 

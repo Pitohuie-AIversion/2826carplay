@@ -69,6 +69,19 @@ async function loadVehicleDeleteWith({ openid, mockDb }) {
 }
 
 describe("cloudfunctions/vehicleDelete integration", () => {
+  test.each([["car_1"], { toString: null }, 1, true].map((value) => [value]))("非字符串车辆编号 %p 不会删除车辆或图片", async (id) => {
+    const mocks = createMockDb({
+      rolesData: [{ role: "admin" }], currentData: { imageList: ["cloud://img1"] },
+      removeResult: { stats: { removed: 1 } }
+    })
+    const mod = await loadVehicleDeleteWith({ openid: "admin_openid", mockDb: mocks.db })
+
+    await expect(mod.main({ id })).resolves.toMatchObject({ ok: false, code: "VALIDATION_ERROR" })
+    expect(mocks.vehiclesDoc).not.toHaveBeenCalled()
+    expect(mocks.remove).not.toHaveBeenCalled()
+    expect(require("wx-server-sdk").deleteFile).not.toHaveBeenCalled()
+  })
+
   test("admin 合法删除车辆", async () => {
     const mocks = createMockDb({
       rolesData: [{ role: "admin" }],

@@ -166,6 +166,33 @@ describe("cloudfunctions/bookingQuoteManage integration", () => {
     expect(mocks.quoteState).toEqual({})
   })
 
+  test.each([
+    "baseRentalAmount", "protectionAmount", "serviceFeeAmount", "deliveryFeeAmount", "otherFeeAmount"
+  ])("金额字段 %s 不将数组强转成合法金额", async (field) => {
+    const mocks = createMockDb({ booking: { status: "contacted", startDate: "2099-08-10", endDate: "2099-08-12" } })
+    const mod = await loadModule(mocks.db)
+    expect(await mod.main({ ...draftInput, [field]: ["10.50"] })).toMatchObject({ ok: false, code: "VALIDATION_ERROR" })
+    expect(mocks.db.runTransaction).not.toHaveBeenCalled()
+    expect(mocks.quoteState).toEqual({})
+    expect(mocks.auditAdd).not.toHaveBeenCalled()
+  })
+
+  test.each(["expectedQuoteVersion", "expectedDraftRevision"].flatMap((field) => [false, null, [], [0], "   "].map((value) => [field, value])))("版本字段 %s 拒绝非法原始值 %p", async (field, value) => {
+    const mocks = createMockDb({ booking: { status: "contacted", startDate: "2099-08-10", endDate: "2099-08-12" } })
+    const mod = await loadModule(mocks.db)
+    expect(await mod.main({ ...draftInput, [field]: value })).toMatchObject({ ok: false, code: "VALIDATION_ERROR" })
+    expect(mocks.db.runTransaction).not.toHaveBeenCalled()
+    expect(mocks.quoteState).toEqual({})
+    expect(mocks.auditAdd).not.toHaveBeenCalled()
+  })
+
+  test("合法数字金额和数字字符串版本仍可保存与发送", async () => {
+    const mocks = createMockDb({ booking: { status: "contacted", startDate: "2099-08-10", endDate: "2099-08-12" } })
+    const mod = await loadModule(mocks.db)
+    expect(await mod.main({ ...draftInput, baseRentalAmount: 1200, protectionAmount: 100.5, serviceFeeAmount: 20, deliveryFeeAmount: 30, otherFeeAmount: 0, expectedQuoteVersion: "0", expectedDraftRevision: "0" })).toMatchObject({ ok: true, quote: { totalCents: 135050, revision: 1 } })
+    expect(await mod.main({ action: "send", bookingId: "booking_1", expectedQuoteVersion: "0", expectedDraftRevision: "1", requestId: "send_numeric_001" })).toMatchObject({ ok: true, bookingStatus: "quoted" })
+  })
+
   test("同一草稿基线的第二次保存拒绝覆盖，旧金额页面不能发送新草稿", async () => {
     const mocks = createMockDb({ booking: { status: "contacted", startDate: "2099-08-10", endDate: "2099-08-12" } })
     const mod = await loadModule(mocks.db)
@@ -190,6 +217,54 @@ describe("cloudfunctions/bookingQuoteManage integration", () => {
     mocks.bookingState.status = "confirmed"
     mocks.quoteState.booking_1__v1.status = "confirmed"
     expect(await mod.main(send)).toMatchObject({ ok: true, updated: false, bookingStatus: "confirmed" })
+    expect(Object.keys(mocks.quoteState)).toEqual(["booking_1__v1"])
+    expect(mocks.auditAdd).toHaveBeenCalledTimes(2)
+  })
+
+  test.each([
+    { baseRentalAmount: "2400" },
+    { protectionAmount: "200" },
+    { serviceFeeAmount: "40" },
+    { deliveryFeeAmount: "60" },
+    { otherFeeAmount: "80" },
+    { depositText: "免押金" },
+    { validUntil: "2099-12-30" },
+    { customerNote: "修改后的报价备注" },
+    { expectedQuoteVersion: 1 },
+    { expectedDraftRevision: 1 }
+  ])("复用保存请求标识但改变报价内容或基线时拒绝假成功：%j", async (changes) => {
+    const mocks = createMockDb({ booking: { status: "contacted", startDate: "2099-08-10", endDate: "2099-08-12" } })
+    const mod = await loadModule(mocks.db)
+    const save = { ...draftInput, requestId: "draft_payload_001" }
+    const first = await mod.main(save)
+    const original = { ...mocks.quoteState.booking_1__draft }
+
+    expect(first).toMatchObject({ ok: true, updated: true })
+    expect(await mod.main({ ...save, ...changes })).toMatchObject({ ok: false, code: "IDEMPOTENCY_CONFLICT" })
+    expect(mocks.quoteState.booking_1__draft).toEqual(original)
+    expect(mocks.auditAdd).toHaveBeenCalledTimes(1)
+  })
+
+  test("保存重试按规范化金额核对，等价表示仍返回原草稿", async () => {
+    const mocks = createMockDb({ booking: { status: "contacted", startDate: "2099-08-10", endDate: "2099-08-12" } })
+    const mod = await loadModule(mocks.db)
+    const save = { ...draftInput, requestId: "draft_normalized_001" }
+    await mod.main(save)
+    expect(await mod.main({ ...save, baseRentalAmount: "1200", customerNote: ` ${save.customerNote} ` })).toMatchObject({
+      ok: true, updated: false, quote: { revision: 1, baseRentalCents: 120000 }
+    })
+    expect(mocks.auditAdd).toHaveBeenCalledTimes(1)
+  })
+
+  test("复用发送请求标识但改变草稿修订号时拒绝假成功", async () => {
+    const mocks = createMockDb({ booking: { status: "contacted", startDate: "2099-08-10", endDate: "2099-08-12" } })
+    const mod = await loadModule(mocks.db)
+    await mod.main(draftInput)
+    const send = { action: "send", bookingId: "booking_1", expectedDraftRevision: 1, requestId: "send_payload_001" }
+    expect(await mod.main(send)).toMatchObject({ ok: true, updated: true })
+
+    expect(await mod.main({ ...send, expectedDraftRevision: 2 })).toMatchObject({ ok: false, code: "IDEMPOTENCY_CONFLICT" })
+    expect(mocks.quoteState.booking_1__v1).toMatchObject({ revision: 1, status: "sent", baseRentalCents: 120000 })
     expect(Object.keys(mocks.quoteState)).toEqual(["booking_1__v1"])
     expect(mocks.auditAdd).toHaveBeenCalledTimes(2)
   })

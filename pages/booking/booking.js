@@ -14,7 +14,7 @@ const {
   isPageNativeActionActive
 } = require("../../shared/pageNativeAction")
 const { onNetworkReconnect } = require("../../shared/networkStatus")
-const { clearUnsaved, markUnsaved } = require("../../shared/unsavedChanges")
+const { clearUnsaved, disposeUnsavedChanges, markUnsaved, syncUnsavedChanges } = require("../../shared/unsavedChanges")
 const { formatDate, addDays, getDateSpanText, formatMonthDay } = require("../../shared/dateUtils")
 const { maskPhone } = require("../../shared/bookingStatus")
 const { calculateDynamicRentalPricing } = require("../../shared/rentalPricing")
@@ -250,7 +250,7 @@ Page({
     }
     if (requestedDays > 1 && !this.data.form.startDate && !this.data.form.endDate) {
       const today = formatDate(new Date())
-      const end = addDays(today, requestedDays)
+      const end = addDays(today, requestedDays - 1)
       const nextForm = { ...this.data.form, startDate: today, endDate: end }
       initialData.form = nextForm
       initialData.endMinDate = today
@@ -277,6 +277,7 @@ Page({
   },
 
   onShow() {
+    syncUnsavedChanges(this)
     if (this._bookingSubmissionInterrupted) {
       this._bookingSubmissionInterrupted = false
       this.applyState({ isSubmitting: false, submitButtonText: "提交预约" })
@@ -350,6 +351,12 @@ Page({
     this._cancelOperationConfigRequest = requestOperationConfig({
       force: Boolean(options && options.force),
       onSuccess: (config) => {
+        // Resolve the current selection before replacing names; the user may have changed it while loading.
+        const form = this.data.form || {}
+        const selectedHub = getCityHubs(form.city, this.data.serviceHubs).find((hub) => hub.name === form.pickupLocation)
+        const pending = selectedHub
+          ? { city: normalizeCity(form.city), id: selectedHub.id }
+          : this._pendingPickupSelection
         this.setData({
           operationConfigLoading: false,
           operationConfigFailed: false,
@@ -361,7 +368,6 @@ Page({
           bookingStatusTemplateId: String(config.bookingStatusTemplateId || "").trim(),
           subscriptionEnabled: Boolean(String(config.bookingStatusTemplateId || "").trim())
         })
-        const pending = this._pendingPickupSelection
         const restored = pending && pending.city === normalizeCity(this.data.form.city)
           ? getCityHubs(this.data.form.city, this.data.serviceHubs).find((hub) => hub.id === pending.id)
           : null
@@ -461,7 +467,7 @@ Page({
   },
 
   onUnload() {
-    clearUnsaved(this)
+    disposeUnsavedChanges(this)
     cancelPageNativeActions(this)
     if (typeof this._unsubscribeNetwork === "function") {
       this._unsubscribeNetwork()
@@ -643,7 +649,7 @@ Page({
       }
     } else if (action === "three-days") {
       nextForm.startDate = nextForm.startDate || today
-      nextForm.endDate = addDays(nextForm.startDate, 3)
+      nextForm.endDate = addDays(nextForm.startDate, 2)
     } else {
       return
     }
@@ -1272,7 +1278,7 @@ Page({
     wx.makePhoneCall({
       phoneNumber: phone,
       fail: (error) => {
-        if (!isPageNativeActionActive(this, action)) {
+        if (!isPageNativeActionActive(this, action) || String(this.data.servicePhone || "").trim() !== phone) {
           return
         }
         const message = error && (error.errMsg || error.message)

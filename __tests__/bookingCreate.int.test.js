@@ -84,6 +84,7 @@ function createMockDb({
     bookingsWhere,
     bookingsOrderBy,
     bookingsGet,
+    fallbackGet,
     fallbackSkip,
     fallbackLimit,
     bookingsDoc,
@@ -107,6 +108,64 @@ async function loadBookingCreateWith({ openid, mockDb }) {
   })
 
   return mod
+}
+
+function createConcurrentBookingDb({ overlap = false } = {}) {
+  const vehicle = { name: "MX-5", status: "idle", bookingReferenceVersion: 0 }
+  const mocks = createMockDb({ vehicleData: vehicle })
+  const bookings = new Map()
+  let releasePreflight
+  const preflight = new Promise((resolve) => { releasePreflight = resolve })
+  let releaseInnerReads
+  const innerReads = new Promise((resolve) => { releaseInnerReads = resolve })
+  let queryCount = 0
+  mocks.bookingsGet.mockImplementation(async () => {
+    const query = ++queryCount
+    const data = [...bookings.values()]
+    if (query <= 2) {
+      if (query === 2) releasePreflight()
+      await preflight
+    } else if (overlap && query <= 4) {
+      if (query === 4) releaseInnerReads()
+      await innerReads
+    }
+    return { data }
+  })
+  mocks.bookingsDoc.mockImplementation((id) => ({
+    field: () => ({ get: async () => ({ data: bookings.get(id) || null }) })
+  }))
+  let transactionTail = Promise.resolve()
+  let attempts = 0
+  let committedCreates = 0
+  const execute = async (callback) => {
+    for (let retry = 0; retry < 4; retry += 1) {
+      attempts += 1
+      const version = vehicle.bookingReferenceVersion
+      const snapshotVehicle = { ...vehicle }
+      const snapshotBookings = new Map(bookings)
+      let vehiclePatch = null
+      const pendingBookings = new Map()
+      const result = await callback({ collection: (name) => ({ doc: (id) => ({
+        field: () => ({ get: async () => ({ data: name === "vehicles" ? snapshotVehicle : snapshotBookings.get(id) || null }) }),
+        update: async ({ data }) => { vehiclePatch = data },
+        set: async ({ data }) => { pendingBookings.set(id, data) }
+      }) }) })
+      // CloudBase retries the complete callback when a shared document write conflicts.
+      if (vehiclePatch && vehicle.bookingReferenceVersion !== version) continue
+      if (vehiclePatch) Object.assign(vehicle, vehiclePatch)
+      for (const [id, data] of pendingBookings) bookings.set(id, data)
+      committedCreates += pendingBookings.size
+      return result
+    }
+    throw Object.assign(new Error("transaction conflict"), { code: "DATABASE_TRANSACTION_CONFLICT" })
+  }
+  mocks.db.runTransaction.mockImplementation((callback) => {
+    if (overlap) return execute(callback)
+    const next = transactionTail.then(() => execute(callback))
+    transactionTail = next.catch(() => {})
+    return next
+  })
+  return { ...mocks, vehicle, bookings, getAttempts: () => attempts, getCommittedCreates: () => committedCreates }
 }
 
 describe("cloudfunctions/bookingCreate integration", () => {
@@ -593,5 +652,70 @@ describe("cloudfunctions/bookingCreate integration", () => {
     expect(vehicleData.bookingReferenceVersion).toBe(4)
     expect(mocks.add).not.toHaveBeenCalled()
     errorSpy.mockRestore()
+  })
+
+  test.each([false, true])("不同请求同时通过预查也不能创建相同预约，事务重叠=%s", async (overlap) => {
+    const mocks = createConcurrentBookingDb({ overlap })
+    const mod = await loadBookingCreateWith({ openid: "user_openid", mockDb: mocks.db })
+    const input = { vehicleId: "car_1", userName: "张三", phone: "13800000000", startDate: "2099-08-01", endDate: "2099-08-02", city: "杭州" }
+    const results = await Promise.all([
+      mod.main({ ...input, requestId: "parallel_request_a" }),
+      mod.main({ ...input, requestId: "parallel_request_b" })
+    ])
+    expect(results.filter((result) => result.ok)).toHaveLength(1)
+    expect(results.find((result) => !result.ok)).toMatchObject({ code: "DUPLICATE_BOOKING" })
+    expect(mocks.bookings.size).toBe(1)
+    expect(mocks.getCommittedCreates()).toBe(1)
+    expect(mocks.vehicle.bookingReferenceVersion).toBe(1)
+    expect(mocks.auditAdd).toHaveBeenCalledTimes(1)
+    expect(mocks.getAttempts()).toBe(overlap ? 3 : 2)
+  })
+
+  test("同请求并发发生车辆写冲突后先返回幂等成功，不被重复预约检查拒绝", async () => {
+    const mocks = createConcurrentBookingDb({ overlap: true })
+    const mod = await loadBookingCreateWith({ openid: "user_openid", mockDb: mocks.db })
+    const input = { vehicleId: "car_1", userName: "张三", phone: "13800000000", startDate: "2099-08-01", endDate: "2099-08-02", city: "杭州", requestId: "parallel_same_request" }
+    const results = await Promise.all([mod.main(input), mod.main(input)])
+    expect(results.every((result) => result.ok)).toBe(true)
+    expect(results[0].id).toBe(results[1].id)
+    expect(results.filter((result) => result.duplicated)).toHaveLength(1)
+    expect(mocks.getAttempts()).toBe(3)
+    expect(mocks.getCommittedCreates()).toBe(1)
+    expect(mocks.vehicle.bookingReferenceVersion).toBe(1)
+    expect(mocks.auditAdd).toHaveBeenCalledTimes(1)
+  })
+
+  test("事务内重新查重失败时不新增订单或推进车辆引用版本", async () => {
+    const vehicle = { name: "MX-5", status: "idle", bookingReferenceVersion: 7 }
+    const mocks = createMockDb({ vehicleData: vehicle })
+    mocks.bookingsGet.mockResolvedValueOnce({ data: [] }).mockRejectedValue(new Error("query unavailable"))
+    mocks.fallbackGet.mockRejectedValue(new Error("query unavailable"))
+    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {})
+    const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {})
+    try {
+      const mod = await loadBookingCreateWith({ openid: "user_openid", mockDb: mocks.db })
+      const result = await mod.main({ vehicleId: "car_1", userName: "张三", phone: "13800000000", startDate: "2099-08-01", endDate: "2099-08-02", city: "杭州", requestId: "inner_query_failure" })
+      expect(result).toMatchObject({ ok: false, code: "INTERNAL_ERROR" })
+      expect(mocks.bookingsDocSet).not.toHaveBeenCalled()
+      expect(mocks.vehicleUpdate).not.toHaveBeenCalled()
+      expect(mocks.auditAdd).not.toHaveBeenCalled()
+      expect(vehicle.bookingReferenceVersion).toBe(7)
+    } finally {
+      errorSpy.mockRestore()
+      warnSpy.mockRestore()
+    }
+  })
+
+  test("快照未见同请求但普通查重已见提交结果时仍返回幂等成功", async () => {
+    const mocks = createMockDb({ vehicleData: { name: "MX-5", status: "idle", bookingReferenceVersion: 1 } })
+    const input = { vehicleId: "car_1", userName: "张三", phone: "13800000000", startDate: "2099-08-01", endDate: "2099-08-02", city: "杭州", requestId: "snapshot_same_request" }
+    const existing = { ...input, openid: "user_openid", status: "confirmed" }
+    mocks.bookingsDocGet.mockResolvedValueOnce({ data: null }).mockResolvedValueOnce({ data: null }).mockResolvedValue({ data: existing })
+    mocks.bookingsGet.mockResolvedValueOnce({ data: [] }).mockResolvedValue({ data: [existing] })
+    const mod = await loadBookingCreateWith({ openid: "user_openid", mockDb: mocks.db })
+    expect(await mod.main(input)).toMatchObject({ ok: true, duplicated: true })
+    expect(mocks.bookingsDocSet).not.toHaveBeenCalled()
+    expect(mocks.vehicleUpdate).not.toHaveBeenCalled()
+    expect(mocks.auditAdd).not.toHaveBeenCalled()
   })
 })

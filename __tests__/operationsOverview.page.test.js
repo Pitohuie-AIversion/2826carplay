@@ -396,4 +396,35 @@ describe("pages/operations-overview", () => {
     expect(wxssSource).toMatch(/\.recent-title\s*\{[^}]*-webkit-line-clamp:\s*2/s)
     expect(wxssSource).toContain(".refresh-link-pressed")
   })
+
+  test.each(["allFailed", "storageUnavailable", "privacyUnavailable"])("%s 时不能把未知待办显示为运营平稳", async (kind) => {
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn(({ success }) => success({ result: kind === "allFailed"
+          ? { ok: false, message: "权限已失效" }
+          : { ok: true, counts: { privacyPending: 0, privacyProcessing: 0, storageCleanupPending: 0 },
+            unavailable: [kind === "storageUnavailable" ? "storageCleanupPending" : "privacyPending"], partial: true }
+        }))
+      }
+    }
+    const page = createPage(loadPageDefinition(), { canManageRoles: true })
+    page.loadOverview()
+    await flushPromises()
+    expect(page.data.pendingActionCount).toBe(0)
+    expect(page.data.operationStateLabel).toBe("待办数据待确认")
+    expect(page.data.operationStateClass).toBe("operation-state-pending")
+    const missingAlert = page.data.alerts.find((item) => item.key === (kind === "privacyUnavailable" ? "privacy" : "storage"))
+    expect(missingAlert.tone).toBe("neutral")
+  })
+
+  test("全部授权待办数据成功且为零时显示运营平稳", async () => {
+    global.wx = { cloud: { callFunction: jest.fn(({ success }) => success({ result: {
+      ok: true, counts: { privacyPending: 0, privacyProcessing: 0, storageCleanupPending: 0 }, unavailable: []
+    } })) } }
+    const page = createPage(loadPageDefinition(), { canManageRoles: true })
+    page.loadOverview()
+    await flushPromises()
+    expect(page.data.operationStateLabel).toBe("当前运营平稳")
+    expect(page.data.operationStateClass).toBe("operation-state-clear")
+  })
 })

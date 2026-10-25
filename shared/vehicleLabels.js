@@ -1,5 +1,5 @@
 /**
- * 极境车库 - 车辆展示枚举与元数据字典 (Vehicle Display Labels & Options)
+ * 爱迦租车 - 车辆展示枚举与元数据字典 (Vehicle Display Labels & Options)
  *
  * 统一管理用户端与管理端车辆类型、能源动力、变速箱、运营状态文案与样式映射，
  * 消除多页面重复硬编码，便于未来拓展新车型与新状态。

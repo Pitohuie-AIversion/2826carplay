@@ -83,6 +83,78 @@ describe("pages/car-detail 客户侧车辆状态", () => {
     page.onUnload()
   })
 
+  test.each(["cleared", "failed"])("返回详情页后读取 %s 配置并撤销旧联系方式和网点", (completion) => {
+    const requests = []
+    global.wx = {
+      nextTick: (callback) => callback(), setNavigationBarTitle: jest.fn(),
+      makePhoneCall: jest.fn(), openLocation: jest.fn(), showToast: jest.fn(),
+      cloud: { callFunction: jest.fn((options) => requests.push(options)) }
+    }
+    const page = createPage(loadPageDefinition())
+    const { requestOperationConfig } = require("../shared/operationConfigRequest")
+    page.applyCar({ id: "car", images: [], location: "杭州" })
+    page.loadOperationConfig()
+    page.onShow()
+    expect(requests).toHaveLength(1)
+    requests[0].success({ result: { ok: true, config: {
+      servicePhone: "18800001111", serviceHoursText: "旧营业时间",
+      serviceHubs: [{ id: "store", city: "杭州", type: "store", name: "旧门店", address: "旧地址", latitude: 30.2, longitude: 120.1 }]
+    } } })
+    expect(page.data.canNavigate).toBe(true)
+    page.onHide()
+    requestOperationConfig({ force: true })
+    if (completion === "cleared") {
+      requests[1].success({ result: { ok: true, config: { servicePhone: "", serviceHoursText: "", serviceHubs: [] } } })
+    } else {
+      requests[1].fail({ errMsg: "offline" })
+    }
+    page.onShow()
+    if (completion === "failed") requests[2].fail({ errMsg: "offline" })
+    expect(page.data.servicePhone).toBe("")
+    expect(page.data.serviceHoursText).toBe("")
+    expect(page.data.canNavigate).toBe(false)
+    page.handlePhoneCall()
+    page.handleOpenLocation()
+    expect(wx.makePhoneCall).not.toHaveBeenCalled()
+    expect(wx.openLocation).not.toHaveBeenCalled()
+    page.onUnload()
+  })
+
+  test("卸载时取消返回详情页后重新发起的配置读取", () => {
+    jest.useFakeTimers()
+    let request
+    global.wx = { setNavigationBarTitle: jest.fn(), cloud: { callFunction: (options) => { request = options } } }
+    const page = createPage(loadPageDefinition())
+    page.onShow()
+    page.onHide()
+    page.onShow()
+    expect(jest.getTimerCount()).toBe(1)
+    page.onUnload()
+    expect(jest.getTimerCount()).toBe(0)
+    page.setData.mockClear()
+    request.success({ result: { ok: true, config: { servicePhone: "18800001111" } } })
+    expect(page.setData).not.toHaveBeenCalled()
+  })
+
+  test("返回详情页的缓存读取失效后清空旧联系方式", () => {
+    jest.useFakeTimers()
+    global.wx = { setNavigationBarTitle: jest.fn(), cloud: { callFunction: ({ success }) => success({ result: { ok: true, config: {
+      servicePhone: "18800001111", wxKfCorpId: "ww123456", wxKfExtInfo: "https://work.weixin.qq.com/kfid/sample"
+    } } }) } }
+    const page = createPage(loadPageDefinition())
+    const { clearOperationConfigCache } = require("../shared/operationConfigRequest")
+    page.loadOperationConfig()
+    page.onShow()
+    page.onHide()
+    page.onShow()
+    expect(jest.getTimerCount()).toBe(1)
+    clearOperationConfigCache()
+    expect(page.data.servicePhone).toBe("")
+    expect(page.data.wxKfReady).toBe(false)
+    expect(jest.getTimerCount()).toBe(0)
+    page.onUnload()
+  })
+
   test("导航失败回调在详情页卸载后不会提示", () => {
     global.wx = { setNavigationBarTitle: jest.fn(), openLocation: jest.fn(), showToast: jest.fn() }
     const page = createPage(loadPageDefinition())

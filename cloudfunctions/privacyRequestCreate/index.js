@@ -35,9 +35,11 @@ function createError(code, message, details) {
 function normalizeEvent(event) {
   const payload = event && typeof event === "object" ? event : {}
   return {
-    type: String(payload.type || "").trim(),
-    description: String(payload.description || "").trim(),
-    requestId: String(payload.requestId || "").trim()
+    type: typeof payload.type === "string" ? payload.type.trim() : "",
+    description: typeof payload.description === "string" ? payload.description.trim() : "",
+    requestId: typeof payload.requestId === "string" ? payload.requestId.trim() : "",
+    invalidFieldType: [payload.type, payload.description, payload.requestId]
+      .some((value) => value !== undefined && typeof value !== "string")
   }
 }
 
@@ -124,6 +126,9 @@ exports.main = async (event) => {
   try {
     if (!openid) {
       return createError("UNAUTHORIZED", "未获取到用户身份")
+    }
+    if (input.invalidFieldType) {
+      return createError("VALIDATION_ERROR", "申请类型、说明和请求标识必须为文本")
     }
 
     if (!REQUEST_TYPES.includes(input.type)) {

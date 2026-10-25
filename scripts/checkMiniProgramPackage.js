@@ -180,7 +180,8 @@ function runCli() {
     process.stdout.write(`- ${formatMiB(item.bytes)}  ${item.path}\n`)
   })
   if (result.status === "warning") {
-    process.stderr.write("主包已超过 1.75 MiB 预警线，请压缩资源或规划分包。\n")
+    process.stderr.write("主包已达到 1.75 MiB 安全线，检查未通过，请压缩资源或规划分包。\n")
+    process.exitCode = 1
   }
   if (result.status === "fail") {
     process.stderr.write("主包估算已达到 2 MiB 阻断线，不能继续上传。\n")

@@ -1,5 +1,5 @@
 /**
- * 极境车库 - 客户跟进标签体系
+ * 爱迦租车 - 客户跟进标签体系
  */
 
 const PRESET_CUSTOMER_TAGS = [

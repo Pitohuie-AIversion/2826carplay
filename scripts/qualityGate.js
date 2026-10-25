@@ -1,5 +1,5 @@
 /**
- * 极境车库 - 全链路工程质量总门禁 (Quality Gate & Engineering Doctor)
+ * 爱迦租车 - 全链路工程质量总门禁 (Quality Gate & Engineering Doctor)
  *
  * 工业级 CI/CD 与本地发版前全要素自动体检流水线：
  * 1. 结构与文件规范 (checkProjectStructure)
@@ -8,9 +8,9 @@
  * 4. 16 集合 × 52 复合索引安全规则巡检 (checkDatabaseIndexes)
  * 5. 56 个云函数架构规范与安全鉴权审计 (cloudCheck)
  * 6. 小程序主包与分包体积预算 (checkMiniProgramPackage, <= 1.75 MiB)
- * 7. Jest 自动化测试全量回归 (154 套件，1850+ 用例)
- * 8. 无头全页面组件交互点击仿真 (333 项点击断言)
- * 9. 真实用户多角色业务旅程全闭环验证 (30 项端到端流程)
+ * 7. Jest 自动化测试全量回归（数量以本次运行结果为准）
+ * 8. 无头全页面组件交互点击仿真
+ * 9. 图片预加载与缓存恢复仿真（7 个场景、30 项断言）
  *
  * 用法：
  *   node scripts/qualityGate.js          # 全量 9 阶段深度体检
@@ -66,19 +66,19 @@ if (!isStaticOnly) {
   STAGES.push(
     {
       id: "jest",
-      name: "阶段 7/9: 单元与集成测试全量回归 (Jest 154 Suites)",
+      name: "阶段 7/9: 单元与集成测试全量回归 (Jest)",
       script: "node_modules/jest/bin/jest.js",
       args: ["--runInBand"]
     },
     {
       id: "clicks",
-      name: "阶段 8/9: 无头全页面组件交互点击仿真 (333 Clicks)",
+      name: "阶段 8/9: 无头全页面组件交互点击仿真",
       script: "scripts/simulateAllComponentClicks.js",
       args: []
     },
     {
       id: "usage",
-      name: "阶段 9/9: 真实用户全场景业务旅程仿真 (30 Scenarios)",
+      name: "阶段 9/9: 图片预加载与缓存恢复仿真 (7 场景 / 30 断言)",
       script: "scripts/verifyActualUsage.js",
       args: []
     }
@@ -114,7 +114,7 @@ function main() {
   const overallStart = Date.now()
   console.log("\x1b[1m\x1b[35m")
   console.log("╔════════════════════════════════════════════════════════════════════╗")
-  console.log("║         极境车库工程质量总门禁 (Quality Gate & Doctor)             ║")
+  console.log("║         爱迦租车工程质量总门禁 (Quality Gate & Doctor)             ║")
   console.log("╚════════════════════════════════════════════════════════════════════╝")
   console.log(`模式: ${isStaticOnly ? "静态快速体检 (前 6 阶段)" : "全量深度体检 (全 9 阶段)"}`)
   console.log(`基准目录: ${PROJECT_ROOT}\x1b[0m`)
@@ -147,7 +147,7 @@ function main() {
     process.exit(1)
   }
 
-  console.log(`\n\x1b[32m\x1b[1m🎉 质量门禁全项通过！工程健康评分：100 / 100\x1b[0m`)
+  console.log(`\n\x1b[32m\x1b[1m质量门禁全部配置检查通过。\x1b[0m`)
   console.log(`累计执行阶段: ${results.length}/${STAGES.length} | 总耗时: ${totalDuration}s\n`)
   process.exit(0)
 }

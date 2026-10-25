@@ -355,3 +355,75 @@ describe("pages/privacy-request-manage", () => {
     }))
   })
 })
+
+describe("隐私申请处理切页恢复", () => {
+  beforeEach(() => jest.useFakeTimers())
+  afterEach(() => {
+    jest.clearAllTimers()
+    jest.useRealTimers()
+    delete global.Page
+    delete global.wx
+    delete global.getCurrentPages
+    delete global.getApp
+  })
+
+  function startWrite() {
+    global.wx = { showToast: jest.fn(), cloud: { callFunction: jest.fn() } }
+    const page = createPage(loadPageDefinition())
+    page.data.pageAuthorized = true
+    page.data.hasLoaded = true
+    page.fetchList = jest.fn()
+    global.getCurrentPages = () => [page]
+    page.updateStatus({ id: "request-background" }, "processing", "")
+    return page
+  }
+
+  test.each(["navigation", "app-hide"])("%s 后成功不写后台页面，返回后收尾并刷新", (kind) => {
+    const page = startWrite()
+    if (kind === "navigation") global.getCurrentPages = () => [page, {}]
+    else global.getApp = () => ({ globalData: { nativeActionAppVisible: false } })
+    page.setData.mockClear()
+    wx.cloud.callFunction.mock.calls[0][0].success({ result: { ok: true } })
+    expect(wx.showToast).not.toHaveBeenCalled()
+    expect(page.setData).not.toHaveBeenCalled()
+    expect(page.fetchList).not.toHaveBeenCalled()
+    global.getCurrentPages = () => [page]
+    delete global.getApp
+    page.onShow()
+    expect(page.data.updatingId).toBe("")
+    expect(page.fetchList).toHaveBeenCalledTimes(1)
+    expect(wx.showToast).toHaveBeenCalledTimes(1)
+  })
+
+  test.each(["business", "network", "timeout"])("后台 %s 失败返回时提示并解除忙碌，不自动重复写入", (kind) => {
+    const page = startWrite()
+    global.getCurrentPages = () => [page, {}]
+    page.setData.mockClear()
+    const request = wx.cloud.callFunction.mock.calls[0][0]
+    if (kind === "business") request.success({ result: { ok: false, message: "状态已变化" } })
+    else if (kind === "network") request.fail({ errMsg: "offline" })
+    else jest.advanceTimersByTime(20 * 1000)
+    expect(wx.showToast).not.toHaveBeenCalled()
+    expect(page.setData).not.toHaveBeenCalled()
+    global.getCurrentPages = () => [page]
+    page.onShow()
+    expect(page.data.updatingId).toBe("")
+    expect(page.fetchList).not.toHaveBeenCalled()
+    expect(wx.cloud.callFunction).toHaveBeenCalledTimes(1)
+    expect(wx.showToast).toHaveBeenCalledTimes(1)
+  })
+
+  test("请求仍在进行时返回不解锁，卸载后清除延迟反馈", () => {
+    const page = startWrite()
+    page.onShow()
+    expect(page.data.updatingId).toBe("request-background")
+    expect(page.fetchList).not.toHaveBeenCalled()
+    global.getCurrentPages = () => [page, {}]
+    wx.cloud.callFunction.mock.calls[0][0].success({ result: { ok: true } })
+    expect(typeof page._privacyManageDeferredResult).toBe("function")
+    page.onUnload()
+    expect(page._privacyManageDeferredResult).toBeNull()
+    expect(jest.getTimerCount()).toBe(0)
+    expect(wx.showToast).not.toHaveBeenCalled()
+  })
+})

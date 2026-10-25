@@ -39,6 +39,39 @@ async function loadOperationConfigGetWith({ mockDb }) {
 }
 
 describe("cloudfunctions/operationConfigGet integration", () => {
+  test("旧品牌展示文案按新名称读取，联系方式和自定义内容不变且不写数据库", async () => {
+    const value = {
+      brandName: "极境车库 · 西湖店",
+      garagePageTitle: "探索极境座驾",
+      garagePageSubtitle: "极境车库欢迎您",
+      mineUserDesc: "查看极境车库预约",
+      announcementText: "极境服务正常营业",
+      faqContent: "极境车库预约说明",
+      rulesContent: "自定义取还车规则",
+      bookingPrivacyTip: "极境车库仅用于预约沟通",
+      rentalTerms: { includedText: "以极境客服确认为准", depositText: "自定义押金说明" },
+      servicePhone: "18800000000",
+      emergencyPhone: "18800000001",
+      wxKfCorpId: "ww123456",
+      wxKfExtInfo: "https://example.test/极境车库",
+      hotSearchKeywords: ["极境版车型"]
+    }
+    const mocks = createMockDb({ configData: [{ value }] })
+    const mod = await loadOperationConfigGetWith({ mockDb: mocks.db })
+    expect((await mod.main({ requireStoredConfig: true })).config).toMatchObject({
+      ...value,
+      brandName: "爱迦租车 · 西湖店",
+      garagePageTitle: "探索爱迦座驾",
+      garagePageSubtitle: "爱迦租车欢迎您",
+      mineUserDesc: "查看爱迦租车预约",
+      announcementText: "爱迦服务正常营业",
+      faqContent: "爱迦租车预约说明",
+      bookingPrivacyTip: "爱迦租车仅用于预约沟通",
+      rentalTerms: { includedText: "以爱迦客服确认为准", depositText: "自定义押金说明" }
+    })
+    expect(value.brandName).toBe("极境车库 · 西湖店")
+  })
+
   test("历史重复城市先去重再应用条数限制，不丢失后面的有效城市", async () => {
     const mocks = createMockDb({ configData: [{ value: { cityOptions: [...Array(20).fill(" 杭州 "), "上海"] } }] })
     const mod = await loadOperationConfigGetWith({ mockDb: mocks.db })
@@ -60,6 +93,27 @@ describe("cloudfunctions/operationConfigGet integration", () => {
     const mod = await loadOperationConfigGetWith({ mockDb: mocks.db })
     expect(await mod.main({ requireStoredConfig: true })).toMatchObject({ ok: false, code: "STORED_CONFIG_INVALID", details: { errors: [{ field: "serviceHubs" }] } })
     expect((await mod.main()).config.serviceHubs).toEqual([])
+  })
+
+  test.each([
+    { field: "servicePhone", value: "18800000000" + "-".repeat(9) + "1" },
+    { field: "servicePhone", value: 18800000000 },
+    { field: "servicePhone", value: false },
+    { field: "servicePhone", value: null },
+    { field: "servicePhone", value: ["18800000000"] },
+    { field: "bookingStatusTemplateId", value: "t".repeat(129) },
+    { field: "bookingStatusTemplateId", value: 1234567890 },
+    { field: "bookingStatusTemplateId", value: false },
+    { field: "bookingStatusTemplateId", value: null },
+    { field: "bookingStatusTemplateId", value: ["valid_template"] }
+  ])("管理员读取历史无效 $field 不返回被转换后的可保存值 $value", async ({ field, value }) => {
+    const stored = { [field]: value }
+    const mocks = createMockDb({ configData: [{ value: stored }] })
+    const mod = await loadOperationConfigGetWith({ mockDb: mocks.db })
+    expect(await mod.main({ requireStoredConfig: true })).toMatchObject({
+      ok: false, code: "STORED_CONFIG_INVALID", details: { errors: [{ field }] }
+    })
+    expect(stored[field]).toEqual(value)
   })
 
   test("返回版本基线并拒绝历史重复记录，避免读写选中不同配置", async () => {
@@ -128,7 +182,8 @@ describe("cloudfunctions/operationConfigGet integration", () => {
     const res = await mod.main()
 
     expect(res.ok).toBe(true)
-    expect(res.config.brandName).toBe("极境车库")
+    expect(res.config.brandName).toBe("爱迦租车")
+    expect(res.config.garagePageTitle).toBe("爱迦租车")
     expect(res.config.servicePhone).toBe("")
     expect(res.config.garagePageSubtitle).toBe("甄选座驾，为每一次出发预留专属席位")
     expect(res.config.cityOptions).toEqual(["杭州", "上海"])

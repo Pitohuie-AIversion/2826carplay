@@ -38,7 +38,7 @@
   <view class="car-overlay">
     <view class="car-top">
       <view class="car-identity">
-        <view class="car-edition">EXTREME SELECTION</view>
+        <view class="car-edition">AIJIA SELECTION</view>
         <view class="car-nickname">{{car.name}}</view>
       </view>
       <view class="car-status-badges-group">

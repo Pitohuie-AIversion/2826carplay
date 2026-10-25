@@ -5,7 +5,7 @@
       <view class="receipt-brand">
         <image class="brand-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
         <view>
-          <view class="brand-kicker">EXTREME GARAGE</view>
+          <view class="brand-kicker">AIJIA CAR RENTAL</view>
           <view class="brand-title">预约确认单</view>
         </view>
       </view>
@@ -251,12 +251,12 @@
       <view class="handover-record-head">
         <text>{{item.stageText}}记录 v{{item.version}}</text>
         <view class="handover-badges">
-          <text wx:if="{{item.customerSigned}}" class="handover-signed-badge">已签署留证</text>
+          <text wx:if="{{item.customerConfirmed}}" class="handover-signed-badge">用户已核对</text>
           <text class="handover-status handover-status-{{item.status}}">{{item.statusText}}</text>
         </view>
       </view>
       <view class="handover-record-meta">
-        <text>{{item.mileageKm}} km · {{item.energyText}} · {{item.submittedAtText || '—'}}</text>
+        <text>{{item.mileageText}} · {{item.energyText}} · {{item.submittedAtText || '—'}}</text>
         <text wx:if="{{item.inspectorName}}" class="handover-inspector-text">专员: {{item.inspectorName}}</text>
       </view>
       <view class="handover-record-note">
@@ -429,13 +429,13 @@
       <view class="satisfaction-tags-list" wx:if="{{!reviewSubmitted}}">
         <view
           wx:for="{{satisfactionTags}}"
-          wx:key="*this"
-          class="satisfaction-tag {{selectedSatisfactionTags.includes(item) ? 'satisfaction-tag-active' : ''}}"
-          data-tag="{{item}}"
+          wx:key="label"
+          class="satisfaction-tag {{item.selected ? 'satisfaction-tag-active' : ''}}"
+          data-tag="{{item.label}}"
           bindtap="handleSatisfactionTagTap"
           hover-class="filter-button-pressed"
           aria-role="button"
-        >{{item}}</view>
+        >{{item.label}}</view>
       </view>
       <textarea
         wx:if="{{!reviewSubmitted}}"
@@ -500,7 +500,7 @@
     <view class="voucher-modal-card ui-card" catchtap="true">
       <view class="voucher-modal-header">
         <image class="voucher-brand-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
-        <view class="voucher-modal-kicker">EXTREME MOBILITY VOUCHER</view>
+        <view class="voucher-modal-kicker">AIJIA MOBILITY VOUCHER</view>
         <view class="voucher-modal-title">尊享出行确认凭证</view>
         <view class="voucher-modal-status">方案已确认 · 待尊享履约</view>
       </view>

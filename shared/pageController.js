@@ -1,7 +1,7 @@
 /**
- * 极境车库 - 页面架构控制器与生命周期守卫 (Page Controller & Lifecycle Guard)
+ * 爱迦租车 - 页面架构控制器与生命周期守卫 (Page Controller & Lifecycle Guard)
  *
- * 封装并自动应用《极境车库小程序开发与行为准则》全部守卫：
+ * 封装并自动应用《爱迦租车小程序开发与行为准则》全部守卫：
  * 1. 内存同步优先 (同步更新 this.data + wx.nextTick 排期渲染)
  * 2. 页面卸载主动资源回收 (自动清理 Debounce、定时器、网络重连监听)
  * 3. 原生动作切页防穿透 (pageNativeAction 自动开启与校验)
@@ -50,8 +50,8 @@ function createPageController(pageInstance, config = {}) {
 
   // 4. 声明式权限拦截守卫
   if (config.requiredPermission) {
-    requirePagePermission(pageInstance, config.requiredPermission, () => {
-      // 权限不满足由 requirePagePermission 统一重定向回 mine
+    requirePagePermission(pageInstance, {
+      required: config.requiredPermission
     })
     cleanupTasks.push(() => cancelPagePermissionCheck(pageInstance))
   }
@@ -74,7 +74,7 @@ function createPageController(pageInstance, config = {}) {
    * @returns {object} action token
    */
   const beginAction = (options) => {
-    return beginPageNativeAction(pageInstance, options)
+    return beginPageNativeAction(pageInstance, { requireCurrent: true, ...options })
   }
 
   /**
@@ -92,6 +92,7 @@ function createPageController(pageInstance, config = {}) {
    * @param {string} [fallback]
    */
   const showToast = (title, fallback = "操作失败") => {
+    if (disposed || !isPageNativeActionActive(pageInstance, beginAction())) return
     if (typeof wx !== "undefined" && typeof wx.showToast === "function") {
       wx.showToast({
         title: formatToastTitle(title, fallback),
@@ -114,7 +115,7 @@ function createPageController(pageInstance, config = {}) {
     if (perf && typeof perf.dispose === "function") {
       perf.dispose()
     }
-    pageInstance._perf = null
+    if (pageInstance._perf === perf) pageInstance._perf = null
 
     // 执行注册的清理任务
     while (cleanupTasks.length > 0) {

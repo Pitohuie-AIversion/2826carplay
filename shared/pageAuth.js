@@ -129,17 +129,20 @@ function requirePagePermission(page, options) {
       }
     }, delay)
   }
+  const showFailure = (message, delay = 700) => {
+    if (isPageCurrent(page)) {
+      wx.showToast({ title: message, icon: "none" })
+    }
+    scheduleRedirect(delay)
+  }
 
   page.setData({
     pageAuthorized: false
   })
 
   if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
-    wx.showToast({
-      title: "云能力未初始化",
-      icon: "none"
-    })
-    scheduleRedirect(500)
+    if (config.force) clearPagePermissionCache()
+    showFailure("云能力未初始化", 500)
     return cancel
   }
 
@@ -165,11 +168,10 @@ function requirePagePermission(page, options) {
 
   const handleCheckFailure = () => {
     finish(() => {
-      wx.showToast({
-        title: failMessage,
-        icon: "none"
-      })
-      scheduleRedirect(700)
+      // A failed explicit refresh cannot make an older grant valid again.
+      // Advancing the revision also supersedes older in-flight successes.
+      if (config.force) clearPagePermissionCache()
+      showFailure(failMessage)
     })
   }
 
@@ -178,11 +180,7 @@ function requirePagePermission(page, options) {
     const allowed = resolveAllowed(cached, required)
     if (!allowed) {
       finish(() => {
-        wx.showToast({
-          title: noPermissionMessage,
-          icon: "none"
-        })
-        scheduleRedirect(700)
+        showFailure(noPermissionMessage)
       })
       return cancel
     }
@@ -218,11 +216,7 @@ function requirePagePermission(page, options) {
           lastCompletedRequestSerial = requestSerial
           setCache(PAGE_PERMISSION_CACHE_KEY, result)
           if (!allowed) {
-            wx.showToast({
-              title: noPermissionMessage,
-              icon: "none"
-            })
-            scheduleRedirect(700)
+            showFailure(noPermissionMessage)
             return
           }
           page.setData({

@@ -183,6 +183,7 @@ Page({
     remarkDraft: "",
     savingRemark: false,
     selectedTag: "",
+    tagScrollTarget: "workbench-tag-0",
     presetTags: PRESET_CUSTOMER_TAGS,
     statusUpdatingId: "",
     lastSyncedText: "",
@@ -225,13 +226,18 @@ Page({
     this.fetchBookings(() => wx.stopPullDownRefresh())
   },
   onShow() {
+    if (typeof this._workbenchWriteResume === "function") {
+      const resume = this._workbenchWriteResume
+      this._workbenchWriteResume = null
+      resume()
+      return
+    }
     if (this._workbenchNativeReset) {
       this.applyState(this._workbenchNativeReset)
       this._workbenchNativeReset = null
     }
     if (
       this.data.pageAuthorized &&
-      this.data.allBookings.length &&
       !this.data.loading &&
       !this.data.refreshing &&
       !this.isWorkbenchWriteBusy()
@@ -242,6 +248,7 @@ Page({
   isWorkbenchWriteBusy() {
     return Boolean(
       this._workbenchWriteActive ||
+      this._workbenchWriteResume ||
       this._workbenchStatusFeedbackPending ||
       this.data.updatingId ||
       this.data.savingRemark ||
@@ -265,6 +272,7 @@ Page({
       Number(this._workbenchWriteRequestId || 0) + 1
     this.finishWorkbenchLoadRequestEffects()
     this.clearWorkbenchWriteTimer()
+    this._workbenchWriteResume = null
     this._workbenchWriteActive = false
     this._workbenchStatusFeedbackPending = false
   },
@@ -287,6 +295,7 @@ Page({
     )
     this.setData({
       selectedMode: view.mode,
+      tagScrollTarget: `workbench-tag-${Math.max(0, PRESET_CUSTOMER_TAGS.indexOf(selectedTag))}`,
       queue: filterQueueByKeyword(formattedQueue, keyword, selectedTag),
       queueTotal: formattedQueue.length,
       summary: view.summary,
@@ -677,7 +686,7 @@ Page({
       timeoutTitle: "状态更新超时，请重试",
       failureFallback: "客户状态更新失败",
       clearState: () => this.applyState({ statusUpdatingId: "" }),
-      onResult: (result, isCurrent) => {
+      onResult: (result, isCurrent, deliver) => {
         if (!result || !result.ok) {
           this.applyState({
             statusUpdatingId: ""
@@ -696,12 +705,11 @@ Page({
               return
             }
             feedbackSettled = true
-            this._workbenchStatusFeedbackPending = false
-            if (!isCurrent()) {
-              return
-            }
-            this.applyState({ statusUpdatingId: "" })
-            this.fetchBookings()
+            deliver(() => {
+              this._workbenchStatusFeedbackPending = false
+              this.applyState({ statusUpdatingId: "" })
+              this.fetchBookings()
+            })
           }
           if (typeof wx.showModal !== "function") {
             finishFeedback()
@@ -891,10 +899,20 @@ Page({
     }
     const requestId = Number(this._workbenchWriteRequestId || 0) + 1
     this._workbenchWriteRequestId = requestId
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     this._workbenchWriteActive = true
     this.clearWorkbenchWriteTimer()
     let settled = false
     const isCurrent = () => this._workbenchWriteRequestId === requestId
+    const deliver = (callback) => {
+      if (!isCurrent()) return
+      if (!isPageNativeActionActive(this, action)) {
+        // Keep the settled result until this page is visible; never replay the write.
+        this._workbenchWriteResume = () => deliver(callback)
+        return
+      }
+      callback()
+    }
     const finish = () => {
       if (settled || !isCurrent()) {
         return false
@@ -908,10 +926,12 @@ Page({
       if (!finish()) {
         return
       }
-      clearState()
-      wx.showToast({
-        title: formatToastTitle(message, input.failureFallback || "操作失败"),
-        icon: "none"
+      deliver(() => {
+        clearState()
+        wx.showToast({
+          title: formatToastTitle(message, input.failureFallback || "操作失败"),
+          icon: "none"
+        })
       })
     }
     this._workbenchWriteTimer = setTimeout(() => {
@@ -926,7 +946,7 @@ Page({
         }
         const result = res && res.result ? res.result : null
         if (typeof input.onResult === "function") {
-          input.onResult(result, isCurrent)
+          deliver(() => input.onResult(result, isCurrent, deliver))
         }
       },
       fail: (error) => {

@@ -74,6 +74,30 @@ async function loadVehicleImageUpdateWith({ openid, mockDb }) {
 }
 
 describe("cloudfunctions/vehicleImageUpdate integration", () => {
+  test.each([
+    ["数组车辆编号", { id: ["car_1"] }],
+    ["不可转换车辆编号", { id: { toString: null } }],
+    ["数组动作", { action: ["add"] }],
+    ["不可转换动作", { action: { toString: null } }],
+    ["数组单图编号", { fileId: ["cloud://env/vehicle-images/car_1/img1.jpg"] }],
+    ["非数组图片清单", { fileIds: "cloud://env/vehicle-images/car_1/img1.jpg" }],
+    ["嵌套图片编号数组", { fileIds: [["cloud://env/vehicle-images/car_1/img1.jpg"]] }],
+    ["不可转换图片编号", { fileIds: [{ toString: null }] }],
+    ["混入空图片编号", { fileIds: ["cloud://env/vehicle-images/car_1/img1.jpg", null] }]
+  ])("%s 返回参数错误且不写入图片或清理任务", async (label, patch) => {
+    const mocks = createMockDb({
+      rolesData: [{ role: "admin" }], currentData: { imageList: [], coverImage: "" },
+      updateResult: { stats: { updated: 1 } }
+    })
+    const mod = await loadVehicleImageUpdateWith({ openid: "admin_openid", mockDb: mocks.db })
+
+    await expect(mod.main({ id: "car_1", action: "add", fileIds: ["cloud://env/vehicle-images/car_1/img1.jpg"], ...patch }))
+      .resolves.toMatchObject({ ok: false, code: "VALIDATION_ERROR" })
+    expect(mocks.vehiclesDoc).not.toHaveBeenCalled()
+    expect(mocks.queueSet).not.toHaveBeenCalled()
+    expect(require("wx-server-sdk").deleteFile).not.toHaveBeenCalled()
+  })
+
   test("admin 新增图片并自动设置首张为封面", async () => {
     const mocks = createMockDb({
       rolesData: [{ role: "admin" }],

@@ -80,7 +80,7 @@ describe("mini program package budget", () => {
     })
   })
 
-  test("极境车库品牌徽标兼顾清晰度与主包体积", () => {
+  test("爱迦租车品牌徽标兼顾清晰度与主包体积", () => {
     const emblemPath = path.join(PROJECT_ROOT, "assets", "icons", "jijing-garage-emblem.png")
     const emblem = fs.readFileSync(emblemPath)
 

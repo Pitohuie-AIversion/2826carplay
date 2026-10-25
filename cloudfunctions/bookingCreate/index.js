@@ -469,6 +469,15 @@ exports.main = async (event) => {
       }
       if (!latestVehicle) return { error: createError("NOT_FOUND", "车辆不存在") }
       if (String(latestVehicle.status || "").trim() === "retired") return { error: createError("NOT_AVAILABLE", "车辆已停用，暂不可预约") }
+      // Read after the vehicle snapshot: a concurrent create either appears here or
+      // conflicts with the vehicle update below, causing the SDK to retry this callback.
+      const latestSubmissionError = await checkBookingSubmission(openid, input)
+      if (latestSubmissionError) {
+        // A normal query can see a same-request commit newer than this transaction's snapshot.
+        const committed = input.requestId ? await findIdempotentBooking(openid, input.requestId, db, requestPayloadHash) : null
+        if (committed && (committed.existing || committed.conflict)) return committed
+        return { error: latestSubmissionError }
+      }
       await transaction.collection("vehicles").doc(input.vehicleId).update({ data: {
         bookingReferenceVersion: Number(latestVehicle.bookingReferenceVersion || 0) + 1
       } })

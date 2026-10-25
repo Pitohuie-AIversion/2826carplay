@@ -154,12 +154,84 @@ describe("管理员预约原生动作与写入恢复", () => {
     expect(page.data.booking.tags).toEqual([])
   })
 
+  test.each([undefined, [], ["老客户"], [" 老客户 "]])("标签并发基线使用服务端原值 %p，冲突不改展示或基线", (tags) => {
+    const page = loadPage("booking-manage-detail")
+    page.data.id = "booking_1"
+    page.loadDetail()
+    wx.cloud.callFunction.mock.calls[0][0].success({ result: { ok: true, detail: {
+      id: "booking_1", status: "contacted", city: "杭州", pickupLocation: "送车上门",
+      ...(tags === undefined ? {} : { tags })
+    } } })
+    const displayed = page.data.booking.tags.slice()
+    const event = { currentTarget: { dataset: { tag: "高意向" } } }
+    page.handleToggleCustomerTag(event)
+    const request = wx.cloud.callFunction.mock.calls[1][0]
+    expect(request.data.expectedValues.tags).toEqual(tags === undefined ? null : tags)
+    request.success({ result: { ok: false, code: "VERSION_CONFLICT", message: "标签已更新，请刷新" } })
+    expect(page.data.booking.tags).toEqual(displayed)
+    expect(page.data.booking.tagBaseline).toEqual(tags === undefined ? null : tags)
+    page.handleToggleCustomerTag(event)
+    wx.cloud.callFunction.mock.calls[2][0].success({ result: { ok: true, tags: ["高意向"] } })
+    expect(page.data.booking.tags).toEqual(["高意向"])
+    page.handleToggleCustomerTag(event)
+    expect(wx.cloud.callFunction.mock.calls[3][0].data.expectedValues.tags).toEqual(["高意向"])
+    page.onUnload()
+  })
+
   test("报价草稿未保存时 onShow 与刷新加载都保留草稿", () => {
     const page = loadPage("booking-manage-detail")
     Object.assign(page.data, { id: "booking_1", pageAuthorized: true, quoteDirty: true })
     page.onShow()
     page.loadDetail()
     expect(wx.cloud.callFunction).not.toHaveBeenCalled()
+  })
+
+  test.each([true, false])("报价草稿存在时协调保存 changed=%s 立即回填真实结果和下次版本基线", (changed) => {
+    const page = loadPage("booking-manage-detail")
+    Object.assign(page.data, {
+      id: "booking_1", quoteDirty: true, coordinationEditable: true,
+      quoteForm: { baseRentalAmount: "1234.50", customerNote: "未保存报价" },
+      booking: { status: "contacted", schedulePriority: "normal", coordinationStatus: "pending" }
+    })
+    const quoteBefore = { ...page.data.quoteForm }
+    page.handleUpdateCoordination({ currentTarget: { dataset: { field: "schedulePriority", value: "priority" } } })
+    wx.cloud.callFunction.mock.calls[0][0].success({ result: { ok: true, changed, schedulePriority: "priority", coordinationStatus: "coordinating" } })
+    expect(page.data.booking.schedulePriority).toBe("priority")
+    expect(page.data.booking.coordinationStatus).toBe("coordinating")
+    expect(page.data.quoteDirty).toBe(true)
+    expect(page.data.quoteForm).toEqual(quoteBefore)
+    expect(wx.cloud.callFunction).toHaveBeenCalledTimes(1)
+    page.handleUpdateCoordination({ currentTarget: { dataset: { field: "schedulePriority", value: "standby" } } })
+    expect(wx.cloud.callFunction.mock.calls[1][0].data.expectedValues).toEqual({ schedulePriority: "priority" })
+    page.onUnload()
+  })
+
+  test.each([false, true])("备注保存成功在报价草稿旁更新基线，后台返回=%s", (background) => {
+    const page = loadPage("booking-manage-detail")
+    Object.assign(page.data, {
+      id: "booking_1", quoteDirty: true, remarkDirty: true,
+      quoteForm: { baseRentalAmount: "4567.00", customerNote: "未保存方案" },
+      booking: { status: "contacted", adminRemark: "原备注", adminRemarkDraft: "新备注" }
+    })
+    const quoteBefore = { ...page.data.quoteForm }
+    page.handleSaveRemark()
+    if (background) global.getCurrentPages = () => [page, {}]
+    wx.cloud.callFunction.mock.calls[0][0].success({ result: { ok: true, adminRemark: "服务端确认的新备注" } })
+    if (background) {
+      expect(page.data.booking.adminRemark).toBe("原备注")
+      global.getCurrentPages = () => [page]
+      page.onShow()
+    }
+    expect(page.data.booking.adminRemark).toBe("服务端确认的新备注")
+    expect(page.data.booking.adminRemarkDraft).toBe("服务端确认的新备注")
+    expect(page.data.remarkDirty).toBe(false)
+    expect(page.data.quoteDirty).toBe(true)
+    expect(page.data.quoteForm).toEqual(quoteBefore)
+    expect(wx.cloud.callFunction).toHaveBeenCalledTimes(1)
+    page.handleRemarkInput({ detail: { value: "再次修改" } })
+    page.handleSaveRemark()
+    expect(wx.cloud.callFunction.mock.calls[1][0].data.expectedAdminRemark).toBe("服务端确认的新备注")
+    page.onUnload()
   })
 
   test("后台 CSV 分享失败不提示也不自动打开文件", () => {

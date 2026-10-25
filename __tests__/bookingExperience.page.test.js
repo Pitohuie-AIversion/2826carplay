@@ -40,6 +40,7 @@ describe("预约表单人性化体验", () => {
     delete global.Page
     delete global.wx
     delete global.getCurrentPages
+    delete global.getApp
   })
 
   test("城市列表加载后不再静默选择第一个城市", () => {
@@ -80,11 +81,74 @@ describe("预约表单人性化体验", () => {
     page.handleDateShortcut({ currentTarget: { dataset: { action: "three-days" } } })
 
     expect(page.data.form.startDate).toBe("2026-08-05")
-    expect(page.data.form.endDate).toBe("2026-08-08")
+    expect(page.data.form.endDate).toBe("2026-08-07")
+    expect(page.data.rentalEstimate.rentalDays).toBe(3)
     const wxml = fs.readFileSync(path.resolve(__dirname, "../pages/booking/booking.wxml"), "utf8")
     expect(wxml).toContain("field-inline-error")
     expect(wxml).toContain('data-action="three-days"')
     expect(wxml).toContain("使用上次联系人")
+  })
+
+  test.each([
+    ["2026-08-05", "7", "2026-08-11"],
+    ["2026-08-29", "7", "2026-09-04"],
+    ["2026-12-30", "3", "2027-01-01"]
+  ])("详情试算 %s 的 %s 天带入预约后保持日期数量和参考金额", (today, days, expectedEnd) => {
+    jest.useFakeTimers().setSystemTime(new Date(`${today}T12:00:00`))
+    global.wx = {}
+    global.getApp = () => ({ globalData: {} })
+    const page = createPage(loadPageDefinition())
+    page.loadSavedContact = jest.fn()
+    page.loadOperationConfig = jest.fn()
+    page.loadBookingCar = jest.fn()
+    const checkedRanges = []
+    page.checkVehicleAvailability = jest.fn(() => checkedRanges.push({ ...page.data.form }))
+
+    page.onLoad({ carId: "car-trip", days })
+    page.applyCar({ name: "行程车辆", priceDay: 100, rentalDiscountTiers: [{ minDays: 7, discountRate: 0.9 }] })
+
+    expect(page.data.form).toEqual(expect.objectContaining({ startDate: today, endDate: expectedEnd }))
+    expect(checkedRanges).toEqual([expect.objectContaining({ startDate: today, endDate: expectedEnd })])
+    expect(page.data.rentalEstimate.rentalDays).toBe(Number(days))
+    expect(page.data.rentalEstimate.estimateTotal).toBe(Number(days) * (Number(days) >= 7 ? 90 : 100))
+    page.onUnload()
+  })
+
+  test("普通预约入口不预填日期，手动同日取还仍按一天预估", () => {
+    global.wx = {}
+    global.getApp = () => ({ globalData: {} })
+    const page = createPage(loadPageDefinition())
+    page.loadSavedContact = jest.fn()
+    page.loadOperationConfig = jest.fn()
+    page.loadBookingCar = jest.fn()
+    page.checkVehicleAvailability = jest.fn()
+
+    page.onLoad({ carId: "car-trip" })
+    expect(page.data.form.startDate).toBe("")
+    expect(page.data.form.endDate).toBe("")
+    expect(page.checkVehicleAvailability).not.toHaveBeenCalled()
+    page.applyCar({ name: "行程车辆", priceDay: 100 })
+    for (const field of ["startDate", "endDate"]) {
+      page.handleDateChange({ currentTarget: { dataset: { field } }, detail: { value: "2026-08-05" } })
+    }
+    expect(page.data.rentalEstimate).toEqual(expect.objectContaining({ rentalDays: 1, estimateTotal: 100 }))
+    page.onUnload()
+  })
+
+  test("安排三天使用已选开始日并跨月同步正确档期与参考金额", () => {
+    global.wx = {}
+    const page = createPage(loadPageDefinition())
+    page.data.today = "2026-08-05"
+    page.data.form.startDate = "2026-08-31"
+    page.data.priceDay = 100
+    const checkedRanges = []
+    page.checkVehicleAvailability = jest.fn(() => checkedRanges.push({ ...page.data.form }))
+
+    page.handleDateShortcut({ currentTarget: { dataset: { action: "three-days" } } })
+
+    expect(page.data.form).toEqual(expect.objectContaining({ startDate: "2026-08-31", endDate: "2026-09-02" }))
+    expect(checkedRanges).toEqual([expect.objectContaining({ startDate: "2026-08-31", endDate: "2026-09-02" })])
+    expect(page.data.rentalEstimate).toEqual(expect.objectContaining({ rentalDays: 3, estimateTotal: 300 }))
   })
 
   test("订阅弹窗期间修改表单不会改变已确认的提交内容", () => {

@@ -648,14 +648,15 @@ describe("车辆新增与编辑表单体验", () => {
 
   test("编辑保存成功后应用处于后台时延迟返回到重新前台", () => {
     jest.useFakeTimers()
-    const app = { globalData: { nativeActionAppVisible: false } }
+    const app = { globalData: { nativeActionAppVisible: true } }
+    let requestOptions
     let page = null
     global.getApp = jest.fn(() => app)
     global.getCurrentPages = jest.fn(() => [page])
     global.wx = {
       cloud: {
         callFunction: jest.fn((options) => {
-          options.success({ result: { ok: true } })
+          requestOptions = options
         })
       },
       showToast: jest.fn(),
@@ -669,13 +670,19 @@ describe("车辆新增与编辑表单体验", () => {
     )
 
     page.handleSubmit()
+    app.globalData.nativeActionAppVisible = false
+    requestOptions.success({ result: { ok: true } })
     jest.advanceTimersByTime(900)
 
     expect(wx.navigateBack).not.toHaveBeenCalled()
+    expect(wx.showToast).not.toHaveBeenCalled()
     expect(page.data.isSubmitting).toBe(true)
 
     app.globalData.nativeActionAppVisible = true
     page.onShow()
+    expect(wx.showToast).toHaveBeenCalledWith(expect.objectContaining({ title: "保存成功" }))
+    expect(wx.navigateBack).not.toHaveBeenCalled()
+    jest.advanceTimersByTime(900)
 
     expect(wx.navigateBack).toHaveBeenCalledWith(expect.objectContaining({ delta: 1 }))
   })

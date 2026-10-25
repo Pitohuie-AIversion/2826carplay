@@ -35,6 +35,7 @@ function trackEvent(eventType, vehicleId, context) {
   if (
     !ALLOWED_EVENTS.includes(type) ||
     (CONTENT_ID_REQUIRED_EVENTS.includes(type) && !source.contentId) ||
+    typeof wx === "undefined" ||
     !wx.cloud ||
     typeof wx.cloud.callFunction !== "function"
   ) {
@@ -43,11 +44,15 @@ function trackEvent(eventType, vehicleId, context) {
 
   const eventKey = `${type}:${targetVehicleId}:${source.contentId || ""}:${source.channel || ""}:${source.scene || ""}`
   const now = Date.now()
-  const lastTrackedAt = recentEvents.get(eventKey) || 0
-  if (now - lastTrackedAt < TRACK_COOLDOWN_MS) {
+  const previousEvent = recentEvents.get(eventKey)
+  if (previousEvent && now - previousEvent.trackedAt < TRACK_COOLDOWN_MS) {
     return
   }
-  recentEvents.set(eventKey, now)
+  const currentEvent = { trackedAt: now }
+  recentEvents.set(eventKey, currentEvent)
+  const releaseCooldown = () => {
+    if (recentEvents.get(eventKey) === currentEvent) recentEvents.delete(eventKey)
+  }
 
   const data = {
     eventType: type,
@@ -64,12 +69,10 @@ function trackEvent(eventType, vehicleId, context) {
     wx.cloud.callFunction({
       name: "analyticsTrack",
       data,
-      fail: () => {
-        recentEvents.delete(eventKey)
-      }
+      fail: releaseCooldown
     })
   } catch (error) {
-    recentEvents.delete(eventKey)
+    releaseCooldown()
   }
 }
 

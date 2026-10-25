@@ -347,7 +347,7 @@
       <view class="quote-history-title">当前记录与最近 40 条历史</view>
       <view class="handover-record" wx:for="{{handoverHistory}}" wx:key="id">
         <view class="handover-record-head"><text>{{item.stageText}} v{{item.version}}</text><text>{{item.statusText}}</text></view>
-        <view class="handover-record-meta">{{item.mileageKm}} km · {{item.energyText}} · 提交 {{item.submittedAtText || '—'}}</view>
+        <view class="handover-record-meta">{{item.mileageText}} · {{item.energyText}} · 提交 {{item.submittedAtText || '—'}}</view>
         <view class="handover-record-note">已知损伤：{{item.damageNote || '—'}}</view>
         <view wx:if="{{item.scratchSummary}}" class="handover-record-note">环检记录：{{item.scratchSummary}}</view>
         <view wx:if="{{item.additionalNote}}" class="handover-record-note">补充：{{item.additionalNote}}</view>

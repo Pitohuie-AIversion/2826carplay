@@ -142,26 +142,11 @@ function selectQueueRecords(records, limit, now) {
 
 function failedFilesFromResult(result, originalFileList) {
   const resultList = result && Array.isArray(result.fileList) ? result.fileList : []
-  if (!resultList.length) {
-    return []
-  }
-
-  const failedItems = resultList.filter((item) => {
-    if (!item || typeof item !== "object") {
-      return false
-    }
-    if (isAlreadyMissingFileError(item)) {
-      return false
-    }
-    const status = Number(item.status)
-    return (Number.isFinite(status) && status !== 0) || (!Number.isFinite(status) && Boolean(item.errMsg))
+  return normalizeStringArray(originalFileList).filter((fileId) => {
+    const item = resultList.find((entry) => entry &&
+      (entry.fileID === fileId || entry.fileId === fileId))
+    return !item || !(item.status === 0 || item.status === "0" || isAlreadyMissingFileError(item))
   })
-  const failedFiles = failedItems
-    .map((item) => String(item.fileID || item.fileId || "").trim())
-    .filter(Boolean)
-  return failedItems.length && !failedFiles.length
-    ? normalizeStringArray(originalFileList)
-    : failedFiles
 }
 
 async function writeAuditLogBestEffort(payload) {

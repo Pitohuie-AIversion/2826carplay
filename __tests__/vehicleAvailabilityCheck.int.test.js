@@ -1,6 +1,6 @@
 jest.mock("wx-server-sdk")
 
-function loadModule({ openid = "user_openid", vehicle, bookings = [], total = bookings.length, occupiedDates = [], priceRules = [] }) {
+function loadModule({ openid = "user_openid", vehicle, bookings = [], total = bookings.length, occupiedDates = [], priceRules = [], dayReadError }) {
   jest.resetModules()
   const cloud = require("wx-server-sdk")
   cloud.__reset()
@@ -42,6 +42,7 @@ function loadModule({ openid = "user_openid", vehicle, bookings = [], total = bo
           doc: jest.fn((id) => ({
             field: jest.fn(() => ({
               get: jest.fn(() => {
+                if (dayReadError) return Promise.reject(dayReadError)
                 const date = String(id).slice(-8).replace(/(\d{4})(\d{2})(\d{2})/, "$1-$2-$3")
                 if (occupiedDates.includes(date)) return Promise.resolve({ data: { date, kind: "booking", blockId: "block_1" } })
                 return Promise.reject(new Error("document not found"))
@@ -75,6 +76,32 @@ function loadModule({ openid = "user_openid", vehicle, bookings = [], total = bo
 }
 
 describe("cloudfunctions/vehicleAvailabilityCheck integration", () => {
+  test.each([
+    { code: "DATABASE_COLLECTION_NOT_EXIST", message: "collection not exist" },
+    { errCode: -502005, errMsg: "database collection not exists | [ResourceNotFound] Db or Table not exist" },
+    { message: "document.get:fail collection not found" },
+    { code: "RESOURCE_NOT_FOUND", message: "environment not found" },
+    { code: "DATABASE_PERMISSION_DENIED", message: "document access denied" }
+  ])("日历读取异常 %p 不会被当成无占用", async (dayReadError) => {
+    const { mod } = loadModule({ vehicle: { status: "idle", priceDay: 800 }, dayReadError })
+    const result = await mod.main({ vehicleId: "vehicle_1", startDate: "2099-08-01", endDate: "2099-08-02" })
+    expect(result).toMatchObject({ ok: false, code: "INTERNAL_ERROR" })
+    expect(result).not.toHaveProperty("available")
+    expect(result).not.toHaveProperty("priceSummary")
+  })
+
+  test.each([
+    { code: "DOCUMENT_NOT_FOUND" },
+    { errCode: "DATABASE_DOCUMENT_NOT_EXIST" },
+    { message: "document not found" },
+    { errCode: -1, errMsg: "document.get:fail document with _id day_1 does not exist" }
+  ])("真正缺少某日文档 %p 仍表示该日无占用", async (dayReadError) => {
+    const { mod } = loadModule({ vehicle: { status: "idle", priceDay: 800 }, dayReadError })
+    expect(await mod.main({ vehicleId: "vehicle_1", startDate: "2099-08-01", endDate: "2099-08-02" })).toMatchObject({
+      ok: true, available: true, occupiedDayCount: 0, priceSummary: { estimatedTotal: 1600 }
+    })
+  })
+
   test.each([undefined, "", "legacy-unknown"])("未知车辆状态 %p 不会被当成可预约", async (status) => {
     const { mod, bookingWhere } = loadModule({ vehicle: { status, priceDay: 800 } })
     const result = await mod.main({ vehicleId: "vehicle_1", startDate: "2099-08-01", endDate: "2099-08-02" })

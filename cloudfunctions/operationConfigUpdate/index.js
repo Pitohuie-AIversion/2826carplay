@@ -31,10 +31,10 @@ const DEFAULT_RENTAL_TERMS = {
 }
 const DEFAULT_CONFIG = {
   ...normalizeServiceConfig({}),
-  brandName: "极境车库",
+  brandName: "爱迦租车",
   servicePhone: "",
   mineUserDesc: "查看预约、个人信息申请与车库服务",
-  garagePageTitle: "极境车库",
+  garagePageTitle: "爱迦租车",
   garagePageSubtitle: "甄选座驾，为每一次出发预留专属席位",
   announcementText: "",
   cityOptions: ["杭州", "上海"],
@@ -56,23 +56,39 @@ function normalizeText(value, maxLen) {
   return maxLen && text.length > maxLen ? text.slice(0, maxLen) : text
 }
 
+function normalizeBrandText(value, maxLen) {
+  return normalizeText(value, maxLen).replace(/极境车库/g, "爱迦租车").replace(/极境/g, "爱迦")
+}
+
 function isValidServicePhone(value) {
   const phone = String(value || "").trim()
   const digitCount = phone.replace(/\D/g, "").length
   return /^\+?[0-9-]{6,20}$/.test(phone) && digitCount >= 6 && digitCount <= 15
 }
 
+function validateContactConfig(input) {
+  const phone = input.servicePhone
+  if (phone !== undefined && (typeof phone !== "string" || (phone.trim() && !isValidServicePhone(phone)))) {
+    return { field: "servicePhone", message: "客服电话格式不正确" }
+  }
+  const templateId = input.bookingStatusTemplateId
+  if (templateId !== undefined && (typeof templateId !== "string" || (templateId.trim() && !/^[A-Za-z0-9_-]{10,128}$/.test(templateId.trim())))) {
+    return { field: "bookingStatusTemplateId", message: "订阅消息模板 ID 格式不正确" }
+  }
+  return null
+}
+
 function normalizeRentalTerms(raw) {
   const input = raw && typeof raw === "object" ? raw : {}
   return Object.keys(DEFAULT_RENTAL_TERMS).reduce((result, key) => {
-    result[key] = normalizeText(input[key], 200) || DEFAULT_RENTAL_TERMS[key]
+    result[key] = normalizeBrandText(input[key], 200) || DEFAULT_RENTAL_TERMS[key]
     return result
   }, {})
 }
 
 function normalizeConfig(raw) {
   const input = raw && typeof raw === "object" ? raw : {}
-  const garagePageSubtitle = normalizeText(input.garagePageSubtitle, 80)
+  const garagePageSubtitle = normalizeBrandText(input.garagePageSubtitle, 80)
   const cityOptions = Array.isArray(input.cityOptions)
     ? input.cityOptions
         .map((item) => normalizeText(item, 20))
@@ -83,15 +99,15 @@ function normalizeConfig(raw) {
 
   return {
     ...normalizeServiceConfig(input),
-    brandName: normalizeText(input.brandName, 20) || DEFAULT_CONFIG.brandName,
+    brandName: normalizeBrandText(input.brandName, 20) || DEFAULT_CONFIG.brandName,
     servicePhone: normalizeText(input.servicePhone, 20),
-    mineUserDesc: normalizeText(input.mineUserDesc, 80) || DEFAULT_CONFIG.mineUserDesc,
-    garagePageTitle: normalizeText(input.garagePageTitle, 20) || DEFAULT_CONFIG.garagePageTitle,
+    mineUserDesc: normalizeBrandText(input.mineUserDesc, 80) || DEFAULT_CONFIG.mineUserDesc,
+    garagePageTitle: normalizeBrandText(input.garagePageTitle, 20) || DEFAULT_CONFIG.garagePageTitle,
     garagePageSubtitle:
       !garagePageSubtitle
         ? DEFAULT_CONFIG.garagePageSubtitle
         : garagePageSubtitle,
-    announcementText: normalizeText(input.announcementText, 120),
+    announcementText: normalizeBrandText(input.announcementText, 120),
     cityOptions,
     hotSearchKeywords: Array.isArray(input.hotSearchKeywords)
       ? input.hotSearchKeywords
@@ -99,11 +115,11 @@ function normalizeConfig(raw) {
           .filter(Boolean)
           .slice(0, 10)
       : DEFAULT_CONFIG.hotSearchKeywords.slice(),
-    faqContent: normalizeText(input.faqContent, 1000) || DEFAULT_CONFIG.faqContent,
-    rulesContent: normalizeText(input.rulesContent, 1000) || DEFAULT_CONFIG.rulesContent,
+    faqContent: normalizeBrandText(input.faqContent, 1000) || DEFAULT_CONFIG.faqContent,
+    rulesContent: normalizeBrandText(input.rulesContent, 1000) || DEFAULT_CONFIG.rulesContent,
     bookingStatusTemplateId: normalizeText(input.bookingStatusTemplateId, 128),
     rentalTerms: normalizeRentalTerms(input.rentalTerms),
-    bookingPrivacyTip: normalizeText(input.bookingPrivacyTip, 300) || DEFAULT_CONFIG.bookingPrivacyTip
+    bookingPrivacyTip: normalizeBrandText(input.bookingPrivacyTip, 300) || DEFAULT_CONFIG.bookingPrivacyTip
   }
 }
 
@@ -251,9 +267,10 @@ exports.main = async (event) => {
       const previous = existed && existed.value || {}
       // Preserve omitted fields for older clients; an explicit empty value clears optional fields.
       const merged = { ...previous, ...input, rentalTerms: { ...previous.rentalTerms, ...input.rentalTerms } }
-      const serviceError = validateServiceConfig(merged) || validateCityOptions(merged.cityOptions)
-      if (serviceError) {
-        return { ok: false, code: "VALIDATION_ERROR", message: serviceError.message, details: { errors: [serviceError] } }
+      // Validate exact contact values before normalization or the idempotent-save shortcut.
+      const configError = validateServiceConfig(merged) || validateCityOptions(merged.cityOptions) || validateContactConfig(merged)
+      if (configError) {
+        return { ok: false, code: "VALIDATION_ERROR", message: configError.message, details: { errors: [configError] } }
       }
       const config = normalizeConfig(merged)
       // A successful save must also persist normalization of legacy values and missing fields.
@@ -267,41 +284,6 @@ exports.main = async (event) => {
       }
       if (expectedRevision !== undefined && expectedRevision !== revision) {
         return { ok: false, code: "CONFIG_CONFLICT", message: "配置已被其他管理员修改，请重新加载后核对" }
-      }
-
-      if (config.servicePhone && !isValidServicePhone(config.servicePhone)) {
-        return {
-          ok: false,
-          code: "VALIDATION_ERROR",
-          message: "客服电话格式不正确",
-          details: {
-            errors: [
-              {
-                field: "servicePhone",
-                message: "客服电话仅支持数字、连字符和可选的国际区号"
-              }
-            ]
-          }
-        }
-      }
-
-      if (
-        config.bookingStatusTemplateId &&
-        !/^[A-Za-z0-9_-]{10,128}$/.test(config.bookingStatusTemplateId)
-      ) {
-        return {
-          ok: false,
-          code: "VALIDATION_ERROR",
-          message: "订阅消息模板 ID 格式不正确",
-          details: {
-            errors: [
-              {
-                field: "bookingStatusTemplateId",
-                message: "模板 ID 仅支持 10-128 位字母、数字、下划线和连字符"
-              }
-            ]
-          }
-        }
       }
 
       const now = db.serverDate()

@@ -1,6 +1,6 @@
 const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
 const { buildMonthView, normalizeMonthKey, shiftMonth } = require("../../shared/bookingCalendar")
-const { clearUnsaved, markUnsaved } = require("../../shared/unsavedChanges")
+const { clearUnsaved, disposeUnsavedChanges, markUnsaved, syncUnsavedChanges } = require("../../shared/unsavedChanges")
 const { formatToastTitle } = require("../../shared/uiFeedback")
 const {
   activatePageNativeActions,
@@ -10,7 +10,6 @@ const {
 } = require("../../shared/pageNativeAction")
 const { STATUS_TEXT_MAP, mapStatusClass } = require("../../shared/bookingStatus")
 
-const CURRENT_MONTH_KEY = normalizeMonthKey("")
 function getCalendarSnapshotKey(monthKey) {
   return `booking_calendar_${monthKey || "current"}`
 }
@@ -78,7 +77,7 @@ Page({
     loading: true,
     loadError: "",
     monthKey: "",
-    currentMonthKey: CURRENT_MONTH_KEY,
+    currentMonthKey: "",
     isCurrentMonth: true,
     monthTitle: "",
     selectedDate: "",
@@ -117,8 +116,10 @@ Page({
 
   onLoad(options) {
     activatePageNativeActions(this)
-    const monthKey = this.data.currentMonthKey
-    this.setData({ monthKey, isCurrentMonth: true })
+    this._calendarHasShown = false
+    this._calendarRefreshPending = false
+    const monthKey = normalizeMonthKey("")
+    this.setData({ monthKey, currentMonthKey: monthKey, isCurrentMonth: true })
     const initVehicleId = String((options && options.vehicleId) || "").trim()
     const initKind = String((options && options.kind) || "").trim()
     if (initVehicleId) {
@@ -179,10 +180,25 @@ Page({
     this.fetchBookings(() => wx.stopPullDownRefresh())
   },
 
+  onShow() {
+    syncUnsavedChanges(this)
+    const currentMonthKey = normalizeMonthKey("")
+    this.setData({ currentMonthKey, isCurrentMonth: this.data.monthKey === currentMonthKey })
+    if (this.data.monthKey) this.applyCalendar()
+    const returning = this._calendarHasShown
+    this._calendarHasShown = true
+    if (!returning || !this.data.pageAuthorized) return
+    if (this.data.isSavingCalendar) {
+      this._calendarRefreshPending = true
+      return
+    }
+    this.fetchBookings({ month: this.data.monthKey })
+  },
   onUnload() {
+    this._calendarRefreshPending = false
+    disposeUnsavedChanges(this)
     cancelPagePermissionCheck(this)
     cancelPageNativeActions(this)
-    clearUnsaved(this)
     this._bookingCalendarRequestId =
       Number(this._bookingCalendarRequestId || 0) + 1
     this._calendarSaveRequestId = Number(this._calendarSaveRequestId || 0) + 1
@@ -202,28 +218,31 @@ Page({
   },
 
   handleCurrentMonth() {
-    if (this.data.monthKey === this.data.currentMonthKey) {
+    const monthKey = normalizeMonthKey("")
+    this.setData({ currentMonthKey: monthKey })
+    if (this.data.monthKey === monthKey) {
       return
     }
-    const monthKey = this.data.currentMonthKey
     this.setData({
       monthKey,
       selectedDate: "",
       isCurrentMonth: true
     })
     this.restoreCalendarSnapshot(monthKey)
-    this.fetchBookings()
+    this.fetchBookings({ month: monthKey })
   },
 
   changeMonth(offset) {
     const monthKey = shiftMonth(this.data.monthKey, offset)
+    const currentMonthKey = normalizeMonthKey("")
     this.setData({
       monthKey,
       selectedDate: "",
-      isCurrentMonth: monthKey === this.data.currentMonthKey
+      currentMonthKey,
+      isCurrentMonth: monthKey === currentMonthKey
     })
     this.restoreCalendarSnapshot(monthKey)
-    this.fetchBookings()
+    this.fetchBookings({ month: monthKey })
   },
 
   handleDateTap(event) {
@@ -301,7 +320,12 @@ Page({
     })
   },
 
-  fetchBookings(done) {
+  fetchBookings(input, done) {
+    if (typeof input === "function") {
+      done = input
+      input = null
+    }
+    this._calendarRefreshPending = false
     this.finishBookingCalendarRequestEffects()
     const requestId = Number(this._bookingCalendarRequestId || 0) + 1
     this._bookingCalendarRequestId = requestId
@@ -317,7 +341,7 @@ Page({
       return
     }
 
-    const monthKey = String(this.data.monthKey || "")
+    const monthKey = String(input && input.month || this.data.monthKey || "")
     const showSkeleton = !this._hasCalendarSnapshot
     this._hasCalendarSnapshot = false
     this.setData({
@@ -589,8 +613,17 @@ Page({
       this.setData({ isSavingCalendar: false })
       return true
     }
+    const refreshAfterSave = (always = false) => {
+      if (always || this._calendarRefreshPending) {
+        this._calendarRefreshPending = false
+        this.fetchBookings({ month: this.data.monthKey })
+      }
+    }
     this._calendarSaveTimer = setTimeout(() => {
-      if (finish()) showToast({ title: "保存超时，请重试", icon: "none" })
+      if (finish()) {
+        showToast({ title: "保存超时，请重试", icon: "none" })
+        refreshAfterSave()
+      }
     }, CALENDAR_SAVE_TIMEOUT_MS)
     const options = {
       name: "vehicleCalendarManage",
@@ -601,16 +634,19 @@ Page({
         if (!result || !result.ok) {
           this.setData({ calendarSaveError: result && result.message || "保存失败，请重试" })
           showToast({ title: formatToastTitle(result && result.message, "保存失败"), icon: "none" })
-          if (result && result.code === "CALENDAR_VERSION_CONFLICT") this.fetchBookings()
+          refreshAfterSave(Boolean(result && result.code === "CALENDAR_VERSION_CONFLICT"))
           return
         }
         showToast({ title: result.duplicate ? "已确认保存结果" : "车辆日历已更新", icon: "success" })
         if (["createBlock", "updateBlock"].includes(action) || (action === "releaseBlock" && this.data.editingBlockId === payload.id)) this.handleResetBlockForm()
         if (["createPriceRule", "updatePriceRule"].includes(action) || (action === "releasePriceRule" && this.data.editingRuleId === payload.id)) this.handleResetPriceForm()
-        this.fetchBookings()
+        refreshAfterSave(true)
       },
       fail: () => {
-        if (finish()) showToast({ title: "保存失败，请重试", icon: "none" })
+        if (finish()) {
+          showToast({ title: "保存失败，请重试", icon: "none" })
+          refreshAfterSave()
+        }
       }
     }
     try {

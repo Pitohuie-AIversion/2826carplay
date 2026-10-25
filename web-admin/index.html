@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>极境车库 · 运营指挥中心 | JiJing Operations Command</title>
+  <title>爱迦租车 · 运营指挥中心 | AIJIA CAR RENTAL OPERATIONS COMMAND</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -813,8 +813,8 @@
     <div class="brand-group">
       <div class="brand-logo">28</div>
       <div class="brand-text">
-        <h1>极境车库 · 运营指挥中心</h1>
-        <span class="en-sub">JIJING RACING FLEET OPERATIONS COMMAND</span>
+        <h1>爱迦租车 · 运营指挥中心</h1>
+        <span class="en-sub">AIJIA CAR RENTAL FLEET OPERATIONS COMMAND</span>
       </div>
     </div>
 
@@ -1200,7 +1200,7 @@
 
   <!-- Footer -->
   <footer class="app-footer">
-    极境车库 (JiJing Garage) 运营指挥中心 · 云开发 Serverless 架构托管 · 运行环境 cloud1-d8gtmns36320e045e
+    爱迦租车 (AIJIA CAR RENTAL) 运营指挥中心 · 云开发 Serverless 架构托管 · 运行环境 cloud1-d8gtmns36320e045e
   </footer>
 
   <script>
@@ -1468,7 +1468,7 @@
       let fileName = '';
 
       if (type === 'bookings') {
-        fileName = '极境车库_预约明细_17列脱敏合规.csv';
+        fileName = '爱迦租车_预约明细_17列脱敏合规.csv';
         const headers = [
           '预约编号', '车型名称', '用车城市', '取车日期', '还车日期',
           '租期天数', '状态', '联系电话', '取车地点', '基础日租(元)',
@@ -1476,21 +1476,21 @@
           '创建时间', '更新时间'
         ];
         const rows = [
-          ['BK_2026092101', 'Porsche 911 GT3 RS', '杭州', '2026-09-22', '2026-09-24', '2', '已确认', '157****0090', '极境中心旗舰店', '12800', '25600', '30000', 'wechat_share', 'content_card', 'ev-first-rental', '2026-09-21 10:30', '2026-09-21 11:00'],
+          ['BK_2026092101', 'Porsche 911 GT3 RS', '杭州', '2026-09-22', '2026-09-24', '2', '已确认', '157****0090', '爱迦中心旗舰店', '12800', '25600', '30000', 'wechat_share', 'content_card', 'ev-first-rental', '2026-09-21 10:30', '2026-09-21 11:00'],
           ['BK_2026092102', 'Ferrari 488 Pista', '上海', '2026-09-23', '2026-09-25', '2', '租赁中', '138****8888', '虹桥专属交付区', '16800', '33600', '50000', 'search', 'organic_explore', 'track-day-prep', '2026-09-20 16:15', '2026-09-21 09:30'],
           ['BK_2026092103', 'Lamborghini Huracán EVO', '杭州', '2026-09-26', '2026-09-28', '2', '已报价', '186****6666', '萧山机场接送点', '13500', '27000', '40000', 'moments', 'business_vip', 'supercar-guide', '2026-09-21 14:00', '2026-09-21 14:20']
         ];
         csvContent += headers.join(',') + '\n';
         rows.forEach(r => { csvContent += r.map(f => `"${f}"`).join(',') + '\n'; });
       } else if (type === 'vehicles') {
-        fileName = '极境车库_车队档案矩阵.csv';
+        fileName = '爱迦租车_车队档案矩阵.csv';
         const headers = ['车辆编号', '车型名称', '车牌号码', '定位级别', '运行状态', '排期说明'];
         csvContent += headers.join(',') + '\n';
         VEHICLES.forEach(v => {
           csvContent += [`"${v.id}"`, `"${v.name}"`, `"${v.plate}"`, `"${v.category}"`, `"${v.statusText}"`, `"${v.schedule}"`].join(',') + '\n';
         });
       } else if (type === 'audit_logs') {
-        fileName = '极境车库_操作审计日志.csv';
+        fileName = '爱迦租车_操作审计日志.csv';
         const headers = ['日志编号', '操作动作', '操作者', '目标对象', '时间', '结果'];
         const logs = [
           ['LOG_001', 'bookingHandoverSubmit', 'admin_1', 'BK_2026092101', '2026-09-21 14:00:00', 'SUCCESS'],
@@ -1625,7 +1625,7 @@
       document.getElementById('simDiscountedTotal').innerText = `￥${discountedTotal.toLocaleString()}`;
       document.getElementById('simDailyAverage').innerText = `折合仅 ￥${avgPerDay.toLocaleString()} / 天 ${savings > 0 ? `(日均立省 ￥${(dailyRate - avgPerDay).toLocaleString()})` : ''}`;
 
-      const quoteText = `【极境车库 · 专属管家尊享报价】
+      const quoteText = `【爱迦租车 · 专属管家尊享报价】
 尊敬的贵宾客户，为您测算的预约方案如下：
 • 预订车型：${currentSimVehicle.name} (${currentSimVehicle.category})
 • 基础日租：￥${dailyRate.toLocaleString()} / 天

@@ -80,7 +80,7 @@
     </view>
     <view class="form-item">
       <view class="form-label">品牌名称</view>
-      <input class="form-input ui-input" value="{{form.brandName}}" data-field="brandName" disabled="{{loading || saving}}" bindinput="handleInput" maxlength="20" confirm-type="done" placeholder="例如 极境车库" aria-label="品牌名称" />
+      <input class="form-input ui-input" value="{{form.brandName}}" data-field="brandName" disabled="{{loading || saving}}" bindinput="handleInput" maxlength="20" confirm-type="done" placeholder="例如 爱迦租车" aria-label="品牌名称" />
     </view>
     <view class="form-item">
       <view class="form-label">客服电话</view>
@@ -117,7 +117,7 @@
     </view>
     <view class="form-item">
       <view class="form-label">首页标题</view>
-      <input class="form-input ui-input" value="{{form.garagePageTitle}}" data-field="garagePageTitle" disabled="{{loading || saving}}" bindinput="handleInput" maxlength="20" confirm-type="done" placeholder="例如 探索极境座驾" aria-label="首页标题" />
+      <input class="form-input ui-input" value="{{form.garagePageTitle}}" data-field="garagePageTitle" disabled="{{loading || saving}}" bindinput="handleInput" maxlength="20" confirm-type="done" placeholder="例如 探索爱迦座驾" aria-label="首页标题" />
     </view>
     <view class="form-item">
       <view class="form-label">首页副标题</view>

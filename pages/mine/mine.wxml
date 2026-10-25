@@ -2,7 +2,7 @@
   <view class="mine-glow"></view>
   <view class="mine-intro">
     <view class="intro-kicker">MEMBER CENTER</view>
-    <view class="intro-title">我的极境</view>
+    <view class="intro-title">我的爱迦</view>
     <view class="intro-desc">管理预约与专属服务</view>
   </view>
   <view class="profile-card ui-card ui-card-gradient" aria-role="group" aria-label="{{userName}}，{{roleLabel}}，{{userDesc}}">
@@ -176,13 +176,13 @@
     </view>
     <view class="section-desc">如需确认车辆档期、价格或取还车规则，可选择在线客服或电话咨询。</view>
     <view class="contact-actions">
-      <button wx:if="{{wxKfReady}}" class="action-button ui-btn ui-btn-ghost" bindtap="handleOpenCustomerService" hover-class="mine-button-pressed" aria-label="联系极境车库在线客服">
+      <button wx:if="{{wxKfReady}}" class="action-button ui-btn ui-btn-ghost" bindtap="handleOpenCustomerService" hover-class="mine-button-pressed" aria-label="联系爱迦租车在线客服">
         <view class="contact-action-content"><view class="contact-action-native-icon contact-chat-native-icon" aria-hidden="true"></view><text>在线客服</text></view>
       </button>
-      <button wx:else class="action-button ui-btn ui-btn-ghost" open-type="contact" hover-class="mine-button-pressed" aria-label="联系极境车库在线客服">
+      <button wx:else class="action-button ui-btn ui-btn-ghost" open-type="contact" hover-class="mine-button-pressed" aria-label="联系爱迦租车在线客服">
         <view class="contact-action-content"><view class="contact-action-native-icon contact-chat-native-icon" aria-hidden="true"></view><text>在线客服</text></view>
       </button>
-      <button class="action-button ui-btn ui-btn-ghost action-button-offset" bindtap="handlePhoneCall" hover-class="mine-button-pressed" aria-label="拨打极境车库咨询电话">
+      <button class="action-button ui-btn ui-btn-ghost action-button-offset" bindtap="handlePhoneCall" hover-class="mine-button-pressed" aria-label="拨打爱迦租车咨询电话">
         <view class="contact-action-content"><view class="contact-action-native-icon contact-phone-native-icon" aria-hidden="true"></view><text>电话咨询</text></view>
       </button>
     </view>
@@ -192,9 +192,9 @@
     bindtap="handleShowReleaseNotes"
     hover-class="mine-version-footer-pressed"
     aria-role="button"
-    aria-label="极境车库版本 {{appVersion}}，点击查看更新说明"
+    aria-label="爱迦租车版本 {{appVersion}}，点击查看更新说明"
   >
-    <text class="mine-version-label">极境车库 v{{appVersion}}</text>
+    <text class="mine-version-label">爱迦租车 v{{appVersion}}</text>
     <text class="mine-version-dot">·</text>
     <text class="mine-version-action">更新日志</text>
   </view>

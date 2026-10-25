@@ -98,6 +98,36 @@ async function loadOperationConfigUpdateWith({ openid, mockDb }) {
 }
 
 describe("cloudfunctions/operationConfigUpdate integration", () => {
+  test("保存旧品牌配置时持久化新品牌，兼容省略字段和旧客户端重试", async () => {
+    const mocks = createMockDb({ rolesData: [{ openid: "admin_openid", role: "admin" }], configData: [{
+      _id: "legacy", key: "operation_settings", revision: 2,
+      value: {
+        brandName: "极境车库", garagePageTitle: "极境车库 · 杭州",
+        mineUserDesc: "极境会员服务", garagePageSubtitle: "定制出行服务",
+        announcementText: "欢迎来到极境车库", faqContent: "极境预约说明",
+        rulesContent: "按客服确认规则取还", bookingPrivacyTip: "极境车库仅用于预约沟通",
+        servicePhone: "18800000000", emergencyPhone: "18800000001",
+        hotSearchKeywords: ["极境版车型"], rentalTerms: { includedText: "以极境客服确认为准", depositText: "定制押金说明" }
+      }
+    }] })
+    const mod = await loadOperationConfigUpdateWith({ openid: "admin_openid", mockDb: mocks.db })
+    const input = { expectedRevision: 2, config: { brandName: "极境车库" } }
+    const saved = await mod.main(input)
+    expect(saved).toMatchObject({ ok: true, updated: true, revision: 3, config: {
+      brandName: "爱迦租车", garagePageTitle: "爱迦租车 · 杭州",
+      mineUserDesc: "爱迦会员服务", garagePageSubtitle: "定制出行服务",
+      announcementText: "欢迎来到爱迦租车", faqContent: "爱迦预约说明",
+      rulesContent: "按客服确认规则取还", bookingPrivacyTip: "爱迦租车仅用于预约沟通",
+      servicePhone: "18800000000", emergencyPhone: "18800000001",
+      hotSearchKeywords: ["极境版车型"], rentalTerms: { includedText: "以爱迦客服确认为准", depositText: "定制押金说明" }
+    } })
+    expect(mocks.records[0].value).toEqual(saved.config)
+    const getter = require("../cloudfunctions/operationConfigGet/index")
+    expect((await getter.main({ requireStoredConfig: true })).config).toMatchObject(saved.config)
+    expect(await mod.main(input)).toMatchObject({ ok: true, updated: false, revision: 3 })
+    expect(mocks.configUpdate).toHaveBeenCalledTimes(1)
+  })
+
   test("规范化后的同内容保存会真正持久化旧记录，响应、存储、再次读取保持一致且重试幂等", async () => {
     const mocks = createMockDb({ rolesData: [{ openid: "admin_openid", role: "admin" }], configData: [{
       _id: "legacy", key: "operation_settings", revision: 3,
@@ -303,6 +333,62 @@ describe("cloudfunctions/operationConfigUpdate integration", () => {
     expect(res.message).toBe("客服电话格式不正确")
     expect(mocks.configSet).not.toHaveBeenCalled()
     expect(mocks.configUpdate).not.toHaveBeenCalled()
+  })
+
+  test.each([
+    { field: "servicePhone", value: "18800000000" + "-".repeat(9) + "1" },
+    { field: "servicePhone", value: 18800000000 },
+    { field: "servicePhone", value: false },
+    { field: "servicePhone", value: null },
+    { field: "servicePhone", value: ["18800000000"] },
+    { field: "bookingStatusTemplateId", value: "t".repeat(129) },
+    { field: "bookingStatusTemplateId", value: 1234567890 },
+    { field: "bookingStatusTemplateId", value: false },
+    { field: "bookingStatusTemplateId", value: null },
+    { field: "bookingStatusTemplateId", value: ["valid_template"] }
+  ])("$field 不截断或转换错误类型后保存 $value", async ({ field, value }) => {
+    const current = { _id: "existing", key: "operation_settings", revision: 4, value: {
+      servicePhone: "18800000001", bookingStatusTemplateId: "existing_template"
+    } }
+    const mocks = createMockDb({ rolesData: [{ openid: "admin_openid", role: "admin" }], configData: [current] })
+    const mod = await loadOperationConfigUpdateWith({ openid: "admin_openid", mockDb: mocks.db })
+    expect(await mod.main({ expectedRevision: 4, config: { [field]: value } })).toMatchObject({
+      ok: false, code: "VALIDATION_ERROR", details: { errors: [{ field }] }
+    })
+    expect(mocks.records).toEqual([current])
+    expect(mocks.configUpdate).not.toHaveBeenCalled()
+    expect(mocks.configSet).not.toHaveBeenCalled()
+  })
+
+  test.each(["servicePhone", "bookingStatusTemplateId"])("历史无效 %s 不能通过同内容幂等分支绕过校验", async (field) => {
+    const mocks = createMockDb({ rolesData: [{ openid: "admin_openid", role: "admin" }], configData: [] })
+    const mod = await loadOperationConfigUpdateWith({ openid: "admin_openid", mockDb: mocks.db })
+    const saved = await mod.main({ expectedRevision: 0, config: { brandName: "测试品牌" } })
+    expect(saved.ok).toBe(true)
+    mocks.records[0].value[field] = "bad"
+    expect(await mod.main({ expectedRevision: saved.revision, config: {} })).toMatchObject({
+      ok: false, code: "VALIDATION_ERROR", details: { errors: [{ field }] }
+    })
+    expect(mocks.records[0].value[field]).toBe("bad")
+    expect(mocks.configUpdate).not.toHaveBeenCalled()
+  })
+
+  test("客服电话和模板保留省略值，合法输入去空格，显式空串清空并可幂等重试", async () => {
+    const mocks = createMockDb({ rolesData: [{ openid: "admin_openid", role: "admin" }], configData: [] })
+    const mod = await loadOperationConfigUpdateWith({ openid: "admin_openid", mockDb: mocks.db })
+    const contacts = { servicePhone: "+86-18800000000", bookingStatusTemplateId: "t".repeat(128) }
+    const saved = await mod.main({ expectedRevision: 0, config: {
+      servicePhone: ` ${contacts.servicePhone} `, bookingStatusTemplateId: ` ${contacts.bookingStatusTemplateId} `
+    } })
+    expect(saved).toMatchObject({ ok: true, revision: 1, config: contacts })
+    const edited = await mod.main({ expectedRevision: 1, config: { announcementText: "新的公告" } })
+    expect(edited).toMatchObject({ ok: true, revision: 2, config: contacts })
+    const input = { expectedRevision: 2, config: { servicePhone: "", bookingStatusTemplateId: "" } }
+    const cleared = await mod.main(input)
+    expect(cleared).toMatchObject({ ok: true, revision: 3, config: input.config })
+    expect(mocks.records[0].value).toMatchObject(input.config)
+    expect(await mod.main(input)).toMatchObject({ ok: true, updated: false, revision: 3 })
+    expect(mocks.configUpdate).toHaveBeenCalledTimes(2)
   })
 
   test("非法订阅模板 ID 在写入前被拒绝", async () => {

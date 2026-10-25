@@ -1,5 +1,5 @@
 /**
- * 极境车库小程序 - 实际使用场景全链路模拟与实机测试脚本
+ * 爱迦租车小程序 - 实际使用场景全链路模拟与实机测试脚本
  * 
  * 模拟真实用户使用流程：
  * 1. 首次打开小程序进入车库首页（封面预热、卡片渲染、无闪烁）
@@ -139,7 +139,7 @@ const globalWx = {
       } else if (name === "contentGuideList") {
         success({ result: { ok: true, list: [] } })
       } else if (name === "operationConfigGet") {
-        success({ result: { ok: true, config: { brandName: "极境车库" } } })
+        success({ result: { ok: true, config: { brandName: "爱迦租车" } } })
       }
     }
   },
@@ -153,7 +153,7 @@ const appInstance = { globalData: {} }
 global.getApp = () => appInstance
 
 console.log(`${c.bold}${c.cyan}======================================================${c.reset}`)
-console.log(`${c.bold}${c.cyan}  极境车库小程序 实际使用场景真实仿真测试${c.reset}`)
+console.log(`${c.bold}${c.cyan}  爱迦租车小程序 实际使用场景真实仿真测试${c.reset}`)
 console.log(`${c.bold}${c.cyan}======================================================${c.reset}\n`)
 
 async function runRealWorldJourneyTest() {

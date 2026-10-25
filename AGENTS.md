@@ -1,4 +1,4 @@
-# 极境车库小程序开发与行为准则 (WeChat Mini-Program Guardrails)
+# 爱迦租车小程序开发与行为准则 (WeChat Mini-Program Guardrails)
 
 本项目基于微信原生小程序与腾讯云开发（CloudBase）构建。所有在此代码库进行开发、重构或调试的 Agent 必须严格遵守以下准则：
 

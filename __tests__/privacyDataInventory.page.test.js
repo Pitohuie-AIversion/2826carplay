@@ -498,6 +498,148 @@ describe("pages/privacy-data-inventory", () => {
     expect(page.data.request.typeIconClass).toBe("request-type-icon-deletion")
   })
 
+  test.each(["success", "business", "network", "timeout"])("导出确认 %s 在后台返回时，回到本页才处理结果", async (outcome) => {
+    jest.useFakeTimers()
+    let confirmation
+    global.wx = {
+      cloud: { callFunction: jest.fn((options) => {
+        if (options.data.mode === "confirmExport") confirmation = options
+        else options.success({ result: { ok: true, csvText: "data", exportToken: "test-token" } })
+      }) },
+      showModal: jest.fn(({ success }) => success({ confirm: true })),
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition(), { loading: false, requestId: "request_1", request: { type: "access" } })
+    global.getCurrentPages = () => [page]
+    page.handleExport()
+    await Promise.resolve()
+    expect(confirmation).toBeDefined()
+    global.getCurrentPages = () => [page, {}]
+    page.setData.mockClear()
+    if (outcome === "success") confirmation.success({ result: { ok: true, confirmed: true } })
+    else if (outcome === "business") confirmation.success({ result: { ok: false, message: "申请已撤回" } })
+    else if (outcome === "network") confirmation.fail(new Error("network timeout"))
+    else jest.advanceTimersByTime(20 * 1000)
+
+    expect(page.setData).not.toHaveBeenCalled()
+    expect(wx.showToast).not.toHaveBeenCalled()
+    page.onShow()
+    expect(page.setData).not.toHaveBeenCalled()
+    expect(wx.showToast).not.toHaveBeenCalled()
+    global.getCurrentPages = () => [page]
+    page.onShow()
+    expect(page.data.exporting).toBe(false)
+    expect(page.data.exportConfirmationPending).toBe(outcome !== "success")
+    expect(page.data.exportFilePath).toBe("wxfile://usr/privacy-data-request_1.csv")
+    expect(wx.showToast).toHaveBeenCalledTimes(1)
+    expect(wx.showToast).toHaveBeenLastCalledWith({
+      title: { success: "个人数据已生成", business: "申请已撤回", network: "导出确认失败", timeout: "导出超时，请重试" }[outcome],
+      icon: "none"
+    })
+    page.onShow()
+    expect(wx.showToast).toHaveBeenCalledTimes(1)
+    expect(jest.getTimerCount()).toBe(0)
+    page.onUnload()
+  })
+
+  test("后台已确认的导出结果在卸载后不再更新页面", async () => {
+    let confirmation
+    global.wx = {
+      cloud: { callFunction: jest.fn((options) => {
+        if (options.data.mode === "confirmExport") confirmation = options
+        else options.success({ result: { ok: true, csvText: "data", exportToken: "test-token" } })
+      }) },
+      showModal: jest.fn(({ success }) => success({ confirm: true })),
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition(), { loading: false, requestId: "request_1", request: { type: "access" } })
+    global.getCurrentPages = () => [page]
+    page.handleExport()
+    await Promise.resolve()
+    global.getCurrentPages = () => [page, {}]
+    confirmation.success({ result: { ok: true } })
+    page.onUnload()
+    page.setData.mockClear()
+    global.getCurrentPages = () => [page]
+    page.onShow()
+    expect(page.setData).not.toHaveBeenCalled()
+    expect(wx.showToast).not.toHaveBeenCalled()
+  })
+
+  test.each(["return", "replacement", "unload"])("本地删除在后台完成后按 %s 状态恢复文件入口", async (nextState) => {
+    let resolveRemoval
+    mockRemoveCsvFile.mockImplementationOnce(() => new Promise((resolve) => { resolveRemoval = resolve }))
+    global.wx = {
+      showModal: jest.fn(({ success }) => success({ confirm: true })),
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition(), {
+      loading: false,
+      exportFilePath: "/user-data/private-old.csv",
+      exportFileName: "private-old.csv",
+      exportConfirmationPending: true
+    })
+    global.getCurrentPages = () => [page]
+    page.handleDeleteExportedFile()
+    global.getCurrentPages = () => [page, {}]
+    page.setData.mockClear()
+    resolveRemoval()
+    await Promise.resolve()
+    expect(page.setData).not.toHaveBeenCalled()
+    expect(wx.showToast).not.toHaveBeenCalled()
+    if (nextState === "replacement") {
+      page.data.exportFilePath = "/user-data/private-new.csv"
+      page.data.exportFileName = "private-new.csv"
+    } else if (nextState === "unload") page.onUnload()
+    global.getCurrentPages = () => [page]
+    page.onShow()
+    if (nextState === "return") {
+      expect(page.data).toMatchObject({ exportFilePath: "", exportFileName: "", exportConfirmationPending: false })
+      page.handleShareExportedFile()
+      page.handleOpenExportedFile()
+      expect(mockShareCsvFile).not.toHaveBeenCalled()
+      expect(mockOpenCsvFile).not.toHaveBeenCalled()
+    } else {
+      expect(page.setData).not.toHaveBeenCalled()
+      expect(page.data.exportFilePath).toBe(nextState === "replacement" ? "/user-data/private-new.csv" : "/user-data/private-old.csv")
+      expect(page.data.exportConfirmationPending).toBe(true)
+    }
+    page.onUnload()
+  })
+
+  test.each([
+    { status: "cancelled" },
+    { status: "rejected" },
+    { type: "correction" },
+    { partial: true },
+    { requestId: "request_2" }
+  ])("确认弹窗期间刷新为 %j 后不再使用旧确认导出", (update) => {
+    jest.useFakeTimers()
+    let modal
+    global.wx = {
+      cloud: { callFunction: jest.fn() },
+      showModal: jest.fn((options) => { modal = options }),
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition(), {
+      loading: false, requestId: "request_1", request: { type: "access", status: "processing" }
+    })
+    page.handleExport()
+    page.loadInventory({ refreshing: true })
+    const refresh = wx.cloud.callFunction.mock.calls[0][0]
+    if (update.requestId) page.data.requestId = update.requestId
+    refresh.success({ result: {
+      ok: true,
+      request: { id: "request_1", type: "access", status: "processing", ...update },
+      partial: Boolean(update.partial),
+      categories: {}
+    } })
+    modal.success({ confirm: true })
+    expect(wx.cloud.callFunction).toHaveBeenCalledTimes(1)
+    expect(page.data.exporting).toBe(false)
+    page.onUnload()
+  })
+
   test("清单页面使用覆盖进度、分类图标和原生文件操作", () => {
     const pageDir = path.resolve(__dirname, "../pages-admin/privacy-data-inventory")
     const wxmlSource = fs.readFileSync(path.join(pageDir, "privacy-data-inventory.wxml"), "utf8")

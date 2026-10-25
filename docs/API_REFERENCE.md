@@ -18,6 +18,8 @@ shared/
 ├── performance.js            # 内存同步优先的 applyState 状态调度器
 ├── imageCache.js             # 两级 LRU + SWR 零闪烁图片预加载缓存
 ├── pageNativeAction.js       # 微信系统级动作生命周期防穿透守卫
+├── unsavedChanges.js         # 表单脏状态与当前页面离开提醒同步
+├── handoverReport.js         # 交接事实、CSV 与独立导出文件名
 ├── networkStatus.js          # 弱网监听与断网重连自愈
 └── uiFeedback.js             # 界面轻提示与 Toast 字符截断防溢出
 ```
@@ -32,7 +34,7 @@ shared/
 ```javascript
 const { definePage, callCloud, calculateRentalDays } = require("../../shared")
 
-definePage({
+Page(definePage({
   data: {
     startDate: "2026-10-01",
     endDate: "2026-10-03",
@@ -59,16 +61,18 @@ definePage({
     }
   }
   // onUnload 自动触发 controller.dispose()，无需手动销毁定时器
-})
+}))
 ```
 
 ### `createPageController(pageInstance, options)`
 用于已有或自定义页面手动初始化生命周期控制器。
 
-- **`controller.applyState(patch, callback)`**：内存同步优先的状态批处理更新。
+- `options.requiredPermission` 可传权限字段名或权限判断函数，校验结果写入 `pageAuthorized`；页面读取业务数据前应检查授权状态。
+- **`controller.applyState(patch)`**：内存同步优先的状态批处理更新。
 - **`controller.flushStateNow()`**：立即强制清空当前待排期的状态更新并触发渲染。
-- **`controller.beginAction(options)`**：派发原生动作代币（支持 `exclusiveKey` 排他模式）。
+- **`controller.beginAction(options)`**：派发原生动作凭证，默认要求页面处于栈顶；支持 `exclusiveKey` 排他模式。只有可在后台完成的逻辑可显式设置 `requireCurrent: false`。
 - **`controller.isActionActive(actionToken)`**：校验当前动作代币及页面是否依然有效活跃。
+- **`controller.showToast(title, fallback)`**：仅在当前页面仍处于前台且控制器未销毁时展示提示。
 - **`controller.dispose()`**：主动销毁所有挂载的防抖器、定时器与监听器。
 
 ---
@@ -82,14 +86,14 @@ definePage({
   - `name` *(string)*: 云函数名称。
   - `data` *(object)*: 业务透传参数字典。
   - `options` *(object)*:
-    - `pageContext` *(Page)*: 当前页面实例。若页面已卸载，回调将自动静默拦截，严防跨页污染。
-    - `timeoutMs` *(number)*: 超时阈值，默认 `15000` ms。超时返回 `CLOUD_TIMEOUT` 错误码。
+    - `pageContext` *(Page)*: 当前页面实例。调用时捕获生命周期；响应或超时到达时若页面已卸载或重新初始化，Promise 返回 `CANCELLED`，不执行业务回调或错误提示。普通后台读取仍可完成。
+    - `action` *(object)*: 可选原生动作凭证；需要阻止切页后回调时，传入带 `requireCurrent: true` 的凭证。
+    - `timeoutMs` *(number)*: 超时阈值，默认 `15000` ms，`0` 表示不限时。超时返回 `TIMEOUT` 错误码。
     - `showErrorToast` *(boolean)*: 出错时是否自动弹出微信 `wx.showToast`，默认 `false`。
-    - `toastDurationMs` *(number)*: 错误提示停留时间，默认 `2000` ms。
 
 - **返回格式**：
   - 成功：`{ ok: true, data: ..., raw: ... }`
-  - 失败：`{ ok: false, code: "CLOUD_TIMEOUT" | "CLOUD_ERROR" | "...", message: "...", raw: ... }`
+  - 失败或失效：`{ ok: false, code: "TIMEOUT" | "CLOUD_ERROR" | "CANCELLED" | "...", message: "...", raw?: ... }`
 
 ```javascript
 const { callCloud } = require("../../shared/cloudClient")
@@ -261,3 +265,18 @@ wx.makePhoneCall({
   }
 })
 ```
+
+---
+
+## 10. 未保存提醒 (unsavedChanges.js)
+
+- 输入变化时调用 `markUnsaved(page)`；保存成功后调用 `clearUnsaved(page)`。两者立即更新本页逻辑状态，仅在本页当前可见时同步原生提醒。
+- 每次 `onShow` 调用 `syncUnsavedChanges(page)`，处理后台保存结果及原生接口失败后的重试。
+- `onUnload` 调用 `disposeUnsavedChanges(page)`，释放回调状态，不对新的当前页执行关闭提醒。
+- 原生启用或关闭成功后才记录实际状态；旧请求回调不得覆盖更新的操作。
+
+## 11. 交接报告 (handoverReport.js)
+
+`buildHandoverReport(booking, handover)` 保留明确记录的零值。里程应为 0 至 5,000,000 的整数，能源百分比应为 0 至 100 的整数；缺失或非法值返回 `null`。`bookingMyDetail` 与 `bookingDetail` 的交接读取字段也遵守这一约定，调用方不能用 `value || 0` 将缺失值还原成零。
+
+报告缺少车况说明时显示“车况未记录”；`customerConfirmed` 表示内容已核对，不代表电子签署。`formatHandoverCsvContent` 转义 CSV 单元格并将可能的公式前缀按文本保存。`getHandoverFileName` 每次返回独立文件名；页面在新文件写入成功后回收旧文件，迟到写入只清理自己的路径。

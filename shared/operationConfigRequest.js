@@ -11,6 +11,31 @@ let latestCompletedRequestId = 0
 let cachedStoredRevision = null
 const invalidationListeners = new Set()
 
+// Old cloud deployments and cached snapshots can still contain the former brand.
+// Normalize display copy only; identifiers, contact details and addresses stay intact.
+function normalizeConfigBranding(config) {
+  const result = { ...config }
+  const normalizeText = (text) => text.replace(/极境车库/g, "爱迦租车").replace(/极境/g, "爱迦")
+  const displayFields = [
+    "brandName", "mineUserDesc", "garagePageTitle", "garagePageSubtitle",
+    "announcementText", "faqContent", "rulesContent", "bookingPrivacyTip"
+  ]
+  displayFields.forEach((key) => {
+    if (typeof result[key] === "string") result[key] = normalizeText(result[key])
+  })
+  if (config.rentalTerms && typeof config.rentalTerms === "object" && !Array.isArray(config.rentalTerms)) {
+    result.rentalTerms = { ...config.rentalTerms }
+    const rentalFields = [
+      "includedText", "protectionText", "serviceFeeText", "deliveryFeeText", "depositText",
+      "cancellationText", "overtimeText", "energyText", "estimateDisclaimer"
+    ]
+    rentalFields.forEach((key) => {
+      if (typeof result.rentalTerms[key] === "string") result.rentalTerms[key] = normalizeText(result.rentalTerms[key])
+    })
+  }
+  return result
+}
+
 function clearOperationConfigCache() {
   cacheRevision += 1
   latestCompletedRequestId = 0
@@ -66,7 +91,7 @@ function requestOperationConfig(input) {
       // TTL may have expired while the page was waiting for the next tick.
       const current = getCached(OPERATION_CONFIG_CACHE_KEY, OPERATION_CONFIG_CACHE_TTL_MS)
       if (!current) cancelRefresh = requestOperationConfig(options)
-      else if (typeof options.onSuccess === "function") options.onSuccess(current)
+      else if (typeof options.onSuccess === "function") options.onSuccess(normalizeConfigBranding(current))
     }
     if (typeof wx !== "undefined" && typeof wx.nextTick === "function") {
       wx.nextTick(deliver)
@@ -105,7 +130,7 @@ function requestOperationConfig(input) {
     const current = getCached(OPERATION_CONFIG_CACHE_KEY, OPERATION_CONFIG_CACHE_TTL_MS)
     if (requestId < latestCompletedRequestId && current) {
       finish(() => {
-        if (typeof options.onSuccess === "function") options.onSuccess(current)
+        if (typeof options.onSuccess === "function") options.onSuccess(normalizeConfigBranding(current))
       })
       return
     }
@@ -163,13 +188,14 @@ function requestOperationConfig(input) {
         const olderVersion = storedRevision !== null && cachedStoredRevision !== null && storedRevision < cachedStoredRevision
         const newerVersion = storedRevision !== null && cachedStoredRevision !== null && storedRevision > cachedStoredRevision
         const useCurrent = current && (olderVersion || (!newerVersion && requestId < latestCompletedRequestId))
+        const config = normalizeConfigBranding(useCurrent ? current : result.config)
         if (!useCurrent) {
           latestCompletedRequestId = Math.max(latestCompletedRequestId, requestId)
           cachedStoredRevision = storedRevision
-          setCache(OPERATION_CONFIG_CACHE_KEY, result.config)
+          setCache(OPERATION_CONFIG_CACHE_KEY, config)
         }
         if (typeof options.onSuccess === "function") {
-          options.onSuccess(useCurrent ? current : result.config)
+          options.onSuccess(config)
         }
       })
     },

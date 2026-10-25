@@ -164,6 +164,87 @@ describe("pages/content-page 服务指南", () => {
     expect(page.data.contentError).toBe("")
   })
 
+  function createGuideSession() {
+    const requests = []
+    const storage = new Map()
+    global.wx = {
+      setNavigationBarTitle: jest.fn(),
+      getStorageSync: jest.fn((key) => storage.get(key)),
+      setStorageSync: jest.fn((key, value) => storage.set(key, value)),
+      removeStorageSync: jest.fn((key) => storage.delete(key)),
+      cloud: { callFunction: jest.fn((options) => requests.push(options)) }
+    }
+    const page = createPage(loadPageDefinition())
+    global.getCurrentPages = () => [page]
+    page.onLoad({ contentId: "return-guide" })
+    page.onShow()
+    const reads = () => requests.filter((request) => request.name === "contentGuideDetail")
+    const guide = { id: "return-guide", slug: "return-guide", title: "原场景标题", summary: "原摘要", body: "1. 出发准备\n原正文" }
+    return { page, reads, guide, storage }
+  }
+
+  test("场景指南首次显示不重复读取，返回后重新核验发布状态并清除下线内容", () => {
+    const { page, reads, guide, storage } = createGuideSession()
+    expect(reads()).toHaveLength(1)
+    reads()[0].success({ result: { ok: true, guide, vehicles: [{ id: "car_1", name: "原关联车辆" }] } })
+    page.onShow()
+    expect(reads()).toHaveLength(2)
+    reads()[1].success({ result: { ok: false, code: "NOT_FOUND" } })
+    expect(page.data.guide).toBeNull()
+    expect(page.data.relatedVehicles).toEqual([])
+    expect(page.data.content).toBe("")
+    expect(page.data.sections).toEqual([])
+    expect(page.data.pageTitle).toBe("场景指南")
+    expect(page.data.heroDesc).not.toBe(guide.summary)
+    expect(page.data.guideError).toContain("下线")
+    expect(storage.has("guide_return-guide")).toBe(false)
+    expect(page.onShareAppMessage().title).not.toBe(guide.title)
+  })
+
+  test("场景指南返回刷新更新正文和车辆，网络失败保留明确标注的上次内容", () => {
+    const { page, reads, guide } = createGuideSession()
+    reads()[0].success({ result: { ok: true, guide, vehicles: [{ id: "car_1" }] } })
+    page.onShow()
+    expect(reads()).toHaveLength(2)
+    reads()[1].success({ result: { ok: true, guide: { ...guide, body: "1. 最新准备\n最新正文" }, vehicles: [] } })
+    expect(page.data.content).toContain("最新正文")
+    expect(page.data.relatedVehicles).toEqual([])
+    page.onShow()
+    expect(reads()).toHaveLength(3)
+    reads()[2].fail({ errMsg: "offline" })
+    expect(page.data.content).toContain("最新正文")
+    expect(page.data.guideNotice).toContain("上次保存")
+    expect(page.data.guideLoading).toBe(false)
+  })
+
+  test("返回重读后旧请求迟到或卸载不能恢复失效场景内容", () => {
+    const { page, reads, guide } = createGuideSession()
+    page.onShow()
+    expect(reads()).toHaveLength(2)
+    reads()[1].success({ result: { ok: false, code: "NOT_FOUND" } })
+    reads()[0].success({ result: { ok: true, guide, vehicles: [{ id: "car_1" }] } })
+    expect(page.data.guide).toBeNull()
+    expect(page.data.content).toBe("")
+    page.onShow()
+    page.onUnload()
+    page.setData.mockClear()
+    reads()[2].success({ result: { ok: true, guide, vehicles: [] } })
+    expect(page.setData).not.toHaveBeenCalled()
+  })
+
+  test("场景快照写缓存失败时返回刷新沿用较新的内存内容", () => {
+    const { page, reads, guide, storage } = createGuideSession()
+    storage.set("guide_return-guide", { guide, vehicles: [] })
+    wx.setStorageSync.mockImplementation(() => { throw new Error("storage full") })
+    reads()[0].success({ result: { ok: true, guide: { ...guide, body: "最新已核验正文" }, vehicles: [] } })
+    page.onShow()
+    expect(reads()).toHaveLength(2)
+    expect(page.data.content).toBe("最新已核验正文")
+    reads()[1].fail({ errMsg: "offline" })
+    expect(page.data.content).toBe("最新已核验正文")
+    expect(page.data.guideNotice).toContain("上次保存")
+  })
+
   test("可切换服务指南并定位文档章节", () => {
     global.wx = {
       redirectTo: jest.fn(),
@@ -222,8 +303,8 @@ describe("pages/content-page 服务指南", () => {
     expect(wxml).toContain('class="document-count-value">{{sections.length}}</text><text>节内容</text>')
     expect(wxml).toContain('class="hero-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true"')
     expect(wxml).toContain('aria-label="提交个人信息查询、更正或删除申请"')
-    expect(wxml).toContain('aria-label="联系极境车库在线客服"')
-    expect(wxml).toContain('aria-label="拨打极境车库咨询电话"')
+    expect(wxml).toContain('aria-label="联系爱迦租车在线客服"')
+    expect(wxml).toContain('aria-label="拨打爱迦租车咨询电话"')
     expect(wxml).not.toContain('open-type="contact">在线客服</button>')
     expect(wxss).toContain(".content-action-content")
     expect(wxss).toContain(".rights-action-native-icon")

@@ -86,6 +86,24 @@ async function loadModule(openid, mockDb) {
 }
 
 describe("cloudfunctions/privacyRequestCreate integration", () => {
+  test.each([
+    { description: {} },
+    { description: ["查询个人信息"] },
+    { description: true },
+    { type: ["access"] },
+    { requestId: ["retry_request_1"] },
+    { requestId: 12345678 },
+    { description: { toString: null } }
+  ])("拒绝非字符串提交字段 %j，不创建申请或审计", async (invalid) => {
+    const mocks = createMockDb()
+    const mod = await loadModule("user_openid", mocks.db)
+    expect(await mod.main({ type: "access", description: "查询个人信息", ...invalid }))
+      .toMatchObject({ ok: false, code: "VALIDATION_ERROR" })
+    expect(mocks.privacyWhere).not.toHaveBeenCalled()
+    expect(mocks.privacySet).not.toHaveBeenCalled()
+    expect(mocks.auditAdd).not.toHaveBeenCalled()
+  })
+
   test("守卫写入失败会回滚申请，原请求号可安全重试", async () => {
     const mocks = createMockDb()
     const mod = await loadModule("user_openid", mocks.db)

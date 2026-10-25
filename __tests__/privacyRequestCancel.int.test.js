@@ -51,6 +51,15 @@ async function loadModule(openid, mockDb) {
 }
 
 describe("cloudfunctions/privacyRequestCancel integration", () => {
+  test.each([["privacy_1"], {}, 12345678, { toString: null }].map((id) => [id]))("拒绝非字符串申请 ID %j", async (id) => {
+    const mocks = createMockDb({ current: { openid: "user_openid", type: "access", status: "pending" } })
+    const mod = await loadModule("user_openid", mocks.db)
+    expect(await mod.main({ id })).toMatchObject({ ok: false, code: "VALIDATION_ERROR" })
+    expect(mocks.requestField).not.toHaveBeenCalled()
+    expect(mocks.requestUpdate).not.toHaveBeenCalled()
+    expect(mocks.auditAdd).not.toHaveBeenCalled()
+  })
+
   test("撤回成功后的重试返回成功而不重复修改或审计", async () => {
     const mocks = createMockDb({ current: { openid: "user_openid", type: "access", status: "cancelled" } })
     const mod = await loadModule("user_openid", mocks.db)

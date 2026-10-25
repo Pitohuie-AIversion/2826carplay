@@ -140,7 +140,7 @@ const GUIDANCE_DETAIL_MAP = {
   },
   completed: {
     title: "本次行程已完成",
-    desc: "预约流程已经结束，感谢使用极境车库服务。",
+    desc: "预约流程已经结束，感谢使用爱迦租车服务。",
     tone: "completed"
   },
   cancelled: {

@@ -65,7 +65,7 @@
     <view class="hero-shade"></view>
     <view class="hero-signature">
       <view class="signature-line"></view>
-      <text>EXTREME GARAGE</text>
+      <text>AIJIA CAR RENTAL</text>
     </view>
     <view wx:if="{{car.imageItems.length > 1}}" class="hero-pagination" aria-hidden="true">
       <view
@@ -135,7 +135,7 @@
       <text wx:for="{{car.tags}}" wx:key="*this" class="tag-item">{{item}}</text>
     </view>
   </view>
-  <view class="vip-privilege-strip ui-card" bindtap="handleTogglePrivilegeModal" hover-class="vip-strip-pressed" aria-role="button" aria-label="极境车库尊享权益保障，点击查看详情">
+  <view class="vip-privilege-strip ui-card" bindtap="handleTogglePrivilegeModal" hover-class="vip-strip-pressed" aria-role="button" aria-label="爱迦租车尊享权益保障，点击查看详情">
     <view class="vip-strip-left">
       <view class="vip-strip-icon-crown" aria-hidden="true">👑</view>
       <view class="vip-strip-items">
@@ -402,10 +402,10 @@
       <button class="action-button ui-btn ui-btn-primary" disabled="{{!detailVerified}}" bindtap="handleBookingTap" aria-label="{{detailVerified ? car.primaryActionText : '正在核实车辆'}}，{{car.actionHintText}}">
         <view class="detail-action-content"><view class="detail-action-native-icon booking-action-native-icon" aria-hidden="true"></view><text>{{detailVerified ? car.primaryActionText : '正在核实车辆'}}</text></view>
       </button>
-      <button class="action-button ui-btn ui-btn-ghost action-button-offset" bindtap="handleOpenCustomerService" hover-class="detail-button-pressed" aria-label="在线咨询极境车库顾问">
+      <button class="action-button ui-btn ui-btn-ghost action-button-offset" bindtap="handleOpenCustomerService" hover-class="detail-button-pressed" aria-label="在线咨询爱迦租车顾问">
         <view class="detail-action-content"><view class="detail-action-native-icon contact-chat-native-icon" aria-hidden="true"></view><text>在线咨询</text></view>
       </button>
-      <button class="action-button ui-btn ui-btn-ghost action-button-offset" bindtap="handlePhoneCall" aria-label="电话咨询极境车库顾问">
+      <button class="action-button ui-btn ui-btn-ghost action-button-offset" bindtap="handlePhoneCall" aria-label="电话咨询爱迦租车顾问">
         <view class="detail-action-content"><view class="detail-action-native-icon phone-action-native-icon" aria-hidden="true"></view><text>电话咨询</text></view>
       </button>
       <button class="action-button ui-btn ui-btn-ghost action-button-offset" bindtap="handleWechatConsult" aria-label="打开微信客服咨询">
@@ -439,7 +439,7 @@
       <view class="privilege-modal-header">
         <view class="privilege-modal-title-wrap">
           <view class="privilege-modal-badge">VIP GUARANTEE</view>
-          <view class="privilege-modal-title">极境车库 · 尊享权益保障</view>
+          <view class="privilege-modal-title">爱迦租车 · 尊享权益保障</view>
         </view>
         <view class="privilege-modal-close" bindtap="handleClosePrivilegeModal" hover-class="privilege-modal-close-hover" aria-role="button" aria-label="关闭权益说明">✕</view>
       </view>

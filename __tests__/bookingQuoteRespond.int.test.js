@@ -13,7 +13,7 @@ function createMockDb({ booking, quote, occupied = false, vehicle = { status: "i
     if (inTransaction && ++operationCount > 100) throw new Error("Transaction exceeds 100 operations")
   }
   const doc = (state) => ({
-    field: () => ({ get: async () => { countOperation(); return { data: { ...state } } } }),
+    field: (fields) => ({ get: async () => { countOperation(); return { data: Object.fromEntries(Object.entries(state).filter(([key]) => fields[key])) } } }),
     update: async ({ data }) => { countOperation(); Object.assign(state, data); return { stats: { updated: 1 } } }
   })
   const db = {
@@ -188,6 +188,60 @@ describe("cloudfunctions/bookingQuoteRespond integration", () => {
     expect(res).toMatchObject({ ok: true, bookingStatus: "adjustment_requested" })
     expect(mocks.quoteState.adjustmentNote).toBe("希望取消取送车服务")
     expect(JSON.stringify(mocks.auditAdd.mock.calls)).not.toContain("希望取消取送车服务")
+  })
+
+  test("调整申请响应丢失后改写正文重试不能误报成功", async () => {
+    const mocks = createQuotedState()
+    const mod = await loadModule("user_1", mocks.db)
+    const input = { bookingId: "booking_1", quoteId: "quote_1", action: "requestAdjustment", adjustmentNote: "希望取消取送车服务" }
+    expect(await mod.main(input)).toMatchObject({ ok: true, updated: true })
+    const second = await mod.main({ ...input, adjustmentNote: "请改成机场取车" })
+    expect(second).toMatchObject({ ok: false, code: "VERSION_CONFLICT" })
+    expect(second.message).toContain("查看最新申请")
+    expect(mocks.quoteState.adjustmentNote).toBe(input.adjustmentNote)
+    expect(mocks.bookingState.status).toBe("adjustment_requested")
+    expect(mocks.auditAdd).toHaveBeenCalledTimes(1)
+    expect(mocks.dayWrites).toEqual([])
+  })
+
+  test("相同调整正文重试保持幂等，并返回服务端保存的完整正文", async () => {
+    const mocks = createQuotedState()
+    const mod = await loadModule("user_1", mocks.db)
+    const adjustmentNote = "取车地点待顾问确认".repeat(20)
+    const input = { bookingId: "booking_1", quoteId: "quote_1", action: "requestAdjustment", adjustmentNote }
+    const first = await mod.main(input)
+    expect(first).toMatchObject({ ok: true, updated: true, adjustmentNote })
+    const second = await mod.main({ ...input, adjustmentNote: ` ${adjustmentNote} ` })
+    expect(second).toMatchObject({ ok: true, updated: false, adjustmentNote })
+    expect(mocks.quoteState.adjustmentNote).toBe(adjustmentNote)
+    expect(mocks.auditAdd).toHaveBeenCalledTimes(1)
+  })
+
+  test.each([
+    ["修改取车地点"],
+    12345,
+    true,
+    { note: "修改取车地点" },
+    "调".repeat(201)
+  ].map((value) => [value]))("调整正文非法类型或超长 %p 不得强转或截断后提交", async (adjustmentNote) => {
+    const mocks = createQuotedState()
+    const mod = await loadModule("user_1", mocks.db)
+    expect(await mod.main({ bookingId: "booking_1", quoteId: "quote_1", action: "requestAdjustment", adjustmentNote })).toMatchObject({ ok: false, code: "VALIDATION_ERROR" })
+    expect(mocks.db.runTransaction).not.toHaveBeenCalled()
+    expect(mocks.bookingState.status).toBe("quoted")
+    expect(mocks.quoteState.status).toBe("sent")
+    expect(mocks.quoteState.adjustmentNote).toBeUndefined()
+    expect(mocks.auditAdd).not.toHaveBeenCalled()
+  })
+
+  test("200 字原申请追加尾部不能截断成旧申请后返回重复成功", async () => {
+    const mocks = createQuotedState()
+    const mod = await loadModule("user_1", mocks.db)
+    const input = { bookingId: "booking_1", quoteId: "quote_1", action: "requestAdjustment", adjustmentNote: "调".repeat(200) }
+    expect(await mod.main(input)).toMatchObject({ ok: true, updated: true })
+    expect(await mod.main({ ...input, adjustmentNote: `${input.adjustmentNote}新内容` })).toMatchObject({ ok: false, code: "VALIDATION_ERROR" })
+    expect(mocks.quoteState.adjustmentNote).toBe(input.adjustmentNote)
+    expect(mocks.auditAdd).toHaveBeenCalledTimes(1)
   })
 
   test("不能处理他人的报价", async () => {

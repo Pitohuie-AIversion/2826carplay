@@ -71,7 +71,18 @@ function createMockDb({
     ? jest.fn(async () => ({ data: { ...request } }))
     : jest.fn().mockRejectedValue(new Error("document not found"))
   const exportStateUpdate = jest.fn(async ({ data }) => { Object.assign(request, data); return { stats: { updated: 1 } } })
-  const exportWhere = jest.fn(() => ({ update: exportStateUpdate }))
+  const exportWhere = jest.fn((filter) => ({
+    update: async (payload) => {
+      const matches = Object.entries(filter).every(([key, value]) => {
+        if (key === "_id") return true
+        if (value && typeof value === "object" && value.operation === "neq") {
+          return request[key] !== value.value
+        }
+        return request[key] === value
+      })
+      return matches ? exportStateUpdate(payload) : { stats: { updated: 0 } }
+    }
+  }))
   const requestField = jest.fn(() => ({ get: requestGet }))
   const privacyDoc = jest.fn(() => ({
     get: requestGet,
@@ -112,6 +123,7 @@ function createMockDb({
   return {
     db: {
       collection,
+      command: { neq: jest.fn((value) => ({ operation: "neq", value })) },
       serverDate: jest.fn(() => serverDateValue)
     },
     bookingsWhere,
@@ -140,6 +152,55 @@ async function loadModule(openid, mockDb) {
 }
 
 describe("cloudfunctions/privacyRequestDataInventory integration", () => {
+  test.each([
+    ["数组申请 ID", { requestId: ["request_1"] }],
+    ["数字申请 ID", { requestId: 123 }],
+    ["对象申请 ID", { requestId: { toString: null } }],
+    ["数组模式", { mode: ["export"] }],
+    ["布尔模式", { mode: false }],
+    ["对象模式", { mode: { toString: null } }],
+    ["数组确认标识", { mode: "confirmExport", exportToken: ["a".repeat(40)] }],
+    ["对象确认标识", { mode: "confirmExport", exportToken: { toString: null } }]
+  ])("拒绝%s而不读取个人数据或修改导出状态", async (_, input) => {
+    const mocks = createMockDb({
+      roles: [{ openid: "admin", role: "admin" }],
+      request: { openid: "user", type: "access", status: "processing", dataExportToken: "a".repeat(40) }
+    })
+    const mod = await loadModule("admin", mocks.db)
+    await expect(mod.main({ requestId: "request_1", ...input })).resolves.toMatchObject({ ok: false, code: "VALIDATION_ERROR" })
+    expect(mocks.requestGet).not.toHaveBeenCalled()
+    expect(mocks.bookingsWhere).not.toHaveBeenCalled()
+    expect(mocks.exportStateUpdate).not.toHaveBeenCalled()
+    expect(mocks.auditAdd).not.toHaveBeenCalled()
+  })
+
+  test("并发确认相同导出只记录一次交付和审计，另一请求返回幂等成功", async () => {
+    const request = { openid: "user", type: "access", status: "processing", dataExportToken: "a".repeat(40) }
+    const mocks = createMockDb({ roles: [{ openid: "admin", role: "admin" }], request })
+    const mod = await loadModule("admin", mocks.db)
+    const input = { requestId: "request_1", mode: "confirmExport", exportToken: request.dataExportToken }
+    const results = await Promise.all([mod.main(input), mod.main(input)])
+    expect(results).toEqual(expect.arrayContaining([
+      { ok: true, confirmed: true },
+      { ok: true, confirmed: true, duplicate: true }
+    ]))
+    expect(mocks.exportStateUpdate).toHaveBeenCalledTimes(1)
+    expect(mocks.auditAdd).toHaveBeenCalledTimes(1)
+  })
+
+  test.each(["cancelled", "rejected"])("并发确认后申请变为 %s 时仍然拒绝确认", async (status) => {
+    const request = { openid: "user", type: "access", status: "processing", dataExportToken: "a".repeat(40) }
+    const mocks = createMockDb({ roles: [{ openid: "admin", role: "admin" }], request })
+    mocks.exportStateUpdate.mockImplementationOnce(async () => {
+      Object.assign(request, { status, dataExportedToken: request.dataExportToken, dataExportedAt: "2026-10-25T00:00:00.000Z" })
+      return { stats: { updated: 0 } }
+    })
+    const mod = await loadModule("admin", mocks.db)
+    expect(await mod.main({ requestId: "request_1", mode: "confirmExport", exportToken: request.dataExportToken }))
+      .toMatchObject({ ok: false, code: "EXPORT_STATE_CONFLICT" })
+    expect(mocks.auditAdd).not.toHaveBeenCalled()
+  })
+
   test("取消或驳回后不能生成或确认个人数据导出", async () => {
     for (const status of ["cancelled", "rejected"]) {
       const mocks = createMockDb({ roles: [{ openid: "admin", role: "admin" }], request: { openid: "user", type: "access", status } })
@@ -163,7 +224,7 @@ describe("cloudfunctions/privacyRequestDataInventory integration", () => {
     expect(request.dataExportedAt).toBeTruthy()
     expect(await mod.main(input)).toMatchObject({ ok: true, confirmed: true, duplicate: true })
     expect(mocks.exportStateUpdate).toHaveBeenCalledTimes(2)
-    expect(mocks.exportWhere).toHaveBeenLastCalledWith({ _id: "request_1", openid: "user", type: "access", status: "processing", dataExportToken: generated.exportToken })
+    expect(mocks.exportWhere).toHaveBeenLastCalledWith({ _id: "request_1", openid: "user", type: "access", status: "processing", dataExportToken: generated.exportToken, dataExportedToken: { operation: "neq", value: generated.exportToken } })
   })
 
   test("生成或保存确认期间发生撤回时，条件写失败不会标记交付完成", async () => {

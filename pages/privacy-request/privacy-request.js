@@ -1,5 +1,5 @@
 const { formatToastTitle } = require("../../shared/uiFeedback")
-const { markUnsaved, clearUnsaved } = require("../../shared/unsavedChanges")
+const { markUnsaved, clearUnsaved, disposeUnsavedChanges, syncUnsavedChanges } = require("../../shared/unsavedChanges")
 const {
   activatePageNativeActions,
   beginPageNativeAction,
@@ -123,15 +123,17 @@ Page({
     this.fetchList()
   },
 
-  onReachBottom() {
-    this.handleLoadMore()
+  onShow() {
+    syncUnsavedChanges(this)
+    if (typeof this._privacyMutationDeferredResult === "function") {
+      const deliver = this._privacyMutationDeferredResult
+      this._privacyMutationDeferredResult = null
+      deliver()
+    }
   },
 
-  handleLoadMore() {
-    if (this.data.loading || this.data.submitting || !this.data.hasMore) {
-      return
-    }
-    this.fetchList({ append: true })
+  onReachBottom() {
+    this.handleLoadMore()
   },
 
   onPullDownRefresh() {
@@ -147,11 +149,12 @@ Page({
   },
 
   onUnload() {
-    clearUnsaved(this)
+    disposeUnsavedChanges(this)
     cancelPageNativeActions(this)
     this._listRequestId = Number(this._listRequestId || 0) + 1
     this._submitRequestSerial = Number(this._submitRequestSerial || 0) + 1
     this._cancelRequestSerial = Number(this._cancelRequestSerial || 0) + 1
+    this._privacyMutationDeferredResult = null
     this.finishListRequestEffects()
     this.clearSubmitRequestTimer()
     this.clearCancelRequestTimer()
@@ -206,9 +209,11 @@ Page({
   },
 
   handleSubmit() {
-    if (this.data.submitting) {
+    if (this.data.submitting || this.data.cancellingId) {
       return
     }
+    const action = beginPageNativeAction(this, { requireCurrent: true })
+    if (!isPageNativeActionActive(this, action)) return
     const description = String(this.data.description || "").trim()
     if (description.length < 2) {
       wx.showToast({
@@ -241,6 +246,8 @@ Page({
     this._submitRequestSerial = submitSerial
     this.clearSubmitRequestTimer()
     this.setData({ submitting: true })
+    const isCurrent = () => submitSerial === this._submitRequestSerial
+    const deliver = (callback) => this.deliverPrivacyMutation(action, isCurrent, callback)
 
     let settled = false
     const finishRequest = () => {
@@ -255,10 +262,12 @@ Page({
       if (!finishRequest()) {
         return
       }
-      this.setData({ submitting: false })
-      wx.showToast({
-        title: formatToastTitle(message, "提交失败"),
-        icon: "none"
+      deliver(() => {
+        this.setData({ submitting: false })
+        wx.showToast({
+          title: formatToastTitle(message, "提交失败"),
+          icon: "none"
+        })
       })
     }
 
@@ -278,25 +287,27 @@ Page({
           return
         }
         const result = res && res.result ? res.result : null
-        if (!result || !result.ok) {
-          this.setData({ submitting: false })
-          wx.showToast({
-            title: formatToastTitle(result && result.message, "提交失败"),
-            icon: "none"
+        deliver(() => {
+          if (!result || !result.ok) {
+            this.setData({ submitting: false })
+            wx.showToast({
+              title: formatToastTitle(result && result.message, "提交失败"),
+              icon: "none"
+            })
+            return
+          }
+          clearUnsaved(this)
+          this._submissionSnapshot = null
+          this.setData({
+            ...buildDescriptionState(""),
+            submitting: false
           })
-          return
-        }
-        clearUnsaved(this)
-        this._submissionSnapshot = null
-        this.setData({
-          ...buildDescriptionState(""),
-          submitting: false
+          wx.showToast({
+            title: "申请已提交",
+            icon: "success"
+          })
+          this.fetchList()
         })
-        wx.showToast({
-          title: "申请已提交",
-          icon: "success"
-        })
-        this.fetchList()
       },
       fail: (error) => {
         handleFailure(error && (error.errMsg || error.message))
@@ -316,6 +327,15 @@ Page({
     }
     clearTimeout(this._submitRequestTimer)
     this._submitRequestTimer = null
+  },
+
+  deliverPrivacyMutation(action, isCurrent, callback) {
+    if (!isCurrent() || this._nativeActionsUnloaded === true) return
+    if (!isPageNativeActionActive(this, action)) {
+      this._privacyMutationDeferredResult = () => this.deliverPrivacyMutation(action, isCurrent, callback)
+      return
+    }
+    callback()
   },
 
   handleRetry() {
@@ -365,6 +385,8 @@ Page({
     ) {
       return
     }
+    const action = beginPageNativeAction(this, { requireCurrent: true })
+    if (!isPageNativeActionActive(this, action)) return
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       wx.showToast({
         title: "云能力未初始化",
@@ -379,6 +401,8 @@ Page({
     this.finishListRequestEffects()
     this.clearCancelRequestTimer()
     this.setData({ cancellingId: requestId, loading: false })
+    const isCurrent = () => cancelSerial === this._cancelRequestSerial
+    const deliver = (callback) => this.deliverPrivacyMutation(action, isCurrent, callback)
 
     let settled = false
     const finishRequest = () => {
@@ -393,10 +417,12 @@ Page({
       if (!finishRequest()) {
         return
       }
-      this.setData({ cancellingId: "" })
-      wx.showToast({
-        title: formatToastTitle(message, "撤回失败"),
-        icon: "none"
+      deliver(() => {
+        this.setData({ cancellingId: "" })
+        wx.showToast({
+          title: formatToastTitle(message, "撤回失败"),
+          icon: "none"
+        })
       })
     }
 
@@ -412,23 +438,25 @@ Page({
           return
         }
         const result = res && res.result ? res.result : null
-        if (!result || !result.ok) {
-          this.setData({ cancellingId: "" })
+        deliver(() => {
+          if (!result || !result.ok) {
+            this.setData({ cancellingId: "" })
+            wx.showToast({
+              title: formatToastTitle(result && result.message, "撤回失败"),
+              icon: "none"
+            })
+            if (result && ["STATUS_CONFLICT", "STATUS_NOT_ALLOWED"].includes(result.code)) {
+              this.fetchList()
+            }
+            return
+          }
           wx.showToast({
-            title: formatToastTitle(result && result.message, "撤回失败"),
+            title: "申请已撤回",
             icon: "none"
           })
-          if (result && ["STATUS_CONFLICT", "STATUS_NOT_ALLOWED"].includes(result.code)) {
-            this.fetchList()
-          }
-          return
-        }
-        wx.showToast({
-          title: "申请已撤回",
-          icon: "none"
+          this.setData({ cancellingId: "" })
+          this.fetchList()
         })
-        this.setData({ cancellingId: "" })
-        this.fetchList()
       },
       fail: (error) => {
         handleFailure(error && (error.errMsg || error.message))

@@ -22,12 +22,12 @@ const DEFAULT_RENTAL_TERMS = {
 }
 const DEFAULT_CONFIG = {
   ...normalizeServiceConfig({}),
-  brandName: "极境车库",
+  brandName: "爱迦租车",
   servicePhone: "",
   wxKfCorpId: "",
   wxKfExtInfo: "",
   mineUserDesc: "查看预约、个人信息申请与车库服务",
-  garagePageTitle: "极境车库",
+  garagePageTitle: "爱迦租车",
   garagePageSubtitle: "甄选座驾，为每一次出发预留专属席位",
   announcementText: "",
   cityOptions: ["杭州", "上海"],
@@ -49,19 +49,41 @@ function normalizeText(value, maxLen) {
   return maxLen && text.length > maxLen ? text.slice(0, maxLen) : text
 }
 
+function normalizeBrandText(value, maxLen) {
+  return normalizeText(value, maxLen).replace(/极境车库/g, "爱迦租车").replace(/极境/g, "爱迦")
+}
+
+function isValidServicePhone(value) {
+  const phone = String(value || "").trim()
+  const digitCount = phone.replace(/\D/g, "").length
+  return /^\+?[0-9-]{6,20}$/.test(phone) && digitCount >= 6 && digitCount <= 15
+}
+
+function validateContactConfig(input) {
+  const phone = input.servicePhone
+  if (phone !== undefined && (typeof phone !== "string" || (phone.trim() && !isValidServicePhone(phone)))) {
+    return { field: "servicePhone", message: "客服电话格式不正确" }
+  }
+  const templateId = input.bookingStatusTemplateId
+  if (templateId !== undefined && (typeof templateId !== "string" || (templateId.trim() && !/^[A-Za-z0-9_-]{10,128}$/.test(templateId.trim())))) {
+    return { field: "bookingStatusTemplateId", message: "订阅消息模板 ID 格式不正确" }
+  }
+  return null
+}
+
 function normalizeRentalTerms(raw) {
   const input = raw && typeof raw === "object" ? raw : {}
   return Object.keys(DEFAULT_RENTAL_TERMS).reduce((result, key) => {
-    result[key] = normalizeText(input[key], 200) || DEFAULT_RENTAL_TERMS[key]
+    result[key] = normalizeBrandText(input[key], 200) || DEFAULT_RENTAL_TERMS[key]
     return result
   }, {})
 }
 
 function normalizeConfig(raw) {
   const input = raw && typeof raw === "object" ? raw : {}
-  const mineUserDesc = normalizeText(input.mineUserDesc, 80)
-  const garagePageSubtitle = normalizeText(input.garagePageSubtitle, 80)
-  const bookingPrivacyTip = normalizeText(input.bookingPrivacyTip, 300)
+  const mineUserDesc = normalizeBrandText(input.mineUserDesc, 80)
+  const garagePageSubtitle = normalizeBrandText(input.garagePageSubtitle, 80)
+  const bookingPrivacyTip = normalizeBrandText(input.bookingPrivacyTip, 300)
   const cityOptions = Array.isArray(input.cityOptions)
     ? input.cityOptions
         .map((item) => normalizeText(item, 20))
@@ -72,17 +94,17 @@ function normalizeConfig(raw) {
 
   return {
     ...normalizeServiceConfig(input),
-    brandName: normalizeText(input.brandName, 20) || DEFAULT_CONFIG.brandName,
+    brandName: normalizeBrandText(input.brandName, 20) || DEFAULT_CONFIG.brandName,
     servicePhone: normalizeText(input.servicePhone, 20),
     wxKfCorpId: normalizeText(input.wxKfCorpId, 64),
     wxKfExtInfo: normalizeText(input.wxKfExtInfo, 512),
     mineUserDesc: mineUserDesc || DEFAULT_CONFIG.mineUserDesc,
-    garagePageTitle: normalizeText(input.garagePageTitle, 20) || DEFAULT_CONFIG.garagePageTitle,
+    garagePageTitle: normalizeBrandText(input.garagePageTitle, 20) || DEFAULT_CONFIG.garagePageTitle,
     garagePageSubtitle:
       !garagePageSubtitle
         ? DEFAULT_CONFIG.garagePageSubtitle
         : garagePageSubtitle,
-    announcementText: normalizeText(input.announcementText, 120),
+    announcementText: normalizeBrandText(input.announcementText, 120),
     cityOptions,
     hotSearchKeywords: Array.isArray(input.hotSearchKeywords)
       ? input.hotSearchKeywords
@@ -90,8 +112,8 @@ function normalizeConfig(raw) {
           .filter(Boolean)
           .slice(0, 10)
       : DEFAULT_CONFIG.hotSearchKeywords.slice(),
-    faqContent: normalizeText(input.faqContent, 1000) || DEFAULT_CONFIG.faqContent,
-    rulesContent: normalizeText(input.rulesContent, 1000) || DEFAULT_CONFIG.rulesContent,
+    faqContent: normalizeBrandText(input.faqContent, 1000) || DEFAULT_CONFIG.faqContent,
+    rulesContent: normalizeBrandText(input.rulesContent, 1000) || DEFAULT_CONFIG.rulesContent,
     bookingStatusTemplateId: normalizeText(input.bookingStatusTemplateId, 128),
     rentalTerms: normalizeRentalTerms(input.rentalTerms),
     bookingPrivacyTip: bookingPrivacyTip || DEFAULT_CONFIG.bookingPrivacyTip
@@ -113,7 +135,7 @@ exports.main = async (event) => {
     const current = list.length ? list[0] : null
     if (current && event && event.requireStoredConfig) {
       const stored = current.value || {}
-      const error = validateServiceConfig(stored) || validateCityOptions(stored.cityOptions)
+      const error = validateServiceConfig(stored) || validateCityOptions(stored.cityOptions) || validateContactConfig(stored)
       if (error) {
         return { ok: false, code: "STORED_CONFIG_INVALID", message: "已保存配置存在无效字段，请核对后再编辑", details: { errors: [error] } }
       }

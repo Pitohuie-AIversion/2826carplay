@@ -277,4 +277,31 @@ describe("pages/system-health", () => {
     expect(wxss).toContain(".health-skeleton-check-status")
     expect(wxss).toContain(".refresh-link-pressed")
   })
+
+  test.each(["return", "toggle"])("跨天 %s 时重新核验人工确认，不把昨天勾选写入今天", (action) => {
+    jest.useFakeTimers()
+    jest.setSystemTime(new Date(2026, 9, 24, 23, 59))
+    let saved = null
+    global.wx = {
+      getStorageSync: jest.fn(() => saved),
+      setStorageSync: jest.fn((key, value) => { saved = value })
+    }
+    const page = createPage(loadPageDefinition(), { loading: false, summary: {
+      total: 1, passed: 1, warnings: 0, failed: 0
+    } })
+    page.restoreManualChecks()
+    page.handleManualToggle({ currentTarget: { dataset: { key: "indexes" } } })
+    expect(page.data.manualCompletedCount).toBe(1)
+    jest.setSystemTime(new Date(2026, 9, 25, 0, 1))
+    if (action === "return") {
+      if (page.onShow) page.onShow()
+      expect(page.data.manualCompletedCount).toBe(0)
+    } else {
+      page.handleManualToggle({ currentTarget: { dataset: { key: "quota" } } })
+      expect(page.data.manualCompletedCount).toBe(1)
+      expect(saved).toEqual({ day: "2026-10-25", completedKeys: ["quota"] })
+    }
+    expect(page.data.manualChecks.find((item) => item.key === "indexes").checked).toBe(false)
+    expect(page.data.summary.ready).toBe(false)
+  })
 })

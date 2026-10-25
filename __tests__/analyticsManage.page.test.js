@@ -34,6 +34,7 @@ describe("pages/analytics-manage cleanup", () => {
     jest.useRealTimers()
     delete global.Page
     delete global.wx
+    delete global.getCurrentPages
   })
 
   test("分析概览无回调时超时收尾并忽略迟到结果", () => {
@@ -378,6 +379,123 @@ describe("pages/analytics-manage cleanup", () => {
 
     expect(global.wx.showModal).not.toHaveBeenCalled()
     expect(global.wx.cloud.callFunction).not.toHaveBeenCalled()
+  })
+
+  test.each(["business", "network", "timeout"])("清理 %s 失败在返回本页后反馈一次，不关闭其他页加载提示", (kind) => {
+    jest.useFakeTimers()
+    const requests = []
+    global.wx = {
+      showLoading: jest.fn(), hideLoading: jest.fn(), showToast: jest.fn(), showModal: jest.fn(),
+      cloud: { callFunction: jest.fn((options) => requests.push(options)) }
+    }
+    const page = createPage(loadPageDefinition(), { canCleanup: true, loading: false })
+    global.getCurrentPages = () => [page]
+    page.runCleanup()
+    if (page.onHide) page.onHide()
+    expect(global.wx.hideLoading).toHaveBeenCalledTimes(1)
+    global.getCurrentPages = () => [page, {}]
+    global.wx.hideLoading.mockClear()
+    page.setData.mockClear()
+    if (kind === "business") requests[0].success({ result: { ok: false, message: "没有清理权限" } })
+    if (kind === "network") requests[0].fail({ errMsg: "network error" })
+    if (kind === "timeout") jest.advanceTimersByTime(20 * 1000)
+    expect(global.wx.showToast).not.toHaveBeenCalled()
+    expect(global.wx.hideLoading).not.toHaveBeenCalled()
+    expect(page.setData).not.toHaveBeenCalled()
+    expect(page.data.cleanupLoading).toBe(true)
+    global.getCurrentPages = () => [page]
+    page.onShow()
+    page.onShow()
+    expect(page.data.cleanupLoading).toBe(false)
+    expect(global.wx.showToast).toHaveBeenCalledTimes(1)
+    expect(requests).toHaveLength(1)
+  })
+
+  test("后台完成清理后保留统计，返回本页展示结果并且只刷新一次", () => {
+    const requests = []
+    global.wx = {
+      showLoading: jest.fn(), hideLoading: jest.fn(), showToast: jest.fn(), showModal: jest.fn(),
+      cloud: { callFunction: jest.fn((options) => requests.push(options)) }
+    }
+    const page = createPage(loadPageDefinition(), { canCleanup: true, loading: false })
+    global.getCurrentPages = () => [page]
+    page.runCleanup()
+    if (page.onHide) page.onHide()
+    global.getCurrentPages = () => [page, {}]
+    requests[0].success({ result: { ok: true, processed: 3, deleted: 2, failed: 1, hasMore: true } })
+    expect(global.wx.showModal).not.toHaveBeenCalled()
+    expect(page.data.cleanupLoading).toBe(true)
+    global.getCurrentPages = () => [page]
+    page.onShow()
+    page.onShow()
+    expect(global.wx.showModal).toHaveBeenCalledTimes(1)
+    expect(global.wx.showModal.mock.calls[0][0].content).toContain("处理 3 条，成功删除 2 条，失败 1 条")
+    expect(requests).toHaveLength(1)
+    const modal = global.wx.showModal.mock.calls[0][0]
+    modal.complete()
+    modal.complete()
+    expect(page.data.cleanupLoading).toBe(false)
+    expect(requests).toHaveLength(2)
+    expect(requests[1].name).toBe("analyticsOverview")
+  })
+
+  test.each(["success", "failure"])("卸载后丢弃后台挂起的清理 %s 反馈", (kind) => {
+    const requests = []
+    global.wx = {
+      showLoading: jest.fn(), hideLoading: jest.fn(), showToast: jest.fn(), showModal: jest.fn(),
+      cloud: { callFunction: jest.fn((options) => requests.push(options)) }
+    }
+    const page = createPage(loadPageDefinition(), { canCleanup: true, loading: false })
+    global.getCurrentPages = () => [page]
+    page.runCleanup()
+    if (page.onHide) page.onHide()
+    global.getCurrentPages = () => [page, {}]
+    requests[0].success({ result: { ok: kind === "success", processed: 1, deleted: 1, failed: 0 } })
+    page.onUnload()
+    global.getCurrentPages = () => [page]
+    page.setData.mockClear()
+    page.onShow()
+    expect(page.setData).not.toHaveBeenCalled()
+    expect(global.wx.showModal).not.toHaveBeenCalled()
+    expect(global.wx.showToast).not.toHaveBeenCalled()
+    expect(requests).toHaveLength(1)
+  })
+
+  test("清理统计弹窗在后台关闭时保留写锁，回页只刷新一次", () => {
+    const requests = []
+    global.wx = {
+      showLoading: jest.fn(), hideLoading: jest.fn(), showToast: jest.fn(), showModal: jest.fn(),
+      cloud: { callFunction: jest.fn((options) => requests.push(options)) }
+    }
+    const page = createPage(loadPageDefinition(), { canCleanup: true, loading: false })
+    global.getCurrentPages = () => [page]
+    page.runCleanup()
+    requests[0].success({ result: { ok: true, processed: 1, deleted: 1, failed: 0 } })
+    const modal = global.wx.showModal.mock.calls[0][0]
+    global.getCurrentPages = () => [page, {}]
+    page.onHide()
+    page.setData.mockClear()
+    modal.complete()
+    expect(page.setData).not.toHaveBeenCalled()
+    expect(page.data.cleanupLoading).toBe(true)
+    expect(requests).toHaveLength(1)
+    global.getCurrentPages = () => [page]
+    page.onShow()
+    page.onShow()
+    modal.complete()
+    expect(page.data.cleanupLoading).toBe(false)
+    expect(requests).toHaveLength(2)
+    expect(global.wx.showModal).toHaveBeenCalledTimes(1)
+  })
+
+  test("后台页面不启动新的清理任务", () => {
+    global.wx = { cloud: { callFunction: jest.fn() }, showLoading: jest.fn() }
+    const page = createPage(loadPageDefinition(), { canCleanup: true, loading: false })
+    global.getCurrentPages = () => [page, {}]
+    page.runCleanup()
+    expect(global.wx.cloud.callFunction).not.toHaveBeenCalled()
+    expect(global.wx.showLoading).not.toHaveBeenCalled()
+    expect(page.data.cleanupLoading).toBe(false)
   })
 
   test("分析结果构建指标图标和分阶段漏斗比例", () => {

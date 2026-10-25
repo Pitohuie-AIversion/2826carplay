@@ -20,7 +20,7 @@ const CONTENT_MAP = {
   },
   rules: {
     title: "平台规则",
-    heroDesc: "使用极境车库服务前需要了解的约定",
+    heroDesc: "使用爱迦租车服务前需要了解的约定",
     documentTitle: "服务规则与使用约定"
   },
   privacy: {
@@ -28,7 +28,7 @@ const CONTENT_MAP = {
     heroDesc: "了解我们如何收集、使用与保护您的信息",
     documentTitle: "个人信息处理说明",
     defaultContent:
-      "更新日期：2026年8月21日\n\n1. 信息收集\n当您提交车辆预约时，我们会收集您主动填写的姓名、手机号、取还车日期、城市及备注，并通过微信提供的 OpenID 识别和展示您本人的预约记录。为改进车辆内容与预约流程，我们还会记录不包含 OpenID、预约 ID 和表单内容的页面行为类型、可选内容 ID、车辆 ID、渠道与场景枚举及发生时间。\n\n2. 使用目的\n预约信息仅用于车辆预约登记、客服沟通、档期确认、预约查询与取消，以及必要的安全审计和故障排查。匿名行为事件仅用于汇总内容与车辆关注度、分享落地和预约转化趋势，不用于建立用户个人行为画像。\n\n3. 保存与保护\n信息存储在微信云开发环境中，仅授权工作人员可按职责访问。我们仅在实现预约服务和履行法定义务所必需的期限内保存；目的实现后将依法删除或匿名化，法律法规另有要求的除外。\n\n4. 信息共享\n除提供云开发基础设施所必需的处理、取得您的另行同意或法律法规要求外，我们不会主动向第三方出售或提供您的个人信息。\n\n5. 您的权利\n您可以在【我的预约】查看和取消预约。如需查询、更正或删除个人信息，可通过【我的 → 个人信息申请】在线提交，并查看处理进度与反馈。\n\n6. 未成年人保护\n未成年人应在监护人同意和指导下使用预约服务。\n\n7. 联系我们\n如对本政策或个人信息处理有疑问，请通过小程序内在线客服或客服电话联系极境车库运营方。"
+      "更新日期：2026年8月21日\n\n1. 信息收集\n当您提交车辆预约时，我们会收集您主动填写的姓名、手机号、取还车日期、城市及备注，并通过微信提供的 OpenID 识别和展示您本人的预约记录。为改进车辆内容与预约流程，我们还会记录不包含 OpenID、预约 ID 和表单内容的页面行为类型、可选内容 ID、车辆 ID、渠道与场景枚举及发生时间。\n\n2. 使用目的\n预约信息仅用于车辆预约登记、客服沟通、档期确认、预约查询与取消，以及必要的安全审计和故障排查。匿名行为事件仅用于汇总内容与车辆关注度、分享落地和预约转化趋势，不用于建立用户个人行为画像。\n\n3. 保存与保护\n信息存储在微信云开发环境中，仅授权工作人员可按职责访问。我们仅在实现预约服务和履行法定义务所必需的期限内保存；目的实现后将依法删除或匿名化，法律法规另有要求的除外。\n\n4. 信息共享\n除提供云开发基础设施所必需的处理、取得您的另行同意或法律法规要求外，我们不会主动向第三方出售或提供您的个人信息。\n\n5. 您的权利\n您可以在【我的预约】查看和取消预约。如需查询、更正或删除个人信息，可通过【我的 → 个人信息申请】在线提交，并查看处理进度与反馈。\n\n6. 未成年人保护\n未成年人应在监护人同意和指导下使用预约服务。\n\n7. 联系我们\n如对本政策或个人信息处理有疑问，请通过小程序内在线客服或客服电话联系爱迦租车运营方。"
   }
 }
 
@@ -148,7 +148,10 @@ Page({
     if (isPageCurrent(this) && typeof wx.setNavigationBarTitle === "function") {
       wx.setNavigationBarTitle({ title: this.data.pageTitle || "服务指南" })
     }
-    if (this._contentHasShown) this.loadContent(this.data.guideMode ? "" : this.data.type)
+    if (this._contentHasShown) {
+      this.loadContent(this.data.guideMode ? "" : this.data.type)
+      if (this.data.guideMode && this._guideContentId) this.loadGuide(this._guideContentId)
+    }
     this._contentHasShown = true
   },
 
@@ -166,8 +169,13 @@ Page({
       this.applyContent("")
     }
     this._guideContentId = contentId
+    this.setData({
+      guideLoading: !this.data.guide,
+      guideError: "",
+      guideNotice: this.data.guide ? "正在更新已保存的内容…" : ""
+    })
     try {
-      if (contentId && typeof wx !== "undefined" && typeof wx.getStorageSync === "function") {
+      if (!this.data.guide && contentId && typeof wx !== "undefined" && typeof wx.getStorageSync === "function") {
         const cached = wx.getStorageSync(`guide_${contentId}`)
         if (cached && cached.guide) {
           const guide = cached.guide
@@ -241,8 +249,15 @@ Page({
       try {
         if (typeof wx.removeStorageSync === "function") wx.removeStorageSync(`guide_${this._guideContentId}`)
       } catch (e) {}
-      this.setData({ guide: null, relatedVehicles: [], guideLoading: false, guideError: "内容已下线或尚未发布", guideNotice: "" })
+      this.setData({
+        guide: null, relatedVehicles: [], guideLoading: false,
+        guideError: "内容已下线或尚未发布", guideNotice: "",
+        pageTitle: "场景指南", heroDesc: "内容已下线或尚未发布", documentTitle: ""
+      })
       this.applyContent("")
+      if (isPageCurrent(this) && typeof wx.setNavigationBarTitle === "function") {
+        wx.setNavigationBarTitle({ title: "场景指南" })
+      }
       return
     }
     this.setData({
@@ -443,7 +458,7 @@ Page({
     wx.makePhoneCall({
       phoneNumber: phone,
       fail: (error) => {
-        if (!isPageNativeActionActive(this, action)) {
+        if (!isPageNativeActionActive(this, action) || String(this.data.servicePhone || "").trim() !== phone) {
           return
         }
         const message = error && (error.errMsg || error.message)

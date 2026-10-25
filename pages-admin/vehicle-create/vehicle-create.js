@@ -8,7 +8,7 @@ const {
 } = require("../../shared/vehicleFormProgress")
 const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
 const { formatToastTitle } = require("../../shared/uiFeedback")
-const { clearUnsaved, markUnsaved } = require("../../shared/unsavedChanges")
+const { clearUnsaved, disposeUnsavedChanges, markUnsaved, syncUnsavedChanges } = require("../../shared/unsavedChanges")
 const { activatePageNativeActions, beginPageNativeAction, cancelPageNativeActions, isPageNativeActionActive, isPageCurrent } = require("../../shared/pageNativeAction")
 const VEHICLE_CREATE_TIMEOUT_MS = 20 * 1000
 const {
@@ -184,14 +184,23 @@ Page({
     })
   },
   onUnload() {
+    disposeUnsavedChanges(this)
     cancelPageNativeActions(this)
     this._createdVehiclePending = null
+    this._vehicleCreateDeferredResult = null
     cancelPagePermissionCheck(this)
     this._vehicleCreateUnloaded = true
     this._vehicleCreateRequestId = Number(this._vehicleCreateRequestId || 0) + 1
     this.clearVehicleCreateTimer()
   },
   onShow() {
+    syncUnsavedChanges(this)
+    const pending = this._vehicleCreateDeferredResult
+    if (pending) {
+      this._vehicleCreateDeferredResult = null
+      pending()
+      return
+    }
     this.showCreatedVehiclePrompt()
   },
   showCreatedVehiclePrompt() {
@@ -472,6 +481,7 @@ Page({
     }
     const requestId = Number(this._vehicleCreateRequestId || 0) + 1
     this._vehicleCreateRequestId = requestId
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     this.clearVehicleCreateTimer()
     this.setData({ isSubmitting: true })
     let settled = false
@@ -484,14 +494,24 @@ Page({
       this.clearVehicleCreateTimer()
       return true
     }
+    const deliverResult = (callback) => {
+      if (!isCurrent()) return
+      if (!isPageNativeActionActive(this, action)) {
+        this._vehicleCreateDeferredResult = () => deliverResult(callback)
+        return
+      }
+      callback()
+    }
     const handleFailure = (message) => {
       if (!finishRequest()) {
         return
       }
-      this.setData({ isSubmitting: false })
-      wx.showToast({
-        title: formatToastTitle(message, "新增失败"),
-        icon: "none"
+      deliverResult(() => {
+        this.setData({ isSubmitting: false })
+        wx.showToast({
+          title: formatToastTitle(message, "新增失败"),
+          icon: "none"
+        })
       })
     }
     this._vehicleCreateTimer = setTimeout(() => {
@@ -504,26 +524,23 @@ Page({
         if (!finishRequest()) {
           return
         }
-        const result = res && res.result ? res.result : null
-        if (result && result.ok) {
-          clearUnsaved(this)
-          this._createdVehiclePending = { id: result.id, requestId }
-          this.showCreatedVehiclePrompt()
-          return
-        }
-        const title =
-          result &&
-          result.code === "VALIDATION_ERROR" &&
-          result.details &&
-          result.details.errors
-            ? this.getValidationMessage(result)
-            : (result && result.message) || "新增失败"
-        wx.showToast({
-          title,
-          icon: "none"
-        })
-        this.setData({
-          isSubmitting: false
+        deliverResult(() => {
+          const result = res && res.result ? res.result : null
+          if (result && result.ok) {
+            clearUnsaved(this)
+            this._createdVehiclePending = { id: result.id, requestId }
+            this.showCreatedVehiclePrompt()
+            return
+          }
+          const title =
+            result &&
+            result.code === "VALIDATION_ERROR" &&
+            result.details &&
+            result.details.errors
+              ? this.getValidationMessage(result)
+              : (result && result.message) || "新增失败"
+          wx.showToast({ title, icon: "none" })
+          this.setData({ isSubmitting: false })
         })
       },
       fail: (error) => {

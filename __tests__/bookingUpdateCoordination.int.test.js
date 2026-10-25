@@ -89,6 +89,67 @@ describe("cloudfunctions/bookingUpdateCoordination integration", () => {
     expect(mocks.bookingUpdate).toHaveBeenCalledWith({ data: expect.objectContaining({ tags: [] }) })
   })
 
+  test("两位顾问基于相同标签旧值保存时后提交者不能覆盖标签或其他安排", async () => {
+    const booking = { status: "contacted", tags: [], schedulePriority: "normal" }
+    const mocks = loadModule({ booking })
+    expect(await mocks.mod.main({ id: "booking_1", tags: ["老客户"], expectedValues: { tags: [] } })).toMatchObject({ ok: true })
+    expect(await mocks.mod.main({ id: "booking_1", tags: ["高意向"], schedulePriority: "priority", expectedValues: { tags: [], schedulePriority: "normal" } })).toMatchObject({ ok: false, code: "VERSION_CONFLICT" })
+    expect(booking).toMatchObject({ tags: ["老客户"], schedulePriority: "normal" })
+    expect(mocks.bookingUpdate).toHaveBeenCalledTimes(1)
+    expect(mocks.auditAdd).toHaveBeenCalledTimes(1)
+  })
+
+  test("标签保存回执丢失后重试不能把另一位顾问的新标签覆盖回旧结果", async () => {
+    const booking = { status: "contacted", tags: [] }
+    const mocks = loadModule({ booking })
+    const original = { id: "booking_1", tags: ["老客户"], expectedValues: { tags: [] } }
+    expect(await mocks.mod.main(original)).toMatchObject({ ok: true, changed: true })
+    expect(await mocks.mod.main({ id: "booking_1", tags: ["老客户", "高意向"], expectedValues: { tags: ["老客户"] } })).toMatchObject({ ok: true, changed: true })
+    expect(await mocks.mod.main(original)).toMatchObject({ ok: false, code: "VERSION_CONFLICT" })
+    expect(booking.tags).toEqual(["老客户", "高意向"])
+    expect(mocks.bookingUpdate).toHaveBeenCalledTimes(2)
+    expect(mocks.auditAdd).toHaveBeenCalledTimes(2)
+  })
+
+  test("标签目标已保存时旧基线重试仍幂等，不重复审计", async () => {
+    const booking = { status: "contacted", tags: [] }
+    const mocks = loadModule({ booking })
+    const input = { id: "booking_1", tags: ["老客户"], expectedValues: { tags: [] } }
+    expect(await mocks.mod.main(input)).toMatchObject({ ok: true, changed: true, tags: ["老客户"] })
+    expect(await mocks.mod.main(input)).toMatchObject({ ok: true, changed: false, tags: ["老客户"] })
+    expect(mocks.bookingUpdate).toHaveBeenCalledTimes(1)
+    expect(mocks.auditAdd).toHaveBeenCalledTimes(1)
+  })
+
+  test("未设置标签的 null 基线可首次清空，随后不能把明确空数组当成仍未设置", async () => {
+    const booking = { status: "contacted" }
+    const mocks = loadModule({ booking })
+    const clear = { id: "booking_1", tags: [], expectedValues: { tags: null } }
+    expect(await mocks.mod.main(clear)).toMatchObject({ ok: true, changed: true, tags: [] })
+    expect(await mocks.mod.main(clear)).toMatchObject({ ok: true, changed: false, tags: [] })
+    expect(await mocks.mod.main({ ...clear, tags: ["高意向"] })).toMatchObject({ ok: false, code: "VERSION_CONFLICT" })
+    expect(booking.tags).toEqual([])
+    expect(mocks.bookingUpdate).toHaveBeenCalledTimes(1)
+  })
+
+  test("未设置标签不能用明确空数组基线覆盖，重新读取 null 基线后可以保存", async () => {
+    const booking = { status: "contacted" }
+    const mocks = loadModule({ booking })
+    const input = { id: "booking_1", tags: ["长租意向"], expectedValues: { tags: [] } }
+    expect(await mocks.mod.main(input)).toMatchObject({ ok: false, code: "VERSION_CONFLICT" })
+    expect(await mocks.mod.main({ ...input, expectedValues: { tags: null } })).toMatchObject({ ok: true, tags: ["长租意向"] })
+    expect(mocks.bookingUpdate).toHaveBeenCalledTimes(1)
+  })
+
+  test.each(["老客户", {}, false, ["老客户", null]].map((value) => [value]))("显式非法标签基线 %p 不应降级成无基线保存", async (tags) => {
+    const booking = { status: "contacted", tags: [] }
+    const mocks = loadModule({ booking })
+    expect(await mocks.mod.main({ id: "booking_1", tags: ["高意向"], expectedValues: { tags } })).toMatchObject({ ok: false, code: "VALIDATION_ERROR" })
+    expect(booking.tags).toEqual([])
+    expect(mocks.bookingUpdate).not.toHaveBeenCalled()
+    expect(mocks.auditAdd).not.toHaveBeenCalled()
+  })
+
   test.each([["未知标签"], ["老客户", "高意向", "需要送车", "长租意向", "车损敏感", "跨城用车"]])("拒绝不受支持或过多标签 %j", async (...tags) => {
     const mocks = loadModule({ booking: { status: "contacted" } })
     expect(await mocks.mod.main({ id: "booking_1", tags })).toMatchObject({ ok: false, code: "VALIDATION_ERROR" })

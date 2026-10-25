@@ -301,7 +301,7 @@ describe("pages/mine 运营待办角标", () => {
     })
 
     expect(page.data.permissionsReady).toBe(false)
-    expect(page.data.brandName).toBe("极境车库")
+    expect(page.data.brandName).toBe("爱迦租车")
   })
 
   test("运营摘要超时后恢复入口并忽略迟到结果", () => {

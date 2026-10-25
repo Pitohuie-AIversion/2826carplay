@@ -184,13 +184,8 @@ Page({
     if (!this.data.keyword) {
       return
     }
-    const listRequestId = Number(this._errorListRequestId || 0)
-    this.setData({ keyword: "" }, () => {
-      if (listRequestId !== Number(this._errorListRequestId || 0)) {
-        return
-      }
-      this.fetchList()
-    })
+    this.setData({ keyword: "" })
+    this.fetchList({ keyword: "" })
   },
   handleSearch() {
     this.fetchList()
@@ -209,23 +204,18 @@ Page({
       currentFunc: value,
       currentFuncLabel: value === "all" ? "全部函数" : FUNC_LABEL_MAP[value] || "未知服务"
     })
-    this.fetchList()
+    this.fetchList({ func: value })
   },
   handleResetFilters() {
     if (!this.data.keyword && this.data.currentFunc === "all") {
       return
     }
-    const listRequestId = Number(this._errorListRequestId || 0)
     this.setData({
       keyword: "",
       currentFunc: "all",
       currentFuncLabel: "全部函数"
-    }, () => {
-      if (listRequestId !== Number(this._errorListRequestId || 0)) {
-        return
-      }
-      this.fetchList()
     })
+    this.fetchList({ keyword: "", func: "all" })
   },
   handleLoadMore() {
     if (this.data.loading || !this.data.hasMore) {
@@ -244,8 +234,12 @@ Page({
       })
       return
     }
-    const filter = this.data.currentFunc === "all" ? "" : this.data.currentFunc
-    const keyword = String(this.data.keyword || "")
+    const query = this._errorListFilters || {
+      func: this.data.currentFunc === "all" ? "" : this.data.currentFunc,
+      keyword: String(this.data.keyword || "")
+    }
+    const filter = query.func
+    const keyword = query.keyword
     const exportSerial = Number(this._exportRequestSerial || 0) + 1
     this._exportRequestSerial = exportSerial
     const nativeAction = beginPageNativeAction(this, { requireCurrent: true })
@@ -446,11 +440,21 @@ Page({
   },
   fetchList(input) {
     const done = typeof input === "function" ? input : input && input.done
-    const append = Boolean(input && typeof input === "object" && input.append)
-    const nextPage = append ? this.data.page + 1 : 0
-    const selectedFilter = input && input.func !== undefined ? input.func : this.data.currentFunc
+    let append = Boolean(input && typeof input === "object" && input.append)
+    // Pagination and export belong to the displayed query, not the search draft.
+    const baseFilters = append && this._errorListFilters ? this._errorListFilters : {
+      func: this.data.currentFunc,
+      keyword: this.data.keyword
+    }
+    const selectedFilter = input && input.func !== undefined ? input.func : baseFilters.func
     const func = selectedFilter === "all" ? "" : selectedFilter
-    const keyword = String(input && input.keyword !== undefined ? input.keyword : this.data.keyword || "")
+    const keyword = String(input && input.keyword !== undefined ? input.keyword : baseFilters.keyword || "").trim()
+    if (append && this._errorListFilters &&
+      (func !== this._errorListFilters.func || keyword !== this._errorListFilters.keyword)) {
+      append = false
+    }
+    const nextPage = append ? this.data.page + 1 : 0
+    if (!append) this._errorListFilters = null
     const requestId = Number(this._errorListRequestId || 0) + 1
     this._errorListRequestId = requestId
     this.finishErrorListRequestEffects()
@@ -521,10 +525,10 @@ Page({
             initialLoading: false,
             loading: false,
             list: append ? this.data.list : [],
-            hasMore: false,
-            total: 0,
-            truncated: false,
-            page: 0
+            hasMore: append ? this.data.hasMore : false,
+            total: append ? this.data.total : 0,
+            truncated: append ? this.data.truncated : false,
+            page: append ? this.data.page : 0
           })
           return
         }
@@ -541,6 +545,7 @@ Page({
               }
             })
           : []
+        this._errorListFilters = { func, keyword }
         this.setData({
           initialLoading: false,
           loading: false,

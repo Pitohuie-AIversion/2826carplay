@@ -1,6 +1,6 @@
 const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
 const { formatToastTitle } = require("../../shared/uiFeedback")
-const { clearUnsaved, markUnsaved } = require("../../shared/unsavedChanges")
+const { clearUnsaved, disposeUnsavedChanges, markUnsaved, syncUnsavedChanges } = require("../../shared/unsavedChanges")
 const { isPageCurrent } = require("../../shared/pageNativeAction")
 const { clearOperationConfigCache } = require("../../shared/operationConfigRequest")
 const { normalizeServiceConfig, validateServiceConfig, validateCityOptions, MAX_SERVICE_HUBS, HUB_TYPES } = require("../../shared/serviceConfig")
@@ -19,12 +19,12 @@ const DEFAULT_RENTAL_TERMS = {
 }
 const DEFAULT_CONFIG = {
   ...normalizeServiceConfig({}),
-  brandName: "极境车库",
+  brandName: "爱迦租车",
   servicePhone: "",
   wxKfCorpId: "",
   wxKfExtInfo: "",
   mineUserDesc: "查看预约、个人信息申请与车库服务",
-  garagePageTitle: "极境车库",
+  garagePageTitle: "爱迦租车",
   garagePageSubtitle: "甄选座驾，为每一次出发预留专属席位",
   announcementText: "",
   cityOptions: ["杭州", "上海"],
@@ -42,8 +42,14 @@ function isValidServicePhone(value) {
   return /^\+?[0-9-]{6,20}$/.test(phone) && digitCount >= 6 && digitCount <= 15
 }
 function normalizeGarageSubtitle(value) {
-  const subtitle = String(value || "").trim()
+  const subtitle = normalizeBrandText(String(value || "").trim())
   return !subtitle ? DEFAULT_CONFIG.garagePageSubtitle : subtitle
+}
+function normalizeBrandText(value) {
+  return typeof value === "string" ? value.replace(/极境车库/g, "爱迦租车").replace(/极境/g, "爱迦") : value
+}
+function isConfigObject(config) {
+  return Boolean(config && typeof config === "object" && !Array.isArray(config))
 }
 function buildForm(config) {
   const source = config && typeof config === "object" ? config : DEFAULT_CONFIG
@@ -58,32 +64,32 @@ function buildForm(config) {
       latitude: hub.latitude === null ? "" : String(hub.latitude),
       longitude: hub.longitude === null ? "" : String(hub.longitude)
     })),
-    brandName: source.brandName || DEFAULT_CONFIG.brandName,
+    brandName: normalizeBrandText(source.brandName) || DEFAULT_CONFIG.brandName,
     servicePhone: source.servicePhone || "",
     wxKfCorpId: source.wxKfCorpId || DEFAULT_CONFIG.wxKfCorpId,
     wxKfExtInfo: source.wxKfExtInfo || DEFAULT_CONFIG.wxKfExtInfo,
-    mineUserDesc: source.mineUserDesc || DEFAULT_CONFIG.mineUserDesc,
-    garagePageTitle: source.garagePageTitle || DEFAULT_CONFIG.garagePageTitle,
+    mineUserDesc: normalizeBrandText(source.mineUserDesc) || DEFAULT_CONFIG.mineUserDesc,
+    garagePageTitle: normalizeBrandText(source.garagePageTitle) || DEFAULT_CONFIG.garagePageTitle,
     garagePageSubtitle: normalizeGarageSubtitle(source.garagePageSubtitle),
-    announcementText: source.announcementText || "",
+    announcementText: normalizeBrandText(source.announcementText) || "",
     hotSearchKeywordsText: Array.isArray(source.hotSearchKeywords) && source.hotSearchKeywords.length
       ? source.hotSearchKeywords.join("、")
       : DEFAULT_CONFIG.hotSearchKeywords.join("、"),
     cityOptionsText: Array.isArray(source.cityOptions) ? source.cityOptions.join("\n") : DEFAULT_CONFIG.cityOptions.join("\n"),
-    faqContent: source.faqContent || DEFAULT_CONFIG.faqContent,
-    rulesContent: source.rulesContent || DEFAULT_CONFIG.rulesContent,
+    faqContent: normalizeBrandText(source.faqContent) || DEFAULT_CONFIG.faqContent,
+    rulesContent: normalizeBrandText(source.rulesContent) || DEFAULT_CONFIG.rulesContent,
     bookingStatusTemplateId: source.bookingStatusTemplateId || "",
-    bookingPrivacyTip: source.bookingPrivacyTip || DEFAULT_CONFIG.bookingPrivacyTip,
-    rentalIncludedText: rentalTerms.includedText || DEFAULT_RENTAL_TERMS.includedText,
-    rentalProtectionText: rentalTerms.protectionText || DEFAULT_RENTAL_TERMS.protectionText,
-    rentalServiceFeeText: rentalTerms.serviceFeeText || DEFAULT_RENTAL_TERMS.serviceFeeText,
-    rentalDeliveryFeeText: rentalTerms.deliveryFeeText || DEFAULT_RENTAL_TERMS.deliveryFeeText,
-    rentalDepositText: rentalTerms.depositText || DEFAULT_RENTAL_TERMS.depositText,
-    rentalCancellationText: rentalTerms.cancellationText || DEFAULT_RENTAL_TERMS.cancellationText,
-    rentalOvertimeText: rentalTerms.overtimeText || DEFAULT_RENTAL_TERMS.overtimeText,
-    rentalEnergyText: rentalTerms.energyText || DEFAULT_RENTAL_TERMS.energyText,
+    bookingPrivacyTip: normalizeBrandText(source.bookingPrivacyTip) || DEFAULT_CONFIG.bookingPrivacyTip,
+    rentalIncludedText: normalizeBrandText(rentalTerms.includedText) || DEFAULT_RENTAL_TERMS.includedText,
+    rentalProtectionText: normalizeBrandText(rentalTerms.protectionText) || DEFAULT_RENTAL_TERMS.protectionText,
+    rentalServiceFeeText: normalizeBrandText(rentalTerms.serviceFeeText) || DEFAULT_RENTAL_TERMS.serviceFeeText,
+    rentalDeliveryFeeText: normalizeBrandText(rentalTerms.deliveryFeeText) || DEFAULT_RENTAL_TERMS.deliveryFeeText,
+    rentalDepositText: normalizeBrandText(rentalTerms.depositText) || DEFAULT_RENTAL_TERMS.depositText,
+    rentalCancellationText: normalizeBrandText(rentalTerms.cancellationText) || DEFAULT_RENTAL_TERMS.cancellationText,
+    rentalOvertimeText: normalizeBrandText(rentalTerms.overtimeText) || DEFAULT_RENTAL_TERMS.overtimeText,
+    rentalEnergyText: normalizeBrandText(rentalTerms.energyText) || DEFAULT_RENTAL_TERMS.energyText,
     rentalEstimateDisclaimer:
-      rentalTerms.estimateDisclaimer || DEFAULT_RENTAL_TERMS.estimateDisclaimer
+      normalizeBrandText(rentalTerms.estimateDisclaimer) || DEFAULT_RENTAL_TERMS.estimateDisclaimer
   }
 }
 function buildSubmitConfig(form) {
@@ -97,14 +103,14 @@ function buildSubmitConfig(form) {
     serviceHoursText: String(source.serviceHoursText || "").trim(),
     emergencyPhone: String(source.emergencyPhone || "").trim(),
     serviceHubs: (source.serviceHubs || []).map((hub) => ({ ...hub })),
-    brandName: source.brandName || "",
+    brandName: normalizeBrandText(source.brandName) || "",
     servicePhone: String(source.servicePhone || "").trim(),
     wxKfCorpId: String(source.wxKfCorpId || "").trim(),
     wxKfExtInfo: String(source.wxKfExtInfo || "").trim(),
-    mineUserDesc: source.mineUserDesc || "",
-    garagePageTitle: source.garagePageTitle || "",
-    garagePageSubtitle: source.garagePageSubtitle || "",
-    announcementText: String(source.announcementText || "").trim(),
+    mineUserDesc: normalizeBrandText(source.mineUserDesc) || "",
+    garagePageTitle: normalizeBrandText(source.garagePageTitle) || "",
+    garagePageSubtitle: normalizeBrandText(source.garagePageSubtitle) || "",
+    announcementText: normalizeBrandText(String(source.announcementText || "").trim()),
     hotSearchKeywords: (() => {
       const parsed = String(source.hotSearchKeywordsText || "")
         .split(/[,，、\s]+/)
@@ -115,20 +121,20 @@ function buildSubmitConfig(form) {
       return parsed.length ? parsed : DEFAULT_CONFIG.hotSearchKeywords.slice()
     })(),
     cityOptions,
-    faqContent: source.faqContent || "",
-    rulesContent: source.rulesContent || "",
+    faqContent: normalizeBrandText(source.faqContent) || "",
+    rulesContent: normalizeBrandText(source.rulesContent) || "",
     bookingStatusTemplateId: String(source.bookingStatusTemplateId || "").trim(),
-    bookingPrivacyTip: source.bookingPrivacyTip || "",
+    bookingPrivacyTip: normalizeBrandText(source.bookingPrivacyTip) || "",
     rentalTerms: {
-      includedText: source.rentalIncludedText || "",
-      protectionText: source.rentalProtectionText || "",
-      serviceFeeText: source.rentalServiceFeeText || "",
-      deliveryFeeText: source.rentalDeliveryFeeText || "",
-      depositText: source.rentalDepositText || "",
-      cancellationText: source.rentalCancellationText || "",
-      overtimeText: source.rentalOvertimeText || "",
-      energyText: source.rentalEnergyText || "",
-      estimateDisclaimer: source.rentalEstimateDisclaimer || ""
+      includedText: normalizeBrandText(source.rentalIncludedText) || "",
+      protectionText: normalizeBrandText(source.rentalProtectionText) || "",
+      serviceFeeText: normalizeBrandText(source.rentalServiceFeeText) || "",
+      deliveryFeeText: normalizeBrandText(source.rentalDeliveryFeeText) || "",
+      depositText: normalizeBrandText(source.rentalDepositText) || "",
+      cancellationText: normalizeBrandText(source.rentalCancellationText) || "",
+      overtimeText: normalizeBrandText(source.rentalOvertimeText) || "",
+      energyText: normalizeBrandText(source.rentalEnergyText) || "",
+      estimateDisclaimer: normalizeBrandText(source.rentalEstimateDisclaimer) || ""
     }
   }
 }
@@ -154,6 +160,9 @@ Page({
         this.fetchConfig()
       }
     })
+  },
+  onShow() {
+    syncUnsavedChanges(this)
   },
   onPullDownRefresh() {
     if (!this.data.pageAuthorized) {
@@ -181,7 +190,7 @@ Page({
   },
   onUnload() {
     cancelPagePermissionCheck(this)
-    clearUnsaved(this)
+    disposeUnsavedChanges(this)
     this._configLoadRequestId = Number(this._configLoadRequestId || 0) + 1
     this._configSaveRequestId = Number(this._configSaveRequestId || 0) + 1
     this.finishConfigLoadRequestEffects()
@@ -246,11 +255,13 @@ Page({
           return
         }
         const result = res && res.result ? res.result : null
-        if (!result || !result.ok || !result.config) {
+        if (!result || !result.ok || !isConfigObject(result.config)) {
           this.setData({
             loading: false,
             loadFailed: true,
-            loadErrorText: (result && result.message) || "配置加载失败，请刷新后重试"
+            loadErrorText: result && result.ok
+              ? "配置响应异常，请重试"
+              : (result && result.message) || "配置加载失败，请刷新后重试"
           })
           return
         }
@@ -473,12 +484,19 @@ Page({
         if (!finishRequest()) {
           return
         }
-        if (!result || !result.ok || !result.config) {
+        if (!result || !result.ok || !isConfigObject(result.config)) {
           showSaveToast({
-            title: formatToastTitle(result && result.message, "保存失败"),
+            title: result && result.ok
+              ? "保存响应异常，请重试"
+              : formatToastTitle(result && result.message, "保存失败"),
             icon: "none"
           })
-          this.setData({ saving: false, saveConflict: Boolean(result && ["CONFIG_CONFLICT", "CONFIG_VERSION_REQUIRED"].includes(result.code)) })
+          this.setData({
+            saving: false,
+            saveConflict: result && result.ok
+              ? this.data.saveConflict
+              : Boolean(result && ["CONFIG_CONFLICT", "CONFIG_VERSION_REQUIRED"].includes(result.code))
+          })
           return
         }
         showSaveToast({

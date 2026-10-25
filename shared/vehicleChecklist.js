@@ -45,7 +45,7 @@ function getVehicleReadinessCard(vehicle) {
   return {
     category: cat,
     categoryName: CATEGORY_NAMES[cat] || CATEGORY_NAMES.default,
-    vehicleName: String(v.name || v.brandModel || "极境座驾").trim(),
+    vehicleName: String(v.name || v.brandModel || "爱迦座驾").trim(),
     fuelNotice: tips.fuelNotice,
     suspensionNotice: tips.suspensionNotice,
     drivingNotice: tips.drivingNotice,

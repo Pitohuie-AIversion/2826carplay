@@ -1,6 +1,6 @@
-# 极境车库工程贡献与协同开发规范 (Contributing Guidelines)
+# 爱迦租车工程贡献与协同开发规范 (Contributing Guidelines)
 
-感谢参与 **极境车库 (JiJing Garage)** 原生微信小程序与腾讯云开发 (CloudBase Serverless) 项目的建设。为保证超跑租赁业务的高可靠性、极速秒开体验与极致工程质量，所有贡献者和 AI 智能体必须遵循以下规范。
+感谢参与 **爱迦租车 (Aijia Car Rental)** 原生微信小程序与腾讯云开发 (CloudBase Serverless) 项目的建设。为保证超跑租赁业务的高可靠性、极速秒开体验与极致工程质量，所有贡献者和 AI 智能体必须遵循以下规范。
 
 ---
 

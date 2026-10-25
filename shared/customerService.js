@@ -59,33 +59,48 @@ function openCustomerService(context) {
   const onLegacyFallback = typeof ctx.onLegacyFallback === "function" ? ctx.onLegacyFallback : null
   const action = page ? beginPageNativeAction(page, { requireCurrent: true, exclusiveKey: "customerService" }) : null
   let cancelled = false
+  let cancelConfig = null
+  let cancelFallbackConfig = null
   const isActive = () => !cancelled && (!page || isPageNativeActionActive(page, action))
   cancelCustomerServiceRequest(page)
+  const cancel = () => {
+    cancelled = true
+    if (cancelConfig) cancelConfig()
+    if (cancelFallbackConfig) cancelFallbackConfig()
+  }
+  if (page) page._cancelCustomerServiceRequest = cancel
+  const fallback = (config) => {
+    if (isActive() && onLegacyFallback) onLegacyFallback(config)
+  }
+  const refreshFallback = () => {
+    if (!isActive()) return
+    // Native chat can fail after a newer configuration has cleared the phone.
+    // Read the current snapshot instead of restoring the one used to open chat.
+    cancelFallbackConfig = requestOperationConfig({
+      onSuccess: fallback,
+      onFailure: () => fallback(null),
+      onInvalidated: () => fallback(null)
+    })
+    if (cancelled) cancelFallbackConfig()
+  }
 
   trackEvent("kf_chat", vehicleId, { channel: "miniprogram", scene: source || "page", contentId: bookingId || vehicleId || "" })
 
-  const cancelConfig = requestOperationConfig({
+  cancelConfig = requestOperationConfig({
     onSuccess: (config) => {
       if (!isActive()) return
       if (hasWxKfConfig(config)) {
         const opened = openWxKfChat(config, { page, vehicleId, bookingId, source,
-          onFailure: onLegacyFallback ? () => { if (isActive()) onLegacyFallback(config) } : undefined
+          onFailure: onLegacyFallback ? refreshFallback : undefined
         })
         if (opened) return
       }
-      if (typeof onLegacyFallback === "function") {
-        onLegacyFallback(config)
-      }
+      fallback(config)
     },
-    onFailure: () => {
-      if (!isActive()) return
-      if (typeof onLegacyFallback === "function") {
-        onLegacyFallback(null)
-      }
-    }
+    onFailure: () => fallback(null),
+    onInvalidated: () => fallback(null)
   })
-  const cancel = () => { cancelled = true; cancelConfig() }
-  if (page) page._cancelCustomerServiceRequest = cancel
+  if (cancelled) cancelConfig()
   return cancel
 }
 

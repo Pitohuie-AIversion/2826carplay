@@ -1,5 +1,5 @@
 /**
- * 极境车库 - 统一云函数通信客户端 (Standardized Cloud Client)
+ * 爱迦租车 - 统一云函数通信客户端 (Standardized Cloud Client)
  *
  * 特性：
  * 1. 结构化 Promise 返回，统一响应协议与错误提取
@@ -8,7 +8,7 @@
  * 4. 完全保留 wx.cloud.callFunction 底层调用语义，兼容 Jest 与模拟点击沙箱
  */
 
-const { isPageNativeActionActive } = require("./pageNativeAction")
+const { beginPageNativeAction, isPageNativeActionActive } = require("./pageNativeAction")
 const { formatToastTitle } = require("./uiFeedback")
 
 const DEFAULT_TIMEOUT_MS = 15 * 1000
@@ -46,11 +46,13 @@ function extractErrorMessage(error, fallback = "请求失败，请稍后重试")
  * @param {function} [options.onSuccess=null] 兼容回调形式
  * @param {function} [options.onFail=null] 兼容回调形式
  * @param {function} [options.onComplete=null] 完成回调
+ * 页面或动作失效后 Promise 返回 CANCELLED，不调用业务回调或弹出 Toast。
  * @returns {Promise<{ ok: boolean, data: any, code?: string, message?: string, raw?: any }>}
  */
 function callCloud(name, data = {}, options = {}) {
   const timeoutMs = Number.isFinite(options.timeoutMs) ? options.timeoutMs : DEFAULT_TIMEOUT_MS
   const { pageContext, action, showErrorToast } = options
+  const requestAction = pageContext ? action || beginPageNativeAction(pageContext) : null
 
   return new Promise((resolve) => {
     let settled = false
@@ -58,10 +60,7 @@ function callCloud(name, data = {}, options = {}) {
 
     const isCurrentActive = () => {
       if (!pageContext) return true
-      if (action) {
-        return isPageNativeActionActive(pageContext, action)
-      }
-      return pageContext._nativeActionsUnloaded !== true
+      return isPageNativeActionActive(pageContext, requestAction)
     }
 
     const cleanup = () => {
@@ -77,6 +76,7 @@ function callCloud(name, data = {}, options = {}) {
       cleanup()
 
       if (!isCurrentActive()) {
+        resolve({ ok: false, code: "CANCELLED", message: "页面请求已失效" })
         return
       }
 

@@ -153,6 +153,12 @@ async function readLatestQuote(item) {
   }
 }
 
+function recordedHandoverNumber(value, max) {
+  if ((typeof value !== "number" && typeof value !== "string") || (typeof value === "string" && !value.trim())) return null
+  const number = Number(value)
+  return Number.isInteger(number) && number >= 0 && number <= max ? number : null
+}
+
 async function mapHandover(item) {
   if (!item) return null
   const photos = Array.isArray(item.photos) ? item.photos : []
@@ -172,9 +178,9 @@ async function mapHandover(item) {
     stage: String(item.stage || ""),
     version: Math.max(0, Number(item.version || 0)),
     status: String(item.status || ""),
-    mileageKm: Math.max(0, Number(item.mileageKm || 0)),
+    mileageKm: recordedHandoverNumber(item.mileageKm, 5000000),
     energyType: String(item.energyType || ""),
-    energyLevelPercent: Math.max(0, Number(item.energyLevelPercent || 0)),
+    energyLevelPercent: recordedHandoverNumber(item.energyLevelPercent, 100),
     damageNote: String(item.damageNote || ""),
     additionalNote: String(item.additionalNote || ""),
     photos: photos.map((photo) => ({ angle: String(photo.angle || ""), url: urlMap.get(String(photo.fileId || "")) || "" })),

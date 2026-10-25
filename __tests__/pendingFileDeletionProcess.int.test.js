@@ -102,6 +102,48 @@ async function loadFunctionWith({ openid, mockDb }) {
 }
 
 describe("cloudfunctions/pendingFileDeletionProcess integration", () => {
+  test.each([
+    ["没有返回结果", undefined],
+    ["没有文件清单", {}],
+    ["空文件清单", { fileList: [] }],
+    ["缺少文件编号", { fileList: [{ status: 0 }] }],
+    ["缺少状态", { fileList: [{ fileID: "cloud://img1" }] }],
+    ["null 状态", { fileList: [{ fileID: "cloud://img1", status: null }] }],
+    ["空字符串状态", { fileList: [{ fileID: "cloud://img1", status: "" }] }],
+    ["false 状态", { fileList: [{ fileID: "cloud://img1", status: false }] }]
+  ])("旧清理任务在%s时保留未确认文件", async (label, response) => {
+    const mocks = createMockDb({
+      rolesData: [{ role: "admin" }],
+      queueData: [{ _id: "queue_1", fileList: ["cloud://img1"], attemptCount: 2 }]
+    })
+    const mod = await loadFunctionWith({ openid: "admin_openid", mockDb: mocks.db })
+    require("wx-server-sdk").deleteFile.mockResolvedValue(response)
+
+    expect(await mod.main()).toMatchObject({ ok: true, deleted: 0, failed: 1 })
+    expect(mocks.queueRemove).not.toHaveBeenCalled()
+    expect(mocks.queueUpdate).toHaveBeenCalledWith({ data: {
+      fileList: ["cloud://img1"], attemptCount: 3,
+      lastError: "部分文件删除失败", lastAttemptAt: mocks.serverDateValue
+    } })
+  })
+
+  test("部分回执只移除已确认文件，无关文件编号不会进入后续删除队列", async () => {
+    const mocks = createMockDb({
+      rolesData: [{ role: "admin" }],
+      queueData: [{ _id: "queue_1", fileList: ["cloud://img1", "cloud://img2", "cloud://img3"] }]
+    })
+    const mod = await loadFunctionWith({ openid: "admin_openid", mockDb: mocks.db })
+    require("wx-server-sdk").deleteFile.mockResolvedValue({ fileList: [
+      { fileID: "cloud://img1", status: "0" },
+      { fileID: "cloud://img3", status: -1, errMsg: "delete failed" },
+      { fileID: "cloud://unrelated", status: -1, errMsg: "delete failed" }
+    ] })
+
+    expect(await mod.main()).toMatchObject({ ok: true, deleted: 0, failed: 1 })
+    expect(mocks.queueRemove).not.toHaveBeenCalled()
+    expect(mocks.queueUpdate.mock.calls[0][0].data.fileList).toEqual(["cloud://img2", "cloud://img3"])
+  })
+
   test("管理员可清理成功记录和空队列记录", async () => {
     const mocks = createMockDb({
       rolesData: [{ openid: "admin_openid", role: "admin" }],

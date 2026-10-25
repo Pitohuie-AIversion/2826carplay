@@ -40,6 +40,48 @@ async function loadBookingMyDetailWith({ openid, mockDb }) {
 }
 
 describe("cloudfunctions/bookingMyDetail integration", () => {
+  test.each([
+    ["缺失", undefined, undefined, null, null],
+    ["null", null, null, null, null],
+    ["空串", "", "", null, null],
+    ["空白", " \t", "\n", null, null],
+    ["false", false, false, null, null],
+    ["true", true, true, null, null],
+    ["空数组", [], [], null, null],
+    ["数值数组", [0], [100], null, null],
+    ["对象", {}, {}, null, null],
+    ["NaN", NaN, NaN, null, null],
+    ["无限值", Infinity, Infinity, null, null],
+    ["负值", -1, -1, null, null],
+    ["非整数", 1.5, "80.5", null, null],
+    ["无效文本", "unknown", "unknown", null, null],
+    ["超过上限", 5000001, 101, null, null],
+    ["实际零值", 0, 0, 0, 0],
+    ["字符串零值", "0", "0", 0, 0],
+    ["上限", 5000000, 100, 5000000, 100],
+    ["带空白的整数", " 123 ", " 80 ", 123, 80]
+  ])("当前取还车记录读取%s时保留缺失与实际数值的区别", async (_label, mileageKm, energyLevelPercent, expectedMileage, expectedEnergy) => {
+    const handovers = ["pickup", "return"].map((stage) => ({
+      _id: `${stage}_1`, bookingId: "booking_1", stage, version: 1,
+      mileageKm, energyLevelPercent, energyType: "fuel", status: "confirmed", photos: []
+    }))
+    const mocks = createMockDb({
+      bookingData: { _id: "booking_1", openid: "user", latestPickupHandoverId: "pickup_1", latestReturnHandoverId: "return_1" },
+      handovers
+    })
+    const mod = await loadBookingMyDetailWith({ openid: "user", mockDb: mocks.db })
+    const result = await mod.main({ id: "booking_1" })
+    expect(result.ok).toBe(true)
+    expect(mocks.handoverDoc.mock.calls.map(([id]) => id)).toEqual(["pickup_1", "return_1"])
+    const { buildHandoverReport } = require("../shared/handoverReport")
+    for (const record of Object.values(result.handovers)) {
+      expect(record).toMatchObject({ mileageKm: expectedMileage, energyLevelPercent: expectedEnergy, damageNote: "" })
+      expect(buildHandoverReport(result.detail, record)).toMatchObject({
+        mileageKm: expectedMileage, energyLevelPercent: expectedEnergy, damageNote: "车况未记录"
+      })
+    }
+  })
+
   test("超过40条历史仍按当前两个交接ID读取，拒绝其他预约或阶段记录", async () => {
     const handovers = Array.from({ length: 45 }, (_, index) => ({ _id: `pickup_${index + 1}`, bookingId: "booking_1", stage: "pickup", version: index + 1, status: "confirmed", photos: [] }))
     handovers.push({ _id: "return_1", bookingId: "booking_1", stage: "return", version: 1, status: "confirmed", photos: [] })

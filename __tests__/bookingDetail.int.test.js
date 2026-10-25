@@ -101,6 +101,72 @@ async function loadBookingDetailWith({ openid, mockDb }) {
 }
 
 describe("cloudfunctions/bookingDetail integration", () => {
+  test.each([
+    ["缺失", undefined, undefined, null, null],
+    ["null", null, null, null, null],
+    ["空串", "", "", null, null],
+    ["空白", " \t", "\n", null, null],
+    ["false", false, false, null, null],
+    ["true", true, true, null, null],
+    ["空数组", [], [], null, null],
+    ["数值数组", [0], [100], null, null],
+    ["对象", {}, {}, null, null],
+    ["NaN", NaN, NaN, null, null],
+    ["无限值", Infinity, Infinity, null, null],
+    ["负值", -1, -1, null, null],
+    ["非整数", 1.5, "80.5", null, null],
+    ["无效文本", "unknown", "unknown", null, null],
+    ["超过上限", 5000001, 101, null, null],
+    ["实际零值", 0, 0, 0, 0],
+    ["字符串零值", "0", "0", 0, 0],
+    ["上限", 5000000, 100, 5000000, 100],
+    ["带空白的整数", " 123 ", " 80 ", 123, 80]
+  ])("交接历史读取%s时不把缺失或非法数值伪装为零", async (_label, mileageKm, energyLevelPercent, expectedMileage, expectedEnergy) => {
+    const handoverData = ["pickup", "return"].map((stage) => ({
+      _id: `${stage}_1`, bookingId: "booking_1", stage, version: 1,
+      mileageKm, energyLevelPercent, energyType: "electric", status: "confirmed", photos: [],
+      submittedAt: "2026-10-25T00:00:00.000Z"
+    }))
+    const mocks = createMockDb({
+      rolesData: [{ role: "admin" }], handoverData,
+      bookingData: { _id: "booking_1", status: "confirmed", latestPickupHandoverId: "pickup_1", latestReturnHandoverId: "return_1" }
+    })
+    const mod = await loadBookingDetailWith({ openid: "admin", mockDb: mocks.db })
+    const result = await mod.main({ id: "booking_1" })
+    expect(result.ok).toBe(true)
+    expect(result.handoverHistory).toHaveLength(2)
+    const { buildHandoverReport } = require("../shared/handoverReport")
+    for (const record of result.handoverHistory) {
+      expect(record).toMatchObject({ mileageKm: expectedMileage, energyLevelPercent: expectedEnergy, damageNote: "" })
+      expect(buildHandoverReport(result.detail, record)).toMatchObject({
+        mileageKm: expectedMileage, energyLevelPercent: expectedEnergy, damageNote: "车况未记录"
+      })
+    }
+  })
+
+  test("历史查询失败后单独读取当前交接记录仍保留缺失值，真实零值仍可导出", async () => {
+    const mocks = createMockDb({
+      rolesData: [{ role: "admin" }],
+      handoverData: [
+        { _id: "pickup_1", bookingId: "booking_1", stage: "pickup", status: "confirmed", photos: [] },
+        { _id: "return_1", bookingId: "booking_1", stage: "return", status: "confirmed", photos: [], mileageKm: 0, energyType: "fuel", energyLevelPercent: 0 }
+      ],
+      handoverError: new Error("history unavailable"),
+      bookingData: { _id: "booking_1", status: "confirmed", latestPickupHandoverId: "pickup_1", latestReturnHandoverId: "return_1" }
+    })
+    const mod = await loadBookingDetailWith({ openid: "admin", mockDb: mocks.db })
+    const result = await mod.main({ id: "booking_1" })
+    expect(result.ok).toBe(true)
+    expect(result.handoverHistoryUnavailable).toBe(true)
+    const pickup = result.handoverHistory.find((record) => record.stage === "pickup")
+    const returned = result.handoverHistory.find((record) => record.stage === "return")
+    expect(pickup).toMatchObject({ mileageKm: null, energyLevelPercent: null })
+    expect(returned).toMatchObject({ mileageKm: 0, energyLevelPercent: 0 })
+    const { formatHandoverCsvContent } = require("../shared/handoverReport")
+    expect(formatHandoverCsvContent(result.detail, pickup)).toContain("未记录,未记录,未记录,车况未记录")
+    expect(formatHandoverCsvContent(result.detail, returned)).toContain("0,燃油,0%,车况未记录")
+  })
+
   test.each([false, true])("超过40个交接版本时单独合入当前取还车记录（历史查询失败=%s）", async (historyFails) => {
     const history = Array.from({ length: 45 }, (_, index) => ({
       _id: `pickup_${index + 1}`, bookingId: "booking_1", stage: "pickup", version: index + 1,

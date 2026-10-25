@@ -290,7 +290,7 @@ function drawPosterTextEllipsis(ctx, text, x, y, maxWidth) {
 
 Page({
   data: {
-    brandName: "极境车库",
+    brandName: "爱迦租车",
     servicePhone: "",
     serviceHoursText: "",
     serviceHubs: [],
@@ -337,6 +337,7 @@ Page({
 
   onLoad(options) {
     activatePageNativeActions(this)
+    this._operationConfigHasShown = false
     const app = getApp()
     const env =
       app &&
@@ -443,6 +444,14 @@ Page({
 
   loadOperationConfig(options) {
     this.cancelOperationConfigRequest()
+    const handleFailure = () => {
+      const rentalTerms = normalizeRentalTerms()
+      this.setData({
+        servicePhone: "", serviceHoursText: "", serviceHubs: [], serviceHub: null,
+        canNavigate: false, wxKfReady: false, rentalTerms,
+        pricingOverview: buildPricingOverview(this.data.car, rentalTerms)
+      })
+    }
     this._cancelOperationConfigRequest = requestOperationConfig({
       force: Boolean(options && options.force),
       onSuccess: (config) => {
@@ -461,14 +470,8 @@ Page({
         })
         this.updateServiceHub()
       },
-      onFailure: () => {
-        const rentalTerms = normalizeRentalTerms()
-        this.setData({
-          servicePhone: "", serviceHoursText: "", serviceHubs: [], serviceHub: null,
-          canNavigate: false, wxKfReady: false, rentalTerms,
-          pricingOverview: buildPricingOverview(this.data.car, rentalTerms)
-        })
-      }
+      onFailure: handleFailure,
+      onInvalidated: handleFailure
     })
   },
 
@@ -670,6 +673,8 @@ Page({
   },
 
   onShow() {
+    if (this._operationConfigHasShown) this.loadOperationConfig()
+    this._operationConfigHasShown = true
     if (this.data.posterModalVisible && this.data.posterGenerating) this.handleClosePosterModal()
     if (isPageCurrent(this) && typeof wx.setNavigationBarTitle === "function") {
       wx.setNavigationBarTitle({ title: this.data.car && this.data.car.name || "车辆详情" })
@@ -1188,7 +1193,7 @@ Page({
     wx.makePhoneCall({
       phoneNumber: phone,
       fail: (error) => {
-        if (!isPageNativeActionActive(this, action)) {
+        if (!isPageNativeActionActive(this, action) || String(this.data.servicePhone || "").trim() !== phone) {
           return
         }
         const message = error && (error.errMsg || error.message)
@@ -1277,13 +1282,13 @@ Page({
 
     if (!car) {
       return {
-        title: "极境车库 · 尊享豪华座驾",
+        title: "爱迦租车 · 尊享豪华座驾",
         path: "/pages/garage/garage"
       }
     }
 
     const titleParts = [car.brand, car.name].filter(Boolean)
-    const title = titleParts.length ? titleParts.join(" ") : "极境尊享座驾"
+    const title = titleParts.length ? titleParts.join(" ") : "爱迦尊享座驾"
     const priceText = car.priceText || (car.priceDay ? `￥${car.priceDay}/天` : "")
     const shareTitle = priceText ? `${title} | ${priceText}` : title
     const imageUrl = car.cover || (car.images && car.images[0]) || ""
@@ -1299,14 +1304,14 @@ Page({
     const car = this.data.car
     if (!car) {
       return {
-        title: "极境车库 · 尊享豪华座驾",
+        title: "爱迦租车 · 尊享豪华座驾",
         query: ""
       }
     }
-    const title = [car.brand, car.name].filter(Boolean).join(" ") || "极境尊享座驾"
+    const title = [car.brand, car.name].filter(Boolean).join(" ") || "爱迦尊享座驾"
     const priceText = car.priceText || (car.priceDay ? `￥${car.priceDay}/天` : "")
     return {
-      title: priceText ? `${title} | ${priceText} - 极境车库` : `${title} - 极境车库`,
+      title: priceText ? `${title} | ${priceText} - 爱迦租车` : `${title} - 爱迦租车`,
       query: buildQuery({ ...this.data.attribution, channel: "timeline_share", vehicleId: car.id }),
       imageUrl: car.cover || (car.images && car.images[0]) || ""
     }
@@ -1447,12 +1452,12 @@ Page({
         // Brand title
         ctx.fillStyle = "#E8C88B"
         ctx.font = "bold 22px sans-serif"
-        ctx.fillText("极境车库 · 尊享甄选", 52, 64)
+        ctx.fillText("爱迦租车 · 尊享甄选", 52, 64)
 
         // Subtitle
         ctx.fillStyle = "#7E8B9E"
         ctx.font = "11px sans-serif"
-        ctx.fillText("JIJING GARAGE LUXURY FLEET", 52, 82)
+        ctx.fillText("AIJIA CAR RENTAL LUXURY FLEET", 52, 82)
 
         // Official tag
         ctx.fillStyle = "rgba(208, 158, 90, 0.12)"
@@ -1468,7 +1473,7 @@ Page({
 
         // Car Title
         const car = this.data.car || {}
-        const carFullName = [car.brand, car.name].filter(Boolean).join(" ") || "极境座驾"
+        const carFullName = [car.brand, car.name].filter(Boolean).join(" ") || "爱迦座驾"
         ctx.fillStyle = "#FFFFFF"
         ctx.font = "bold 30px sans-serif"
         drawPosterTextEllipsis(ctx, carFullName, 36, 136, width - 72)
@@ -1494,7 +1499,7 @@ Page({
           ctx.fillRect(photoX, photoY, photoW, photoH)
           ctx.fillStyle = "#8D98AA"
           ctx.font = "16px sans-serif"
-          const placeText = "极境座驾实拍"
+          const placeText = "爱迦座驾实拍"
           const tw = ctx.measureText ? ctx.measureText(placeText).width : 96
           ctx.fillText(placeText, photoX + (photoW - tw) / 2, photoY + photoH / 2 + 6)
           ctx.restore()
@@ -1589,7 +1594,7 @@ Page({
 
           ctx.fillStyle = "#D09E5A"
           ctx.font = "bold 13px sans-serif"
-          ctx.fillText("微信搜索【极境车库】小程序，查看完整档期与报价", photoX, 874)
+          ctx.fillText("微信搜索【爱迦租车】小程序，查看完整档期与报价", photoX, 874)
 
           // Footer Right Emblem Badge
           const qrSize = 58
@@ -1605,10 +1610,10 @@ Page({
 
           ctx.fillStyle = "#E8C88B"
           ctx.font = "bold 12px sans-serif"
-          const qr1W = ctx.measureText ? ctx.measureText("极境").width : 24
-          const qr2W = ctx.measureText ? ctx.measureText("车库").width : 24
-          ctx.fillText("极境", qrX + (qrSize - qr1W) / 2, qrY + 25)
-          ctx.fillText("车库", qrX + (qrSize - qr2W) / 2, qrY + 45)
+          const qr1W = ctx.measureText ? ctx.measureText("爱迦").width : 24
+          const qr2W = ctx.measureText ? ctx.measureText("租车").width : 24
+          ctx.fillText("爱迦", qrX + (qrSize - qr1W) / 2, qrY + 25)
+          ctx.fillText("租车", qrX + (qrSize - qr2W) / 2, qrY + 45)
 
           if (!isActive()) return
           if (typeof wx.canvasToTempFilePath === "function") {

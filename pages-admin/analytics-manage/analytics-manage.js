@@ -222,6 +222,9 @@ Page({
       finish()
     }
   },
+  onHide() {
+    this.hideCleanupLoading()
+  },
   handlePeriodTap(event) {
     const days = Number(event.currentTarget.dataset.days)
     if (
@@ -284,6 +287,10 @@ Page({
     ) {
       return
     }
+    const resultAction = beginPageNativeAction(this, { requireCurrent: true })
+    if (!isPageNativeActionActive(this, resultAction)) {
+      return
+    }
     const requestId = Number(this._cleanupRequestId || 0) + 1
     this._cleanupRequestId = requestId
     this.finishCleanupRequestEffects()
@@ -292,6 +299,16 @@ Page({
     this._cleanupLoadingVisible = true
     let settled = false
     const isCurrent = () => this._cleanupRequestId === requestId
+    const deliverResult = (callback) => {
+      if (!isCurrent()) {
+        return
+      }
+      if (!isPageNativeActionActive(this, resultAction)) {
+        this._finishCleanupResultOnShow = () => deliverResult(callback)
+        return
+      }
+      callback()
+    }
     const finishRequest = () => {
       if (settled || !isCurrent()) {
         return false
@@ -304,11 +321,13 @@ Page({
       if (!finishRequest()) {
         return
       }
-      wx.showToast({
-        title: formatToastTitle(message, "清理失败"),
-        icon: "none"
+      deliverResult(() => {
+        wx.showToast({
+          title: formatToastTitle(message, "清理失败"),
+          icon: "none"
+        })
+        this.setData({ cleanupLoading: false })
       })
-      this.setData({ cleanupLoading: false })
     }
     this._cleanupRequestTimer = setTimeout(() => {
       handleFailure("清理超时，请重试")
@@ -324,15 +343,16 @@ Page({
         }
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
-          this.setData({ cleanupLoading: false })
-          wx.showToast({
-          title: formatToastTitle(result && result.message, "清理失败"),
-            icon: "none"
+          deliverResult(() => {
+            this.setData({ cleanupLoading: false })
+            wx.showToast({
+              title: formatToastTitle(result && result.message, "清理失败"),
+              icon: "none"
+            })
           })
           return
         }
         let cleanupResultSettled = false
-        const resultAction = beginPageNativeAction(this, { requireCurrent: true })
         const finishCleanupResult = () => {
           if (cleanupResultSettled || !isCurrent()) {
             return
@@ -345,22 +365,24 @@ Page({
           this.setData({ cleanupLoading: false })
           this.fetchOverview()
         }
-        if (typeof wx.showModal !== "function" || !isPageNativeActionActive(this, resultAction)) {
-          finishCleanupResult()
-          return
-        }
-        try {
-          wx.showModal({
-            title: "清理完成",
-            content: `处理 ${result.processed || 0} 条，成功删除 ${result.deleted || 0} 条，失败 ${result.failed || 0} 条。${result.hasMore ? "可能仍有过期数据，可再次执行清理。" : "已处理完当前过期数据。"}`,
-            confirmText: "知道了",
-            confirmColor: "#528fff",
-            showCancel: false,
-            complete: finishCleanupResult
-          })
-        } catch (error) {
-          finishCleanupResult()
-        }
+        deliverResult(() => {
+          if (typeof wx.showModal !== "function") {
+            finishCleanupResult()
+            return
+          }
+          try {
+            wx.showModal({
+              title: "清理完成",
+              content: `处理 ${result.processed || 0} 条，成功删除 ${result.deleted || 0} 条，失败 ${result.failed || 0} 条。${result.hasMore ? "可能仍有过期数据，可再次执行清理。" : "已处理完当前过期数据。"}`,
+              confirmText: "知道了",
+              confirmColor: "#528fff",
+              showCancel: false,
+              complete: finishCleanupResult
+            })
+          } catch (error) {
+            finishCleanupResult()
+          }
+        })
       },
       fail: (error) => {
         handleFailure(error && (error.errMsg || error.message))
@@ -494,6 +516,9 @@ Page({
       clearTimeout(this._cleanupRequestTimer)
       this._cleanupRequestTimer = null
     }
+    this.hideCleanupLoading()
+  },
+  hideCleanupLoading() {
     if (this._cleanupLoadingVisible) {
       this._cleanupLoadingVisible = false
       wx.hideLoading()

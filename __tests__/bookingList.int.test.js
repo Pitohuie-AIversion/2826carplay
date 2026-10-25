@@ -1,32 +1,37 @@
 jest.mock("wx-server-sdk")
 
 function createMockDb({ rolesData, bookingData, orderedError = null }) {
+  let bookingFields = {}
+  const readBookingData = (offset, limit) => bookingData
+    .slice(offset, offset + limit)
+    .map((item) => Object.fromEntries(
+      Object.entries(item).filter(([key]) => bookingFields[key] === true)
+    ))
   const rolesGet = jest.fn().mockResolvedValue({ data: rolesData })
 
   const rolesLimit = jest.fn(() => ({ get: rolesGet }))
   const rolesWhere = jest.fn(() => ({ limit: rolesLimit }))
 
   const bookingsLimit = jest.fn((limitValue) => ({
-    get: jest.fn().mockResolvedValue({ data: bookingData.slice(0, limitValue) })
+    get: jest.fn().mockResolvedValue({ data: readBookingData(0, limitValue) })
   }))
   const bookingsSkip = jest.fn((offset) => ({
     limit: jest.fn((limitValue) => ({
-      get: jest.fn().mockResolvedValue({ data: bookingData.slice(offset, offset + limitValue) })
+      get: jest.fn().mockResolvedValue({ data: readBookingData(offset, limitValue) })
     }))
   }))
   const bookingsOrderedSkip = jest.fn((offset) => ({
     limit: jest.fn((limitValue) => ({
       get: orderedError
         ? jest.fn().mockRejectedValue(orderedError)
-        : jest.fn().mockResolvedValue({ data: bookingData.slice(offset, offset + limitValue) })
+        : jest.fn().mockResolvedValue({ data: readBookingData(offset, limitValue) })
     }))
   }))
   const bookingsOrderBy = jest.fn(() => ({ skip: bookingsOrderedSkip }))
-  const bookingsField = jest.fn(() => ({
-    limit: bookingsLimit,
-    skip: bookingsSkip,
-    orderBy: bookingsOrderBy
-  }))
+  const bookingsField = jest.fn((fields) => {
+    bookingFields = fields
+    return { limit: bookingsLimit, skip: bookingsSkip, orderBy: bookingsOrderBy }
+  })
 
   const db = {
     collection: jest.fn((name) => {
@@ -70,6 +75,45 @@ async function loadBookingListWith({ openid, mockDb }) {
 }
 
 describe("cloudfunctions/bookingList integration", () => {
+  test.each([
+    ["pickupLocation", "虹桥机场专人送车", "需要送车"],
+    ["returnLocation", "异地还车", "跨城用车"],
+    ["location", "机场专人送车", "需要送车"]
+  ])("%s 经列表投影后仍可用于工作台智能标签筛选", async (field, location, tag) => {
+    const mocks = createMockDb({
+      rolesData: [{ role: "booking_manager" }],
+      bookingData: [
+        { _id: "b_auto", status: "pending", [field]: location, futureInternalField: "private" },
+        { _id: "b_cleared", status: "pending", [field]: location, tags: [] }
+      ]
+    })
+    const mod = await loadBookingListWith({ openid: "booking_manager_openid", mockDb: mocks.db })
+    const res = await mod.main({ status: "all" })
+    expect(res.ok).toBe(true)
+    expect(res.list[0][field]).toBe(location)
+    expect(res.list[0]).not.toHaveProperty("futureInternalField")
+
+    let definition
+    const previousPage = global.Page
+    try {
+      global.Page = (value) => { definition = value }
+      jest.isolateModules(() => require("../pages/booking-workbench/booking-workbench"))
+    } finally {
+      if (previousPage === undefined) delete global.Page
+      else global.Page = previousPage
+    }
+    const page = {
+      ...definition,
+      data: { ...definition.data, allBookings: res.list },
+      setData(patch) { Object.assign(this.data, patch) }
+    }
+    page.applyWorkbench("todo")
+    expect(page.data.queue.find((item) => item.id === "b_auto").tags).toContain(tag)
+    expect(page.data.queue.find((item) => item.id === "b_cleared").tags).toEqual([])
+    page.handleTagFilter({ currentTarget: { dataset: { tag } } })
+    expect(page.data.queue.map((item) => item.id)).toEqual(["b_auto"])
+  })
+
   test("admin 可按状态筛选", async () => {
     const now = Date.now()
     const mocks = createMockDb({

@@ -7,7 +7,7 @@ const {
   cancelPageNativeActions,
   isPageNativeActionActive
 } = require("../../shared/pageNativeAction")
-const { formatHandoverCsvContent, getHandoverFileName } = require("../../shared/handoverReport")
+const { buildHandoverReport, formatHandoverCsvContent, getHandoverFileName } = require("../../shared/handoverReport")
 const { PRESET_CUSTOMER_TAGS, normalizeTags, autoTagBooking } = require("../../shared/bookingTags")
 const {
   STATUS_TEXT_MAP,
@@ -95,6 +95,7 @@ function createHandoverForm() {
 function normalizeHandover(item) {
   const record = item && typeof item === "object" ? item : {}
   const status = String(record.status || "")
+  const report = buildHandoverReport({}, record)
   const scratchItems = Array.isArray(record.scratchItems) ? record.scratchItems : []
   const scratchSummary = scratchItems.length > 0
     ? scratchItems.map((s) => `${s.partLabel || s.part || "部位"}: ${s.typeLabel || s.type || "损伤"}${s.description ? `(${s.description})` : ""}`).join("; ")
@@ -104,7 +105,8 @@ function normalizeHandover(item) {
     id: String(record.id || ""),
     stageText: record.stage === "return" ? "还车" : "取车",
     statusText: { submitted: "待用户核对", confirmed: "用户已核对", superseded: "已被新版本替代", archived: "已归档" }[status] || status,
-    energyText: `${record.energyType === "electric" ? "电量" : "油量"} ${Math.max(0, Number(record.energyLevelPercent || 0))}%`,
+    mileageText: report.mileageKm === null ? "里程未记录" : `${report.mileageKm} km`,
+    energyText: report.energyLevelPercent === null || !report.energyType ? "能源未记录" : `${report.energyType === "electric" ? "电量" : "油量"} ${report.energyLevelPercent}%`,
     submittedAtText: formatDisplayTime(record.submittedAt),
     confirmedAtText: formatDisplayTime(record.confirmedAt),
     photos: Array.isArray(record.photos) ? record.photos : [],
@@ -137,6 +139,7 @@ function normalizeBooking(item) {
     adminRemark: booking.adminRemark || "",
     adminRemarkDraft: booking.adminRemark || "",
     adminRemarkUpdatedAt: booking.adminRemarkUpdatedAt || "",
+    tagBaseline: Array.isArray(booking.tags) ? booking.tags.slice() : null,
     tags: Array.isArray(booking.tags) ? normalizeTags(booking.tags) : autoTagBooking(booking),
     tagMap: (Array.isArray(booking.tags) ? normalizeTags(booking.tags) : autoTagBooking(booking)).reduce((acc, t) => { acc[t] = true; return acc }, {}),
     schedulePriority: PRIORITY_TEXT_MAP[booking.schedulePriority]
@@ -289,6 +292,12 @@ Page({
       this._handoverPhotoNeedsReset = false
       this.applyState({ handoverLoading: false })
     }
+    if (typeof this._bookingDetailMutationDeferredResult === "function") {
+      const deliverResult = this._bookingDetailMutationDeferredResult
+      this._bookingDetailMutationDeferredResult = null
+      deliverResult()
+      return
+    }
     if (
       this.data.pageAuthorized &&
       this.data.id &&
@@ -351,6 +360,7 @@ Page({
     this.finishBookingDetailLoadEffects()
     this.clearBookingDetailTimer()
     this.clearBookingDetailMutationTimer()
+    this._bookingDetailMutationDeferredResult = null
     this._bookingDetailMutationActive = false
     this._bookingDetailStatusFeedbackPending = false
     this._handoverRequestId = Number(this._handoverRequestId || 0) + 1
@@ -611,7 +621,13 @@ Page({
           icon: "none"
         })
         if (isCurrent()) {
-          this.applyState({ remarkDirty: false, loading: false })
+          const savedRemark = typeof result.adminRemark === "string" ? normalizeRemark(result.adminRemark) : adminRemark
+          this.applyState({
+            "booking.adminRemark": savedRemark,
+            "booking.adminRemarkDraft": savedRemark,
+            remarkDirty: false,
+            loading: false
+          })
           this.loadDetail()
         }
       }
@@ -746,17 +762,17 @@ Page({
           endState: { quoteLoading: false },
           timeoutTitle: "报价发送超时，请重试",
           failureFallback: "报价发送失败",
-          onResult: (result, isCurrent) => {
+          onResult: (result, isCurrent, deliverResult) => {
             if (!result || !result.ok) {
               this.applyState({ quoteLoading: false })
               if (result && result.code === "VERSION_CONFLICT") { this.promptReloadQuote(); return }
               wx.showToast({ title: formatToastTitle(result && result.message, "报价发送失败"), icon: "none" })
               return
             }
-            showStatusUpdateFeedback(result, () => {
+            showStatusUpdateFeedback(result, () => deliverResult(() => {
               this.applyState({ quoteLoading: false })
               if (isCurrent()) this.loadDetail()
-            })
+            }))
           }
         })
       }
@@ -851,7 +867,11 @@ Page({
           title: result.changed === false ? "协调安排未变化" : "协调安排已更新",
           icon: "none"
         })
-        this.applyState({ coordinationLoading: false })
+        this.applyState({
+          "booking.schedulePriority": PRIORITY_TEXT_MAP[result.schedulePriority] ? result.schedulePriority : schedulePriority,
+          "booking.coordinationStatus": COORDINATION_TEXT_MAP[result.coordinationStatus] ? result.coordinationStatus : coordinationStatus,
+          coordinationLoading: false
+        })
         if (isCurrent()) {
           this.loadDetail()
         }
@@ -957,11 +977,44 @@ Page({
     })
   },
   handleHandoverStageChange(event) {
-    if (this.data.handoverLoading) return
+    if (this.isBookingDetailInteractionBusy()) return
     const stage = String(event.currentTarget.dataset.stage || "")
     if (!["pickup", "return"].includes(stage) || stage === this.data.handoverStage) return
-    this.cleanupPendingHandoverUploads()
-    this.setData({ handoverStage: stage, handoverForm: createHandoverForm() })
+    const bookingId = this.data.id
+    const previousStage = this.data.handoverStage
+    const form = this.data.handoverForm
+    const snapshot = JSON.stringify(form)
+    const fileList = form.photos.map((item) => item.fileId).filter(Boolean)
+    const action = beginPageNativeAction(this, { exclusiveKey: "handover-stage-confirmation", requireCurrent: true })
+    if (!isPageNativeActionActive(this, action)) return
+    const applyStage = () => {
+      if (!isPageNativeActionActive(this, action) || this.isBookingDetailInteractionBusy() ||
+          this.data.id !== bookingId || this.data.handoverStage !== previousStage ||
+          JSON.stringify(this.data.handoverForm) !== snapshot) return
+      if (fileList.length) this.queueHandoverUploadCleanup(fileList, previousStage, bookingId)
+      this._handoverSubmitSnapshot = null
+      this.setData({ handoverStage: stage, handoverForm: createHandoverForm() })
+    }
+    const hasDraft = [form.mileageKm, form.energyLevelPercent, form.damageNote, form.additionalNote].some((value) => String(value || "").length > 0) ||
+      form.energyType !== "fuel" || form.photos.some((item) => item.fileId || item.url)
+    if (!hasDraft) {
+      applyStage()
+      return
+    }
+    try {
+      wx.showModal({
+        title: "切换交接阶段",
+        content: "切换会清空本次未提交的交接内容和照片，是否继续？",
+        confirmText: "放弃并切换",
+        cancelText: "继续填写",
+        confirmColor: "#528fff",
+        success: (choice) => {
+          if (isPageNativeActionActive(this, action) && choice && choice.confirm) applyStage()
+        }
+      })
+    } catch (error) {
+      if (isPageNativeActionActive(this, action)) wx.showToast({ title: "暂时无法切换，请重试", icon: "none" })
+    }
   },
   handleHandoverInput(event) {
     if (this.data.handoverLoading) return
@@ -1188,6 +1241,7 @@ Page({
     }
     const filePath = `${wx.env.USER_DATA_PATH}/${fileName}`
     let settled = false
+    let writeSuccessHandled = false
     const finish = () => {
       if (settled) return false
       settled = true
@@ -1207,11 +1261,17 @@ Page({
       data: csvContent,
       encoding: "utf8",
       success: () => {
+        if (writeSuccessHandled) return
+        writeSuccessHandled = true
         if (!finish()) {
           if (typeof fs.unlink === "function") fs.unlink({ filePath, fail: () => {} })
           return
         }
+        const previousPath = this.data.exportedHandoverPath
         this.setData({ exportedHandoverPath: filePath, exportingHandover: false })
+        if (previousPath && previousPath !== filePath && typeof fs.unlink === "function") {
+          try { fs.unlink({ filePath: previousPath, fail: () => {} }) } catch (error) {}
+        }
         if (typeof wx !== "undefined" && wx.showToast) wx.showToast({ title: "留证单已导出", icon: "success" })
       },
       fail
@@ -1265,8 +1325,18 @@ Page({
   },
   handleToggleCustomerTag(event) {
     const tag = String((event && event.currentTarget && event.currentTarget.dataset && event.currentTarget.dataset.tag) || "").trim()
-    if (!tag || !this.data.coordinationEditable || this.isBookingDetailInteractionBusy()) return
+    if (!tag || !this.data.id) return
     const booking = this.data.booking || {}
+    if (["completed", "cancelled"].includes(booking.status)) return
+    if (
+      this.data.loading ||
+      this.data.coordinationLoading ||
+      this.data.quoteLoading ||
+      this.data.handoverLoading ||
+      this._bookingDetailMutationActive
+    ) {
+      return
+    }
     const currentTags = Array.isArray(booking.tags) ? [...booking.tags] : []
     const idx = currentTags.indexOf(tag)
     let nextTags
@@ -1279,10 +1349,17 @@ Page({
       }
       nextTags = [...currentTags, tag]
     }
-    if (!this.data.id) return
     this.runBookingDetailMutation({
       name: "bookingUpdateCoordination",
-      data: { id: this.data.id, tags: nextTags },
+      data: {
+        id: this.data.id,
+        tags: nextTags,
+        expectedValues: {
+          tags: Object.prototype.hasOwnProperty.call(booking, "tagBaseline")
+            ? booking.tagBaseline
+            : Array.isArray(booking.tags) ? booking.tags.slice() : null
+        }
+      },
       startState: { coordinationLoading: true },
       endState: { coordinationLoading: false },
       timeoutTitle: "标签保存超时",
@@ -1296,8 +1373,13 @@ Page({
         wx.showToast({ title: "标签已更新", icon: "none" })
         const savedTags = normalizeTags(result.tags || nextTags)
         const tagMap = savedTags.reduce((acc, t) => { acc[t] = true; return acc }, {})
+        if (!this.data.booking) this.data.booking = {}
+        this.data.booking.tags = savedTags
+        this.data.booking.tagMap = tagMap
+        this.data.booking.tagBaseline = savedTags.slice()
         this.setData({
           "booking.tags": savedTags,
+          "booking.tagBaseline": savedTags.slice(),
           "booking.tagMap": tagMap
         })
       }
@@ -1363,7 +1445,7 @@ Page({
       endState: { loading: false },
       timeoutTitle: "更新超时，请重试",
       failureFallback: "更新失败",
-      onResult: (result, isCurrent) => {
+      onResult: (result, isCurrent, deliverResult) => {
         if (!result || !result.ok) {
           wx.showToast({
             title: formatToastTitle(result && result.message, "更新失败"),
@@ -1374,12 +1456,12 @@ Page({
         }
         this.applyState({ loading: false })
         this._bookingDetailStatusFeedbackPending = true
-        showStatusUpdateFeedback(result, () => {
+        showStatusUpdateFeedback(result, () => deliverResult(() => {
           this._bookingDetailStatusFeedbackPending = false
           if (isCurrent()) {
             this.loadDetail()
           }
-        })
+        }))
       }
     })
   },
@@ -1393,6 +1475,8 @@ Page({
     ) {
       return
     }
+    const nativeAction = beginPageNativeAction(this, { requireCurrent: true })
+    if (!isPageNativeActionActive(this, nativeAction)) return
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       if (input.endState) {
         this.applyState(input.endState)
@@ -1405,33 +1489,47 @@ Page({
     }
     const requestId = Number(this._bookingDetailMutationRequestId || 0) + 1
     this._bookingDetailMutationRequestId = requestId
+    const bookingId = this.data.id
+    const lifecycleAction = { ...nativeAction, requireCurrent: false }
+    this._bookingDetailMutationDeferredResult = null
     this._bookingDetailMutationActive = true
     this.clearBookingDetailMutationTimer()
     if (input.startState) {
       this.applyState(input.startState)
     }
     let settled = false
-    const isCurrent = () =>
-      this._bookingDetailMutationRequestId === requestId
+    const isRequestCurrent = () =>
+      this._bookingDetailMutationRequestId === requestId && this.data.id === bookingId &&
+      isPageNativeActionActive(this, lifecycleAction)
+    const isCurrent = () => isRequestCurrent() && isPageNativeActionActive(this, nativeAction)
     const finishRequest = () => {
-      if (settled || !isCurrent()) {
+      if (settled || !isRequestCurrent()) {
         return false
       }
       settled = true
-      this._bookingDetailMutationActive = false
       this.clearBookingDetailMutationTimer()
       return true
+    }
+    const deliverResult = (callback) => {
+      if (!isRequestCurrent()) return
+      if (!isPageNativeActionActive(this, nativeAction)) {
+        this._bookingDetailMutationDeferredResult = () => deliverResult(callback)
+        return
+      }
+      this._bookingDetailMutationDeferredResult = null
+      this._bookingDetailMutationActive = false
+      callback()
     }
     const handleFailure = (message) => {
       if (!finishRequest()) {
         return
       }
-      if (input.endState) {
-        this.applyState(input.endState)
-      }
-      wx.showToast({
-        title: formatToastTitle(message, input.failureFallback || "操作失败"),
-        icon: "none"
+      deliverResult(() => {
+        if (input.endState) this.applyState(input.endState)
+        wx.showToast({
+          title: formatToastTitle(message, input.failureFallback || "操作失败"),
+          icon: "none"
+        })
       })
     }
     this._bookingDetailMutationTimer = setTimeout(() => {
@@ -1445,9 +1543,10 @@ Page({
           return
         }
         const result = res && res.result ? res.result : null
-        if (typeof input.onResult === "function") {
-          input.onResult(result, isCurrent)
-        }
+        deliverResult(() => {
+          if (typeof input.onResult === "function") input.onResult(result, isCurrent, deliverResult)
+          else if (input.endState) this.applyState(input.endState)
+        })
       },
       fail: (error) => {
         handleFailure(error && (error.errMsg || error.message))

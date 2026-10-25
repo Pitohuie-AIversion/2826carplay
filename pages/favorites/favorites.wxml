@@ -5,7 +5,7 @@
       <view>
         <view class="page-kicker">PRIVATE COLLECTION</view>
         <view class="hero-title">我的收藏</view>
-        <view class="hero-desc">保存心仪车型，随时回到极境车库继续了解</view>
+        <view class="hero-desc">保存心仪车型，随时回到爱迦租车继续了解</view>
       </view>
       <image class="hero-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
     </view>
@@ -162,7 +162,7 @@
     <view class="empty-title">还没有收藏车辆</view>
     <view class="empty-desc">进入车辆详情，点击“收藏”即可把喜欢的车型保存到这里。</view>
     <button class="empty-button ui-btn ui-btn-primary" bindtap="handleBrowseGarage">
-      <view class="favorite-action-content"><view class="favorite-action-native-icon favorite-garage-native-icon" aria-hidden="true"><view class="favorite-garage-door"></view></view><text>浏览极境车库</text></view>
+      <view class="favorite-action-content"><view class="favorite-action-native-icon favorite-garage-native-icon" aria-hidden="true"><view class="favorite-garage-door"></view></view><text>浏览爱迦租车</text></view>
     </button>
   </view>
   <view wx:if="{{undoFavorite}}" class="favorite-undo-bar" aria-live="polite">

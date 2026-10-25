@@ -1,5 +1,5 @@
 /**
- * 极境车库 - 全局网络状态与重连自愈管理
+ * 爱迦租车 - 全局网络状态与重连自愈管理
  * 
  * 适用于地下车库、电梯、高速等弱网及断网场景。
  * 当检测到网络从离线恢复为在线时，自动通知订阅者静默重刷页面或自愈重试。
@@ -42,23 +42,23 @@ function initNetworkStatusListener() {
   if (isListening) return
   if (typeof wx === "undefined") return
 
+  if (typeof wx.onNetworkStatusChange === "function") {
+    try {
+      wx.onNetworkStatusChange(handleNetworkStatusChange)
+      isListening = true
+    } catch (e) {}
+  }
+
   if (typeof wx.getNetworkType === "function") {
     const initialRevision = statusRevision
     try {
       wx.getNetworkType({
         success: (res) => {
           if (initialRevision !== statusRevision) return
-          networkType = String((res && res.networkType) || "unknown")
-          isConnected = networkType !== "none"
+          const initialType = String((res && res.networkType) || "unknown")
+          handleNetworkStatusChange({ isConnected: initialType !== "none", networkType: initialType })
         }
       })
-    } catch (e) {}
-  }
-
-  if (typeof wx.onNetworkStatusChange === "function") {
-    try {
-      wx.onNetworkStatusChange(handleNetworkStatusChange)
-      isListening = true
     } catch (e) {}
   }
 }
@@ -74,8 +74,8 @@ function onNetworkReconnect(callback) {
 
 function onNetworkStatusChange(callback) {
   if (typeof callback !== "function") return () => {}
-  initNetworkStatusListener()
   statusChangeListeners.add(callback)
+  initNetworkStatusListener()
   return () => {
     statusChangeListeners.delete(callback)
   }

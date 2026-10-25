@@ -305,7 +305,7 @@ const MINE_TOOL_TIMEOUT_MS = 20 * 1000
 
 Page({
   data: {
-    brandName: "极境车库",
+    brandName: "爱迦租车",
     servicePhone: "",
     wxKfReady: false,
     userName: "车库来访者",
@@ -1063,7 +1063,7 @@ Page({
     wx.makePhoneCall({
       phoneNumber: phone,
       fail: (error) => {
-        if (!isPageNativeActionActive(this, action)) {
+        if (!isPageNativeActionActive(this, action) || String(this.data.servicePhone || "").trim() !== phone) {
           return
         }
         const message = error && (error.errMsg || error.message)

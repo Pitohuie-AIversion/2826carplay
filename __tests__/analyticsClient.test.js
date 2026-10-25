@@ -76,6 +76,42 @@ describe("shared/analytics", () => {
     expect(global.wx.cloud.callFunction).toHaveBeenCalledTimes(2)
   })
 
+  test.each(["vehicle_detail", "content_view"])("%s 的旧失败不能撤销新一轮上报的冷却期", (eventType) => {
+    jest.useFakeTimers()
+    const requests = []
+    global.wx = { cloud: { callFunction: jest.fn((options) => requests.push(options)) } }
+    const { trackEvent } = loadAnalytics()
+    const context = { contentId: "guide_1", channel: "miniprogram", scene: "content" }
+    trackEvent(eventType, "vehicle_1", context)
+    jest.advanceTimersByTime(5000)
+    trackEvent(eventType, "vehicle_1", context)
+    requests[0].fail({ errMsg: "old network failure" })
+    trackEvent(eventType, "vehicle_1", context)
+    expect(requests).toHaveLength(2)
+    requests[1].fail({ errMsg: "current network failure" })
+    trackEvent(eventType, "vehicle_1", context)
+    expect(requests).toHaveLength(3)
+  })
+
+  test("同一毫秒内重试后，旧请求重复失败也不能清除新冷却期", () => {
+    jest.useFakeTimers()
+    const requests = []
+    global.wx = { cloud: { callFunction: jest.fn((options) => requests.push(options)) } }
+    const { trackEvent } = loadAnalytics()
+    trackEvent("booking_submit", "vehicle_1")
+    requests[0].fail()
+    trackEvent("booking_submit", "vehicle_1")
+    requests[0].fail()
+    trackEvent("booking_submit", "vehicle_1")
+    expect(requests).toHaveLength(2)
+  })
+
+  test("微信环境不可用时匿名统计静默退出", () => {
+    delete global.wx
+    const { trackEvent } = loadAnalytics()
+    expect(() => trackEvent("garage_view")).not.toThrow()
+  })
+
   test("费用、规则、咨询、分享与档期结果使用最小匿名载荷", () => {
     global.wx = {
       cloud: {

@@ -246,9 +246,15 @@ Page({
     this._vehicleDetailLoadRequestId =
       Number(this._vehicleDetailLoadRequestId || 0) + 1
     this._vehicleStatusRequestId = Number(this._vehicleStatusRequestId || 0) + 1
+    this._vehicleStatusDeferredResult = null
     this._vehicleImageChangeRequestId =
       Number(this._vehicleImageChangeRequestId || 0) + 1
     this._vehicleUploadSessionId = Number(this._vehicleUploadSessionId || 0) + 1
+    const deferredImageResult = this._vehicleImageDeferredResult
+    this._vehicleImageDeferredResult = null
+    if (deferredImageResult && typeof deferredImageResult.discard === "function") {
+      deferredImageResult.discard()
+    }
     this.clearVehicleDetailLoadTimer()
     this.clearVehicleStatusTimer()
     this.clearVehicleImageChangeTimer()
@@ -275,11 +281,24 @@ Page({
     }
     this._activeUploadTask = null
     this._cancelActiveUpload = null
-    if (typeof wx.hideLoading === "function") {
-      wx.hideLoading()
-    }
+    this.hideVehicleDetailLoading()
+  },
+  onHide() {
+    this.hideVehicleDetailLoading()
   },
   onShow() {
+    const deferredStatusResult = this._vehicleStatusDeferredResult
+    if (deferredStatusResult) {
+      this._vehicleStatusDeferredResult = null
+      deferredStatusResult()
+      return
+    }
+    const deferredImageResult = this._vehicleImageDeferredResult
+    if (deferredImageResult) {
+      this._vehicleImageDeferredResult = null
+      deferredImageResult.resume()
+      return
+    }
     if (this.data.pageAuthorized && this.data.detail && !this.isVehicleDetailInteractionBusy()) {
       this.fetchDetail(this.data.id)
     }
@@ -538,6 +557,10 @@ Page({
     if (this.isVehicleDetailInteractionBusy() || !this.isVehicleDetailActive()) {
       return
     }
+    const action = beginPageNativeAction(this, { requireCurrent: true })
+    if (!isPageNativeActionActive(this, action)) {
+      return
+    }
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       wx.showToast({
         title: "云能力未初始化",
@@ -551,12 +574,13 @@ Page({
     this.setData({
       updatingStatus: true
     })
+    this._vehicleDetailLoadingVisible = true
     wx.showLoading({
       title: input.loadingTitle || "处理中…",
       mask: true
     })
     let settled = false
-    const finishRequest = () => {
+    const finishRequest = (callback) => {
       if (
         settled ||
         this._vehicleStatusRequestId !== requestId ||
@@ -566,17 +590,23 @@ Page({
       }
       settled = true
       this.clearVehicleStatusTimer()
-      wx.hideLoading()
+      this.deliverVehicleStatusResult(
+        action,
+        () => this._vehicleStatusRequestId === requestId && this.isVehicleDetailActive(),
+        () => {
+          this.hideVehicleDetailLoading()
+          callback()
+        }
+      )
       return true
     }
     const handleFailure = (message) => {
-      if (!finishRequest()) {
-        return
-      }
-      this.setData({ updatingStatus: false })
-      wx.showToast({
-        title: formatToastTitle(message, input.failureTitle || "操作失败"),
-        icon: "none"
+      finishRequest(() => {
+        this.setData({ updatingStatus: false })
+        wx.showToast({
+          title: formatToastTitle(message, input.failureTitle || "操作失败"),
+          icon: "none"
+        })
       })
     }
     this._vehicleStatusTimer = setTimeout(() => {
@@ -586,28 +616,27 @@ Page({
       name: input.name,
       data: { ...(input.data || {}) },
       success: (res) => {
-        if (!finishRequest()) {
-          return
-        }
-        const result = res && res.result ? res.result : null
-        if (!result || !result.ok) {
+        finishRequest(() => {
+          const result = res && res.result ? res.result : null
+          if (!result || !result.ok) {
+            this.setData({ updatingStatus: false })
+            if (result && result.code === "VERSION_CONFLICT") this.fetchDetail(input.id)
+            wx.showToast({
+              title: formatToastTitle(
+                result && result.message,
+                input.failureTitle || "操作失败"
+              ),
+              icon: "none"
+            })
+            return
+          }
           this.setData({ updatingStatus: false })
-          if (result && result.code === "VERSION_CONFLICT") this.fetchDetail(input.id)
           wx.showToast({
-            title: formatToastTitle(
-              result && result.message,
-              input.failureTitle || "操作失败"
-            ),
-            icon: "none"
+            title: formatToastTitle(result.message, input.successTitle || "操作成功"),
+            icon: "success"
           })
-          return
-        }
-        this.setData({ updatingStatus: false })
-        wx.showToast({
-          title: formatToastTitle(result.message, input.successTitle || "操作成功"),
-          icon: "success"
+          this.fetchDetail(input.id)
         })
-        this.fetchDetail(input.id)
       },
       fail: (error) => {
         handleFailure(error && (error.errMsg || error.message))
@@ -749,6 +778,10 @@ Page({
     ) {
       return
     }
+    const action = beginPageNativeAction(this, { requireCurrent: true })
+    if (!isPageNativeActionActive(this, action)) {
+      return
+    }
     if (!wx.cloud || typeof wx.cloud.uploadFile !== "function") {
       wx.showToast({
         title: "云上传能力未初始化",
@@ -813,21 +846,19 @@ Page({
           failedUploadPaths
         })
         const totalSkipped = Number(skippedCount || 0) + failedUploadPaths.length
-        const summary = failedUploadPaths.length
-          ? { failedUploadPaths, allFilePaths: selectedPaths.slice(), uploadedCount: uploadedFileIds.length }
-          : null
-        const args = [
+        const summary = {
+          failedUploadPaths,
+          allFilePaths: selectedPaths.slice(),
+          uploadedCount: uploadedFileIds.length
+        }
+        this.persistImageChange(
           { action: "add", fileIds: uploadedFileIds },
           uploadedFileIds,
-          totalSkipped
-        ]
-        if (summary) {
-          args.push(summary)
-        }
-        this.persistImageChange(...args)
+          totalSkipped,
+          summary
+        )
         return
       }
-      wx.hideLoading()
       this.setData({
         uploading: false,
         failedUploadPaths,
@@ -861,11 +892,12 @@ Page({
       }
       const filePath = selectedPaths[index]
       const extension = getFileExtension(filePath)
-      const cloudPath = `vehicle-images/${vehicleId}/${Date.now()}_${index}.${extension}`
+      const cloudPath = `vehicle-images/${vehicleId}/${Date.now()}_${sessionId}_${index}_${retryCount}.${extension}`
       updateItem(index, "uploading", retryCount ? "正在重试" : "上传中")
       let uploadSettled = false
       let uploadTimeoutId = null
-      const settleUpload = (callback) => {
+      let uploadTask = null
+      const settleUpload = (callback, abortTask) => {
         if (uploadSettled) {
           return
         }
@@ -878,9 +910,19 @@ Page({
           clearTimeout(uploadTimeoutId)
           uploadTimeoutId = null
         }
-        callback()
+        if (abortTask && uploadTask && typeof uploadTask.abort === "function") {
+          try {
+            uploadTask.abort()
+          } catch (error) {}
+        }
+        this.deliverVehicleImageResult(
+          action,
+          isUploadCurrent,
+          callback,
+          () => requestUploadedFileCleanup(vehicleId, uploadedFileIds)
+        )
       }
-      const handleUploadFailure = (error) => {
+      const handleUploadFailure = (error, abortTask = false) => {
         settleUpload(() => {
           if (!this._uploadCancelled && shouldRetryCloudUpload(error, retryCount)) {
             uploadNext(index, retryCount + 1)
@@ -889,16 +931,16 @@ Page({
           failedFiles.push({ filePath, error })
           updateItem(index, this._uploadCancelled ? "cancelled" : "failed", this._uploadCancelled ? "已取消" : "上传失败")
           uploadNext(index + 1)
-        })
+        }, abortTask)
       }
       uploadTimeoutId = setTimeout(() => {
-        handleUploadFailure({ errMsg: "uploadFile:fail timeout" })
+        handleUploadFailure({ errMsg: "uploadFile:fail timeout" }, true)
       }, CLOUD_UPLOAD_TIMEOUT_MS)
       this._cancelActiveUpload = () => {
         handleUploadFailure({ errMsg: "uploadFile:fail cancel" })
       }
       try {
-        const uploadTask = wx.cloud.uploadFile({
+        uploadTask = wx.cloud.uploadFile({
           cloudPath,
           filePath,
           success: (uploadRes) => {
@@ -910,8 +952,8 @@ Page({
               requestUploadedFileCleanup(vehicleId, [uploadRes.fileID])
               return
             }
+            uploadedFileIds.push(uploadRes.fileID)
             settleUpload(() => {
-              uploadedFileIds.push(uploadRes.fileID)
               updateItem(index, "success", "上传成功")
               uploadNext(index + 1)
             })
@@ -1027,7 +1069,7 @@ Page({
         }))
       : this.data.uploadItems
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
-      wx.hideLoading()
+      this.hideVehicleDetailLoading()
       this.setData({
         uploading: false,
         uploadItems: getRetryUploadItems(),
@@ -1041,6 +1083,7 @@ Page({
       return
     }
     const requestId = Number(this._vehicleImageChangeRequestId || 0) + 1
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     this._vehicleImageChangeRequestId = requestId
     this._imageChangePending = true
     this._pendingImageCleanupFileIds = cleanupIds.slice()
@@ -1048,6 +1091,7 @@ Page({
     this.clearVehicleImageChangeTimer()
     const showLoading = actionPayload.action === "remove" || actionPayload.action === "setCover"
     if (showLoading) {
+      this._vehicleDetailLoadingVisible = true
       wx.showLoading({
         title: actionPayload.action === "setCover" ? "设置中…" : "处理中…",
         mask: true
@@ -1064,15 +1108,21 @@ Page({
       }
       settled = true
       this.clearVehicleImageChangeTimer()
-      this._imageChangePending = false
-      this._pendingImageCleanupFileIds = []
-      this._pendingImageVehicleId = ""
-      callback()
+      this.deliverVehicleImageResult(
+        action,
+        () => this._vehicleImageChangeRequestId === requestId && this.isVehicleDetailActive(),
+        () => {
+          this._imageChangePending = false
+          this._pendingImageCleanupFileIds = []
+          this._pendingImageVehicleId = ""
+          callback()
+        }
+      )
       return true
     }
     const handleFailure = () => {
       finish(() => {
-        wx.hideLoading()
+        this.hideVehicleDetailLoading()
         this.setData({
           uploading: false,
           uploadItems: getRetryUploadItems(),
@@ -1100,7 +1150,7 @@ Page({
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
           finish(() => {
-            wx.hideLoading()
+            this.hideVehicleDetailLoading()
             this.setData({
               uploading: false,
               uploadItems: getRetryUploadItems(),
@@ -1116,7 +1166,7 @@ Page({
           return
         }
         finish(() => {
-          wx.hideLoading()
+          this.hideVehicleDetailLoading()
           const currentDetail = this.data.detail || {}
           this.setData({
             uploading: false,
@@ -1163,6 +1213,39 @@ Page({
   },
   isVehicleDetailActive() {
     return this._vehicleDetailUnloaded !== true
+  },
+  hideVehicleDetailLoading() {
+    if (!this._vehicleDetailLoadingVisible) {
+      return
+    }
+    this._vehicleDetailLoadingVisible = false
+    if (typeof wx.hideLoading === "function") {
+      wx.hideLoading()
+    }
+  },
+  deliverVehicleImageResult(action, isCurrent, callback, discard) {
+    if (!isCurrent()) {
+      if (typeof discard === "function") discard()
+      return
+    }
+    if (!isPageNativeActionActive(this, action)) {
+      this._vehicleImageDeferredResult = {
+        resume: () => this.deliverVehicleImageResult(action, isCurrent, callback, discard),
+        discard
+      }
+      return
+    }
+    callback()
+  },
+  deliverVehicleStatusResult(action, isCurrent, callback) {
+    if (!isCurrent()) {
+      return
+    }
+    if (!isPageNativeActionActive(this, action)) {
+      this._vehicleStatusDeferredResult = () => this.deliverVehicleStatusResult(action, isCurrent, callback)
+      return
+    }
+    callback()
   },
   isVehicleDetailInteractionBusy() {
     return Boolean(

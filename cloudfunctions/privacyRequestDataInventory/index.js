@@ -509,12 +509,17 @@ exports.main = async (event) => {
   const wxContext = cloud.getWXContext()
   const adminOpenid = wxContext && wxContext.OPENID ? wxContext.OPENID : ""
   const input = event && typeof event === "object" ? event : {}
-  const requestId = String(input.requestId || "").trim()
-  const mode = String(input.mode || "inventory").trim()
+  const requestId = typeof input.requestId === "string" ? input.requestId.trim() : ""
+  const mode = typeof input.mode === "string" ? input.mode.trim() : "inventory"
+  const invalidFieldType = [input.requestId, input.mode, input.exportToken]
+    .some((value) => value !== undefined && typeof value !== "string")
 
   try {
     if (!(await isAdminOpenid(adminOpenid))) {
       return createError("FORBIDDEN", "权限不足")
+    }
+    if (invalidFieldType) {
+      return createError("VALIDATION_ERROR", "申请 ID、操作模式和导出确认标识必须为文本")
     }
     if (!REQUEST_ID_PATTERN.test(requestId)) {
       return createError("VALIDATION_ERROR", "申请 ID 格式不正确")
@@ -551,19 +556,28 @@ exports.main = async (event) => {
       return createError("INVALID_REQUEST_DATA", "该申请缺少用户身份，无法核验")
     }
     if (mode === "confirmExport") {
-      const exportToken = String(input.exportToken || "")
+      const exportToken = input.exportToken || ""
       if (!/^[a-f0-9]{40}$/.test(exportToken)) return createError("VALIDATION_ERROR", "导出确认标识不合法")
       if (request.dataExportedToken === exportToken && request.dataExportedAt) {
         return { ok: true, confirmed: true, duplicate: true }
       }
       if (request.dataExportToken !== exportToken) return createError("EXPORT_STATE_CONFLICT", "导出记录已变化，请重新导出")
       const confirmed = await db.collection("privacy_requests").where({
-        _id: requestId, openid: subjectOpenid, type: "access", status: request.status, dataExportToken: exportToken
+        _id: requestId, openid: subjectOpenid, type: "access", status: request.status,
+        dataExportToken: exportToken, dataExportedToken: db.command.neq(exportToken)
       }).update({ data: {
         dataExportedAt: db.serverDate(), dataExportedBy: adminOpenid,
         dataExportedToken: exportToken, updatedAt: db.serverDate()
       } })
       if (!(Number(confirmed && confirmed.stats && confirmed.stats.updated) > 0)) {
+        const latestRes = await db.collection("privacy_requests").doc(requestId)
+          .field(REQUEST_HEADER_FIELDS).get()
+        const latest = latestRes && latestRes.data
+        if (latest && latest.openid === subjectOpenid && latest.type === "access" &&
+            EXPORTABLE_STATUSES.includes(latest.status) && latest.dataExportedToken === exportToken &&
+            latest.dataExportedAt) {
+          return { ok: true, confirmed: true, duplicate: true }
+        }
         return createError("EXPORT_STATE_CONFLICT", "申请状态已变化，请刷新后重试")
       }
       await writeAuditLogBestEffort({ openid: adminOpenid, action: "privacyRequestDataExportConfirmed", requestId, requestType: "access" })

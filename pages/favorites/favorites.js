@@ -83,8 +83,8 @@ function buildCompareState(car1, car2, diffOnly) {
   const tags1 = Array.isArray(car1.tags) ? car1.tags : []
   const tags2 = Array.isArray(car2.tags) ? car2.tags : []
 
-  const service1 = "极境车损无忧 · 管家交付"
-  const service2 = "极境车损无忧 · 管家交付"
+  const service1 = "爱迦车损无忧 · 管家交付"
+  const service2 = "爱迦车损无忧 · 管家交付"
 
   const allRows = [
     {
@@ -210,15 +210,30 @@ Page({
     }
   },
 
-  loadOperationConfig() {
+  updateServicePhone(value) {
+    const servicePhone = String(value || "").trim()
+    if (servicePhone === this.data.servicePhone) return
+    // A generated poster may still contain a contact number that was removed.
+    if (this.data.comparePosterVisible) this.handleCloseComparePosterModal()
+    this.setData({ servicePhone })
+  },
+
+  cancelOperationConfigRequest() {
+    if (typeof this._cancelOperationConfigRequest === "function") {
+      this._cancelOperationConfigRequest()
+      this._cancelOperationConfigRequest = null
+    }
+  },
+
+  loadOperationConfig(options) {
+    this.cancelOperationConfigRequest()
     this._cancelOperationConfigRequest = requestOperationConfig({
+      force: Boolean(options && options.force),
       onSuccess: (config) => {
-        if (config && config.servicePhone) {
-          this.setData({
-            servicePhone: String(config.servicePhone || "").trim()
-          })
-        }
-      }
+        this.updateServicePhone(config.servicePhone)
+      },
+      onFailure: () => this.updateServicePhone(""),
+      onInvalidated: () => this.updateServicePhone("")
     })
   },
 
@@ -239,7 +254,6 @@ Page({
       }
     } catch (e) {}
     this.fetchList()
-    this.loadOperationConfig()
   },
 
   onReachBottom() {
@@ -247,6 +261,10 @@ Page({
   },
 
   onShow() {
+    this.loadOperationConfig()
+    if (this.data.comparePosterVisible && this.data.comparePosterGenerating) {
+      this.handleCloseComparePosterModal()
+    }
     if (
       this.data.loadedOnce &&
       !this.data.loading &&
@@ -257,6 +275,10 @@ Page({
     }
   },
 
+  onHide() {
+    this.cancelComparePosterGeneration()
+  },
+
   onPullDownRefresh() {
     if (this.data.removingId || this.data.undoingFavorite) {
       if (typeof wx.stopPullDownRefresh === "function") {
@@ -264,6 +286,7 @@ Page({
       }
       return
     }
+    this.loadOperationConfig({ force: true })
     this.fetchList({
       done: () => wx.stopPullDownRefresh()
     })
@@ -272,10 +295,7 @@ Page({
   onUnload() {
     cancelPageNativeActions(this)
     this.cancelComparePosterGeneration()
-    if (typeof this._cancelOperationConfigRequest === "function") {
-      this._cancelOperationConfigRequest()
-      this._cancelOperationConfigRequest = null
-    }
+    this.cancelOperationConfigRequest()
     this._favoritesRequestId = Number(this._favoritesRequestId || 0) + 1
     this._favoriteRemoveSerial = Number(this._favoriteRemoveSerial || 0) + 1
     this._favoriteUndoSerial = Number(this._favoriteUndoSerial || 0) + 1
@@ -582,12 +602,12 @@ Page({
         // Header Title
         ctx.fillStyle = "#E8C88B"
         ctx.font = "bold 21px sans-serif"
-        ctx.fillText("极境车库 · 心仪双车深度对比", 50, 62)
+        ctx.fillText("爱迦租车 · 心仪双车深度对比", 50, 62)
 
         // Header Subtitle
         ctx.fillStyle = "#7E8B9E"
         ctx.font = "11px sans-serif"
-        ctx.fillText("EXTREME GARAGE BENCHMARK MATRIX", 50, 80)
+        ctx.fillText("AIJIA CAR RENTAL BENCHMARK MATRIX", 50, 80)
 
         // Benchmark Badge
         ctx.fillStyle = "rgba(208, 158, 90, 0.12)"
@@ -726,14 +746,14 @@ Page({
         ctx.lineTo(width - 36, footerY)
         ctx.stroke()
 
-        const phone = String(this.data.servicePhone || "极境管家专属通道").trim()
+        const phone = String(this.data.servicePhone || "爱迦管家专属通道").trim()
         ctx.fillStyle = "#E8C88B"
         ctx.font = "bold 13px sans-serif"
         ctx.fillText("专属管家服务专线 · " + phone, 36, footerY + 36)
 
         ctx.fillStyle = "#7E8B9E"
         ctx.font = "11px sans-serif"
-        ctx.fillText("微信搜索【极境车库】小程序，尊享专属试驾与排期确认", 36, footerY + 58)
+        ctx.fillText("微信搜索【爱迦租车】小程序，尊享专属试驾与排期确认", 36, footerY + 58)
 
         // Seal Emblem
         const emblemSize = 60
@@ -749,8 +769,8 @@ Page({
         ctx.fillStyle = "#E8C88B"
         ctx.font = "bold 12px sans-serif"
         ctx.textAlign = "center"
-        ctx.fillText("极境", emblemX + emblemSize / 2, emblemY + 26)
-        ctx.fillText("车库", emblemX + emblemSize / 2, emblemY + 46)
+        ctx.fillText("爱迦", emblemX + emblemSize / 2, emblemY + 26)
+        ctx.fillText("租车", emblemX + emblemSize / 2, emblemY + 46)
         ctx.textAlign = "left"
 
         if (!isActive()) return
@@ -786,7 +806,11 @@ Page({
 
   async handleSaveComparePoster() {
     const action = beginPageNativeAction(this, { requireCurrent: true, exclusiveKey: "compare-poster-save" })
-    if (!isPageNativeActionActive(this, action)) return
+    const serial = Number(this._comparePosterRenderSerial || 0)
+    const isActive = () => isPageNativeActionActive(this, action) &&
+      Number(this._comparePosterRenderSerial || 0) === serial &&
+      this.data.comparePosterVisible
+    if (!isActive()) return
     const filePath = this.data.comparePosterImagePath
     if (!filePath) {
       wx.showToast({ title: "海报生成中", icon: "none" })
@@ -797,14 +821,14 @@ Page({
       wx.saveImageToPhotosAlbum({
         filePath,
         success: () => {
-          if (isPageNativeActionActive(this, action)) {
+          if (isActive()) {
             triggerHapticFeedback("medium")
             wx.showToast({ title: "海报已保存相册", icon: "success" })
             this.handleCloseComparePosterModal()
           }
         },
         fail: (err) => {
-          if (!isPageNativeActionActive(this, action)) return
+          if (!isActive()) return
           const msg = String((err && (err.errMsg || err.message)) || "").toLowerCase()
           if (msg.includes("cancel")) {
             return
@@ -829,7 +853,7 @@ Page({
     const car2 = cars[1] || {}
     const c1Name = car1.name || "车型一"
     const c2Name = car2.name || "车型二"
-    const inquiryText = `【极境车库 · 心仪车型对比咨询】\n您好专属管家，我在小程序心仪对比中看中了：\n1. ${c1Name} (${car1.priceText || "待核价"})\n2. ${c2Name} (${car2.priceText || "待核价"})\n想了解这两款车近期的排期与尊享租赁方案。`
+    const inquiryText = `【爱迦租车 · 心仪车型对比咨询】\n您好专属管家，我在小程序心仪对比中看中了：\n1. ${c1Name} (${car1.priceText || "待核价"})\n2. ${c2Name} (${car2.priceText || "待核价"})\n想了解这两款车近期的排期与尊享租赁方案。`
 
     let action = beginPageNativeAction(this, { requireCurrent: true, exclusiveKey: "copy-inquiry" })
     if (typeof wx.setClipboardData === "function") {
@@ -860,7 +884,7 @@ Page({
     wx.makePhoneCall({
       phoneNumber: phone,
       fail: (error) => {
-        if (!isPageNativeActionActive(this, action)) return
+        if (!isPageNativeActionActive(this, action) || String(this.data.servicePhone || "").trim() !== phone) return
         const message = error && (error.errMsg || error.message)
         if (message && String(message).includes("cancel")) return
         wx.showModal({
@@ -883,7 +907,7 @@ Page({
     const diffState = buildCompareState(c1, c2, false)
     const diffRows = diffState.compareRows.filter((r) => r.isDiff)
 
-    const lines = ["【极境车库 · 心仪车型深度对比】"]
+    const lines = ["【爱迦租车 · 心仪车型深度对比】"]
     lines.push(`▶ 对比车型：${c1.name || "车型一"} VS ${c2.name || "车型二"}`)
     lines.push(`1. ${c1.name}：${c1.priceText || "日租待确认"} | ${c1.statusText || "可预约"} | ${c1.transmission || c1.nickname || "自动挡"}`)
     lines.push(`2. ${c2.name}：${c2.priceText || "日租待确认"} | ${c2.statusText || "可预约"} | ${c2.transmission || c2.nickname || "自动挡"}`)
@@ -903,7 +927,7 @@ Page({
     if (phone) {
       lines.push(`\n专属管家电话：${phone}`)
     }
-    lines.push("更多车型与排期请在微信搜索【极境车库】小程序查看。")
+    lines.push("更多车型与排期请在微信搜索【爱迦租车】小程序查看。")
 
     const text = lines.join("\n")
     const action = beginPageNativeAction(this, { requireCurrent: true, exclusiveKey: "copy-compare-list" })
@@ -1308,14 +1332,14 @@ Page({
 
   onShareAppMessage() {
     return {
-      title: "极境车库 · 心仪豪华座驾收藏",
+      title: "爱迦租车 · 心仪豪华座驾收藏",
       path: "/pages/favorites/favorites?channel=wechat_share"
     }
   },
 
   onShareTimeline() {
     return {
-      title: "极境车库 · 心仪豪华座驾收藏",
+      title: "爱迦租车 · 心仪豪华座驾收藏",
       query: "channel=timeline_share"
     }
   }

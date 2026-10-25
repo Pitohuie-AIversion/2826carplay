@@ -178,7 +178,7 @@ async function writeErrorLogBestEffort(payload) {
 exports.main = async (event) => {
   const wxContext = cloud.getWXContext()
   const openid = wxContext && wxContext.OPENID ? wxContext.OPENID : ""
-  const id = String((event && event.id) || "").trim()
+  const id = event && typeof event.id === "string" ? event.id.trim() : ""
 
   try {
     const allowed = await hasOpenidCapability(openid, "vehicle_manage")

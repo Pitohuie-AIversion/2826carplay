@@ -77,8 +77,13 @@ function dayDocumentId(vehicleId, date) {
 }
 
 function documentMissing(error) {
+  const code = String(error && (error.code || error.errCode) || "").toUpperCase()
+  if (["DOCUMENT_NOT_FOUND", "DATABASE_DOCUMENT_NOT_EXIST"].includes(code)) return true
+  if (code && code !== "-1") return false
   const message = String(error && (error.errMsg || error.message) || error || "").toLowerCase()
-  return message.includes("not exist") || message.includes("not found") || message.includes("document_not_found") || message.includes("-502005")
+  // A failed collection/resource read cannot establish that an individual day is free.
+  if (/database_collection_not_exist|-502005|\b(?:collection|table|database|environment|resource)\b.*(?:not\s+found|not\s+exist)/.test(message)) return false
+  return /document_not_found|database_document_not_exist|document.*(?:not\s+found|not\s+exist)|文档不存在/.test(message)
 }
 
 async function getDocOrNull(collection, id, fields) {
@@ -95,6 +100,7 @@ async function getDocOrNull(collection, id, fields) {
 
 function normalizeEvent(event) {
   const payload = event && typeof event === "object" ? event : {}
+  const price = payload.dailyPrice
   return {
     action: String(payload.action || "").trim(),
     id: String(payload.id || payload.blockId || payload.ruleId || "").trim(),
@@ -106,7 +112,7 @@ function normalizeEvent(event) {
     reason: String(payload.reason || "").trim().slice(0, 200),
     expectedVersion: payload.expectedVersion,
     requestId: String(payload.requestId || "").trim(),
-    dailyPrice: payload.dailyPrice === null || payload.dailyPrice === undefined || String(payload.dailyPrice).trim() === "" ? NaN : Number(payload.dailyPrice)
+    dailyPrice: typeof price === "number" ? price : typeof price === "string" && price.trim() !== "" ? Number(price) : NaN
   }
 }
 

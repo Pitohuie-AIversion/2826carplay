@@ -227,7 +227,7 @@ function pickListCarFields(car) {
 
 Page({
   data: {
-    pageTitle: "极境车库",
+    pageTitle: "爱迦租车",
     pageSubtitle: DEFAULT_GARAGE_SUBTITLE,
     announcementText: "",
     announcementDismissed: false,
@@ -1177,7 +1177,7 @@ Page({
     if (this.data.selectedCity) params.push(`city=${encodeURIComponent(this.data.selectedCity)}`)
     if (this.data.sortBy && this.data.sortBy !== "default") params.push(`sortBy=${encodeURIComponent(this.data.sortBy)}`)
     return {
-      title: "极境车库",
+      title: "爱迦租车",
       path: `/pages/garage/garage?${params.join("&")}`
     }
   },
@@ -1189,7 +1189,7 @@ Page({
     if (this.data.selectedCity) params.push(`city=${encodeURIComponent(this.data.selectedCity)}`)
     if (this.data.sortBy && this.data.sortBy !== "default") params.push(`sortBy=${encodeURIComponent(this.data.sortBy)}`)
     return {
-      title: `${this.data.pageTitle || "极境车库"} · ${this.data.pageSubtitle || "甄选座驾，为每一次出发预留专属席位"}`,
+      title: `${this.data.pageTitle || "爱迦租车"} · ${this.data.pageSubtitle || "甄选座驾，为每一次出发预留专属席位"}`,
       query: params.join("&")
     }
   }

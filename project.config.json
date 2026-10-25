@@ -163,7 +163,7 @@
   },
   "simulatorType": "wechat",
   "simulatorPluginLibVersion": {},
-  "projectname": "jijing-garage",
+  "projectname": "爱迦租车",
   "cloudfunctionRoot": "cloudfunctions/",
   "cloudfunctionTemplateRoot": "cloudfunctionTemplate/"
 }

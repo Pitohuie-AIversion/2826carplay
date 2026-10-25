@@ -6,7 +6,7 @@ const STORAGE_KEY_RELEASE_NOTES = "app_latest_release_notes"
 const RELEASE_NOTES = {
   version: CURRENT_VERSION,
   releaseDate: "2026-10-19",
-  title: "极境车库 v1.2.0 尊享对比矩阵与交验车留证闭环升级",
+  title: "爱迦租车 v1.2.0 尊享对比矩阵与交验车留证闭环升级",
   highlights: [
     "【验车留证】预约详情全面支持客户专属交验车留证事实备忘复制、环检损伤结构化呈现与留证单 (CSV) 导出、查看及分享",
     "【心仪对比】心仪收藏夹引入车型对比矩阵、参数差异高亮过滤（只看差异）、生成尊享对比长图海报与管家一键核价闭环",

@@ -143,6 +143,12 @@ Page({
     })
   },
   onShow() {
+    const pending = this._vehicleMutationDeferredResult
+    if (pending) {
+      this._vehicleMutationDeferredResult = null
+      pending()
+      return
+    }
     if (
       !this.data.pageAuthorized ||
       this.data.loading ||
@@ -151,6 +157,9 @@ Page({
       return
     }
     this.fetchList()
+  },
+  onHide() {
+    this.hideVehicleMutationLoading()
   },
   onPullDownRefresh() {
     if (
@@ -180,6 +189,7 @@ Page({
     cancelPageNativeActions(this)
     this._vehicleListRequestId = Number(this._vehicleListRequestId || 0) + 1
     this._vehicleMutationRequestId = Number(this._vehicleMutationRequestId || 0) + 1
+    this._vehicleMutationDeferredResult = null
     this.finishVehicleListRequestEffects()
     this.finishVehicleMutationEffects()
   },
@@ -200,13 +210,8 @@ Page({
     if (!this.data.keyword || this.data.loading || this.isVehicleMutationBusy()) {
       return
     }
-    const listRequestId = Number(this._vehicleListRequestId || 0)
-    this.setData({ keyword: "" }, () => {
-      if (listRequestId !== Number(this._vehicleListRequestId || 0)) {
-        return
-      }
-      this.fetchList({ keyword: "" })
-    })
+    this.setData({ keyword: "" })
+    this.fetchList({ keyword: "" })
   },
   handleKeywordConfirm(event) {
     this.handleSearchConfirm(event)
@@ -604,6 +609,7 @@ Page({
     }
     const requestId = Number(this._vehicleMutationRequestId || 0) + 1
     this._vehicleMutationRequestId = requestId
+    const action = beginPageNativeAction(this, { requireCurrent: true })
     this.finishVehicleMutationEffects()
     const stateField = input.stateField === "deletingId" ? "deletingId" : "updatingId"
     this.setData({ [stateField]: id })
@@ -621,18 +627,28 @@ Page({
       this.finishVehicleMutationEffects()
       return true
     }
+    const deliverResult = (callback) => {
+      if (this._vehicleMutationRequestId !== requestId) return
+      if (!isPageNativeActionActive(this, action)) {
+        this._vehicleMutationDeferredResult = () => deliverResult(callback)
+        return
+      }
+      this.setData({ [stateField]: "" })
+      callback()
+    }
     const handleFailure = (message) => {
       if (!finishRequest()) {
         return
       }
-      this.setData({ [stateField]: "" })
-      if (typeof input.onFailure === "function") {
-        input.onFailure(message)
-        return
-      }
-      wx.showToast({
-        title: formatToastTitle(message, input.failureFallback || "操作失败"),
-        icon: "none"
+      deliverResult(() => {
+        if (typeof input.onFailure === "function") {
+          input.onFailure(message)
+          return
+        }
+        wx.showToast({
+          title: formatToastTitle(message, input.failureFallback || "操作失败"),
+          icon: "none"
+        })
       })
     }
     this._vehicleMutationRequestTimer = setTimeout(() => {
@@ -645,11 +661,12 @@ Page({
         if (!finishRequest()) {
           return
         }
-        this.setData({ [stateField]: "" })
         const result = res && res.result ? res.result : null
-        if (typeof input.onResult === "function") {
-          input.onResult(result)
-        }
+        deliverResult(() => {
+          if (typeof input.onResult === "function") {
+            input.onResult(result)
+          }
+        })
       },
       fail: (error) => {
         handleFailure(error && (error.errMsg || error.message))
@@ -722,7 +739,19 @@ Page({
   },
   fetchList(input) {
     const done = typeof input === "function" ? input : input && input.done
-    const append = Boolean(input && typeof input === "object" && input.append)
+    const options = input && typeof input === "object" ? input : {}
+    const committedQuery = this._vehicleListQuery
+    const querySource = options.append && committedQuery ? committedQuery : {
+      keyword: this.data.keyword,
+      status: this.data.currentStatus
+    }
+    const query = {
+      keyword: String(typeof options.keyword === "string" ? options.keyword : querySource.keyword || "").trim(),
+      status: typeof options.status === "string" ? options.status : querySource.status
+    }
+    const append = Boolean(options.append && (!committedQuery || (
+      query.keyword === committedQuery.keyword && query.status === committedQuery.status
+    )))
     const nextPage = append ? this.data.page + 1 : 0
     const pageSize = this.data.pageSize || DEFAULT_PAGE_SIZE
     const requestId = Number(this._vehicleListRequestId || 0) + 1
@@ -739,8 +768,7 @@ Page({
       return
     }
     const filters = {
-      keyword: String(input && typeof input.keyword === "string" ? input.keyword : (this.data.keyword || "")).trim(),
-      status: input && typeof input.status === "string" ? input.status : this.data.currentStatus,
+      ...query,
       page: nextPage,
       pageSize
     }
@@ -817,6 +845,7 @@ Page({
             }))
           : []
         const nextList = append ? this.data.list.concat(list) : list
+        this._vehicleListQuery = query
         this.setData({
           loading: false,
           maintenanceSummary: buildFleetMaintenanceSummary(nextList),
@@ -858,6 +887,9 @@ Page({
       clearTimeout(this._vehicleMutationRequestTimer)
       this._vehicleMutationRequestTimer = null
     }
+    this.hideVehicleMutationLoading()
+  },
+  hideVehicleMutationLoading() {
     if (this._vehicleMutationLoadingVisible) {
       this._vehicleMutationLoadingVisible = false
       wx.hideLoading()

@@ -127,7 +127,7 @@ function extractBalancedCallBodies(source, marker) {
 }
 
 describe("用户主流程原生图标", () => {
-  test("全站极境车库徽标均作为文字内容旁的装饰图形", () => {
+  test("全站爱迦租车徽标均作为文字内容旁的装饰图形", () => {
     const wxmlFiles = [...[...listWxmlFiles("pages"), ...listWxmlFiles("pages-admin")], ...listWxmlFiles("components")]
     let emblemCount = 0
 
@@ -480,7 +480,7 @@ describe("用户主流程原生图标", () => {
       })
     })
 
-    expect(horizontalScrollCount).toBe(12)
+    expect(horizontalScrollCount).toBe(13)
   })
 
   test("全站用户可见缺省值不使用技术双短横或 N/A", () => {
@@ -544,7 +544,7 @@ describe("用户主流程原生图标", () => {
       })
     })
 
-    expect(confirmationCount).toBe(39)
+    expect(confirmationCount).toBe(40)
   })
 
   test("原生操作菜单统一使用品牌色与顶部说明", () => {
@@ -696,7 +696,7 @@ describe("用户主流程原生图标", () => {
     )
     const bookingDetailSource = read("pages/booking-detail/booking-detail.js")
 
-    expect(currentOnlyActionCount).toBe(99)
+    expect(currentOnlyActionCount).toBe(111)
     expect(bookingDetailSource).toContain("isPageCurrent(this)")
     expect(read("app.js")).toContain("nativeActionAppVisible = false")
     expect(read("app.js")).toContain("nativeActionAppVisible = true")

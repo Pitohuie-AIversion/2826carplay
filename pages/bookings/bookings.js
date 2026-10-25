@@ -544,7 +544,7 @@ Page({
 
   onShareAppMessage() {
     return {
-      title: "极境车库 · 我的尊享自驾旅程",
+      title: "爱迦租车 · 我的尊享自驾旅程",
       path: "/pages/bookings/bookings?channel=wechat_share"
     }
   }

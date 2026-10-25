@@ -68,6 +68,7 @@ function createMockDb() {
           let offset = 0
           let limit = 100
           const chain = {
+            count: async () => ({ total: [...maps[name].values()].filter((value) => Object.entries(filter).every(([key, match]) => value[key] === match)).length }),
             field: () => chain, orderBy: () => chain,
             skip: (value) => { offset = value; return chain },
             limit: (value) => { limit = value; return chain },
@@ -95,7 +96,100 @@ async function loadModule(db) {
   return mod
 }
 
+function failCalendarDayReads(db, error) {
+  const runTransaction = db.runTransaction.getMockImplementation()
+  db.runTransaction.mockImplementation((callback) => runTransaction((transaction) => callback({
+    collection: (name) => {
+      const collection = transaction.collection(name)
+      if (name !== "vehicle_calendar_days") return collection
+      return { doc: (id) => {
+        const doc = { ...collection.doc(id), get: async () => { throw error } }
+        doc.field = () => doc
+        return doc
+      } }
+    }
+  })))
+}
+
 describe("cloudfunctions/vehicleCalendarManage integration", () => {
+  test.each([
+    { code: "DATABASE_COLLECTION_NOT_EXIST", message: "collection not exist" },
+    { errCode: -502005, errMsg: "database collection not exists | Db or Table not exist" },
+    { message: "document.get:fail collection not found" }
+  ])("日历集合读取失败 %p 时不能创建或假报释放成功", async (error) => {
+    const mocks = createMockDb()
+    const mod = await loadModule(mocks.db)
+    const input = { vehicleId: "vehicle_1", kind: "hold", startDate: "2099-08-01", endDate: "2099-08-02", reason: "核对" }
+    const created = await mod.main({ action: "createBlock", ...input })
+    expect(created.ok).toBe(true)
+    const savedBlock = { ...mocks.blocks.get(created.blockId) }
+    const savedDays = [...mocks.days.entries()]
+    mocks.auditAdd.mockClear()
+    failCalendarDayReads(mocks.db, error)
+    expect(await mod.main({ action: "createBlock", ...input, vehicleId: "vehicle_2" })).toMatchObject({ ok: false, code: "INTERNAL_ERROR" })
+    expect(await mod.main({ action: "releaseBlock", id: created.blockId, expectedVersion: 1, reason: "取消" })).toMatchObject({ ok: false, code: "INTERNAL_ERROR" })
+    expect(mocks.blocks.size).toBe(1)
+    expect(mocks.blocks.get(created.blockId)).toEqual(savedBlock)
+    expect([...mocks.days.entries()]).toEqual(savedDays)
+    expect(mocks.auditAdd).not.toHaveBeenCalled()
+  })
+
+  test.each([{ code: "DOCUMENT_NOT_FOUND" }, { errCode: "DATABASE_DOCUMENT_NOT_EXIST" }])("明确缺文档 %p 仍允许创建新的日历占用", async (error) => {
+    const mocks = createMockDb()
+    const mod = await loadModule(mocks.db)
+    failCalendarDayReads(mocks.db, error)
+    expect(await mod.main({ action: "createBlock", vehicleId: "vehicle_1", kind: "hold", startDate: "2099-08-01", endDate: "2099-08-02", reason: "核对" })).toMatchObject({ ok: true })
+    expect(mocks.blocks.size).toBe(1)
+    expect(mocks.days.size).toBe(2)
+  })
+
+  test.each([true, false, [1200], [0], [], {}])("价格非法类型 %p 在新建和更新事务前均拒绝", async (dailyPrice) => {
+    const mocks = createMockDb()
+    const mod = await loadModule(mocks.db)
+    const input = { vehicleId: "vehicle_1", label: "特殊价", startDate: "2099-08-01", endDate: "2099-08-02", dailyPrice: 800, reason: "核对" }
+    mocks.rules.set("existing", { ...input, status: "active", version: 1 })
+    const saved = { ...mocks.rules.get("existing") }
+    for (const action of ["createPriceRule", "updatePriceRule"]) {
+      expect(await mod.main({ ...input, action, vehicleId: action === "createPriceRule" ? "vehicle_2" : "vehicle_1", id: "existing", expectedVersion: 1, dailyPrice })).toMatchObject({ ok: false, code: "VALIDATION_ERROR" })
+    }
+    expect(mocks.db.runTransaction).not.toHaveBeenCalled()
+    expect(mocks.rules.size).toBe(1)
+    expect(mocks.rules.get("existing")).toEqual(saved)
+    expect(mocks.vehicles.get("vehicle_1")).not.toHaveProperty("priceRuleVersion")
+    expect(mocks.auditAdd).not.toHaveBeenCalled()
+    let availability
+    jest.isolateModules(() => { availability = require("../cloudfunctions/vehicleAvailabilityCheck/index") })
+    expect(await availability.main({ vehicleId: "vehicle_1", startDate: "2099-08-01", endDate: "2099-08-02" })).toMatchObject({
+      ok: true, available: true, priceSummary: { estimatedTotal: 1600, estimatedTotalText: "￥1600" }
+    })
+  })
+
+  test.each([-1, 100000, 1.5, "1.5", "invalid", NaN, Infinity])("价格非法数值 %p 继续在事务前拒绝", async (dailyPrice) => {
+    const mocks = createMockDb()
+    const mod = await loadModule(mocks.db)
+    expect(await mod.main({ action: "createPriceRule", vehicleId: "vehicle_1", label: "特殊价", startDate: "2099-08-01", endDate: "2099-08-02", dailyPrice, reason: "核对" })).toMatchObject({ ok: false, code: "VALIDATION_ERROR" })
+    expect(mocks.db.runTransaction).not.toHaveBeenCalled()
+    expect(mocks.rules.size).toBe(0)
+  })
+
+  test.each([0, " 0 ", 99999, "99999", " 1200 "])("合法价格 %p 保存后客户估价保持真实数值", async (dailyPrice) => {
+    const mocks = createMockDb()
+    const mod = await loadModule(mocks.db)
+    const created = await mod.main({ action: "createPriceRule", vehicleId: "vehicle_1", label: "特殊价", startDate: "2099-08-01", endDate: "2099-08-02", dailyPrice, reason: "核对" })
+    const numericPrice = Number(dailyPrice)
+    expect(created).toMatchObject({ ok: true, dailyPrice: numericPrice })
+    expect(mocks.rules.get(created.ruleId).dailyPrice).toBe(numericPrice)
+    let availability
+    jest.isolateModules(() => { availability = require("../cloudfunctions/vehicleAvailabilityCheck/index") })
+    const result = await availability.main({ vehicleId: "vehicle_1", startDate: "2099-08-01", endDate: "2099-08-02" })
+    expect(result).toMatchObject({ ok: true, available: true, priceSummary: {
+      estimatedTotal: numericPrice * 2,
+      estimatedTotalText: numericPrice > 0 ? `￥${numericPrice * 2}` : "待顾问报价",
+      specialDayCount: 2
+    } })
+    expect(result.priceSummary.daily.map((item) => item.dailyRate)).toEqual([numericPrice, numericPrice])
+  })
+
   test.each(["Block", "PriceRule"])("新建%s已落库但响应丢失，重试返回原记录且释放后不重建", async (type) => {
     const mocks = createMockDb()
     const mod = await loadModule(mocks.db)

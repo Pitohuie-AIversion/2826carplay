@@ -16,6 +16,8 @@ function getCached(key, ttlMs) {
 }
 
 function setCache(key, data) {
+  // Explicit writes supersede any earlier request, including after this entry expires.
+  pendingPromises.delete(key)
   memoryCache.set(key, {
     data,
     timestamp: Date.now()
@@ -45,11 +47,15 @@ function fetchWithCache(key, fetcher, ttlMs = 5 * 60 * 1000) {
   const promise = Promise.resolve()
     .then(() => fetcher())
     .then((data) => {
-      setCache(key, data)
+      if (pendingPromises.get(key) === promise) {
+        setCache(key, data)
+      }
       return data
     })
     .finally(() => {
-      pendingPromises.delete(key)
+      if (pendingPromises.get(key) === promise) {
+        pendingPromises.delete(key)
+      }
     })
 
   pendingPromises.set(key, promise)

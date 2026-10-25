@@ -66,8 +66,13 @@ function validateInput(input) {
 }
 
 function documentMissing(error) {
+  const code = String(error && (error.code || error.errCode) || "").toUpperCase()
+  if (["DOCUMENT_NOT_FOUND", "DATABASE_DOCUMENT_NOT_EXIST"].includes(code)) return true
+  if (code && code !== "-1") return false
   const message = String(error && (error.errMsg || error.message) || error || "").toLowerCase()
-  return message.includes("not exist") || message.includes("not found") || message.includes("document_not_found") || message.includes("-502005")
+  // A failed collection/resource read cannot establish that an individual day is free.
+  if (/database_collection_not_exist|-502005|\b(?:collection|table|database|environment|resource)\b.*(?:not\s+found|not\s+exist)/.test(message)) return false
+  return /document_not_found|database_document_not_exist|document.*(?:not\s+found|not\s+exist)|文档不存在/.test(message)
 }
 
 async function getDayOrNull(id) {

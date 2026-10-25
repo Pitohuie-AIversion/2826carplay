@@ -27,6 +27,19 @@ const BOOKING_FIELDS = {
   latestReturnHandoverId: true,
   latestReturnHandoverVersion: true
 }
+const SUBMISSION_FIELDS = {
+  bookingId: true,
+  stage: true,
+  version: true,
+  submitRequestId: true,
+  submitFingerprint: true,
+  mileageKm: true,
+  energyType: true,
+  energyLevelPercent: true,
+  damageNote: true,
+  additionalNote: true,
+  photos: true
+}
 
 function error(code, message, details) {
   const result = { ok: false, code, message }
@@ -41,6 +54,11 @@ function text(value, maxLength) {
 function strings(value) {
   if (!Array.isArray(value)) return []
   return [...new Set(value.map((item) => String(item || "").trim()).filter(Boolean))]
+}
+
+function numericInput(value) {
+  if (typeof value !== "number" && (typeof value !== "string" || !value.trim())) return NaN
+  return Number(value)
 }
 
 function hasAdminRole(record) {
@@ -92,13 +110,11 @@ function normalizeInput(event) {
     bookingId: text(source.bookingId, 128),
     handoverId: text(source.handoverId, 160),
     stage: text(source.stage, 20),
-    requestId: text(source.requestId, 80),
-    expectedVersion: Number(source.expectedVersion || 0),
-    mileageProvided: source.mileageKm !== "" && source.mileageKm !== null && source.mileageKm !== undefined,
-    mileageKm: Number(source.mileageKm),
+    requestId: typeof source.requestId === "string" ? source.requestId.trim() : "",
+    expectedVersion: source.expectedVersion === undefined ? 0 : numericInput(source.expectedVersion),
+    mileageKm: numericInput(source.mileageKm),
     energyType: text(source.energyType, 20),
-    energyLevelProvided: source.energyLevelPercent !== "" && source.energyLevelPercent !== null && source.energyLevelPercent !== undefined,
-    energyLevelPercent: Number(source.energyLevelPercent),
+    energyLevelPercent: numericInput(source.energyLevelPercent),
     damageNote: text(source.damageNote, 500),
     additionalNote: text(source.additionalNote, 500),
     photos: source.photos,
@@ -112,13 +128,36 @@ function validateSubmit(input) {
   if (!STAGES.includes(input.stage)) errors.push({ field: "stage", message: "交接类型不合法" })
   if (!/^[A-Za-z0-9_-]{8,80}$/.test(input.requestId)) errors.push({ field: "requestId", message: "请求标识不合法" })
   if (!Number.isSafeInteger(input.expectedVersion) || input.expectedVersion < 0) errors.push({ field: "expectedVersion", message: "交接版本不合法" })
-  if (!input.mileageProvided || !Number.isInteger(input.mileageKm) || input.mileageKm < 0 || input.mileageKm > 5000000) errors.push({ field: "mileageKm", message: "里程须为 0 至 5000000 的整数" })
+  if (!Number.isInteger(input.mileageKm) || input.mileageKm < 0 || input.mileageKm > 5000000) errors.push({ field: "mileageKm", message: "里程须为 0 至 5000000 的整数" })
   if (!["fuel", "electric"].includes(input.energyType)) errors.push({ field: "energyType", message: "能源类型不合法" })
-  if (!input.energyLevelProvided || !Number.isInteger(input.energyLevelPercent) || input.energyLevelPercent < 0 || input.energyLevelPercent > 100) errors.push({ field: "energyLevelPercent", message: "油量或电量须为 0 至 100 的整数" })
+  if (!Number.isInteger(input.energyLevelPercent) || input.energyLevelPercent < 0 || input.energyLevelPercent > 100) errors.push({ field: "energyLevelPercent", message: "油量或电量须为 0 至 100 的整数" })
   if (!input.damageNote) errors.push({ field: "damageNote", message: "请填写已知损伤情况；无损伤时请明确填写未发现" })
   const photos = normalizePhotos(input.photos, input.bookingId, input.stage)
   if (!photos.length) errors.push({ field: "photos", message: "请上传前、后、左、右四个角度且不重复的照片" })
   return { errors, photos }
+}
+
+function submissionFingerprint(input, photos) {
+  return crypto.createHash("sha256").update(JSON.stringify({
+    bookingId: input.bookingId,
+    stage: input.stage,
+    expectedVersion: input.expectedVersion,
+    mileageKm: input.mileageKm,
+    energyType: input.energyType,
+    energyLevelPercent: input.energyLevelPercent,
+    damageNote: input.damageNote,
+    additionalNote: input.additionalNote || "",
+    photos
+  })).digest("hex")
+}
+
+function matchesSubmission(record, input, fingerprint) {
+  if (record.bookingId !== input.bookingId || record.stage !== input.stage || Number(record.version) !== input.expectedVersion + 1) return false
+  if (record.submitFingerprint) return record.submitFingerprint === fingerprint
+  // Legacy records can be checked while their photos still exist. New records
+  // retain the digest when archive clears photos, so a true retry stays idempotent.
+  const photos = normalizePhotos(record.photos, record.bookingId, record.stage)
+  return photos.length > 0 && submissionFingerprint({ ...record, expectedVersion: Number(record.version) - 1 }, photos) === fingerprint
 }
 
 function isMissing(errorValue) {
@@ -176,7 +215,7 @@ async function sendHandoverNotificationBestEffort(info) {
       miniprogramState,
       lang: "zh_CN",
       data: {
-        thing1: { value: String(info.vehicleName || "极境座驾").slice(0, 20) },
+        thing1: { value: String(info.vehicleName || "爱迦座驾").slice(0, 20) },
         phrase2: { value: statusPhrase },
         thing3: { value: remark },
         time4: { value: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().slice(11, 16) }
@@ -206,13 +245,17 @@ async function sendHandoverNotificationBestEffort(info) {
 async function submit(input, openid) {
   const validation = validateSubmit(input)
   if (validation.errors.length) return error("VALIDATION_ERROR", "交接记录校验失败", { errors: validation.errors })
+  const fingerprint = submissionFingerprint(input, validation.photos)
 
   const result = await db.runTransaction(async (transaction) => {
     const booking = await getDocOrNull(transaction.collection("bookings"), input.bookingId, BOOKING_FIELDS)
     if (!booking) return { result: error("NOT_FOUND", "预约不存在") }
     const candidateId = `${input.bookingId}__${input.stage}__v${input.expectedVersion + 1}`
-    const candidate = await getDocOrNull(transaction.collection("booking_handovers"), candidateId, { submitRequestId: true, version: true })
+    const candidate = await getDocOrNull(transaction.collection("booking_handovers"), candidateId, SUBMISSION_FIELDS)
     if (candidate && candidate.submitRequestId === input.requestId) {
+      if (!matchesSubmission(candidate, input, fingerprint)) {
+        return { result: error("VERSION_CONFLICT", "该请求已提交不同的交接内容，请刷新核对后重新提交") }
+      }
       return { result: { ok: true, action: "submit", duplicate: true, handoverId: candidateId, version: Number(candidate.version) || input.expectedVersion + 1 } }
     }
     if (booking.status !== "confirmed") return { result: error("STATUS_NOT_ALLOWED", "仅已确认预约可以提交交接记录") }
@@ -223,7 +266,7 @@ async function submit(input, openid) {
       ? await getDocOrNull(transaction.collection("booking_handovers"), latestId, { _id: true, submitRequestId: true, status: true, version: true })
       : null
     if (latest && latest.submitRequestId === input.requestId) {
-      return { result: { ok: true, action: "submit", duplicate: true, handoverId: latestId, version: Number(latest.version) || 1 } }
+      return { result: error("VERSION_CONFLICT", "该请求对应的交接版本已变化，请刷新核对后重新提交") }
     }
     if (Math.max(Number(booking[`latest${prefix}HandoverVersion`]) || 0, Number(latest && latest.version) || 0) !== input.expectedVersion || candidate) {
       return { result: error("VERSION_CONFLICT", "交接记录已更新，请刷新") }
@@ -258,6 +301,7 @@ async function submit(input, openid) {
       additionalNote: input.additionalNote,
       photos: validation.photos,
       submitRequestId: input.requestId,
+      submitFingerprint: fingerprint,
       submittedBy: openid,
       capturedAt: db.serverDate(),
       submittedAt: db.serverDate(),

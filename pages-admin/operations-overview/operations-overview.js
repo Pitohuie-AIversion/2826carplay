@@ -369,12 +369,22 @@ Page({
             tone: storageCleanupPendingCount ? "primary" : "success",
             url: "/pages/mine/mine"
           })
+        } else if (permissions.canManageRoles) {
+          alerts.push({
+            key: "storage",
+            title: "存储清理待办暂不可用",
+            desc: "其他运营数据仍可正常查看",
+            value: 0,
+            tone: "neutral",
+            url: "/pages/mine/mine"
+          })
         }
         const loadedSourceCount =
           Number(vehicleLoaded) + Number(bookingLoaded) + Number(summaryLoaded)
         const actionableAlerts = alerts.filter(
           (item) => item.tone !== "neutral" && Number(item.value) > 0
         )
+        const hasUnavailableActions = !alerts.length || alerts.some((item) => item.tone === "neutral")
         const pendingActionCount = actionableAlerts.reduce(
           (total, item) => total + Number(item.value || 0),
           0
@@ -414,8 +424,12 @@ Page({
             loadedSourceCount === requestedSourceCount ? "数据源已同步" : "部分数据可用",
           syncStateClass:
             loadedSourceCount === requestedSourceCount ? "sync-state-complete" : "sync-state-partial",
-          operationStateLabel: pendingActionCount ? "有待办需要处理" : "当前运营平稳",
-          operationStateClass: pendingActionCount ? "operation-state-attention" : "operation-state-clear",
+          operationStateLabel: pendingActionCount
+            ? "有待办需要处理"
+            : hasUnavailableActions ? "待办数据待确认" : "当前运营平稳",
+          operationStateClass: pendingActionCount
+            ? "operation-state-attention"
+            : hasUnavailableActions ? "operation-state-pending" : "operation-state-clear",
           lastSyncedText:
             loadedSourceCount > 0 ? formatShortTime(Date.now()) : this.data.lastSyncedText
         })

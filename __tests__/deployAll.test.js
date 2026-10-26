@@ -198,13 +198,21 @@ describe("CloudBase Automated Deploy & Orchestration (scripts/deployAll.js)", ()
   });
 
   describe("syncSecurityRules", () => {
-    test("correctly parses security manifest and reads 17 collections", () => {
-      const res = syncSecurityRules("cloud1-d8gtmns36320e045e", true);
+    test("validates manifest and rule files for 17 collections without applying anything", () => {
+      const res = syncSecurityRules("cloud1-d8gtmns36320e045e");
+      expect(res.ok).toBe(true);
+      expect(res.issues).toEqual([]);
       expect(res.collectionsCount).toBe(17);
-      expect(res.storageRule).toBeDefined();
-      expect(res.dbRule).toBeDefined();
-      expect(res.dbRule.read).toBe(false);
-      expect(res.dbRule.write).toBe(false);
+      expect(res.dbRule).toEqual({ read: false, write: false });
+      expect(res.storageRule.write).toBe(false);
+      expect(res.storageRuleApplied).toBe(false);
+      expect(res.dbRulesApplied).toBe(false);
+      expect(res.manualSteps.length).toBeGreaterThan(0);
+    });
+
+    test("does not reference any rule-mutating CLI command in source", () => {
+      const src = fs.readFileSync(path.join(__dirname, "..", "scripts", "deployAll.js"), "utf8");
+      expect(src).not.toMatch(/storage rules update/);
     });
   });
 

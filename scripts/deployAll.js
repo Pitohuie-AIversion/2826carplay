@@ -140,7 +140,7 @@ function planDeployment(options = {}) {
 
     if (!cachedHash) {
       status = "NEW";
-      reason = "首次部署 / 暂无云端指纹缓存";
+      reason = "本机无部署记录（云端可能已存在，将覆盖）";
     } else if (force) {
       status = "FORCED";
       reason = "用户显式指定 --force 强制重新部署";
@@ -230,36 +230,46 @@ function deploySingleFunction(fnName, envId, isDryRun) {
 }
 
 /**
- * 同步安全规则与索引建议
+ * 校验本地安全规则文件，并生成需人工执行的下发步骤。
+ *
+ * 本脚本刻意不自动下发任何安全规则：
+ * - 存储规则 write:false 必须在体验版验证后与新版小程序配套发布（见 DEPLOY_CHECKLIST.md），
+ *   提前下发会让旧客户端上传失败；规则含正则，经 Windows shell 转义也容易被破坏。
+ * - 17 个集合的数据库权限需逐个在控制台或 CloudBase API 中设置，CLI 无一键命令。
  */
-function syncSecurityRules(envId, isDryRun) {
+function syncSecurityRules(envId) {
   const manifest = JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8"));
   const storageRule = JSON.parse(fs.readFileSync(STORAGE_RULE_PATH, "utf8"));
   const dbRule = JSON.parse(fs.readFileSync(DB_RULE_PATH, "utf8"));
+  const collections = (manifest.database && manifest.database.collections) || [];
+  const publicPrefix = (manifest.storage && manifest.storage.publicReadPrefix) || "vehicle-images/";
 
-  const results = {
-    collectionsCount: (manifest.database && manifest.database.collections || []).length,
-    storageRuleApplied: false,
-    dbRulesPlanned: true,
-    storageRule,
-    dbRule
-  };
-
-  if (!isDryRun) {
-    try {
-      // 尝试通过 tcb storage rules 更新存储规则
-      const ruleJsonStr = JSON.stringify(storageRule).replace(/"/g, '\\"');
-      const cmd = `tcb storage rules update --acl CUSTOM --rule "${ruleJsonStr}" -e "${envId}"`;
-      const res = spawnSync(cmd, { shell: true, encoding: "utf8", cwd: PROJECT_ROOT });
-      if (res.status === 0) {
-        results.storageRuleApplied = true;
-      }
-    } catch (e) {
-      // 容错处理
-    }
+  const issues = [];
+  if (dbRule.read !== false || dbRule.write !== false) {
+    issues.push("database-deny-client.json 必须同时为 read:false、write:false");
+  }
+  if (storageRule.write !== false) {
+    issues.push("storage.json 必须为 write:false（客户端禁止直接写入）");
+  }
+  if (typeof storageRule.read !== "string" || !storageRule.read.includes(publicPrefix.replace(/\/$/, ""))) {
+    issues.push(`storage.json 的 read 规则应仅开放 ${publicPrefix}`);
   }
 
-  return results;
+  return {
+    collectionsCount: collections.length,
+    collections,
+    storageRuleApplied: false,
+    dbRulesApplied: false,
+    ok: issues.length === 0,
+    issues,
+    storageRule,
+    dbRule,
+    manualSteps: [
+      `控制台 → 数据库：为 ${collections.length} 个集合设置自定义规则 ${JSON.stringify(dbRule)}（不存在的集合先创建）`,
+      `控制台 → 云存储 → 权限设置：自定义规则 ${JSON.stringify(storageRule)}（仅在新版小程序配套发布时应用）`,
+      `下发后等待 1–3 分钟，执行 tcb storage rules get -e ${envId} 回读核对`
+    ]
+  };
 }
 
 /**
@@ -277,8 +287,10 @@ function deployWebAdminHosting(envId, isDryRun) {
     const cmd2 = `tcb hosting deploy "${WEB_ADMIN_PATH}" admin/index.html -e ${envId}`;
     const res2 = spawnSync(cmd2, { shell: true, encoding: "utf8", cwd: PROJECT_ROOT });
 
+    const failed = [res1, res2].find((r) => r.status !== 0);
     return {
-      ok: res1.status === 0 && res2.status === 0,
+      ok: !failed,
+      error: failed ? String(failed.stderr || failed.stdout || (failed.error && failed.error.message) || "tcb hosting deploy 失败").trim() : undefined,
       url: `https://${envId}-1451689651.tcloudbaseapp.com/`,
       adminUrl: `https://${envId}-1451689651.tcloudbaseapp.com/admin/`
     };
@@ -345,6 +357,9 @@ async function runDeployment(args = process.argv) {
 
   // 2. 云函数指纹比对与增量计划
   let deployPlan = null;
+  let functionFailures = 0;
+  let hostingFailed = false;
+  let rulesInvalid = false;
   if (!rulesOnly && !adminOnly) {
     console.log(colorize("▶ [2/4] 计算 57 项微服务云函数增量指纹与变更集...", "bold"));
     deployPlan = planDeployment({ envId, targetFunctions, force: isForce });
@@ -385,7 +400,7 @@ async function runDeployment(args = process.argv) {
 
     // 真正执行部署
     if (isApply && deployPlan.toDeploy.length > 0) {
-      console.log(colorize(`🚀 正在并发部署 ${deployPlan.toDeploy.length} 个云函数到环境 ${envId}...`, "bold"));
+      console.log(colorize(`🚀 正在逐个部署 ${deployPlan.toDeploy.length} 个云函数到环境 ${envId}...`, "bold"));
       const cache = readDeployCache();
       if (!cache.environments) cache.environments = {};
       if (!cache.environments[envId]) cache.environments[envId] = { functions: {} };
@@ -411,6 +426,7 @@ async function runDeployment(args = process.argv) {
         }
       }
 
+      functionFailures = failCount;
       writeDeployCache(cache);
       console.log("");
       console.log(`部署完成: ${colorize(`成功 ${successCount}`, "green")} | ${colorize(`失败 ${failCount}`, failCount > 0 ? "red" : "gray")}`);
@@ -420,14 +436,16 @@ async function runDeployment(args = process.argv) {
 
   // 3. 安全规则与集合编排
   if (!functionsOnly && !adminOnly) {
-    console.log(colorize("▶ [3/4] 编排与同步 17 个数据库集合及云存储安全规则...", "bold"));
-    const ruleRes = syncSecurityRules(envId, isDryRun);
-    console.log(`✔ 17 数据库集合规则: 全部收敛于服务端 (database-deny-client.json)`);
-    console.log(`✔ 云存储权限安全边界: 仅开放 vehicle-images/ 读取，客户端禁止写入 (storage.json)`);
-    console.log(`✔ 云函数网关安全准则: 全面启用 auth != null 鉴权与 OPENID 校验`);
-    if (isApply) {
-      console.log(colorize("✔ 存储安全规则已下发同步", "green"));
+    console.log(colorize("▶ [3/4] 校验本地安全规则文件（本脚本不自动下发规则）...", "bold"));
+    const ruleRes = syncSecurityRules(envId);
+    if (ruleRes.ok) {
+      console.log(colorize(`✔ 本地规则文件校验通过：${ruleRes.collectionsCount} 个集合禁止客户端读写；存储仅公开 vehicle-images/ 且禁止客户端写入`, "green"));
+    } else {
+      rulesInvalid = true;
+      ruleRes.issues.forEach((iss) => console.log(colorize(`❌ ${iss}`, "red")));
     }
+    console.log(colorize("⚠ 线上规则未被修改。如需应用，请人工执行：", "yellow"));
+    ruleRes.manualSteps.forEach((step, i) => console.log(`   ${i + 1}. ${step}`));
     console.log("");
   }
 
@@ -444,6 +462,7 @@ async function runDeployment(args = process.argv) {
         console.log(`  访问地址: ${colorize(hostRes.url, "cyan")}`);
         console.log(`  管理路由: ${colorize(hostRes.adminUrl, "cyan")}`);
       } else {
+        hostingFailed = true;
         console.log(colorize(`❌ 静态托管发布失败: ${hostRes.error}`, "red"));
       }
     }
@@ -451,19 +470,22 @@ async function runDeployment(args = process.argv) {
   }
 
   // 总结与指引
+  const failed = functionFailures > 0 || hostingFailed || rulesInvalid;
   console.log(colorize("═══════════════════════════════════════════════════════════════", "cyan"));
-  if (isDryRun) {
+  if (failed) {
+    console.log(colorize(`❌ 存在失败项：云函数失败 ${functionFailures} 个${hostingFailed ? "，静态托管失败" : ""}${rulesInvalid ? "，本地规则文件不合规" : ""}`, "red"));
+  } else if (isDryRun) {
     console.log(colorize("🎉 安全演练巡检完成 (DRY-RUN PASS)！", "green"));
     console.log("如需正式执行线上部署，请运行：");
     console.log(`   ${colorize("node scripts/deployAll.js --apply", "cyan")}`);
     console.log("如需精准只更新某个函数，请运行：");
     console.log(`   ${colorize("node scripts/deployAll.js --apply --fn=adminImageUpload", "cyan")}`);
   } else {
-    console.log(colorize("🎉 全栈云端部署已执行完毕！", "green"));
+    console.log(colorize("🎉 云函数与静态托管部署完成（安全规则仍需按上方步骤人工应用）", "green"));
   }
   console.log(colorize("═══════════════════════════════════════════════════════════════", "cyan"));
 
-  return { ok: true, exitCode: 0, plan: deployPlan };
+  return { ok: !failed, exitCode: failed ? 1 : 0, plan: deployPlan, functionFailures, hostingFailed, rulesInvalid };
 }
 
 if (require.main === module) {

@@ -13,7 +13,7 @@ const CMDS = [
   ["cloud:backup", "云数据库异地冷备导出（核心集合/全量16集合归档至 backups/）", "默认 --dry；加 --apply 真正拉取，加 --all 导出全集合"],
   ["cloud:admin:deploy", "构建并一键部署 Web 运营指挥中心大屏至云开发静态托管 CDN", "默认 --dry；加 --apply 真正发布"],
   ["cloud:trigger:check", "巡检 cloudbaserc.json 中配置的自动化 Cron 定时触发器"],
-  ["cloud:deploy", "57 项云函数增量指纹比对 + 本地安全规则文件校验 + Web 后台检查（演练，不改线上）", "支持 --fn=<name> 过滤、--force 强制全量、--functions-only / --rules-only / --admin-only"],
+  ["cloud:deploy", "57 项云函数增量指纹比对 + 本地安全规则文件校验 + Web 后台检查（演练，不改线上）", "--fn=<name> 仅指定函数；--env=<id> 指定环境；三类 --*-only 范围互斥；演练 --clean-cache 保留原缓存"],
   ["cloud:deploy:apply", "逐个部署有变化的云函数并发布 Web 后台；安全规则不自动下发，仅打印人工步骤", "真正上传云端；任一失败退出码为 1"],
   ["cloud:help", "输出本帮助"],
 ];

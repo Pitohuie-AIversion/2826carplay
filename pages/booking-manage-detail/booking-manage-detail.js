@@ -10,7 +10,7 @@ const {
   isPageNativeActionActive
 } = require("../../shared/pageNativeAction")
 const { buildHandoverReport, formatHandoverCsvContent, getHandoverFileName } = require("../../shared/handoverReport")
-const { PRESET_CUSTOMER_TAGS, normalizeTags, autoTagBooking } = require("../../shared/bookingTags")
+const { PRESET_CUSTOMER_TAGS, normalizeTags, autoTagBooking, deriveBookingIntelligentTags } = require("../../shared/bookingTags")
 const {
   STATUS_TEXT_MAP,
   STATUS_CLASS_MAP,
@@ -235,6 +235,7 @@ Page({
     handoverHistoryUnavailable: false,
     handoverReadyForCompletion: false,
     presetTags: PRESET_CUSTOMER_TAGS,
+    recommendedTags: [],
     exportedHandoverPath: "",
     exportingHandover: false
   },
@@ -419,8 +420,12 @@ Page({
         if (stored && stored.rating) customerReview = stored
       } catch (e) {}
     }
+    const intelligentTags = deriveBookingIntelligentTags(booking)
+    const currentTagMap = booking.tagMap || {}
+    const recommendedTags = intelligentTags.filter((tag) => !currentTagMap[tag])
     this.applyState({
       booking,
+      recommendedTags,
       rentalDays,
       quoteDateRangeTooLong: rentalDays > 47,
       recommendedDiscount,
@@ -1435,10 +1440,79 @@ Page({
         this.data.booking.tags = savedTags
         this.data.booking.tagMap = tagMap
         this.data.booking.tagBaseline = savedTags.slice()
+        const intelligentTags = deriveBookingIntelligentTags(this.data.booking)
+        const recommendedTags = intelligentTags.filter((t) => !tagMap[t])
+        this.data.recommendedTags = recommendedTags
         this.setData({
           "booking.tags": savedTags,
           "booking.tagBaseline": savedTags.slice(),
-          "booking.tagMap": tagMap
+          "booking.tagMap": tagMap,
+          recommendedTags
+        })
+      }
+    })
+  },
+  handleApplyAllRecommendedTags() {
+    if (
+      this.data.loading ||
+      this.data.coordinationLoading ||
+      this.data.quoteLoading ||
+      this.data.handoverLoading ||
+      this._bookingDetailMutationActive ||
+      !this.data.coordinationEditable ||
+      !this.data.id
+    ) {
+      return
+    }
+    const booking = this.data.booking || {}
+    if (["completed", "cancelled"].includes(booking.status)) return
+    const recommended = Array.isArray(this.data.recommendedTags) ? this.data.recommendedTags : []
+    if (!recommended.length) return
+    const currentTags = Array.isArray(booking.tags) ? [...booking.tags] : []
+    const combined = [...currentTags]
+    for (const tag of recommended) {
+      if (!combined.includes(tag) && combined.length < 5) {
+        combined.push(tag)
+      }
+    }
+    if (combined.length === currentTags.length) return
+    const nextTags = normalizeTags(combined)
+    this.runBookingDetailMutation({
+      name: "bookingUpdateCoordination",
+      data: {
+        id: this.data.id,
+        tags: nextTags,
+        expectedValues: {
+          tags: Object.prototype.hasOwnProperty.call(booking, "tagBaseline")
+            ? booking.tagBaseline
+            : Array.isArray(booking.tags) ? booking.tags.slice() : null
+        }
+      },
+      startState: { coordinationLoading: true },
+      endState: { coordinationLoading: false },
+      timeoutTitle: "推荐标签应用超时",
+      failureFallback: "推荐标签应用失败",
+      onResult: (result) => {
+        this.applyState({ coordinationLoading: false })
+        if (!result || !result.ok) {
+          wx.showToast({ title: formatToastTitle(result && result.message, "推荐标签保存失败"), icon: "none" })
+          return
+        }
+        wx.showToast({ title: "已应用推荐标签", icon: "none" })
+        const savedTags = normalizeTags(result.tags || nextTags)
+        const tagMap = savedTags.reduce((acc, t) => { acc[t] = true; return acc }, {})
+        if (!this.data.booking) this.data.booking = {}
+        this.data.booking.tags = savedTags
+        this.data.booking.tagMap = tagMap
+        this.data.booking.tagBaseline = savedTags.slice()
+        const intelligentTags = deriveBookingIntelligentTags(this.data.booking)
+        const nextRecommendedTags = intelligentTags.filter((t) => !tagMap[t])
+        this.data.recommendedTags = nextRecommendedTags
+        this.setData({
+          "booking.tags": savedTags,
+          "booking.tagBaseline": savedTags.slice(),
+          "booking.tagMap": tagMap,
+          recommendedTags: nextRecommendedTags
         })
       }
     })

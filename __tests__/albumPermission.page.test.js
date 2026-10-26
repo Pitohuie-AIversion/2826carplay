@@ -2,17 +2,19 @@ describe.each(["car-detail", "favorites"])("%s 海报相册授权恢复", (name)
   let page
   let currentPages
   let save
+  let app
 
   beforeEach(() => {
     jest.resetModules()
     jest.useFakeTimers()
     global.wx = {
-      showToast: jest.fn(), showModal: jest.fn(), openSetting: jest.fn(),
+      showToast: jest.fn(), showModal: jest.fn(), openSetting: jest.fn(), showLoading: jest.fn(), hideLoading: jest.fn(),
       getPrivacySetting: jest.fn(({ success }) => success({ needAuthorization: false })),
       getSetting: jest.fn(({ success }) => success({ authSetting: { "scope.writePhotosAlbum": false } })),
       saveImageToPhotosAlbum: jest.fn(), vibrateShort: jest.fn()
     }
-    global.getApp = () => ({ globalData: {} })
+    app = { globalData: {} }
+    global.getApp = () => app
     global.Page = (definition) => {
       page = { ...definition, data: JSON.parse(JSON.stringify(definition.data)) }
       page.setData = jest.fn((patch) => Object.assign(page.data, patch))
@@ -31,6 +33,7 @@ describe.each(["car-detail", "favorites"])("%s 海报相册授权恢复", (name)
   afterEach(() => {
     wx.showToast.mock.calls.forEach(([options]) => expect(Array.from(options.title).length).toBeLessThanOrEqual(10))
     page.onUnload()
+    expect(jest.getTimerCount()).toBe(0)
     jest.clearAllTimers()
     jest.useRealTimers()
     delete global.Page
@@ -42,6 +45,89 @@ describe.each(["car-detail", "favorites"])("%s 海报相册授权恢复", (name)
   async function rejectAlbum(error = { errMsg: "saveImageToPhotosAlbum:fail auth deny" }) {
     await save()
     wx.saveImageToPhotosAlbum.mock.calls.at(-1)[0].fail(error)
+  }
+
+  test("首次保存仍在途时连续点击只发起一次相册写入", async () => {
+    await save()
+    await save()
+    expect(wx.saveImageToPhotosAlbum).toHaveBeenCalledTimes(1)
+    wx.saveImageToPhotosAlbum.mock.calls[0][0].success()
+    expect(wx.showToast).toHaveBeenLastCalledWith({ title: "海报已保存相册", icon: "success" })
+  })
+
+  test("保存失败解除在途锁，用户可以立即重新保存", async () => {
+    await rejectAlbum({ errMsg: "saveImageToPhotosAlbum:fail system error" })
+    await save()
+    expect(wx.saveImageToPhotosAlbum).toHaveBeenCalledTimes(2)
+    wx.saveImageToPhotosAlbum.mock.calls[1][0].success()
+    expect(wx.showToast).toHaveBeenLastCalledWith({ title: "海报已保存相册", icon: "success" })
+  })
+
+  test("原生保存同步异常也能解除在途锁并允许重试", async () => {
+    wx.saveImageToPhotosAlbum.mockImplementationOnce(() => { throw new Error("album bridge unavailable") })
+    await expect(save()).resolves.toBeUndefined()
+    expect(wx.showToast).toHaveBeenLastCalledWith({ title: "保存未完成，请重试", icon: "none" })
+    await save()
+    expect(wx.saveImageToPhotosAlbum).toHaveBeenCalledTimes(2)
+    wx.saveImageToPhotosAlbum.mock.calls[1][0].success()
+    expect(wx.showToast).toHaveBeenLastCalledWith({ title: "海报已保存相册", icon: "success" })
+  })
+
+  test.each(["切页", "应用后台"])("%s后返回可新建保存，旧回执不能解除新保存的在途锁", async (leave) => {
+    page.loadOperationConfig = jest.fn()
+    page.fetchList = jest.fn()
+    await save()
+    const previousSave = wx.saveImageToPhotosAlbum.mock.calls[0][0]
+    page.onHide()
+    if (leave === "切页") currentPages = [page, {}]
+    else app.globalData.nativeActionAppVisible = false
+    expect(jest.getTimerCount()).toBe(0)
+    currentPages = [page]
+    app.globalData.nativeActionAppVisible = true
+    page.onShow()
+    await save()
+    previousSave.success()
+    await save()
+    expect(wx.saveImageToPhotosAlbum).toHaveBeenCalledTimes(2)
+    expect(wx.showToast).not.toHaveBeenCalled()
+    wx.saveImageToPhotosAlbum.mock.calls[1][0].fail({ errMsg: "saveImageToPhotosAlbum:fail cancel" })
+    await save()
+    expect(wx.saveImageToPhotosAlbum).toHaveBeenCalledTimes(3)
+  })
+
+  test("原生保存无回执时限时解锁，用户重试不受旧成功回执影响", async () => {
+    await save()
+    const previousSave = wx.saveImageToPhotosAlbum.mock.calls[0][0]
+    jest.advanceTimersByTime(60000)
+    expect(wx.showToast).toHaveBeenLastCalledWith({ title: "保存未确认，请重试", icon: "none" })
+    expect(wx.saveImageToPhotosAlbum).toHaveBeenCalledTimes(1)
+    await save()
+    previousSave.success()
+    await save()
+    expect(wx.saveImageToPhotosAlbum).toHaveBeenCalledTimes(2)
+    wx.saveImageToPhotosAlbum.mock.calls[1][0].success()
+    expect(wx.showToast).toHaveBeenLastCalledWith({ title: "海报已保存相册", icon: "success" })
+    expect(jest.getTimerCount()).toBe(0)
+  })
+
+  if (name === "car-detail") {
+    test("远程封面下载期间禁止重复保存，超时关闭遮罩且迟到下载不再写相册", async () => {
+      page.data.posterImagePath = "cloud://env/cover.jpg"
+      let resolveCover
+      page.resolvePosterCover = jest.fn(() => new Promise((resolve) => { resolveCover = resolve }))
+      const first = save()
+      await save()
+      expect(page.resolvePosterCover).toHaveBeenCalledTimes(1)
+      jest.advanceTimersByTime(60000)
+      expect(wx.hideLoading).toHaveBeenCalledTimes(1)
+      expect(wx.saveImageToPhotosAlbum).not.toHaveBeenCalled()
+      resolveCover("wxfile://late-cover.jpg")
+      await first
+      expect(wx.saveImageToPhotosAlbum).not.toHaveBeenCalled()
+      page.data.posterImagePath = "wxfile://new-cover.jpg"
+      await save()
+      expect(wx.saveImageToPhotosAlbum).toHaveBeenCalledTimes(1)
+    })
   }
 
   test("拒绝后确认才打开设置，允许后由用户再次保存", async () => {

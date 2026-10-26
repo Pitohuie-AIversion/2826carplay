@@ -132,10 +132,12 @@ async function isAdminOpenid(openid) {
 }
 
 function normalizeEvent(event) {
-  const payload = event && typeof event === "object" ? event : {}
+  const payload = event && typeof event === "object" && !Array.isArray(event) ? event : {}
+  const validPermissions = Array.isArray(payload.permissions) && payload.permissions.every((item) => typeof item === "string" && item.trim())
   return {
-    openid: String(payload.openid || "").trim(),
-    permissions: normalizeStringArray(payload.permissions)
+    openid: typeof payload.openid === "string" ? payload.openid.trim() : "",
+    validPermissions,
+    permissions: validPermissions ? normalizeStringArray(payload.permissions) : []
   }
 }
 
@@ -186,6 +188,17 @@ exports.main = async (event) => {
         ok: false,
         code: "VALIDATION_ERROR",
         message: "不支持修改自己的权限"
+      }
+    }
+
+    if (!input.validPermissions) {
+      return {
+        ok: false,
+        code: "VALIDATION_ERROR",
+        message: "权限列表格式不正确",
+        details: {
+          errors: [{ field: "permissions", message: "权限列表必须为非空字符串组成的数组，撤销全部权限请明确传入空数组" }]
+        }
       }
     }
 

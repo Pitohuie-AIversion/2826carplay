@@ -39,29 +39,31 @@ function canShareCsvFile() {
   return !isDevtoolsEnv() && typeof wx.shareFileMessage === "function"
 }
 
-async function saveCsvFile(options) {
-  const input = options && typeof options === "object" ? options : {}
-  const fileName = ensureCsvFileName(input.fileName, input.fallbackFileName)
-  const fs = wx.getFileSystemManager && wx.getFileSystemManager()
-  if (!fs || typeof fs.writeFile !== "function") {
-    throw new Error("文件系统不可用")
-  }
-  const basePath = wx.env && wx.env.USER_DATA_PATH ? wx.env.USER_DATA_PATH : ""
-  if (!basePath) {
-    throw new Error("文件目录不可用")
-  }
-  // Every write owns its path, so a timed-out export cannot overwrite or remove a retry.
-  csvSaveSerial += 1
-  const filePath = `${basePath}/csv_${CSV_SESSION_ID}_${csvSaveSerial}.csv`
-
-  return new Promise((resolve, reject) => {
+function saveCsvFile(options) {
+  let cancel = () => {}
+  const promise = new Promise((resolve, reject) => {
+    const input = options && typeof options === "object" ? options : {}
+    const fileName = ensureCsvFileName(input.fileName, input.fallbackFileName)
+    const fs = wx.getFileSystemManager && wx.getFileSystemManager()
+    if (!fs || typeof fs.writeFile !== "function") throw new Error("文件系统不可用")
+    const basePath = wx.env && wx.env.USER_DATA_PATH ? wx.env.USER_DATA_PATH : ""
+    if (!basePath) throw new Error("文件目录不可用")
+    // Each write owns its path, including after cancellation and a same-name retry.
+    csvSaveSerial += 1
+    const filePath = `${basePath}/csv_${CSV_SESSION_ID}_${csvSaveSerial}.csv`
     let settled = false
     let writeSuccessHandled = false
     const fail = (error) => {
+      if (writeSuccessHandled) return
+      // The native writer may produce more data after cancellation. A late
+      // failure still cleans that data, while a delivered success is retained.
+      removeCsvFile(filePath).catch(() => {})
       if (settled) return
       settled = true
-      removeCsvFile(filePath).catch(() => {})
       reject(error)
+    }
+    cancel = () => {
+      if (!settled) fail(Object.assign(new Error("文件保存已取消"), { code: "CANCELLED" }))
     }
     const writeOptions = {
       filePath,
@@ -85,6 +87,8 @@ async function saveCsvFile(options) {
       fail(error)
     }
   })
+  promise.cancel = () => cancel()
+  return promise
 }
 
 async function removeCsvFile(filePath) {

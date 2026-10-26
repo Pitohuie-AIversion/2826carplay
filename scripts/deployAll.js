@@ -98,6 +98,36 @@ function writeDeployCache(cache, cachePath = CACHE_FILE) {
   }
 }
 
+function validateTargetFunctions(targetFunctions, availableFunctions) {
+  if (targetFunctions == null) return;
+  if (!Array.isArray(targetFunctions) || !targetFunctions.length) {
+    throw new Error("必须明确指定至少一个云函数名称");
+  }
+  const available = new Set(availableFunctions.map((item) => item.name));
+  const invalid = targetFunctions.filter((name) => typeof name !== "string" || !/^[A-Za-z0-9_-]+$/.test(name) || !available.has(name));
+  if (invalid.length) throw new Error(`未知或无效云函数：${invalid.join(", ")}`);
+}
+
+function validateDeploymentOptions(flags, positionals, envId, targetFunctions) {
+  const booleanFlags = ["--apply", "--force", "--clean-cache", "--functions-only", "--fns", "--rules-only", "--admin-only", "--dry", "--dry-run"];
+  const allowed = new Set(booleanFlags.concat("--env", "--fn"));
+  const issues = [];
+  for (const key of Object.keys(flags)) {
+    if (!allowed.has(key)) issues.push(`未知参数：${key}`);
+    else if (booleanFlags.includes(key) && flags[key] !== true) issues.push(`${key} 不接受参数值`);
+  }
+  if (positionals.length) issues.push("参数值请使用 --env=<环境> 或 --fn=<函数> 格式");
+  for (const key of ["--env", "--fn"]) {
+    if (Object.prototype.hasOwnProperty.call(flags, key) && (typeof flags[key] !== "string" || !flags[key].trim())) issues.push(`${key} 缺少有效参数值`);
+  }
+  if (typeof envId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(envId)) issues.push("云环境 ID 格式无效");
+  if (flags["--apply"] && (flags["--dry"] || flags["--dry-run"])) issues.push("--apply 不能与演练模式同时使用");
+  const functionScope = Boolean(flags["--functions-only"] || flags["--fns"] || Object.prototype.hasOwnProperty.call(flags, "--fn"));
+  if ([functionScope, Boolean(flags["--rules-only"]), Boolean(flags["--admin-only"])].filter(Boolean).length > 1) issues.push("函数、规则与静态托管的限定范围不能同时指定");
+  try { validateTargetFunctions(targetFunctions, listCloudfunctions()); } catch (error) { issues.push(error.message); }
+  return issues;
+}
+
 /**
  * 生成增量部署计划 (Deployment Plan)
  */
@@ -117,6 +147,7 @@ function planDeployment(options = {}) {
   });
 
   const availableFunctions = listCloudfunctions();
+  validateTargetFunctions(targetFunctions, availableFunctions);
   const currentCache = cache || readDeployCache();
   const envCache = (currentCache.environments && currentCache.environments[envId]) || { functions: {} };
 
@@ -303,12 +334,12 @@ function deployWebAdminHosting(envId, isDryRun) {
  * 执行部署流程
  */
 async function runDeployment(args = process.argv) {
-  const { flags } = parseArgs(args);
+  const { flags, positionals } = parseArgs(args);
   const isApply = Boolean(flags["--apply"]);
   const isDryRun = !isApply;
   const isForce = Boolean(flags["--force"]);
   const isCleanCache = Boolean(flags["--clean-cache"]);
-  const functionsOnly = Boolean(flags["--functions-only"] || flags["--fns"]);
+  const functionsOnly = Boolean(flags["--functions-only"] || flags["--fns"] || Object.prototype.hasOwnProperty.call(flags, "--fn"));
   const rulesOnly = Boolean(flags["--rules-only"]);
   const adminOnly = Boolean(flags["--admin-only"]);
 
@@ -317,7 +348,12 @@ async function runDeployment(args = process.argv) {
 
   let targetFunctions = null;
   if (typeof flags["--fn"] === "string") {
-    targetFunctions = flags["--fn"].split(",").map((s) => s.trim()).filter(Boolean);
+    targetFunctions = [...new Set(flags["--fn"].split(",").map((s) => s.trim()))];
+  }
+  const optionIssues = validateDeploymentOptions(flags, positionals, envId, targetFunctions);
+  if (optionIssues.length) {
+    optionIssues.forEach((issue) => console.log(colorize(`参数错误：${issue}`, "red")));
+    return { ok: false, exitCode: 1, issues: optionIssues };
   }
 
   console.log(colorize("═══════════════════════════════════════════════════════════════", "cyan"));
@@ -332,13 +368,6 @@ async function runDeployment(args = process.argv) {
     console.log(colorize("强制模式  : --force 已开启，跳过指纹缓存强制全量部署", "yellow"));
   }
   console.log("");
-
-  if (isCleanCache) {
-    if (fs.existsSync(CACHE_FILE)) {
-      fs.unlinkSync(CACHE_FILE);
-      console.log(colorize("✔ 部署指纹缓存已成功清空 (.cloudbase_deploy_cache.json)", "green"));
-    }
-  }
 
   // 1. 前置体检
   console.log(colorize("▶ [1/4] 执行前置环境与安全清单巡检...", "bold"));
@@ -355,6 +384,15 @@ async function runDeployment(args = process.argv) {
   }
   console.log("");
 
+  if (isCleanCache) {
+    if (isDryRun) {
+      console.log(colorize("演练忽略本机部署指纹，保留原缓存文件。", "yellow"));
+    } else if (fs.existsSync(CACHE_FILE)) {
+      fs.unlinkSync(CACHE_FILE);
+      console.log(colorize("✔ 部署指纹缓存已成功清空 (.cloudbase_deploy_cache.json)", "green"));
+    }
+  }
+
   // 2. 云函数指纹比对与增量计划
   let deployPlan = null;
   let functionFailures = 0;
@@ -362,7 +400,7 @@ async function runDeployment(args = process.argv) {
   let rulesInvalid = false;
   if (!rulesOnly && !adminOnly) {
     console.log(colorize("▶ [2/4] 计算 57 项微服务云函数增量指纹与变更集...", "bold"));
-    deployPlan = planDeployment({ envId, targetFunctions, force: isForce });
+    deployPlan = planDeployment({ envId, targetFunctions, force: isForce, cache: isCleanCache ? { version: "1.0.0", environments: {} } : null });
 
     const tableRows = deployPlan.plan.map((p) => {
       let statusColor = "gray";
@@ -470,18 +508,27 @@ async function runDeployment(args = process.argv) {
   }
 
   // 总结与指引
-  const failed = functionFailures > 0 || hostingFailed || rulesInvalid;
+  const failed = !preflight.ok || functionFailures > 0 || hostingFailed || rulesInvalid;
   console.log(colorize("═══════════════════════════════════════════════════════════════", "cyan"));
   if (failed) {
-    console.log(colorize(`❌ 存在失败项：云函数失败 ${functionFailures} 个${hostingFailed ? "，静态托管失败" : ""}${rulesInvalid ? "，本地规则文件不合规" : ""}`, "red"));
+    console.log(colorize(`❌ 存在失败项：云函数失败 ${functionFailures} 个${!preflight.ok ? "，前置检查失败" : ""}${hostingFailed ? "，静态托管失败" : ""}${rulesInvalid ? "，本地规则文件不合规" : ""}`, "red"));
   } else if (isDryRun) {
     console.log(colorize("🎉 安全演练巡检完成 (DRY-RUN PASS)！", "green"));
     console.log("如需正式执行线上部署，请运行：");
-    console.log(`   ${colorize("node scripts/deployAll.js --apply", "cyan")}`);
-    console.log("如需精准只更新某个函数，请运行：");
-    console.log(`   ${colorize("node scripts/deployAll.js --apply --fn=adminImageUpload", "cyan")}`);
+    const applyArgs = ["--apply", `--env=${envId}`];
+    if (targetFunctions) applyArgs.push(`--fn=${targetFunctions.join(",")}`);
+    else if (functionsOnly) applyArgs.push("--functions-only");
+    if (rulesOnly) applyArgs.push("--rules-only");
+    if (adminOnly) applyArgs.push("--admin-only");
+    if (isForce) applyArgs.push("--force");
+    if (isCleanCache) applyArgs.push("--clean-cache");
+    console.log(`   ${colorize(`node scripts/deployAll.js ${applyArgs.join(" ")}`, "cyan")}`);
   } else {
-    console.log(colorize("🎉 云函数与静态托管部署完成（安全规则仍需按上方步骤人工应用）", "green"));
+    const completed = [];
+    if (deployPlan) completed.push("云函数部署完成");
+    if (!functionsOnly && !rulesOnly) completed.push("静态托管部署完成");
+    if (!functionsOnly && !adminOnly) completed.push("本地规则校验完成，线上规则未修改");
+    console.log(colorize(`🎉 ${completed.join("；")}`, "green"));
   }
   console.log(colorize("═══════════════════════════════════════════════════════════════", "cyan"));
 

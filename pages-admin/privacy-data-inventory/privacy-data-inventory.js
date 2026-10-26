@@ -6,8 +6,10 @@ const {
   applyPageCsvFileRemoval,
   beginPageCsvFileAction,
   cancelPageCsvFileActions,
+  cancelPageCsvWrites,
   isPageCsvFileActionActive,
-  markPageCsvFileRemoved
+  markPageCsvFileRemoved,
+  savePageCsvFile
 } = require("../../shared/pageCsvFileActions")
 const {
   activatePageNativeActions,
@@ -22,7 +24,6 @@ const {
   isUserCancelError,
 
   removeCsvFile,
-  saveCsvFile,
   shareCsvFile
 } = require("../../shared/csvFile")
 const INVENTORY_LOAD_TIMEOUT_MS = 15 * 1000
@@ -412,12 +413,14 @@ Page({
         this.clearExportRequestTimer()
         this.setData({ exporting: true })
         let settled = false
+        let preparationSettled = false
         const isActive = () => !settled && exportSerial === this._exportRequestSerial
         const finishRequest = () => {
           if (!isActive()) {
             return false
           }
           settled = true
+          cancelPageCsvWrites(this)
           this.clearExportRequestTimer()
           return true
         }
@@ -436,6 +439,11 @@ Page({
         this._exportRequestTimer = setTimeout(() => {
           handleFailure("导出超时，请重试")
         }, INVENTORY_EXPORT_TIMEOUT_MS)
+        const handlePreparationFailure = (error) => {
+          if (preparationSettled) return
+          preparationSettled = true
+          handleFailure(error && (error.errMsg || error.message))
+        }
         const requestOptions = {
           name: "privacyRequestDataInventory",
           data: {
@@ -443,7 +451,13 @@ Page({
             mode: "export"
           },
           success: (res) => {
-            if (!isActive()) {
+            if (!isActive() || preparationSettled) {
+              return
+            }
+            preparationSettled = true
+            const result = res && res.result ? res.result : null
+            if (!result || !result.ok || !result.csvText || !result.exportToken) {
+              handleFailure(result && result.message)
               return
             }
             if (!isPageNativeActionActive(this, action)) {
@@ -451,12 +465,7 @@ Page({
               this._exportNeedsReset = true
               return
             }
-            const result = res && res.result ? res.result : null
-            if (!result || !result.ok || !result.csvText || !result.exportToken) {
-              handleFailure(result && result.message)
-              return
-            }
-            saveCsvFile({
+            savePageCsvFile(this, {
               fileName: result.fileName,
               fallbackFileName: `privacy-data-${inventoryRequestId}.csv`,
               csvText: result.csvText
@@ -479,7 +488,7 @@ Page({
                 if (previousFilePath && previousFilePath !== filePath) {
                   removeCsvFile(previousFilePath).catch(() => {})
                 }
-                wx.cloud.callFunction({
+                const confirmationOptions = {
                   name: "privacyRequestDataInventory",
                   data: { requestId: inventoryRequestId, mode: "confirmExport", exportToken: result.exportToken },
                   success: (confirmation) => {
@@ -492,20 +501,23 @@ Page({
                     })
                   },
                   fail: () => handleFailure("导出确认失败")
-                })
+                }
+                try {
+                  wx.cloud.callFunction(confirmationOptions)
+                } catch (error) {
+                  handleFailure("导出确认失败")
+                }
               })
               .catch((error) => {
                 handleFailure(error && (error.errMsg || error.message), "保存失败")
               })
           },
-          fail: (error) => {
-            handleFailure(error && (error.errMsg || error.message))
-          }
+          fail: handlePreparationFailure
         }
         try {
           wx.cloud.callFunction(requestOptions)
         } catch (error) {
-          handleFailure(error && (error.errMsg || error.message))
+          handlePreparationFailure(error)
         }
       }
     })

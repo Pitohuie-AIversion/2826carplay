@@ -63,6 +63,44 @@ async function loadRoleUpsertWith({ openid, mockDb }) {
 }
 
 describe("cloudfunctions/roleUpsert integration", () => {
+  test.each([undefined, null, false, "vehicle_manage", {}, [null], [false], [""], ["   "], [["vehicle_manage"]]].map((value) => [value]))("拒绝非法权限列表 %j，不把错误输入当作撤销全部权限", async (permissions) => {
+    const target = { _id: "role_ops", openid: "ops_openid", role: "operator", permissions: ["vehicle_manage"] }
+    const mocks = createMockDb({ rolesData: [{ openid: "admin_openid", role: "admin" }, target] })
+    mocks.rolesUpdate.mockImplementation(async ({ data }) => { Object.assign(target, data); return { stats: { updated: 1 } } })
+    const mod = await loadRoleUpsertWith({ openid: "admin_openid", mockDb: mocks.db })
+    expect(await mod.main({ openid: "ops_openid", permissions })).toMatchObject({ ok: false, code: "VALIDATION_ERROR" })
+    expect(mocks.rolesUpdate).not.toHaveBeenCalled()
+    expect(mocks.rolesSet).not.toHaveBeenCalled()
+    expect(target.permissions).toEqual(["vehicle_manage"])
+  })
+
+  test.each([123456, ["ops_openid"]].map((value) => [value]))("拒绝非文本账号 %j，不通过强制转换写入其他账号", async (openid) => {
+    const mocks = createMockDb({ rolesData: [{ openid: "admin_openid", role: "admin" }] })
+    const mod = await loadRoleUpsertWith({ openid: "admin_openid", mockDb: mocks.db })
+    expect(await mod.main({ openid, permissions: ["vehicle_manage"] })).toMatchObject({ ok: false, code: "VALIDATION_ERROR" })
+    expect(mocks.rolesSet).not.toHaveBeenCalled()
+    expect(mocks.rolesUpdate).not.toHaveBeenCalled()
+  })
+
+  test("合法权限仍可去除首尾空格和重复项", async () => {
+    const mocks = createMockDb({ rolesData: [{ openid: "admin_openid", role: "admin" }] })
+    const mod = await loadRoleUpsertWith({ openid: "admin_openid", mockDb: mocks.db })
+    expect(await mod.main({ openid: " ops_openid ", permissions: [" vehicle_manage ", "vehicle_manage", "booking_manage"] })).toMatchObject({
+      ok: true,
+      openid: "ops_openid",
+      permissions: ["vehicle_manage", "booking_manage"]
+    })
+    expect(mocks.rolesSet).toHaveBeenCalledTimes(1)
+  })
+
+  test("非法参数不会绕过管理员权限检查", async () => {
+    const mocks = createMockDb({ rolesData: [{ openid: "member_openid", role: "member" }] })
+    const mod = await loadRoleUpsertWith({ openid: "member_openid", mockDb: mocks.db })
+    expect(await mod.main({ openid: 123456, permissions: null })).toMatchObject({ ok: false, code: "FORBIDDEN" })
+    expect(mocks.rolesSet).not.toHaveBeenCalled()
+    expect(mocks.rolesUpdate).not.toHaveBeenCalled()
+  })
+
   test("撤销历史角色别名后，实际权限读取不再保留车辆或预约权限", async () => {
     const target = { _id: "role_ops", openid: "ops_openid", role: "vehicle_manager", roles: ["vehicle_manager", "booking_manager"], permissions: ["booking_manage"] }
     const mocks = createMockDb({ rolesData: [{ openid: "admin_openid", role: "admin" }, target] })

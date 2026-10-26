@@ -134,6 +134,13 @@ describe.each(["vehicle", "handover"])("%s real image transport lifecycle", (kin
     expect(t.rpc("begin")).toHaveLength(phase === "stat" ? 0 : 1)
     expect(t.rpc("chunk")).toHaveLength(phase === "complete" ? 1 : 0)
     expect(t.rpc("abort")).toHaveLength(phase === "stat" ? 0 : 1)
+    if (phase === "complete") {
+      const cleanup = t.requests.find((request) => request.data.action === "cleanupUpload")
+      expect(cleanup).toMatchObject({ name: kind === "vehicle" ? "vehicleImageUpdate" : "bookingHandover" })
+      expect(cleanup.data).toEqual(kind === "vehicle"
+        ? { id: "target_1", action: "cleanupUpload", fileIds: [FILE_ID] }
+        : { bookingId: "target_1", stage: "pickup", action: "cleanupUpload", fileList: [FILE_ID] })
+    }
     expect(jest.getTimerCount()).toBe(0)
   })
 
@@ -187,6 +194,58 @@ describe.each(["vehicle", "handover"])("%s real image transport lifecycle", (kin
   })
 
   if (kind === "vehicle") {
+    test("a timed-out completion cannot associate its late file with the automatic retry", () => {
+      const t = setup(kind)
+      t.select(); t.stat(); t.begin(); t.read(); t.chunk()
+      jest.advanceTimersByTime(65000)
+      expect(t.stats).toHaveLength(2)
+      expect(t.rpc("abort")).toHaveLength(1)
+      t.page.setData.mockClear()
+      t.complete(0, "cloud://env/old-attempt.jpg")
+      expect(t.page.setData).not.toHaveBeenCalled()
+      expect(t.page.data.uploading).toBe(true)
+
+      t.stat(1); t.begin(1); t.read(1); t.chunk(1); t.complete(1, "cloud://env/retry.jpg")
+      const updates = t.requests.filter((request) => request.name === "vehicleImageUpdate")
+      expect(updates).toHaveLength(2)
+      expect(updates[0].data).toEqual({ action: "cleanupUpload", id: "target_1", fileIds: ["cloud://env/old-attempt.jpg"] })
+      expect(updates[1].data).toEqual({ action: "add", id: "target_1", fileIds: ["cloud://env/retry.jpg"] })
+      updates[1].success({ result: { ok: true, imageList: ["cloud://env/retry.jpg"], coverImage: "cloud://env/retry.jpg" } })
+      expect(t.page.data.uploading).toBe(false)
+      expect(t.page.data.failedUploadPaths).toEqual([])
+      expect(t.page.data.detail.imageList).toEqual(["cloud://env/retry.jpg"])
+      expect(jest.getTimerCount()).toBe(0)
+    })
+
+    test.each(["cancel", "unload"])("%s during server completion queues the late unassociated file for cleanup", (exit) => {
+      const t = setup(kind)
+      t.select(); t.stat(); t.begin(); t.read(); t.chunk()
+      wx.cloud.callFunction.mockImplementation((request) => {
+        t.requests.push(request)
+        return Promise.resolve({ result: request.data.action === "abort"
+          ? { ok: false, code: "UPLOAD_BUSY" }
+          : { ok: true } })
+      })
+      if (exit === "cancel") t.page.handleCancelUpload()
+      else t.page.onUnload()
+      expect(t.rpc("abort")).toHaveLength(1)
+      t.page.setData.mockClear()
+      wx.showToast.mockClear()
+
+      t.complete()
+
+      const updates = t.requests.filter((request) => request.name === "vehicleImageUpdate")
+      expect(updates).toHaveLength(1)
+      expect(updates[0].data).toEqual({ id: "target_1", action: "cleanupUpload", fileIds: [FILE_ID] })
+      expect(t.page.setData).not.toHaveBeenCalled()
+      expect(wx.showToast).not.toHaveBeenCalled()
+      if (exit === "cancel") {
+        expect(t.page.data.failedUploadPaths).toEqual(["/tmp/native-photo.jpg"])
+        expect(t.page.data.uploading).toBe(false)
+      }
+      expect(jest.getTimerCount()).toBe(0)
+    })
+
     test.each([
       ["UPLOAD_LIMIT", "上传数量或频次已达限"],
       ["FORBIDDEN", "无图片上传权限"],
@@ -271,7 +330,8 @@ describe.each(["vehicle", "handover"])("%s real image transport lifecycle", (kin
       if (phase === "complete") t.complete()
       expect(t.rpc("begin")).toHaveLength(phase === "stat" ? 0 : 1)
       expect(t.rpc("abort")).toHaveLength(phase === "stat" ? 0 : 1)
-      expect(t.requests.filter((request) => request.name === "vehicleImageUpdate")).toHaveLength(0)
+      expect(t.requests.filter((request) => request.name === "vehicleImageUpdate" && request.data.action === "add")).toHaveLength(0)
+      expect(t.requests.filter((request) => request.name === "vehicleImageUpdate" && request.data.action === "cleanupUpload")).toHaveLength(phase === "complete" ? 1 : 0)
       expect(wx.showToast).toHaveBeenCalledTimes(1)
       expect(jest.getTimerCount()).toBe(0)
     })

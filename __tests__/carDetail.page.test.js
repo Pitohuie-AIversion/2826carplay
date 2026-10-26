@@ -724,7 +724,8 @@ describe("pages/car-detail 客户侧车辆状态", () => {
     expect(global.wx.showModal).toHaveBeenCalledWith(expect.objectContaining({ confirmText: "去设置" }))
     expect(global.wx.openSetting).not.toHaveBeenCalled()
 
-    // 2. 模拟保存成功时提示并关闭弹窗
+    // 2. 用户重新点击保存后，本次成功才提示并关闭弹窗。
+    page.handleSavePoster()
     saveCallback.success()
     expect(global.wx.showToast).toHaveBeenCalledWith({
       title: "海报已保存相册",

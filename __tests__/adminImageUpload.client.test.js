@@ -1,4 +1,4 @@
-function setup(size = 9) {
+function setup(size = 9, options = {}) {
   jest.resetModules()
   const calls = []
   const reads = []
@@ -14,7 +14,7 @@ function setup(size = 9) {
   const success = jest.fn()
   const fail = jest.fn()
   const progress = jest.fn()
-  const task = uploadAdminImage({ kind: "vehicle", targetId: "car_1", filePath: "/tmp/photo.jpg", success, fail, onProgress: progress })
+  const task = uploadAdminImage({ kind: "vehicle", targetId: "car_1", filePath: "/tmp/photo.jpg", ...options, success, fail, onProgress: progress })
   const respond = (index, result) => calls[index].success({ result })
   const begin = (fields = {}) => respond(0, { ok: true, uploadId: "upload_1", chunkSize: 6, chunkCount: Math.ceil(size / 6), ...fields })
   const read = (index) => reads[index].success({ data: Buffer.alloc(reads[index].length, 65).toString("base64") })
@@ -141,7 +141,81 @@ describe("管理员图片分块上传客户端", () => {
     expect(t.success).not.toHaveBeenCalled()
     expect(t.fail).toHaveBeenCalledTimes(1)
     expect(t.calls[3].data.action).toBe("abort")
+    expect(t.calls[4]).toMatchObject({ name: "vehicleImageUpdate", data: { action: "cleanupUpload", id: "car_1", fileIds: ["cloud://env/late.jpg"] } })
     expect(jest.getTimerCount()).toBe(0)
+  })
+
+  test("缓存begin在取消后迟到，清理成品且不读取或成功交付", () => {
+    const t = setup(6)
+    t.task.abort()
+    t.begin({ fileID: "cloud://env/cached.jpg" })
+    expect(t.calls.map((request) => request.data.action)).toEqual(["begin", "abort", "cleanupUpload"])
+    expect(t.calls[2]).toMatchObject({ name: "vehicleImageUpdate", data: { id: "car_1", fileIds: ["cloud://env/cached.jpg"] } })
+    expect(t.reads).toHaveLength(0)
+    expect(t.success).not.toHaveBeenCalled()
+    expect(t.fail).toHaveBeenCalledTimes(1)
+  })
+
+  test("complete超时后迟到的成品进入核验清理，不重新交付成功", () => {
+    const t = setup(6)
+    t.begin(); t.read(0); t.respond(1, { ok: true })
+    jest.advanceTimersByTime(65000)
+    t.respond(2, { ok: true, fileID: "cloud://env/timed-out.jpg" })
+    expect(t.calls[4]).toMatchObject({ name: "vehicleImageUpdate", data: { action: "cleanupUpload", id: "car_1", fileIds: ["cloud://env/timed-out.jpg"] } })
+    expect(t.success).not.toHaveBeenCalled()
+    expect(t.fail).toHaveBeenCalledTimes(1)
+    expect(jest.getTimerCount()).toBe(0)
+  })
+
+  test("交接迟到成品使用原预约与阶段提交核验清理", () => {
+    const t = setup(6, { kind: "handover", targetId: "booking_1", stage: "return" })
+    t.begin(); t.read(0); t.respond(1, { ok: true })
+    t.task.abort()
+    t.respond(2, { ok: true, fileID: "cloud://env/handover-images/booking_1/return/late.jpg" })
+    expect(t.calls[4]).toMatchObject({ name: "bookingHandover", data: { action: "cleanupUpload", bookingId: "booking_1", stage: "return", fileList: ["cloud://env/handover-images/booking_1/return/late.jpg"] } })
+    expect(t.success).not.toHaveBeenCalled()
+    expect(t.fail).toHaveBeenCalledTimes(1)
+  })
+
+  test.each(["begin", "complete"])("已成功交付的%s重复回执不触发成品清理", (phase) => {
+    const t = setup(6)
+    const result = { ok: true, fileID: "cloud://env/delivered.jpg" }
+    if (phase === "begin") {
+      t.begin(result)
+      t.task.abort()
+      t.begin(result)
+    } else {
+      t.begin(); t.read(0); t.respond(1, { ok: true })
+      t.respond(2, result)
+      t.task.abort()
+      t.respond(2, result)
+    }
+    expect(t.calls.filter((request) => request.data.action === "cleanupUpload")).toHaveLength(0)
+    expect(t.success).toHaveBeenCalledTimes(1)
+    expect(t.fail).not.toHaveBeenCalled()
+  })
+
+  test.each(["throw", "reject"])("核验清理%s不破坏已经取消的任务", async (failure) => {
+    const t = setup(6)
+    t.begin(); t.read(0); t.respond(1, { ok: true })
+    t.task.abort()
+    wx.cloud.callFunction.mockImplementationOnce(() => {
+      if (failure === "throw") throw new Error("cleanup unavailable")
+      return Promise.reject(new Error("cleanup unavailable"))
+    })
+    expect(() => t.respond(2, { ok: true, fileID: "cloud://env/late.jpg" })).not.toThrow()
+    await Promise.resolve()
+    expect(t.success).not.toHaveBeenCalled()
+    expect(t.fail).toHaveBeenCalledTimes(1)
+    expect(jest.getTimerCount()).toBe(0)
+  })
+
+  test.each([{ ok: false, fileID: "cloud://env/rejected.jpg" }, { ok: true, fileID: "https://example.invalid/photo.jpg" }, { ok: true }])("迟到的非法成品回执不发清理请求: %j", (result) => {
+    const t = setup(6)
+    t.begin(); t.read(0); t.respond(1, { ok: true })
+    t.task.abort()
+    t.respond(2, result)
+    expect(t.calls.filter((request) => request.data.action === "cleanupUpload")).toHaveLength(0)
   })
 
   test("服务端完成耗时允许超过普通块请求时限", () => {

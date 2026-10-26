@@ -1690,6 +1690,15 @@ simulateClick("点击点选客户画像标签 (handleToggleCustomerTag: 老客�
   bmdPage.handleToggleCustomerTag(makeEvent({ tag: "老客户" }))
 })
 
+simulateClick("一键应用智能推荐画像标签 (handleApplyAllRecommendedTags)", () => {
+  bmdPage.setData({
+    coordinationEditable: true,
+    recommendedTags: ["需要送车", "跨城用车"],
+    booking: { ...bmdPage.data.booking, tags: ["老客户"], tagBaseline: ["老客户"] }
+  })
+  bmdPage.handleApplyAllRecommendedTags()
+})
+
 simulateClick("外呼客户联系电话 (handleCallPhone)", () => {
   bmdPage.handleCallPhone()
 })

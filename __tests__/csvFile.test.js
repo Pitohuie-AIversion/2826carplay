@@ -94,6 +94,39 @@ describe("shared/csvFile", () => {
     await expect(helper.saveCsvFile({ fileName: "same.csv" })).rejects.toThrow("fs unavailable")
   })
 
+  test("取消待写文件立即结算并回收迟到成功产生的内容", async () => {
+    let write
+    const files = new Set()
+    const unlink = jest.fn(({ filePath, success }) => { files.delete(filePath); success() })
+    global.wx = {
+      env: { USER_DATA_PATH: "/user-data" },
+      getFileSystemManager: () => ({ unlink, writeFile: (options) => { write = options; files.add(options.filePath) } })
+    }
+    const pending = loadModule().saveCsvFile({ fileName: "private.csv", csvText: "private" })
+    const rejected = expect(pending).rejects.toMatchObject({ code: "CANCELLED" })
+    pending.cancel()
+    pending.cancel()
+    await rejected
+    expect(files.has(write.filePath)).toBe(false)
+    expect(unlink).toHaveBeenCalledTimes(1)
+    files.add(write.filePath)
+    write.success()
+    expect(files.has(write.filePath)).toBe(false)
+    expect(unlink).toHaveBeenCalledTimes(2)
+  })
+
+  test("成功写入后取消不能删除已交付文件", async () => {
+    const unlink = jest.fn()
+    global.wx = {
+      env: { USER_DATA_PATH: "/user-data" },
+      getFileSystemManager: () => ({ unlink, writeFile: ({ success }) => success() })
+    }
+    const saved = loadModule().saveCsvFile({ fileName: "saved.csv", csvText: "content" })
+    await expect(saved).resolves.toMatchObject({ fileName: "saved.csv" })
+    saved.cancel()
+    expect(unlink).not.toHaveBeenCalled()
+  })
+
   test("开发者工具不显示直接分享能力", () => {
     global.wx = {
       getSystemInfoSync: jest.fn(() => ({ platform: "devtools" })),

@@ -325,12 +325,20 @@ Page({
       done = input
       input = null
     }
-    this._calendarRefreshPending = false
     this.finishBookingCalendarRequestEffects()
     const requestId = Number(this._bookingCalendarRequestId || 0) + 1
     this._bookingCalendarRequestId = requestId
     this._bookingCalendarRequestDone =
       typeof done === "function" ? done : null
+
+    if (this.data.isSavingCalendar) {
+      this._calendarRefreshPending = true
+      this.setData({ loading: !this._hasCalendarSnapshot, loadError: "" })
+      this._hasCalendarSnapshot = false
+      this.finishBookingCalendarRequestEffects()
+      return
+    }
+    this._calendarRefreshPending = false
 
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       this.setData({

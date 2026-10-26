@@ -18,6 +18,8 @@ function uploadAdminImage(options) {
   const requestId = input.requestId || createImageUploadRequestId()
   let uploadId = ""
   let settled = false
+  let failed = false
+  const cleanupFiles = new Set()
   let timer = null
   let serial = 0
   let size = 0
@@ -35,9 +37,31 @@ function uploadAdminImage(options) {
       if (pending && typeof pending.catch === "function") pending.catch(() => {})
     } catch (error) {}
   }
+  const cleanupLateFile = (response) => {
+    const result = response && response.result
+    const fileID = result && result.fileID
+    if (!failed || !result || result.ok !== true || typeof fileID !== "string" ||
+        !fileID.startsWith("cloud://") || cleanupFiles.has(fileID)) return
+    const vehicle = input.kind === "vehicle"
+    if ((!vehicle && input.kind !== "handover") || !input.targetId) return
+    cleanupFiles.add(fileID)
+    // Abort can be refused while complete holds its server lease. A late file
+    // still needs reference-aware cleanup, without restoring the cancelled UI.
+    try {
+      const pending = cloud.callFunction({
+        name: vehicle ? "vehicleImageUpdate" : "bookingHandover",
+        data: vehicle
+          ? { action: "cleanupUpload", id: input.targetId, fileIds: [fileID] }
+          : { action: "cleanupUpload", bookingId: input.targetId, stage: input.stage, fileList: [fileID] },
+        fail: () => {}
+      })
+      if (pending && typeof pending.catch === "function") pending.catch(() => {})
+    } catch (error) {}
+  }
   const finish = (error, result) => {
     if (settled) return
     settled = true
+    failed = Boolean(error)
     serial += 1
     clearTimer()
     if (error) {
@@ -103,7 +127,7 @@ function uploadAdminImage(options) {
     if (settled) return
     if (index === chunkCount) {
       progress(size, "verifying")
-      call({ action: "complete", uploadId }, finishFile, COMPLETE_TIMEOUT_MS)
+      call({ action: "complete", uploadId }, finishFile, COMPLETE_TIMEOUT_MS, cleanupLateFile)
       return
     }
     const position = index * chunkSize
@@ -151,6 +175,7 @@ function uploadAdminImage(options) {
     }, REQUEST_TIMEOUT_MS, (late) => {
       const lateId = late && late.result && late.result.uploadId
       if (lateId !== uploadId) abortSession(lateId)
+      cleanupLateFile(late)
     })
   })
   return task

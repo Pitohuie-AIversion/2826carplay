@@ -107,24 +107,75 @@ describe.each(EXPORT_PAGES)("%s CSV export lifecycle", (label, modulePath, busyF
     expect(files.has("/data/previous.csv")).toBe(false)
   })
 
-  test("duplicate cloud replies publish one file and discard the other pending save", async () => {
+  test.each(["timeout", "unload"])("%s cancels a stalled write and cleans partial data without waiting for a native reply", async (end) => {
+    files.set("/data/previous.csv", "previous")
+    Object.assign(page.data, { exportFilePath: "/data/previous.csv", exportFileName: "previous.csv" })
+    page.handleExport()
+    respond(0)
+    const abandonedPath = writes[0].filePath
+    files.set(abandonedPath, "partial personal data")
+    if (end === "unload") page.onUnload()
+    else jest.advanceTimersByTime(20000)
+    await flushPromises()
+    expect(files.has(abandonedPath)).toBe(false)
+    expect(files.get("/data/previous.csv")).toBe("previous")
+    expect(page.data.exportFilePath).toBe("/data/previous.csv")
+    wx.showToast.mockClear()
+    files.set(abandonedPath, "late partial data")
+    writes[0].fail(new Error("late write failure"))
+    await flushPromises()
+    expect(files.has(abandonedPath)).toBe(false)
+    expect(wx.showToast).not.toHaveBeenCalled()
+  })
+
+  test("duplicate cloud successes start only one save and preserve its published file", async () => {
     page.handleExport()
     respond(0, "same exported content")
-    respond(0, "same exported content")
-    expect(writes).toHaveLength(2)
-    await finishWrite(1)
+    respond(0, "unexpected duplicate content")
+    expect(writes).toHaveLength(1)
+    await finishWrite(0)
     const publishedPath = page.data.exportFilePath
     wx.showToast.mockClear()
-    await finishWrite(0)
-    writes[1].success()
-    writes[1].fail(new Error("duplicate native failure"))
+    respond(0, "late duplicate content")
+    writes[0].success()
+    writes[0].fail(new Error("duplicate native failure"))
     await flushPromises()
+    expect(writes).toHaveLength(1)
     expect(page.data.exportFilePath).toBe(publishedPath)
     expect(files.get(publishedPath)).toBe("same exported content")
-    expect(files.has(writes[0].filePath)).toBe(false)
     expect(files.size).toBe(1)
     expect(wx.showToast).not.toHaveBeenCalled()
     expect(page.data[busyField]).toBe(false)
+  })
+
+  test.each(["fail", "business failure", "throw"])("a cloud %s after accepted CSV cannot cancel its pending save", async (reply) => {
+    if (reply === "throw") {
+      wx.cloud.callFunction.mockImplementationOnce((options) => {
+        requests.push(options)
+        respond(0, "accepted content")
+        throw new Error("late transport error")
+      })
+    }
+    page.handleExport()
+    if (reply !== "throw") {
+      respond(0, "accepted content")
+      files.set(writes[0].filePath, "partial accepted content")
+      if (reply === "fail") requests[0].fail(new Error("late transport error"))
+      else requests[0].success({ result: { ok: false, message: "late business error" } })
+    }
+    await flushPromises()
+    expect(page.data[busyField]).toBe(true)
+    expect(fileSystem.unlink).not.toHaveBeenCalled()
+    expect(wx.showToast).not.toHaveBeenCalled()
+    expect(writes).toHaveLength(1)
+
+    await finishWrite(0)
+    expect(page.data.exportFilePath).toBe(writes[0].filePath)
+    expect(files.get(writes[0].filePath)).toBe("accepted content")
+    expect(page.data[busyField]).toBe(false)
+    expect(wx.showToast).toHaveBeenCalledTimes(1)
+    expect(wx.showToast).toHaveBeenCalledWith({ title: "CSV 已生成", icon: "none" })
+    expect(jest.getTimerCount()).toBe(0)
   })
 
   test("background export failure stays silent and unlocks retry on return", () => {

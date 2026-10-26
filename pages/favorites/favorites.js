@@ -502,6 +502,9 @@ Page({
 
   cancelComparePosterGeneration() {
     this._comparePosterRenderSerial = Number(this._comparePosterRenderSerial || 0) + 1
+    this._comparePosterSaveTask = null
+    if (this._comparePosterSaveTimer) clearTimeout(this._comparePosterSaveTimer)
+    this._comparePosterSaveTimer = null
     if (this._comparePosterTimer) {
       clearTimeout(this._comparePosterTimer)
       this._comparePosterTimer = null
@@ -806,6 +809,7 @@ Page({
   },
 
   async handleSaveComparePoster() {
+    if (this._comparePosterSaveTask) return
     const action = beginPageNativeAction(this, { requireCurrent: true, exclusiveKey: "compare-poster-save" })
     const serial = Number(this._comparePosterRenderSerial || 0)
     const isActive = () => isPageNativeActionActive(this, action) &&
@@ -817,23 +821,38 @@ Page({
       wx.showToast({ title: "海报生成中", icon: "none" })
       return
     }
+    const saveTask = {}
+    this._comparePosterSaveTask = saveTask
+    const finishSave = () => {
+      if (this._comparePosterSaveTask !== saveTask) return false
+      this._comparePosterSaveTask = null
+      if (this._comparePosterSaveTimer) clearTimeout(this._comparePosterSaveTimer)
+      this._comparePosterSaveTimer = null
+      return isActive()
+    }
+    const handleFailure = (error) => {
+      if (finishSave()) handleAlbumSaveError(this, error, isActive)
+    }
+    this._comparePosterSaveTimer = setTimeout(() => {
+      if (finishSave()) wx.showToast({ title: "保存未确认，请重试", icon: "none" })
+    }, 60000)
 
     if (typeof wx.saveImageToPhotosAlbum === "function") {
-      wx.saveImageToPhotosAlbum({
-        filePath,
-        success: () => {
-          if (isActive()) {
-            triggerHapticFeedback("medium")
-            wx.showToast({ title: "海报已保存相册", icon: "success" })
-            this.handleCloseComparePosterModal()
-          }
-        },
-        fail: (err) => {
-          if (!isActive()) return
-          handleAlbumSaveError(this, err, isActive)
-        }
-      })
+      try {
+        wx.saveImageToPhotosAlbum({
+          filePath,
+          success: () => {
+            if (finishSave()) {
+              triggerHapticFeedback("medium")
+              wx.showToast({ title: "海报已保存相册", icon: "success" })
+              this.handleCloseComparePosterModal()
+            }
+          },
+          fail: handleFailure
+        })
+      } catch (error) { handleFailure(error) }
     } else {
+      finishSave()
       wx.showToast({ title: "系统暂不支持", icon: "none" })
     }
   },

@@ -1,7 +1,7 @@
 const crypto = require("crypto")
 
 const REVISION_FIELDS = { handoverImageRevision: true }
-const GUARD_FIELDS = { deletionState: true, attemptCount: true }
+const GUARD_FIELDS = { deletionState: true, attemptCount: true, notBeforeAt: true }
 const MAX_HISTORY = 2000
 
 function guardId(bookingId, fileId) {
@@ -112,12 +112,18 @@ function createHandoverImageLifecycle(db, cloud) {
       if (!current || revision(current) !== revision(baseline)) throw new Error("交接图片引用已变化，请重试")
       const orphanFiles = []
       let preserved = 0
+      let deferred = 0
       for (const fileId of files) {
         const id = guardId(bookingId, fileId)
         const guard = await readDocument(transaction.collection("pending_file_deletions"), id, GUARD_FIELDS)
         if (references.has(fileId)) {
           preserved += 1
           if (guard && !["deleting", "deleted"].includes(guard.deletionState)) await transaction.collection("pending_file_deletions").doc(id).remove()
+        } else if (record.source !== "bookingHandoverArchive" && guard &&
+          !["deleting", "deleted"].includes(guard.deletionState) && new Date(guard.notBeforeAt).getTime() > Date.now()) {
+          // The queue snapshot can predate another cleanup request's grace
+          // period. Recheck each guard inside the transaction that claims it.
+          deferred += 1
         } else if (!guard || guard.deletionState !== "deleted") {
           await transaction.collection("pending_file_deletions").doc(id).set({ data: {
             fileList: [fileId], context: { bookingId }, source: "bookingHandoverUploadCleanup",
@@ -131,11 +137,11 @@ function createHandoverImageLifecycle(db, cloud) {
         // even when no image guard existed when submit began.
         await transaction.collection("bookings").doc(bookingId).update({ data: { handoverImageRevision: revision(current) + 1 } })
       }
-      return { orphanFiles, preserved }
+      return { orphanFiles, preserved, deferred }
     })
     const deletion = await deleteClaimed(bookingId, outcome.orphanFiles)
-    if (!files.some((fileId) => guardId(bookingId, fileId) === record._id)) await db.collection("pending_file_deletions").doc(record._id).remove()
-    return { deleted: deletion.failed || outcome.preserved === files.length ? 0 : 1, failed: deletion.failed ? 1 : 0, invalid: 0, deferred: 0, preserved: outcome.preserved }
+    if (!outcome.deferred && !files.some((fileId) => guardId(bookingId, fileId) === record._id)) await db.collection("pending_file_deletions").doc(record._id).remove()
+    return { deleted: deletion.failed || outcome.deferred || outcome.preserved === files.length ? 0 : 1, failed: deletion.failed ? 1 : 0, invalid: 0, deferred: outcome.deferred ? 1 : 0, preserved: outcome.preserved }
   }
 
   return { canAttach, queueUpload, processQueueRecord, deleteClaimed }

@@ -1,4 +1,4 @@
-const { openCsvFile } = require("./csvFile")
+const { openCsvFile, saveCsvFile } = require("./csvFile")
 const { beginPageNativeAction, isPageNativeActionActive } = require("./pageNativeAction")
 
 function closePageCsvPreview(page, options) {
@@ -41,6 +41,25 @@ function activatePageCsvFileActions(page) {
   page._csvFileLifecycleSerial = Number(page._csvFileLifecycleSerial || 0) + 1
 }
 
+function savePageCsvFile(page, options) {
+  const pending = page._pendingCsvWrites || (page._pendingCsvWrites = new Set())
+  const write = saveCsvFile(options)
+  pending.add(write)
+  const release = () => pending.delete(write)
+  write.then(release, release)
+  return write
+}
+
+function cancelPageCsvWrites(page) {
+  const pending = page && page._pendingCsvWrites
+  if (!pending) return
+  page._pendingCsvWrites = null
+  for (const write of pending) {
+    if (typeof write.cancel === "function") write.cancel()
+  }
+  pending.clear()
+}
+
 function beginPageCsvFileAction(page, filePath, options) {
   if (!page || typeof page !== "object") {
     return null
@@ -71,6 +90,7 @@ function cancelPageCsvFileActions(page) {
     return
   }
   page._csvFileActionsUnloaded = true
+  cancelPageCsvWrites(page)
   closePageCsvPreview(page, { unload: true })
   page._removedCsvFileAction = null
   page._csvFileLifecycleSerial = Number(page._csvFileLifecycleSerial || 0) + 1
@@ -99,6 +119,8 @@ function applyPageCsvFileRemoval(page) {
 }
 
 module.exports = {
+  savePageCsvFile,
+  cancelPageCsvWrites,
   closePageCsvPreview,
   openPageCsvPreview,
   activatePageCsvFileActions,

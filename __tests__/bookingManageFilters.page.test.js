@@ -310,6 +310,47 @@ describe("pages/booking-manage workflow filters", () => {
     page.onUnload()
   })
 
+  test("export uses the displayed list query until the keyword draft is submitted", () => {
+    jest.useFakeTimers()
+    const requests = []
+    global.wx = {
+      cloud: { callFunction: jest.fn((options) => requests.push(options)) },
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition(), {
+      currentStatus: "pending",
+      currentPriority: "priority",
+      currentCoordination: "pending",
+      currentCity: "杭州",
+      keyword: "  MX-5  "
+    })
+
+    page.fetchList()
+    requests[0].success({ result: { ok: true, list: [{ id: "existing" }], total: 1 } })
+    page.handleKeywordInput({ detail: { value: "  new draft  " } })
+    page.handleExport()
+
+    expect(page.data.list[0].id).toBe("existing")
+    expect(page.data.keyword).toBe("  new draft  ")
+    expect(requests[1].data).toEqual({
+      status: "pending",
+      schedulePriority: "priority",
+      coordinationStatus: "pending",
+      city: "杭州",
+      keyword: "MX-5",
+      limit: 500
+    })
+    requests[1].fail(new Error("finish first export"))
+
+    page.handleSearchConfirm({ detail: { value: page.data.keyword } })
+    requests[2].success({ result: { ok: true, list: [{ id: "updated" }], total: 1 } })
+    page.handleExport()
+    expect(page.data.list[0].id).toBe("updated")
+    expect(requests[3].data).toEqual({ ...requests[1].data, keyword: "new draft" })
+    page.onUnload()
+    expect(jest.getTimerCount()).toBe(0)
+  })
+
   test("预约状态映射为三阶段跟进轨迹与下一步提示", () => {
     global.wx = {
       cloud: {

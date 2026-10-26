@@ -1340,6 +1340,9 @@ Page({
 
   cancelPosterGeneration() {
     this._posterRenderSerial = Number(this._posterRenderSerial || 0) + 1
+    this._posterSaveTask = null
+    if (this._posterSaveTimer) clearTimeout(this._posterSaveTimer)
+    this._posterSaveTimer = null
     if (this._posterTimer) {
       clearTimeout(this._posterTimer)
       this._posterTimer = null
@@ -1686,6 +1689,7 @@ Page({
   },
 
   async handleSavePoster() {
+    if (this._posterSaveTask) return
     const action = beginPageNativeAction(this, { requireCurrent: true, exclusiveKey: "poster-save" })
     const serial = Number(this._posterRenderSerial || 0)
     const vehicleId = String(this.data.car && this.data.car.id || this.data.carId || "")
@@ -1696,6 +1700,26 @@ Page({
       wx.showToast({ title: "海报生成中", icon: "none" })
       return
     }
+    const saveTask = {}
+    this._posterSaveTask = saveTask
+    const finishSave = () => {
+      if (this._posterSaveTask !== saveTask) return false
+      this._posterSaveTask = null
+      if (this._posterSaveTimer) clearTimeout(this._posterSaveTimer)
+      this._posterSaveTimer = null
+      return isActive()
+    }
+    const handleFailure = (error) => {
+      if (finishSave()) handleAlbumSaveError(this, error, isActive)
+    }
+    this._posterSaveTimer = setTimeout(() => {
+      if (!finishSave()) return
+      if (this._posterSaveLoadingAction === action) {
+        this._posterSaveLoadingAction = null
+        if (typeof wx.hideLoading === "function") wx.hideLoading()
+      }
+      wx.showToast({ title: "保存未确认，请重试", icon: "none" })
+    }, 60000)
 
     if (filePath.startsWith("http://") || filePath.startsWith("https://") || filePath.startsWith("cloud://")) {
       try {
@@ -1713,23 +1737,26 @@ Page({
       }
     }
 
-    if (!isActive()) return
+    if (this._posterSaveTask !== saveTask || !isActive()) {
+      finishSave()
+      return
+    }
     if (typeof wx.saveImageToPhotosAlbum === "function") {
-      wx.saveImageToPhotosAlbum({
-        filePath,
-        success: () => {
-          if (isPageNativeActionActive(this, action) && isActive()) {
-            triggerHapticFeedback("medium")
-            wx.showToast({ title: "海报已保存相册", icon: "success" })
-            this.handleClosePosterModal()
-          }
-        },
-        fail: (err) => {
-          if (!isPageNativeActionActive(this, action) || !isActive()) return
-          handleAlbumSaveError(this, err, isActive)
-        }
-      })
+      try {
+        wx.saveImageToPhotosAlbum({
+          filePath,
+          success: () => {
+            if (finishSave()) {
+              triggerHapticFeedback("medium")
+              wx.showToast({ title: "海报已保存相册", icon: "success" })
+              this.handleClosePosterModal()
+            }
+          },
+          fail: handleFailure
+        })
+      } catch (error) { handleFailure(error) }
     } else {
+      finishSave()
       wx.showToast({ title: "系统暂不支持", icon: "none" })
     }
   },

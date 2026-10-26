@@ -7,6 +7,8 @@ const {
   applyPageCsvFileRemoval,
   beginPageCsvFileAction,
   cancelPageCsvFileActions,
+  cancelPageCsvWrites,
+  savePageCsvFile,
   isPageCsvFileActionActive,
   markPageCsvFileRemoved
 } = require("../../shared/pageCsvFileActions")
@@ -16,7 +18,6 @@ const {
   isUserCancelError,
 
   removeCsvFile,
-  saveCsvFile,
   shareCsvFile
 } = require("../../shared/csvFile")
 const AUDIT_LIST_TIMEOUT_MS = 15 * 1000
@@ -321,6 +322,7 @@ Page({
       exporting: true
     })
     let settled = false
+    let preparationSettled = false
     const isActive = () => !settled && exportSerial === this._exportRequestSerial
     const finishRequest = () => {
       if (!isActive()) {
@@ -328,6 +330,7 @@ Page({
       }
       settled = true
       this.clearExportRequestTimer()
+      cancelPageCsvWrites(this)
       return true
     }
     const handleFailure = (message, fallback = "导出失败") => {
@@ -344,6 +347,13 @@ Page({
         icon: "none"
       })
     }
+    const handlePreparationFailure = (error) => {
+      if (!isActive() || preparationSettled) {
+        return
+      }
+      preparationSettled = true
+      handleFailure(error && (error.errMsg || error.message))
+    }
     this._exportRequestTimer = setTimeout(() => {
       handleFailure("导出超时，请重试")
     }, AUDIT_EXPORT_TIMEOUT_MS)
@@ -356,9 +366,10 @@ Page({
         limit: 500
       },
       success: (res) => {
-        if (!isActive()) {
+        if (!isActive() || preparationSettled) {
           return
         }
+        preparationSettled = true
         if (!isPageNativeActionActive(this, nativeAction)) {
           finishRequest()
           this._exportNeedsReset = true
@@ -371,7 +382,7 @@ Page({
         }
         let savePromise
         try {
-          savePromise = saveCsvFile({
+          savePromise = savePageCsvFile(this, {
             fileName: result.fileName,
             fallbackFileName: "audit-logs.csv",
             csvText: result.csvText
@@ -424,15 +435,13 @@ Page({
             handleFailure(error && (error.errMsg || error.message), "保存失败")
           })
       },
-      fail: (error) => {
-        handleFailure(error && (error.errMsg || error.message))
-      },
+      fail: handlePreparationFailure,
       complete: () => {}
     }
     try {
       wx.cloud.callFunction(requestOptions)
     } catch (error) {
-      handleFailure(error && (error.errMsg || error.message))
+      handlePreparationFailure(error)
     }
   },
   handleShareExportedFile() {

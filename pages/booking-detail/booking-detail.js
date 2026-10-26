@@ -248,6 +248,14 @@ Page({
   },
   onShow() {
     applyPageCsvFileRemoval(this)
+    const mutationFeedback = this._pendingDetailMutationFeedback
+    if (mutationFeedback && this.isBookingDetailActive() && isPageCurrent(this)) {
+      this._pendingDetailMutationFeedback = null
+      if (mutationFeedback.bookingId === this.data.id &&
+        (!mutationFeedback.quoteKey || mutationFeedback.quoteKey === getAdjustmentDraftKey(this.data.id, this.data.latestQuote))) {
+        wx.showToast({ title: mutationFeedback.title, icon: "none" })
+      }
+    }
     const refreshConfig = this._operationConfigSeenOnShow || this.data.operationConfigFailed
     this._operationConfigSeenOnShow = true
     if (refreshConfig) this.loadNotificationConfig({ force: this.data.operationConfigFailed })
@@ -333,6 +341,7 @@ Page({
     this._subscriptionRequestId = Number(this._subscriptionRequestId || 0) + 1
     this._quoteResponseRequestId = Number(this._quoteResponseRequestId || 0) + 1
     this._quoteResponseConflictPending = ""
+    this._pendingDetailMutationFeedback = null
     this._handoverResponseRequestId = Number(this._handoverResponseRequestId || 0) + 1
     this.cancelOperationConfigRequest()
     this.finishDetailLoadEffects()
@@ -690,20 +699,35 @@ Page({
     const quoteId = this.data.latestQuote.id
     const bookingId = this.data.id
     const action = beginPageNativeAction(this, { requireCurrent: true, exclusiveKey: "quote-confirmation" })
-    wx.showModal({
-      title: "确认报价",
-      content: "确认当前费用方案？确认成功后将保留所选档期，但不代表已经付款或签署合同。",
-      confirmText: "确认方案",
-      confirmColor: "#528fff",
-      success: (res) => {
-        if (!isPageNativeActionActive(this, action)) return
-        if (this.data.id !== bookingId || this.data.latestQuote.id !== quoteId || this.data.booking.status !== "quoted") {
-          wx.showToast({ title: "报价已更新，请核对", icon: "none" })
-          return
-        }
-        if (res && res.confirm) this.respondToQuote("confirm")
+    let confirmationSettled = false
+    const handleModalFailure = (error) => {
+      if (confirmationSettled) return
+      confirmationSettled = true
+      if (isPageNativeActionActive(this, action) && !isUserCancelError(error)) {
+        wx.showToast({ title: "确认未打开，请重试", icon: "none" })
       }
-    })
+    }
+    try {
+      wx.showModal({
+        title: "确认报价",
+        content: "确认当前费用方案？确认成功后将保留所选档期，但不代表已经付款或签署合同。",
+        confirmText: "确认方案",
+        confirmColor: "#528fff",
+        success: (res) => {
+          if (confirmationSettled) return
+          confirmationSettled = true
+          if (!isPageNativeActionActive(this, action)) return
+          if (this.data.id !== bookingId || this.data.latestQuote.id !== quoteId || this.data.booking.status !== "quoted") {
+            wx.showToast({ title: "报价已更新，请核对", icon: "none" })
+            return
+          }
+          if (res && res.confirm) this.respondToQuote("confirm")
+        },
+        fail: handleModalFailure
+      })
+    } catch (error) {
+      handleModalFailure(error)
+    }
   },
   handleRequestQuoteAdjustment() {
     if (this.data.quoteResponding || this.data.loading || this.data.cancelling || this.data.saving || this.data.editing || this.data.subscriptionRequesting || this.data.handoverResponding || this.data.booking.status !== "quoted" || !this.data.latestQuote.id) return
@@ -717,10 +741,12 @@ Page({
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function" || this.data.quoteResponding || this.data.cancelling || this.data.loading || this.data.saving || this.data.editing || this.data.subscriptionRequesting || this.data.handoverResponding) return
     const bookingId = this.data.id
     const quoteId = this.data.latestQuote.id
+    const quoteKey = getAdjustmentDraftKey(bookingId, this.data.latestQuote)
     const adjustmentNote = action === "requestAdjustment" ? String(this.data.adjustmentNote || "").trim() : ""
     const requestId = Number(this._quoteResponseRequestId || 0) + 1
     this._quoteResponseRequestId = requestId
     this._quoteResponseConflictPending = ""
+    this._pendingDetailMutationFeedback = null
     this.clearQuoteResponseTimer()
     this.applyState({ quoteResponding: true })
     let settled = false
@@ -733,7 +759,9 @@ Page({
     const fail = (message) => {
       if (!finish()) return
       this.applyState({ quoteResponding: false })
-      if (isPageCurrent(this)) wx.showToast({ title: formatToastTitle(message, "报价操作失败"), icon: "none" })
+      const title = formatToastTitle(message, "报价操作失败")
+      if (isPageCurrent(this)) wx.showToast({ title, icon: "none" })
+      else this._pendingDetailMutationFeedback = { bookingId, quoteKey, title }
     }
     this._quoteResponseTimer = setTimeout(() => fail("报价操作超时，请重试"), BOOKING_DETAIL_MUTATION_TIMEOUT_MS)
     try {
@@ -753,6 +781,9 @@ Page({
             this.applyState({ quoteResponding: false })
             if (result && result.code === "VERSION_CONFLICT" && !isPageCurrent(this)) {
               this._quoteResponseConflictPending = getAdjustmentDraftKey(bookingId, this.data.latestQuote)
+            }
+            if ((!result || result.code !== "VERSION_CONFLICT") && !isPageCurrent(this)) {
+              this._pendingDetailMutationFeedback = { bookingId, quoteKey, title: formatToastTitle(result && result.message, "报价操作失败") }
             }
             if (isPageCurrent(this)) wx.showToast({
               title: result && result.code === "VERSION_CONFLICT" ? "申请已更新，请核对" : formatToastTitle(result && result.message, "报价操作失败"),
@@ -981,6 +1012,7 @@ Page({
       ? this._contactEditBaseline.values
       : Object.fromEntries(["userName", "phone", "city", "note"].map((key) => [key, String((this.data.booking && this.data.booking[key]) || "").trim()]))
     this._saveRequestSerial = saveSerial
+    this._pendingDetailMutationFeedback = null
     this.clearSaveRequestTimer()
     this.applyState({ saving: true, contactSaveError: "" })
     let settled = false
@@ -1026,6 +1058,7 @@ Page({
           if (result && ["STATUS_CONFLICT", "STATUS_NOT_ALLOWED"].includes(result.code)) {
             this.applyState({ editing: false })
             if (isPageCurrent(this)) this.loadDetail()
+            else this._pendingDetailMutationFeedback = { bookingId, title: formatToastTitle(result.message, "保存失败") }
           }
           return
         }

@@ -157,6 +157,28 @@
         <view class="coordination-label">客户画像标签</view>
         <view class="coordination-tags-count">{{booking.tags.length || 0}} / 5</view>
       </view>
+      <view wx:if="{{coordinationEditable && recommendedTags && recommendedTags.length}}" class="coordination-recommend-row">
+        <view class="coordination-recommend-tip">💡 智能建议</view>
+        <view class="coordination-recommend-chips">
+          <button
+            wx:for="{{recommendedTags}}"
+            wx:key="*this"
+            class="coordination-recommend-chip"
+            data-tag="{{item}}"
+            disabled="{{loading || coordinationLoading || remarkDirty || !coordinationEditable || (booking.tags.length >= 5)}}"
+            bindtap="handleToggleCustomerTag"
+            hover-class="coordination-tag-pressed"
+            aria-label="添加建议标签：{{item}}"
+          >+ {{item}}</button>
+        </view>
+        <button
+          wx:if="{{recommendedTags.length > 1}}"
+          class="coordination-recommend-all-btn"
+          disabled="{{loading || coordinationLoading || remarkDirty || !coordinationEditable || (booking.tags.length >= 5)}}"
+          bindtap="handleApplyAllRecommendedTags"
+          hover-class="coordination-tag-pressed"
+        >一键应用</button>
+      </view>
       <view class="coordination-tags-wrap">
         <button
           wx:for="{{presetTags}}"

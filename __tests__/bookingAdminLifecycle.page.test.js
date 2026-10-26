@@ -188,6 +188,39 @@ describe("管理员预约原生动作与写入恢复", () => {
     page.onUnload()
   })
 
+  test("智能推荐画像标签计算与一键应用", () => {
+    const page = loadPage("booking-manage-detail")
+    page.data.id = "booking_1"
+    page.loadDetail()
+    wx.cloud.callFunction.mock.calls[0][0].success({
+      result: {
+        ok: true,
+        detail: {
+          id: "booking_1",
+          status: "contacted",
+          startDate: "2026-11-01",
+          endDate: "2026-11-10",
+          pickupLocation: "萧山机场送车上门",
+          tags: ["老客户"]
+        }
+      }
+    })
+    expect(page.data.recommendedTags).toEqual(["长租意向", "需要送车"])
+    page.handleApplyAllRecommendedTags()
+    expect(wx.cloud.callFunction).toHaveBeenCalledTimes(2)
+    const mutationCall = wx.cloud.callFunction.mock.calls[1][0]
+    expect(mutationCall.data.tags).toEqual(["老客户", "长租意向", "需要送车"])
+    mutationCall.success({
+      result: {
+        ok: true,
+        tags: ["老客户", "长租意向", "需要送车"]
+      }
+    })
+    expect(page.data.booking.tags).toEqual(["老客户", "长租意向", "需要送车"])
+    expect(page.data.recommendedTags).toEqual([])
+    page.onUnload()
+  })
+
   test("报价草稿未保存时 onShow 与刷新加载都保留草稿", () => {
     const page = loadPage("booking-manage-detail")
     Object.assign(page.data, { id: "booking_1", pageAuthorized: true, quoteDirty: true })

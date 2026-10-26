@@ -10,7 +10,11 @@ function createState() {
   function doc(map, id, touch = () => {}, name = "") {
     const api = {
       field: () => api,
-      get: async () => { touch(id, false); return { data: map.has(id) ? { _id: id, ...clone(map.get(id)) } : null } },
+      get: async () => {
+        touch(id, false)
+        if (name === "pending_file_deletions" && db.failGuardRead) throw new Error("guard read failed")
+        return { data: map.has(id) ? { _id: id, ...clone(map.get(id)) } : null }
+      },
       set: async ({ data }) => {
         touch(id, true)
         if (name === "pending_file_deletions" && db.failGuardWrite) throw new Error("guard write failed")
@@ -91,6 +95,94 @@ function queue(state, source = "bookingHandoverUploadCleanup", files = [file("fr
 }
 
 describe("交接图片关联与清理使用同一事务协议", () => {
+  test.each(["afterHistoryRead", "beforeCommit"])("%s 时清理申请续期，旧清理请求不能越过新的30秒宽限删除照片", async (hook) => {
+    jest.useFakeTimers()
+    jest.setSystemTime(new Date("2026-10-26T10:00:00Z"))
+    try {
+      const state = createState()
+      const cleanupRequest = { action: "cleanupUpload", bookingId: "booking_1", stage: "pickup", fileList: [file("front")] }
+      expect(await state.handover.main(cleanupRequest)).toMatchObject({ ok: true })
+      jest.setSystemTime(new Date("2026-10-26T10:00:31Z"))
+      state.db[hook] = async () => {
+        state.db[hook] = null
+        expect(await state.handover.main(cleanupRequest)).toMatchObject({ ok: true })
+      }
+      expect(await state.cleanup.main()).toMatchObject({ ok: true, deleted: 0, deferred: 1 })
+      expect(state.cloud.deleteFile).not.toHaveBeenCalled()
+      const guard = state.stores.pending_file_deletions.get(state.guardId("booking_1", file("front")))
+      expect(guard.deletionState).toBe("pending")
+      expect(new Date(guard.notBeforeAt).getTime()).toBe(Date.parse("2026-10-26T10:01:01Z"))
+      expect(await state.handover.main(payload())).toMatchObject({ ok: true })
+    } finally { jest.useRealTimers() }
+  })
+
+  test("旧批量队列仅删除已到期照片，保留未来期限照片并在下一次到期后继续回收", async () => {
+    jest.useFakeTimers()
+    jest.setSystemTime(new Date("2026-10-26T10:00:00Z"))
+    try {
+      const state = createState()
+      queue(state, "bookingHandoverUploadCleanup", [file("front"), file("rear")])
+      state.db.afterHistoryRead = async () => {
+        state.db.afterHistoryRead = null
+        expect(await state.handover.main({ action: "cleanupUpload", bookingId: "booking_1", stage: "pickup", fileList: [file("rear")] })).toMatchObject({ ok: true })
+      }
+      expect(await state.cleanup.main({ limit: 1 })).toMatchObject({ ok: true, deleted: 0, deferred: 1 })
+      expect(state.cloud.deleteFile.mock.calls[0][0].fileList).toEqual([file("front")])
+      expect(state.stores.pending_file_deletions.has("legacy_queue")).toBe(true)
+      expect(state.stores.pending_file_deletions.get(state.guardId("booking_1", file("front"))).deletionState).toBe("deleted")
+      expect(state.stores.pending_file_deletions.get(state.guardId("booking_1", file("rear"))).deletionState).toBe("pending")
+      jest.setSystemTime(new Date("2026-10-26T10:00:30Z"))
+      expect(await state.cleanup.main({ limit: 1 })).toMatchObject({ ok: true, deleted: 1, deferred: 0 })
+      expect(state.cloud.deleteFile.mock.calls[1][0].fileList).toEqual([file("rear")])
+      expect(await state.cleanup.main({ limit: 1 })).toMatchObject({ ok: true, deleted: 1, deferred: 0 })
+      expect(state.cloud.deleteFile).toHaveBeenCalledTimes(2)
+      expect(state.stores.pending_file_deletions.has("legacy_queue")).toBe(false)
+      expect(state.stores.pending_file_deletions.get(state.guardId("booking_1", file("rear"))).deletionState).toBe("deleted")
+    } finally { jest.useRealTimers() }
+  })
+
+  test("明确归档的照片仍立即核验回收，不受上传代理自动登记的未来期限阻挡", async () => {
+    const state = createState()
+    expect(await state.handover.main(payload())).toMatchObject({ ok: true })
+    const id = state.guardId("booking_1", file("front"))
+    state.stores.pending_file_deletions.set(id, {
+      fileList: [file("front")], context: { bookingId: "booking_1", stage: "pickup" }, source: "bookingHandoverUploadCleanup",
+      deletionState: "pending", notBeforeAt: new Date(Date.now() + 17 * 60 * 1000).toISOString()
+    })
+    expect(await state.handover.main({ action: "archive", bookingId: "booking_1", stage: "pickup", handoverId: "booking_1__pickup__v1" })).toMatchObject({ ok: true })
+    expect(await state.cleanup.main()).toMatchObject({ ok: true, deleted: 1, deferred: 0 })
+    expect(state.cloud.deleteFile.mock.calls[0][0].fileList).toEqual(payload().photos.map((photo) => photo.fileId))
+    expect(state.stores.pending_file_deletions.get(id).deletionState).toBe("deleted")
+  })
+
+  test.each(["deleting", "deleted"])("已有 %s 删除标记不因残留未来期限回退为等待", async (deletionState) => {
+    const state = createState()
+    queue(state)
+    const id = state.guardId("booking_1", file("front"))
+    state.stores.pending_file_deletions.set(id, {
+      deletionState, fileList: [file("front")], source: "bookingHandoverUploadCleanup", context: { bookingId: "booking_1" },
+      notBeforeAt: new Date(Date.now() + 60000).toISOString()
+    })
+    expect(await state.cleanup.main()).toMatchObject({ ok: true, deleted: 1, deferred: 0 })
+    expect(state.cloud.deleteFile).toHaveBeenCalledTimes(deletionState === "deleting" ? 1 : 0)
+    expect(state.stores.pending_file_deletions.get(id).deletionState).toBe("deleted")
+    expect(state.stores.pending_file_deletions.has("legacy_queue")).toBe(false)
+  })
+
+  test("守卫读取失败时关联与回收均中止，保留原任务供读取恢复后重试", async () => {
+    const state = createState()
+    queue(state)
+    state.db.failGuardRead = true
+    expect(await state.handover.main(payload())).toMatchObject({ ok: false, code: "INTERNAL_ERROR" })
+    expect(await state.cleanup.main()).toMatchObject({ ok: true, failed: 1 })
+    expect(state.stores.booking_handovers.size).toBe(0)
+    expect(state.stores.bookings.get("booking_1").handoverImageRevision).toBeUndefined()
+    expect(state.stores.pending_file_deletions.has("legacy_queue")).toBe(true)
+    expect(state.cloud.deleteFile).not.toHaveBeenCalled()
+    state.db.failGuardRead = false
+    expect(await state.cleanup.main()).toMatchObject({ ok: true, deleted: 1 })
+  })
+
   test.each(["afterHistoryRead", "beforeCommit"])("%s 时关联照片使旧清理失效，重试保留已引用图片", async (hook) => {
     const state = createState()
     queue(state)

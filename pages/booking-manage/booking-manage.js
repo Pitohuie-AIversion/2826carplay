@@ -1,6 +1,6 @@
 const { closePageCsvPreview, openPageCsvPreview } = require("../../shared/pageCsvFileActions")
 const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
-const { isUserCancelError, removeCsvFile, saveCsvFile } = require("../../shared/csvFile")
+const { isUserCancelError, removeCsvFile } = require("../../shared/csvFile")
 const { formatToastTitle, calculateRatioSegments } = require("../../shared/uiFeedback")
 const { requestOperationConfig } = require("../../shared/operationConfigRequest")
 const {
@@ -8,6 +8,8 @@ const {
   applyPageCsvFileRemoval,
   beginPageCsvFileAction,
   cancelPageCsvFileActions,
+  cancelPageCsvWrites,
+  savePageCsvFile,
   isPageCsvFileActionActive,
   markPageCsvFileRemoved
 } = require("../../shared/pageCsvFileActions")
@@ -405,15 +407,22 @@ Page({
       })
       return
     }
-    const filters = {
+    const query = this._bookingListFilters || {
       status: this.data.currentStatus,
       schedulePriority: this.data.currentPriority,
       coordinationStatus: this.data.currentCoordination,
       keyword: String(this.data.keyword || ""),
+      city: this.data.currentCity
+    }
+    const filters = {
+      status: query.status,
+      schedulePriority: query.schedulePriority,
+      coordinationStatus: query.coordinationStatus,
+      keyword: query.keyword,
       limit: 500
     }
-    if (this.data.currentCity && this.data.currentCity !== "all") {
-      filters.city = this.data.currentCity
+    if (query.city && query.city !== "all") {
+      filters.city = query.city
     }
     const requestId = Number(this._bookingExportRequestId || 0) + 1
     this._bookingExportRequestId = requestId
@@ -421,6 +430,7 @@ Page({
     this.clearBookingExportTimer()
     this.setData({ loading: true })
     let settled = false
+    let preparationSettled = false
     const isActive = () => !settled && this._bookingExportRequestId === requestId
     const finishRequest = () => {
       if (!isActive()) {
@@ -428,6 +438,7 @@ Page({
       }
       settled = true
       this.clearBookingExportTimer()
+      cancelPageCsvWrites(this)
       return true
     }
     const handleFailure = (message, fallback = "导出失败") => {
@@ -446,6 +457,13 @@ Page({
         })
       }
     }
+    const handlePreparationFailure = (error) => {
+      if (!isActive() || preparationSettled) {
+        return
+      }
+      preparationSettled = true
+      handleFailure(error && (error.errMsg || error.message))
+    }
     this._bookingExportRequestTimer = setTimeout(() => {
       handleFailure("导出超时，请重试")
     }, BOOKING_MANAGE_EXPORT_TIMEOUT_MS)
@@ -453,9 +471,10 @@ Page({
       name: "bookingExportCsv",
       data: filters,
       success: (res) => {
-        if (!isActive()) {
+        if (!isActive() || preparationSettled) {
           return
         }
+        preparationSettled = true
         if (!isPageNativeActionActive(this, nativeAction)) {
           finishRequest()
           this._bookingExportNeedsReset = true
@@ -466,26 +485,28 @@ Page({
           handleFailure(result && result.message)
           return
         }
-        this.saveExportedCsv({
-          fileName: ensureCsvFileName(result.fileName),
-          csvText: result.csvText,
-          total: Number(result.total) || 0,
-          matchedTotal: Number(result.matchedTotal) || 0,
-          sourceTruncated: Boolean(result.sourceTruncated),
-          truncated: Boolean(result.truncated),
-          nativeAction,
-          finishRequest,
-          handleFailure
-        })
+        try {
+          this.saveExportedCsv({
+            fileName: ensureCsvFileName(result.fileName),
+            csvText: result.csvText,
+            total: Number(result.total) || 0,
+            matchedTotal: Number(result.matchedTotal) || 0,
+            sourceTruncated: Boolean(result.sourceTruncated),
+            truncated: Boolean(result.truncated),
+            nativeAction,
+            finishRequest,
+            handleFailure
+          })
+        } catch (error) {
+          handleFailure(error && (error.errMsg || error.message), "保存失败")
+        }
       },
-      fail: (error) => {
-        handleFailure(error && (error.errMsg || error.message))
-      }
+      fail: handlePreparationFailure
     }
     try {
       wx.cloud.callFunction(requestOptions)
     } catch (error) {
-      handleFailure(error && (error.errMsg || error.message))
+      handlePreparationFailure(error)
     }
   },
   saveExportedCsv({
@@ -499,7 +520,7 @@ Page({
     finishRequest,
     handleFailure
   }) {
-    saveCsvFile({ fileName, fallbackFileName: "bookings.csv", csvText })
+    savePageCsvFile(this, { fileName, fallbackFileName: "bookings.csv", csvText })
       .then(({ filePath, fileName }) => {
         if (!finishRequest()) {
           removeCsvFile(filePath).catch(() => {})

@@ -37,7 +37,11 @@ async function setup({ roles = [{ role: "admin" }], vehicles = { car_1: { status
       const query = {
         field: () => query,
         limit: () => query,
-        get: async () => ({ data: name === "roles" ? currentRoles : [...records.entries()].filter(([key, row]) => key.startsWith(`${name}/`) && (!condition.openid || row.openid === condition.openid) && (!condition.expiresAt || new Date(row.expiresAt).getTime() <= condition.expiresAt.lte)).slice(0, 50).map(([key, row]) => ({ _id: key.slice(name.length + 1), ...structuredClone(row) })) })
+        get: async () => {
+          const result = { data: name === "roles" ? currentRoles : [...records.entries()].filter(([key, row]) => key.startsWith(`${name}/`) && (!condition.openid || row.openid === condition.openid) && (!condition.expiresAt || new Date(row.expiresAt).getTime() <= condition.expiresAt.lte)).slice(0, 50).map(([key, row]) => ({ _id: key.slice(name.length + 1), ...structuredClone(row) })) }
+          if (hooks.afterQuery) await hooks.afterQuery(name, condition, result)
+          return result
+        }
       }
       return query
     }
@@ -214,6 +218,9 @@ describe("adminImageUpload server authorization and lifecycle", () => {
     const completing = ctx.main({ action: "complete", uploadId })
     await entered.promise
     jest.setSystemTime(NOW + 15 * 60 * 1000 + 1000)
+    expect(await ctx.main({ action: "cleanup" })).toMatchObject({ ok: true, removed: 0 })
+    expect(ctx.records.has(`admin_upload_sessions/${uploadId}_0`)).toBe(true)
+    expect(ctx.records.get(`admin_upload_sessions/${uploadId}`).state).toBe("completing")
     const nextBegin = await ctx.main(input({ requestId: "image_request_other" }))
     resume.release()
     expect(await completing).toMatchObject({ ok: true })
@@ -573,5 +580,59 @@ describe("adminImageUpload server authorization and lifecycle", () => {
     jest.setSystemTime(NOW + 18 * 60 * 1000)
     expect(await ctx.main({ action: "cleanup" })).toMatchObject({ ok: true, hasMore: true })
     expect(ctx.records.has("admin_upload_sessions/next_expired_batch")).toBe(true)
+  })
+
+  test("清理读到旧target配额后新上传续期，旧请求不删除新配额或它的会话", async () => {
+    const ctx = await setup()
+    await prepare(ctx)
+    const targetKey = [...ctx.records.keys()].find((key) => key.startsWith("admin_upload_sessions/target_"))
+    jest.setSystemTime(NOW + 18 * 60 * 1000)
+    const entered = latch()
+    const resume = latch()
+    let blocked = false
+    ctx.hooks.afterQuery = async (name, condition) => {
+      if (name !== "admin_upload_sessions" || condition.openid || blocked) return
+      blocked = true
+      entered.release()
+      await resume.promise
+    }
+    const oldCleanup = ctx.main({ action: "cleanup" })
+    await entered.promise
+    let newId
+    try { newId = await prepare(ctx, PNG, { requestId: "upload_after_old_quota_snapshot" }) }
+    finally { resume.release() }
+    expect(await oldCleanup).toMatchObject({ ok: true })
+    const quota = ctx.records.get(targetKey)
+    expect(quota.expiresAt.getTime()).toBe(NOW + 33 * 60 * 1000)
+    expect(quota.sessions.map((entry) => entry.id)).toEqual([newId])
+    expect(ctx.records.has(`admin_upload_sessions/${newId}_0`)).toBe(true)
+    expect(await ctx.main({ action: "complete", uploadId: newId })).toMatchObject({ ok: true })
+  })
+
+  test("混合到期记录清理中途失败后begin接续清理，不残留旧名额也不删除成品", async () => {
+    const ctx = await setup()
+    const completedId = await prepare(ctx)
+    const completed = await ctx.main({ action: "complete", uploadId: completedId })
+    const incompleteId = await prepare(ctx, PNG, { requestId: "incomplete_before_cleanup_failure" })
+    let failed = false
+    ctx.hooks.beforeRemove = async (key) => {
+      if (key === `admin_upload_sessions/${incompleteId}_0` && !failed) { failed = true; throw new Error("temporary chunk deletion failure") }
+    }
+    jest.setSystemTime(NOW + 18 * 60 * 1000)
+    expect(await ctx.main({ action: "cleanup" })).toMatchObject({ ok: false, code: "INTERNAL_ERROR" })
+    expect(ctx.records.has(`admin_upload_sessions/${completedId}`)).toBe(false)
+    expect(ctx.records.get(`admin_upload_sessions/${incompleteId}`).state).toBe("aborted")
+    expect(ctx.records.has(`admin_upload_sessions/${incompleteId}_0`)).toBe(true)
+    const newId = await prepare(ctx, PNG, { requestId: "upload_resumes_partial_cleanup" })
+    expect(ctx.records.has(`admin_upload_sessions/${incompleteId}`)).toBe(false)
+    expect(ctx.records.has(`admin_upload_sessions/${incompleteId}_0`)).toBe(false)
+    const owner = [...ctx.records.values()].find((row) => row.recordType === "quota" && row.openid === "admin_1")
+    const target = [...ctx.records.entries()].find(([key]) => key.startsWith("admin_upload_sessions/target_"))[1]
+    expect(owner.sessions.map((entry) => entry.id)).toEqual([newId])
+    expect(target.sessions.map((entry) => entry.id)).toEqual([newId])
+    expect(ctx.files.has(completed.fileID)).toBe(true)
+    expect([...ctx.records.values()].some((row) => row.fileList && row.fileList.includes(completed.fileID))).toBe(true)
+    expect(ctx.cloud.deleteFile).not.toHaveBeenCalled()
+    expect(await ctx.main({ action: "complete", uploadId: newId })).toMatchObject({ ok: true })
   })
 })

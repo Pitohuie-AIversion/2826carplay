@@ -32,6 +32,8 @@
     "cloud:backup": "node scripts/cloudDbBackup.js",
     "cloud:admin:deploy": "node scripts/cloudAdminDeploy.js",
     "cloud:trigger:check": "node scripts/cloudTriggerCheck.js",
+    "cloud:deploy": "node scripts/deployAll.js",
+    "cloud:deploy:apply": "node scripts/deployAll.js --apply",
     "cloud:help": "node scripts/cloudHelp.js"
   },
   "devDependencies": {

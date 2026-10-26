@@ -10,3 +10,4 @@ log/
 .DS_Store
 backups/
 scratch/
+.cloudbase_deploy_cache.json

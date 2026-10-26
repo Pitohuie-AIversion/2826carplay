@@ -49,6 +49,8 @@ Page({
     saving: false,
     pageAuthorized: false,
     list: [],
+    listError: "",
+    listTruncated: false,
     page: 0,
     pageSize: 20,
     hasMore: false,
@@ -113,6 +115,7 @@ Page({
       return
     }
     const append = Boolean(input && input.append)
+    this._roleListRetryAppend = append
     const nextPage = append ? this.data.page + 1 : 0
     const requestId = Number(this._roleListRequestId || 0) + 1
     this._roleListRequestId = requestId
@@ -124,7 +127,8 @@ Page({
       })
       this.setData({
         initialLoading: false,
-        loading: false
+        loading: false,
+        listError: "云能力未初始化"
       })
       if (typeof done === "function") {
         done()
@@ -132,7 +136,7 @@ Page({
       return
     }
     this._roleListRequestDone = typeof done === "function" ? done : null
-    this.setData({ loading: true })
+    this.setData({ loading: true, listError: "" })
     let settled = false
     const finishRequest = () => {
       if (settled || this._roleListRequestId !== requestId) {
@@ -142,7 +146,7 @@ Page({
       this.finishRoleListRequestEffects()
       return true
     }
-    const handleFailure = (message) => {
+    const handleFailure = (message, code) => {
       if (!finishRequest()) {
         return
       }
@@ -153,9 +157,8 @@ Page({
       this.setData({
         initialLoading: false,
         loading: false,
-        list: append ? this.data.list : [],
-        page: append ? this.data.page : 0,
-        hasMore: append ? this.data.hasMore : false
+        listError: message,
+        ...(code === "FORBIDDEN" ? { list: [], page: 0, hasMore: false, listTruncated: false } : {})
       })
     }
     this._roleListRequestTimer = setTimeout(() => {
@@ -168,33 +171,26 @@ Page({
         pageSize: this.data.pageSize
       },
       success: (res) => {
-        if (!finishRequest()) {
-          return
-        }
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
-          this.showRoleToast({
-            title: formatToastTitle(result && result.message, "加载失败"),
-            icon: "none"
-          })
-          this.setData({
-            initialLoading: false,
-            loading: false,
-            list: append ? this.data.list : [],
-            page: append ? this.data.page : 0,
-            hasMore: append ? this.data.hasMore : false
-          })
+          handleFailure(formatToastTitle(result && result.message, "加载失败"), result && result.code)
           return
         }
-        const list = Array.isArray(result.list)
-          ? result.list.map((item) => ({
-              ...item,
-              permissionText: buildPermissionText(item.permissions, item.isAdmin)
-            }))
-          : []
+        if (!Array.isArray(result.list) || result.list.some((item) => !item || typeof item !== "object" || Array.isArray(item))) {
+          handleFailure("角色列表返回异常，请重试")
+          return
+        }
+        if (!finishRequest()) return
+        const list = result.list.map((item) => ({
+          ...item,
+          permissionText: buildPermissionText(item.permissions, item.isAdmin)
+        }))
+        this._roleListRetryAppend = false
         this.setData({
           initialLoading: false,
           loading: false,
+          listError: "",
+          listTruncated: Boolean(result.truncated),
           page: Number.isInteger(result.page) ? result.page : nextPage,
           hasMore: Boolean(result.hasMore),
           list: append ? this.data.list.concat(list) : list
@@ -219,7 +215,15 @@ Page({
     if (this.data.loading || this.data.saving || !this.data.hasMore) {
       return
     }
+    if (this.data.listError) {
+      this.handleRetryRoleList()
+      return
+    }
     this.fetchRoleList({ append: true })
+  },
+  handleRetryRoleList() {
+    if (!this.data.pageAuthorized || this.isRoleInteractionBusy()) return
+    this.fetchRoleList({ append: Boolean(this._roleListRetryAppend && this.data.list.length) })
   },
   handleOpenidInput(event) {
     if (this.isRoleInteractionBusy() || this.data.editingOpenid) {

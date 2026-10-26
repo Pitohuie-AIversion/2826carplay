@@ -167,7 +167,8 @@ exports.main = async (event) => {
       ok: true,
       page,
       pageSize,
-      hasMore: end < sortedList.length || (roleRecords.truncated && end <= MAX_ROLE_RECORDS),
+      hasMore: end < sortedList.length,
+      truncated: roleRecords.truncated,
       list
     }
   } catch (error) {

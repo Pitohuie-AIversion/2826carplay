@@ -992,6 +992,24 @@
       color: #000;
     }
 
+    .fn-fault-btn {
+      background: rgba(244, 63, 94, 0.12);
+      border: 1px solid rgba(244, 63, 94, 0.3);
+      color: #fb7185;
+      padding: 0.2rem 0.45rem;
+      border-radius: 4px;
+      font-size: 0.68rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: var(--transition-smooth);
+      flex-shrink: 0;
+    }
+
+    .fn-fault-btn:hover {
+      background: #f43f5e;
+      color: #fff;
+    }
+
     /* DIAGNOSTIC STUDIO VIEW */
     .diagnostic-layout {
       display: grid;
@@ -1339,26 +1357,206 @@
       align-items: center;
     }
 
-    /* Alert Webhook Preview Card */
+    /* Alert Webhook Preview Card & Multi-Platform Cards */
     .webhook-card-preview {
       background: #0f172a;
       border: 1px solid #334155;
-      border-left: 4px solid #ef4444;
       border-radius: var(--radius-sm);
-      padding: 1rem;
+      overflow: hidden;
       font-size: 0.78rem;
       line-height: 1.6;
     }
 
-    .alert-history-item {
+    .preview-subtabs {
+      display: inline-flex;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid var(--border-subtle);
+      border-radius: 9999px;
+      padding: 2px;
+      gap: 2px;
+    }
+
+    .preview-subtabs .subtab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-dim);
+      font-size: 0.68rem;
+      font-weight: 600;
+      padding: 0.2rem 0.55rem;
+      border-radius: 9999px;
+      cursor: pointer;
+      transition: var(--transition-smooth);
+    }
+
+    .preview-subtabs .subtab-btn:hover {
+      color: var(--text-main);
+    }
+
+    .preview-subtabs .subtab-btn.active {
+      background: rgba(56, 189, 248, 0.2);
+      color: var(--primary);
+      box-shadow: 0 0 10px var(--primary-glow);
+    }
+
+    /* WeCom card preview */
+    .wecom-card {
+      background: #0d1322;
+      border-left: 4px solid #ef4444;
+      padding: 0.9rem;
+      font-size: 0.78rem;
+      line-height: 1.6;
+    }
+
+    .wecom-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.68rem;
+      font-weight: 700;
+      color: #38bdf8;
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      border-radius: 4px;
+      padding: 0.1rem 0.4rem;
+      margin-bottom: 0.4rem;
+    }
+
+    .wecom-tag-high {
+      background: rgba(239, 68, 68, 0.15);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      padding: 0.05rem 0.35rem;
+      border-radius: 3px;
+      font-weight: 600;
+    }
+
+    /* Feishu card preview */
+    .feishu-card {
+      background: #151b2e;
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      font-size: 0.76rem;
+    }
+
+    .feishu-header {
+      background: linear-gradient(90deg, #dc2626, #b91c1c);
+      padding: 0.6rem 0.85rem;
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.84rem;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 0.6rem 0.85rem;
-      background: rgba(15, 23, 42, 0.5);
+    }
+
+    .feishu-body {
+      padding: 0.85rem;
+      line-height: 1.6;
+    }
+
+    .feishu-fields-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.6rem 1rem;
+      margin: 0.6rem 0;
+      background: rgba(10, 15, 29, 0.55);
+      padding: 0.65rem;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .feishu-field-item label {
+      color: #94a3b8;
+      font-size: 0.7rem;
+      display: block;
+    }
+
+    .feishu-field-item span {
+      color: #f8fafc;
+      font-weight: 600;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .feishu-btn-preview {
+      display: inline-block;
+      margin-top: 0.6rem;
+      background: #3370ff;
+      color: #fff;
+      padding: 0.3rem 0.85rem;
+      border-radius: 4px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-align: center;
+    }
+
+    /* DingTalk card preview */
+    .ding-card {
+      background: #0d1424;
+      border-top: 3px solid #f97316;
+      padding: 0.85rem;
+      font-size: 0.78rem;
+      line-height: 1.6;
+    }
+
+    .ding-title {
+      font-weight: 700;
+      color: #fb923c;
+      font-size: 0.85rem;
+      margin-bottom: 0.4rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .ding-btn {
+      display: block;
+      margin-top: 0.75rem;
+      background: rgba(249, 115, 22, 0.15);
+      border: 1px solid rgba(249, 115, 22, 0.4);
+      color: #fb923c;
+      text-align: center;
+      padding: 0.35rem;
+      border-radius: 4px;
+      font-weight: 600;
+      font-size: 0.74rem;
+    }
+
+    /* Sentinel Pulsing Glow on Top Nav */
+    .sentinel-pulsing {
+      animation: alertGlow 1.2s infinite alternate !important;
+      border-color: #ef4444 !important;
+      color: #fca5a5 !important;
+    }
+
+    @keyframes alertGlow {
+      from { box-shadow: 0 0 5px rgba(239, 68, 68, 0.4); transform: scale(1); }
+      to { box-shadow: 0 0 18px rgba(239, 68, 68, 0.95); transform: scale(1.03); }
+    }
+
+    /* Probe History List */
+    .probe-history-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+      max-height: 180px;
+      overflow-y: auto;
+    }
+
+    .probe-history-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(11, 16, 28, 0.65);
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-sm);
+      padding: 0.45rem 0.85rem;
       font-size: 0.76rem;
+      transition: var(--transition-smooth);
+    }
+
+    .probe-history-item:hover {
+      background: rgba(28, 38, 64, 0.5);
+      border-color: var(--border-bright);
     }
 
     /* Footer */
@@ -1418,7 +1616,7 @@
       <button class="btn-action" style="border-color: rgba(16, 185, 129, 0.4); color: #34d399;" onclick="openPayScoreModal()">
         <span>💳</span> 免押结算
       </button>
-      <button class="btn-action" style="border-color: rgba(168, 85, 247, 0.4); color: #c084fc;" onclick="openAlertConfigModal()">
+      <button class="btn-action" id="btnAlertSentinel" style="border-color: rgba(168, 85, 247, 0.4); color: #c084fc;" onclick="openAlertConfigModal()" title="网关哨兵规则与自动化告警中心">
         <span>🚨</span> 告警哨兵
       </button>
       <button class="btn-action primary" onclick="refreshDashboard()">
@@ -1900,6 +2098,21 @@
             <div style="color: #38bdf8; margin-top: 0.85rem;">» 请在左侧选择目标微服务，点击「发起网关即时拨测」查看全链路诊断数据...</div>
           </div>
         </div>
+
+        <!-- Recent Diagnostic Probes History -->
+        <div class="probe-history-panel" style="grid-column: 1 / -1; margin-top: 0.5rem; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 1rem 1.25rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 0.75rem;">
+            <div style="font-weight: 700; font-size: 0.82rem; color: var(--text-main); display: flex; align-items: center; gap: 0.5rem;">
+              <span>📜</span> 最近网关拨测历史流水 (Recent Probes Trail)
+            </div>
+            <button class="btn-action" style="padding: 0.2rem 0.55rem; font-size: 0.72rem;" onclick="clearProbeHistory()">
+              <span>🧹</span> 清空流水
+            </button>
+          </div>
+          <div id="probeHistoryList" class="probe-history-list">
+            <div style="color: var(--text-dim); font-size: 0.75rem; text-align: center; padding: 0.85rem;">暂无拨测记录，请在上方执行微服务探测</div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -2239,17 +2452,17 @@
       <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem;">
         <div class="modal-field">
           <label>SLA 告警下限 (SLA Floor)</label>
-          <input type="text" class="search-input" id="alertSlaInput" value="99.90" style="width:100%; font-family:monospace;">
+          <input type="text" class="search-input" id="alertSlaInput" value="99.90" style="width:100%; font-family:monospace;" oninput="updateWebhookCardPreview()">
           <span style="font-size:0.68rem; color:var(--text-dim);">当前实测: 99.985%</span>
         </div>
         <div class="modal-field">
           <label>5xx 错误率上限 (Error Spike)</label>
-          <input type="text" class="search-input" id="alertErrorInput" value="3.0" style="width:100%; font-family:monospace;">
+          <input type="text" class="search-input" id="alertErrorInput" value="3.0" style="width:100%; font-family:monospace;" oninput="updateWebhookCardPreview()">
           <span style="font-size:0.68rem; color:var(--text-dim);">当前实测: 0.02%</span>
         </div>
         <div class="modal-field">
           <label>P95 延迟告警上限 (Latency)</label>
-          <input type="text" class="search-input" id="alertLatencyInput" value="80" style="width:100%; font-family:monospace;">
+          <input type="text" class="search-input" id="alertLatencyInput" value="80" style="width:100%; font-family:monospace;" oninput="updateWebhookCardPreview()">
           <span style="font-size:0.68rem; color:var(--text-dim);">当前实测: 26 ms</span>
         </div>
       </div>
@@ -2258,7 +2471,7 @@
       <div style="display: grid; grid-template-columns: 180px 1fr; gap: 0.85rem;">
         <div class="modal-field">
           <label>通知渠道平台</label>
-          <select class="search-input" id="alertPlatformSelect" style="width: 100%; padding: 0.6rem;">
+          <select class="search-input" id="alertPlatformSelect" style="width: 100%; padding: 0.6rem;" onchange="onAlertPlatformChange()">
             <option value="wecom">企业微信群机器人</option>
             <option value="feishu">飞书自定义机器人</option>
             <option value="dingtalk">钉钉群智能助手</option>
@@ -2266,25 +2479,41 @@
         </div>
         <div class="modal-field">
           <label>Webhook 机器人推送地址 (URL)</label>
-          <input type="text" class="search-input" id="alertWebhookUrl" style="width: 100%;" value="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=8e29a0f4-aijia-sentinel">
+          <input type="text" class="search-input" id="alertWebhookUrl" style="width: 100%;" value="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=8e29a0f4-aijia-sentinel" oninput="updateWebhookCardPreview()">
         </div>
       </div>
 
       <!-- Webhook Card Live Preview -->
       <div class="modal-field">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <label>机器人推送卡片渲染预览 (Card Preview)</label>
-          <button class="btn-action" style="padding: 0.2rem 0.6rem; font-size: 0.72rem; border-color: rgba(239, 68, 68, 0.4); color: #f87171;" onclick="sendTestWebhookAlert()">
-            <span>🔔</span> 发送模拟告警测试
-          </button>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 0.5rem;">
+          <div style="display:flex; align-items:center; gap:0.6rem;">
+            <label style="margin-bottom:0;">推送卡片与报文实时联动</label>
+            <div class="preview-subtabs">
+              <button type="button" class="subtab-btn active" id="subtabVisual" onclick="setWebhookPreviewMode('visual')">📱 视觉卡片</button>
+              <button type="button" class="subtab-btn" id="subtabJson" onclick="setWebhookPreviewMode('json')">📝 标准 JSON</button>
+              <button type="button" class="subtab-btn" id="subtabCurl" onclick="setWebhookPreviewMode('curl')">💻 cURL 命令</button>
+            </div>
+          </div>
+          <div style="display:flex; gap:0.4rem;">
+            <button type="button" class="btn-action" style="padding: 0.2rem 0.55rem; font-size: 0.72rem;" onclick="copyWebhookPayload()">
+              <span>📋</span> 复制报文
+            </button>
+            <button type="button" class="btn-action" style="padding: 0.2rem 0.6rem; font-size: 0.72rem; border-color: rgba(239, 68, 68, 0.4); color: #f87171;" onclick="sendTestWebhookAlert()">
+              <span>🔔</span> 发送测试告警
+            </button>
+          </div>
         </div>
+
+        <!-- 1. Visual Card Preview Container -->
         <div class="webhook-card-preview" id="webhookPreviewBox">
-          <div style="color: #f87171; font-weight: 700; font-size: 0.85rem;">🚨 [爱迦租车] 微服务网关实时告警通知</div>
-          <div style="margin-top: 0.35rem; color: #cbd5e1;">• 触发规则: 5xx 异常错误率超阈值 (当前 4.2% &gt; 3.0%)</div>
-          <div style="color: #cbd5e1;">• 涉事微服务: <span style="color:#38bdf8; font-family:monospace;">bookingCreate</span> (预约事务创建与排期锁)</div>
-          <div style="color: #cbd5e1;">• 网关集群: 华东一区 (cloud1-d8gtmns36320e045e)</div>
-          <div style="color: #94a3b8; font-size: 0.72rem; margin-top: 0.35rem;">建议运维专员立即核查云数据库锁等待与索引健康度。</div>
+          <!-- Dynamically populated by updateWebhookCardPreview() -->
         </div>
+
+        <!-- 2. JSON Payload Preview Box -->
+        <textarea id="webhookJsonBox" readonly style="display:none; width: 100%; height: 160px; background: rgba(5, 8, 17, 0.85); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: #38bdf8; font-size: 0.76rem; font-family: 'JetBrains Mono', monospace; padding: 0.75rem; resize: none; line-height: 1.45;"></textarea>
+
+        <!-- 3. cURL Command Preview Box -->
+        <textarea id="webhookCurlBox" readonly style="display:none; width: 100%; height: 110px; background: rgba(5, 8, 17, 0.85); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: #34d399; font-size: 0.76rem; font-family: 'JetBrains Mono', monospace; padding: 0.75rem; resize: none; line-height: 1.45;"></textarea>
       </div>
 
       <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:0.75rem;">
@@ -2689,7 +2918,10 @@
             </div>
             <div class="fn-desc">${fn.desc} · <span style="color:var(--primary); font-family:monospace;">${fault === 'TIMEOUT' ? '520ms' : fn.p95 + 'ms'}</span></div>
           </div>
-          <button class="fn-ping-btn" onclick="quickPingFunction('${fn.name}')">Ping</button>
+          <div style="display:flex; gap:0.35rem; align-items:center; flex-shrink:0;">
+            <button class="fn-fault-btn" title="配置该微服务熔断/注入" onclick="openCircuitBreakerForService('${fn.name}')">⚡ 熔断</button>
+            <button class="fn-ping-btn" title="执行网关拨测" onclick="quickPingFunction('${fn.name}')">Ping</button>
+          </div>
         `;
 
         if (fn.cluster === 'booking') bookingGrid.appendChild(card);
@@ -2740,6 +2972,7 @@
       });
 
       loadPresetPayload();
+      renderProbeHistory();
     }
 
     function loadPresetPayload() {
@@ -2757,6 +2990,59 @@
         showToast('JSON 格式化成功', '✨');
       } catch (e) {
         showToast('JSON 语法错误，请检查', '⚠️');
+      }
+    }
+
+    // ==================== PROBE HISTORY TRAIL ====================
+    const PROBE_HISTORY = [];
+
+    function recordProbeHistory(fnName, status, latency, message) {
+      const time = new Date().toLocaleTimeString();
+      PROBE_HISTORY.unshift({ time, fnName, status, latency, message });
+      if (PROBE_HISTORY.length > 20) PROBE_HISTORY.pop();
+      renderProbeHistory();
+    }
+
+    function renderProbeHistory() {
+      const container = document.getElementById('probeHistoryList');
+      if (!container) return;
+      if (PROBE_HISTORY.length === 0) {
+        container.innerHTML = '<div style="color: var(--text-dim); font-size: 0.75rem; text-align: center; padding: 0.85rem;">暂无拨测记录，请在上方执行微服务探测</div>';
+        return;
+      }
+      container.innerHTML = '';
+      PROBE_HISTORY.slice(0, 6).forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'probe-history-item';
+        const statusColor = item.status === 200 ? '#10b981' : item.status === 503 ? '#ef4444' : item.status === 504 ? '#f59e0b' : '#fb923c';
+        div.innerHTML = `
+          <div style="display:flex; align-items:center; gap:0.6rem; overflow:hidden;">
+            <span style="font-family:'JetBrains Mono',monospace; color:var(--text-dim); font-size:0.7rem; flex-shrink:0;">${item.time}</span>
+            <span style="font-weight:700; color:${statusColor}; font-family:'JetBrains Mono',monospace; flex-shrink:0;">${item.status}</span>
+            <span style="color:#f8fafc; font-family:'JetBrains Mono',monospace; font-weight:600; flex-shrink:0;">${item.fnName}</span>
+            <span style="color:var(--text-dim); font-size:0.72rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${item.message}</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:0.5rem; flex-shrink:0;">
+            <span style="font-family:'JetBrains Mono',monospace; color:#38bdf8; font-size:0.72rem;">${item.latency}ms</span>
+            <button class="btn-action" style="padding:0.15rem 0.45rem; font-size:0.68rem;" onclick="reProbeFunction('${item.fnName}')">🔄 重拨</button>
+          </div>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function clearProbeHistory() {
+      PROBE_HISTORY.length = 0;
+      renderProbeHistory();
+      showToast('网关拨测历史已清空', '🧹');
+    }
+
+    function reProbeFunction(fnName) {
+      const select = document.getElementById('diagFunctionSelect');
+      if (select) {
+        select.value = fnName;
+        loadPresetPayload();
+        executeDiagnosticProbe();
       }
     }
 
@@ -2802,6 +3088,7 @@
             </div>
           `;
           appendLogStreamEntry('POST', fnName, 503, '【网关熔断短路】已触发客户端 SWR 本地缓存降级保护', 2);
+          recordProbeHistory(fnName, 503, 2, '网关熔断短路 (已降级SWR本地缓存)');
           showToast(`【${fnName}】微服务熔断保护已触发，已降级 SWR 缓存`, '⚡');
         }, 220);
         return;
@@ -2816,6 +3103,7 @@
             <div style="color:#cbd5e1; margin-top:0.5rem;">客户端检测到慢响应，已进入优雅降级，未阻塞主渲染线程。</div>
           `;
           appendLogStreamEntry('POST', fnName, 504, '【慢响应超时】调用耗时 520ms 超过 500ms 上限', timeoutMs);
+          recordProbeHistory(fnName, 504, timeoutMs, '慢响应超时 (门限500ms已降级)');
           showToast(`【${fnName}】微服务慢响应超时 (520ms)`, '⚠️');
         }, 300);
         return;
@@ -2828,6 +3116,7 @@
             <div style="font-size:0.7rem; color:#64748b; margin-top:0.2rem;">ErrorCode: PERMISSION_DENIED | 拦截点: CloudBase Auth Guard</div>
           `;
           appendLogStreamEntry('POST', fnName, 403, '【权限拦截】调用身份未具备该微服务管理员权限', 14);
+          recordProbeHistory(fnName, 403, 14, '权限鉴权拦截 (PERMISSION_DENIED)');
           showToast(`【${fnName}】鉴权拦截 403 Forbidden`, '⚠️');
         }, 180);
         return;
@@ -2891,8 +3180,9 @@
           <pre style="color: #38bdf8; margin-top: 0.35rem; line-height:1.45;">${JSON.stringify(sampleResponse, null, 2)}</pre>
         `;
 
-        // Append to Live Stream
+        // Append to Live Stream and Probe History
         appendLogStreamEntry('POST', fnName, 200, `网关在线诊断拨测成功 (${authType})`, latencyMs);
+        recordProbeHistory(fnName, 200, latencyMs, `网关应答完成 (${authType})`);
         showToast(`【${fnName}】网关拨测成功 · 耗时 ${latencyMs}ms`, '⚡');
       }, 350);
     }
@@ -3100,6 +3390,26 @@
         const qpsEl = document.getElementById('gwQps');
         if (qpsEl) {
           qpsEl.innerText = (40 + Math.random() * 6).toFixed(1);
+        }
+
+        // Live Sentinel Auto-Evaluation against ALERT_CONFIG thresholds
+        if (totalLogsCount.all >= 12) {
+          const curErrorRate = (totalLogsCount.s500 / totalLogsCount.all) * 100;
+          const sentinelBtn = document.getElementById('btnAlertSentinel');
+          const badgeEl = document.getElementById('sentinelStatusBadge');
+          if (curErrorRate > ALERT_CONFIG.errorMax || lat > ALERT_CONFIG.p95Max) {
+            if (sentinelBtn) sentinelBtn.classList.add('sentinel-pulsing');
+            if (badgeEl) {
+              badgeEl.innerText = '🚨 哨兵告警触发';
+              badgeEl.style.color = '#ef4444';
+            }
+          } else {
+            if (sentinelBtn) sentinelBtn.classList.remove('sentinel-pulsing');
+            if (badgeEl) {
+              badgeEl.innerText = '57/57 正常';
+              badgeEl.style.color = 'var(--success)';
+            }
+          }
         }
       }, 1600);
     }
@@ -3533,11 +3843,30 @@
     }
 
     // ==================== 14. CIRCUIT BREAKER & FAULT INJECTION ENGINE ====================
+    const CIRCUIT_BREAKER_STORAGE_KEY = 'AIJIA_CIRCUIT_BREAKER_FAULTS';
     let selectedCbModeVal = 'NORMAL';
+
+    function persistCircuitBreakerFaults() {
+      try {
+        localStorage.setItem(CIRCUIT_BREAKER_STORAGE_KEY, JSON.stringify(CIRCUIT_BREAKER_FAULTS));
+      } catch (e) {
+        console.warn('Failed to persist circuit breaker faults:', e);
+      }
+    }
 
     function openCircuitBreakerModal() {
       populateCbServicesSelect();
       document.getElementById('circuitBreakerModal').classList.add('active');
+    }
+
+    function openCircuitBreakerForService(fnName) {
+      openCircuitBreakerModal();
+      const select = document.getElementById('cbTargetServiceSelect');
+      if (select) {
+        select.value = fnName;
+      }
+      const currentMode = CIRCUIT_BREAKER_FAULTS[fnName] || 'NORMAL';
+      selectCbMode(currentMode);
     }
 
     function closeCircuitBreakerModal() {
@@ -3575,6 +3904,7 @@
         appendLogStreamEntry('INJECT', fnName, selectedCbModeVal === 'TRIPPED' ? 503 : 504, `已模拟激活微服务故障注入: ${selectedCbModeVal}`, 0);
       }
 
+      persistCircuitBreakerFaults();
       renderGatewayTopology();
       closeCircuitBreakerModal();
     }
@@ -3583,12 +3913,15 @@
       for (const k in CIRCUIT_BREAKER_FAULTS) {
         delete CIRCUIT_BREAKER_FAULTS[k];
       }
+      persistCircuitBreakerFaults();
       renderGatewayTopology();
       showToast(`已重置全量 57 个微服务网关，0 项熔断阻断！`, '🎉');
       closeCircuitBreakerModal();
     }
 
     // ==================== 15. ALERT SENTINEL & WEBHOOK RULES ENGINE ====================
+    const ALERT_SENTINEL_STORAGE_KEY = 'AIJIA_ALERT_SENTINEL_CONFIG';
+
     let ALERT_CONFIG = {
       slaMin: 99.90,
       errorMax: 3.0,
@@ -3597,12 +3930,51 @@
       url: 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=8e29a0f4-aijia-sentinel'
     };
 
+    let activeWebhookPreviewMode = 'visual'; // 'visual' | 'json' | 'curl'
+
+    const DEFAULT_WEBHOOK_URLS = {
+      wecom: 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=8e29a0f4-aijia-sentinel',
+      feishu: 'https://open.feishu.cn/open-apis/bot/v2/hook/8e29a0f4-aijia-sentinel',
+      dingtalk: 'https://oapi.dingtalk.com/robot/send?access_token=8e29a0f4-aijia-sentinel'
+    };
+
+    function loadPersistedConfigs() {
+      try {
+        const rawAlert = localStorage.getItem(ALERT_SENTINEL_STORAGE_KEY);
+        if (rawAlert) {
+          const parsed = JSON.parse(rawAlert);
+          Object.assign(ALERT_CONFIG, parsed);
+        }
+      } catch (e) {
+        console.warn('Failed to load alert config from localStorage', e);
+      }
+
+      try {
+        const rawCb = localStorage.getItem(CIRCUIT_BREAKER_STORAGE_KEY);
+        if (rawCb) {
+          const parsed = JSON.parse(rawCb);
+          Object.assign(CIRCUIT_BREAKER_FAULTS, parsed);
+        }
+      } catch (e) {
+        console.warn('Failed to load circuit breaker faults from localStorage', e);
+      }
+    }
+
+    function persistAlertConfig() {
+      try {
+        localStorage.setItem(ALERT_SENTINEL_STORAGE_KEY, JSON.stringify(ALERT_CONFIG));
+      } catch (e) {
+        console.warn('Failed to persist alert config', e);
+      }
+    }
+
     function openAlertConfigModal() {
       document.getElementById('alertSlaInput').value = ALERT_CONFIG.slaMin;
       document.getElementById('alertErrorInput').value = ALERT_CONFIG.errorMax;
       document.getElementById('alertLatencyInput').value = ALERT_CONFIG.p95Max;
       document.getElementById('alertPlatformSelect').value = ALERT_CONFIG.platform;
       document.getElementById('alertWebhookUrl').value = ALERT_CONFIG.url;
+      updateWebhookCardPreview();
       document.getElementById('alertConfigModal').classList.add('active');
     }
 
@@ -3610,25 +3982,247 @@
       document.getElementById('alertConfigModal').classList.remove('active');
     }
 
-    function saveAlertConfig() {
-      ALERT_CONFIG.slaMin = parseFloat(document.getElementById('alertSlaInput').value) || 99.90;
-      ALERT_CONFIG.errorMax = parseFloat(document.getElementById('alertErrorInput').value) || 3.0;
-      ALERT_CONFIG.p95Max = parseInt(document.getElementById('alertLatencyInput').value) || 80;
-      ALERT_CONFIG.platform = document.getElementById('alertPlatformSelect').value;
-      ALERT_CONFIG.url = document.getElementById('alertWebhookUrl').value.trim();
-
-      showToast('网关哨兵告警规则已成功持久化更新！', '💾');
-      closeAlertConfigModal();
+    function onAlertPlatformChange() {
+      const select = document.getElementById('alertPlatformSelect');
+      const newPlatform = select.value;
+      const urlInput = document.getElementById('alertWebhookUrl');
+      
+      const prevPlatform = ALERT_CONFIG.platform;
+      if (urlInput.value === DEFAULT_WEBHOOK_URLS[prevPlatform] || !urlInput.value.trim()) {
+        urlInput.value = DEFAULT_WEBHOOK_URLS[newPlatform] || '';
+      }
+      ALERT_CONFIG.platform = newPlatform;
+      updateWebhookCardPreview();
     }
 
-    function sendTestWebhookAlert() {
+    function setWebhookPreviewMode(mode) {
+      activeWebhookPreviewMode = mode;
+      document.querySelectorAll('.preview-subtabs .subtab-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.id === `subtab${mode[0].toUpperCase() + mode.slice(1)}`);
+      });
+
+      const visualEl = document.getElementById('webhookPreviewBox');
+      const jsonEl = document.getElementById('webhookJsonBox');
+      const curlEl = document.getElementById('webhookCurlBox');
+
+      if (visualEl) visualEl.style.display = mode === 'visual' ? 'block' : 'none';
+      if (jsonEl) jsonEl.style.display = mode === 'json' ? 'block' : 'none';
+      if (curlEl) curlEl.style.display = mode === 'curl' ? 'block' : 'none';
+    }
+
+    function buildWebhookPayload(platform, config) {
+      const sla = config.slaMin || 99.90;
+      const err = config.errorMax || 3.0;
+      const p95 = config.p95Max || 80;
+      const fnName = 'bookingCreate';
+      const cluster = '华东上海 (cloud1-d8gtmns36320e045e)';
+      const timeStr = new Date().toLocaleString('zh-CN');
+
+      if (platform === 'wecom') {
+        return {
+          msgtype: "markdown",
+          markdown: {
+            content: `# 🚨 【爱迦微服务网关告警】\n> 告警等级: <font color="warning">HIGH</font>\n> 触发规则: 5xx 异常错误率超阈值 (实测 4.2% > 设定 ${err}%)\n> 涉事微服务: <font color="comment">${fnName}</font> (预约事务与日锁)\n> 当前网关 SLA: <font color="info">99.82%</font> (告警门限: ${sla}%)\n> P95 响应耗时: 96ms (上限 ${p95}ms)\n> 发生节点: ${cluster}\n> 告警时间: ${timeStr}\n> 排查建议: 请运维人员核查云数据库写锁及索引命中率。`
+          }
+        };
+      } else if (platform === 'feishu') {
+        return {
+          msg_type: "interactive",
+          card: {
+            header: {
+              template: "red",
+              title: {
+                tag: "plain_text",
+                content: "🚨 [爱迦租车] 微服务网关可用性告警通知"
+              }
+            },
+            elements: [
+              {
+                tag: "div",
+                fields: [
+                  { is_short: true, text: { tag: "lark_md", content: `**⚡ 触发条件:**\n5xx错误率超标 (> ${err}%)` } },
+                  { is_short: true, text: { tag: "lark_md", content: `**🧩 影响微服务:**\n${fnName}` } },
+                  { is_short: true, text: { tag: "lark_md", content: `**⏱️ P95 延迟:**\n96 ms (上限 ${p95}ms)` } },
+                  { is_short: true, text: { tag: "lark_md", content: "**🛡️ 容灾模式:**\n已激活 SWR 缓存降级" } }
+                ]
+              },
+              { tag: "hr" },
+              {
+                tag: "note",
+                elements: [
+                  { tag: "plain_text", content: `集群: ${cluster} · 告警时间: ${timeStr}` }
+                ]
+              }
+            ]
+          }
+        };
+      } else {
+        // DingTalk
+        return {
+          msgtype: "actionCard",
+          actionCard: {
+            title: "🚨 爱迦租车网关告警",
+            text: `### 🚨 【爱迦租车】微服务网关异常预警\n---\n- **告警事件**: 5xx 错误率 4.2% (上限 ${err}%)\n- **涉事微服务**: ${fnName} (预约创建与排期日锁)\n- **网关 SLA**: 99.82% (下限 ${sla}%)\n- **P95 耗时**: 96 ms (门限 ${p95} ms)\n- **网关节点**: ${cluster}\n- **建议处理**: 请检查事务锁与索引健康度`,
+            singleTitle: "进入网关排查",
+            singleURL: "https://2826carplay.tcb.qcloud.la/admin/index.html"
+          }
+        };
+      }
+    }
+
+    function updateWebhookCardPreview() {
+      const platformSelect = document.getElementById('alertPlatformSelect');
+      const platform = platformSelect ? platformSelect.value : ALERT_CONFIG.platform;
+      const sla = parseFloat(document.getElementById('alertSlaInput') ? document.getElementById('alertSlaInput').value : ALERT_CONFIG.slaMin) || ALERT_CONFIG.slaMin;
+      const err = parseFloat(document.getElementById('alertErrorInput') ? document.getElementById('alertErrorInput').value : ALERT_CONFIG.errorMax) || ALERT_CONFIG.errorMax;
+      const p95 = parseInt(document.getElementById('alertLatencyInput') ? document.getElementById('alertLatencyInput').value : ALERT_CONFIG.p95Max) || ALERT_CONFIG.p95Max;
+      const urlInput = document.getElementById('alertWebhookUrl');
+      const url = (urlInput ? urlInput.value.trim() : ALERT_CONFIG.url) || DEFAULT_WEBHOOK_URLS[platform];
+
+      const config = { slaMin: sla, errorMax: err, p95Max: p95, platform, url };
+      const payload = buildWebhookPayload(platform, config);
+
+      // 1. Render Visual Card
+      const previewBox = document.getElementById('webhookPreviewBox');
+      if (previewBox) {
+        if (platform === 'wecom') {
+          previewBox.innerHTML = `
+            <div class="wecom-card">
+              <div class="wecom-badge"><span>💬</span> 企业微信群机器人 · Markdown</div>
+              <div style="font-weight: 700; color: #f87171; font-size: 0.88rem; margin-bottom: 0.35rem;">
+                🚨 【爱迦微服务网关告警】 <span class="wecom-tag-high">HIGH</span>
+              </div>
+              <div style="color: #cbd5e1; font-size: 0.76rem; line-height: 1.6;">
+                • 触发规则: <span style="color:#fbbf24;">5xx 异常错误率超阈值 (实测 4.2% &gt; ${err}%)</span><br>
+                • 涉事微服务: <span style="color:#38bdf8; font-family:monospace; font-weight:600;">bookingCreate</span> (预约防重与排期日锁)<br>
+                • 当前网关 SLA: <span style="color:#60a5fa;">99.82%</span> (最低保障门限: ${sla}%)<br>
+                • P95 响应耗时: <span style="color:#f87171;">96 ms</span> (设定上限: ${p95} ms)<br>
+                • 节点集群: 华东上海极速机房 (cloud1-d8gtmns36320e045e)
+              </div>
+              <div style="color: #94a3b8; font-size: 0.72rem; margin-top: 0.45rem; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 0.4rem;">
+                建议运维专员立即核查云数据库写锁等待与索引命中率。
+              </div>
+            </div>
+          `;
+        } else if (platform === 'feishu') {
+          previewBox.innerHTML = `
+            <div class="feishu-card">
+              <div class="feishu-header">
+                <span>🚨 [爱迦租车] 微服务网关可用性告警通知</span>
+                <span style="font-size:0.68rem; background:rgba(0,0,0,0.25); padding:0.15rem 0.45rem; border-radius:4px;">Lark Card</span>
+              </div>
+              <div class="feishu-body">
+                <div class="feishu-fields-grid">
+                  <div class="feishu-field-item">
+                    <label>⚡ 触发条件</label>
+                    <span style="color:#fbbf24;">5xx 错误率 &gt; ${err}%</span>
+                  </div>
+                  <div class="feishu-field-item">
+                    <label>🧩 影响微服务</label>
+                    <span style="color:#38bdf8;">bookingCreate</span>
+                  </div>
+                  <div class="feishu-field-item">
+                    <label>⏱️ P95 延迟</label>
+                    <span style="color:#f87171;">96 ms (上限 ${p95}ms)</span>
+                  </div>
+                  <div class="feishu-field-item">
+                    <label>🛡️ 容灾模式</label>
+                    <span style="color:#34d399;">已激活 SWR 降级</span>
+                  </div>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid rgba(255,255,255,0.08); padding-top:0.45rem; margin-top:0.35rem;">
+                  <span style="color:#64748b; font-size:0.7rem;">集群: cloud1-d8gtmns36320e045e</span>
+                  <span class="feishu-btn-preview">查看网关监控控制台</span>
+                </div>
+              </div>
+            </div>
+          `;
+        } else {
+          // DingTalk
+          previewBox.innerHTML = `
+            <div class="ding-card">
+              <div class="ding-title">
+                <span>🚨</span> 【爱迦租车】微服务集群稳定性告警
+                <span style="font-size:0.68rem; background:rgba(249,115,22,0.2); color:#fb923c; padding:0.1rem 0.4rem; border-radius:3px; margin-left:auto;">ActionCard</span>
+              </div>
+              <div style="color: #cbd5e1; font-size: 0.76rem; line-height: 1.6; margin-top: 0.35rem;">
+                • 告警事件: 5xx 错误率 4.2% (上限 ${err}%)<br>
+                • 涉事微服务: <span style="color:#38bdf8; font-family:monospace;">bookingCreate</span><br>
+                • 网关 SLA: <span style="color:#60a5fa;">99.82%</span> (下限 ${sla}%)<br>
+                • P95 响应耗时: <span style="color:#f87171;">96 ms</span> (上限 ${p95} ms)<br>
+                • 建议处理: 检查数据库事务锁与 SWR 本地缓存
+              </div>
+              <div class="ding-btn">进入网关排查 →</div>
+            </div>
+          `;
+        }
+      }
+
+      // 2. Render JSON Box
+      const jsonBox = document.getElementById('webhookJsonBox');
+      if (jsonBox) {
+        jsonBox.value = JSON.stringify(payload, null, 2);
+      }
+
+      // 3. Render cURL Box
+      const curlBox = document.getElementById('webhookCurlBox');
+      if (curlBox) {
+        const payloadStr = JSON.stringify(payload).replace(/'/g, "'\\''");
+        curlBox.value = `curl -X POST -H "Content-Type: application/json" -d '${payloadStr}' "${url}"`;
+      }
+    }
+
+    function copyWebhookPayload() {
+      const platformSelect = document.getElementById('alertPlatformSelect');
+      const platform = platformSelect ? platformSelect.value : ALERT_CONFIG.platform;
+      const config = {
+        slaMin: parseFloat(document.getElementById('alertSlaInput') ? document.getElementById('alertSlaInput').value : ALERT_CONFIG.slaMin) || ALERT_CONFIG.slaMin,
+        errorMax: parseFloat(document.getElementById('alertErrorInput') ? document.getElementById('alertErrorInput').value : ALERT_CONFIG.errorMax) || ALERT_CONFIG.errorMax,
+        p95Max: parseInt(document.getElementById('alertLatencyInput') ? document.getElementById('alertLatencyInput').value : ALERT_CONFIG.p95Max) || ALERT_CONFIG.p95Max,
+        url: (document.getElementById('alertWebhookUrl') ? document.getElementById('alertWebhookUrl').value.trim() : ALERT_CONFIG.url) || DEFAULT_WEBHOOK_URLS[platform]
+      };
+      const payload = buildWebhookPayload(platform, config);
+
+      let textToCopy = '';
+      let copyType = '';
+
+      if (activeWebhookPreviewMode === 'curl') {
+        const payloadStr = JSON.stringify(payload).replace(/'/g, "'\\''");
+        textToCopy = `curl -X POST -H "Content-Type: application/json" -d '${payloadStr}' "${config.url}"`;
+        copyType = 'cURL 终端指令';
+      } else {
+        textToCopy = JSON.stringify(payload, null, 2);
+        copyType = '标准 Webhook JSON 报文';
+      }
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(textToCopy).then(() => {
+          showToast(`已成功复制【${copyType}】至剪贴板！`, '📋');
+        });
+      } else {
+        showToast('已选中报文内容', '📋');
+      }
+    }
+
+    async function sendTestWebhookAlert() {
       const platformNameMap = {
         wecom: '企业微信群机器人',
         feishu: '飞书群自定义助手',
         dingtalk: '钉钉智能告警机器人'
       };
-      const platform = document.getElementById('alertPlatformSelect').value;
+      const platformSelect = document.getElementById('alertPlatformSelect');
+      const platform = platformSelect ? platformSelect.value : ALERT_CONFIG.platform;
       const targetPlatform = platformNameMap[platform] || '企业微信群机器人';
+      const urlInput = document.getElementById('alertWebhookUrl');
+      const targetUrl = (urlInput ? urlInput.value.trim() : ALERT_CONFIG.url) || DEFAULT_WEBHOOK_URLS[platform];
+
+      const config = {
+        slaMin: parseFloat(document.getElementById('alertSlaInput') ? document.getElementById('alertSlaInput').value : ALERT_CONFIG.slaMin) || ALERT_CONFIG.slaMin,
+        errorMax: parseFloat(document.getElementById('alertErrorInput') ? document.getElementById('alertErrorInput').value : ALERT_CONFIG.errorMax) || ALERT_CONFIG.errorMax,
+        p95Max: parseInt(document.getElementById('alertLatencyInput') ? document.getElementById('alertLatencyInput').value : ALERT_CONFIG.p95Max) || ALERT_CONFIG.p95Max,
+        url: targetUrl
+      };
+      const payload = buildWebhookPayload(platform, config);
 
       const alertMsg = `【网关报警触发】微服务系统健康检查 P95 响应异常，已向 ${targetPlatform} 推送通知卡片`;
       appendLogStreamEntry('ALERT', 'systemHealthCheck', 500, alertMsg, 0);
@@ -3639,7 +4233,30 @@
         setTimeout(() => { previewBox.style.animation = ''; }, 800);
       }
 
-      showToast(`已向【${targetPlatform}】成功发送网关模拟告警卡片！`, '🔔');
+      try {
+        await fetch(targetUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          mode: 'no-cors'
+        });
+        showToast(`已向【${targetPlatform}】发送真实网关告警请求！`, '🔔');
+      } catch (err) {
+        appendLogStreamEntry('ALERT_CORS', 'webhookDispatcher', 400, `浏览器跨域限制直连，可通过云函数或终端 cURL 执行`, 0);
+        showToast(`已生成标准告警报文！(可点【复制 cURL】在终端直接投递)`, '🔔');
+      }
+    }
+
+    function saveAlertConfig() {
+      ALERT_CONFIG.slaMin = parseFloat(document.getElementById('alertSlaInput').value) || 99.90;
+      ALERT_CONFIG.errorMax = parseFloat(document.getElementById('alertErrorInput').value) || 3.0;
+      ALERT_CONFIG.p95Max = parseInt(document.getElementById('alertLatencyInput').value) || 80;
+      ALERT_CONFIG.platform = document.getElementById('alertPlatformSelect').value;
+      ALERT_CONFIG.url = document.getElementById('alertWebhookUrl').value.trim();
+
+      persistAlertConfig();
+      showToast('网关哨兵告警规则已成功持久化至 LocalStorage！', '💾');
+      closeAlertConfigModal();
     }
 
     // ==================== 16. TOAST & TIMING ====================
@@ -3666,9 +4283,10 @@
       document.getElementById('timeClock').innerText = now.toLocaleTimeString('zh-CN', { hour12: false });
     }
 
-    // ==================== 14. INITIALIZATION ====================
+    // ==================== 17. INITIALIZATION ====================
     setInterval(updateTime, 1000);
     updateTime();
+    loadPersistedConfigs();
     renderVehicles(VEHICLES);
     startLogsSimulation();
   </script>

@@ -471,7 +471,11 @@ global.wx = {
       } else if (name === "roleList") {
         result = {
           ok: true,
-          roles: [{ openid: "admin-openid", roles: ["admin"] }]
+          page: 0,
+          pageSize: 20,
+          hasMore: false,
+          truncated: false,
+          list: [{ id: "role_admin", openid: "admin-openid", isAdmin: true, permissions: ["admin", "vehicle_manage", "booking_manage"] }]
         }
       } else if (name === "operationConfigGet") {
         result = {
@@ -2151,8 +2155,9 @@ simulateClick("输入目标用户的微信 OpenID (handleOpenidInput)", () => {
   if (rmPage.data.formOpenid !== "user-openid-target-99") throw new Error("OpenID 未录入")
 })
 
-simulateClick("勾选/取消车辆管理权限 (handleTogglePermission: canManageVehicles)", () => {
-  rmPage.handleTogglePermission(makeEvent({ value: "canManageVehicles" }))
+simulateClick("勾选/取消车辆管理权限 (handleTogglePermission: vehicle_manage)", () => {
+  rmPage.handleTogglePermission(makeEvent({ value: "vehicle_manage" }))
+  if (!rmPage.data.selectedPermissions.includes("vehicle_manage")) throw new Error("车辆管理权限未选中")
 })
 
 simulateClick("点击保存并下发权限配置 (handleSubmit)", () => {
@@ -2160,7 +2165,7 @@ simulateClick("点击保存并下发权限配置 (handleSubmit)", () => {
 })
 
 simulateClick("点击已有管理员行编辑角色 (handleEditRole)", () => {
-  rmPage.handleEditRole(makeEvent({ openid: "oTestUser1234567890abcdef", permissions: ["canManageVehicles"] }))
+  rmPage.handleEditRole(makeEvent({ openid: "oTestUser1234567890abcdef", permissions: ["vehicle_manage"] }))
 })
 
 simulateClick("点击清空/重置表单 (handleResetForm)", () => {
@@ -2170,6 +2175,22 @@ simulateClick("点击清空/重置表单 (handleResetForm)", () => {
 
 simulateClick("点击加载更多管理员列表 (handleLoadMore)", () => {
   rmPage.handleLoadMore()
+})
+
+simulateClick("权限列表刷新失败保留记录，点击重试从首页恢复 (handleRetryRoleList)", () => {
+  const originalCallFunction = wx.cloud.callFunction
+  const previous = [{ id: "role_previous", openid: "member_previous", permissions: [] }]
+  rmPage.setData({ initialLoading: false, loading: false, saving: false, list: previous, page: 2, hasMore: true })
+  wx.cloud.callFunction = (options) => options.fail({ errMsg: "网络暂不可用" })
+  try {
+    rmPage.onPullDownRefresh()
+    if (rmPage.data.list !== previous || !rmPage.data.listError) throw new Error("刷新失败未保留列表或缺少错误提示")
+  } finally {
+    wx.cloud.callFunction = originalCallFunction
+  }
+  rmPage.handleRetryRoleList()
+  const request = cloudCalls[cloudCalls.length - 1]
+  if (request.name !== "roleList" || request.data.page !== 0 || rmPage.data.listError) throw new Error("重试未从首页恢复列表")
 })
 
 logSuite("23. 分包页面: pages-admin/config-manage/config-manage (系统参数配置)")

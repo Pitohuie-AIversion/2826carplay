@@ -194,7 +194,11 @@ Page({
     }
     this.fetchBookings({ month: this.data.monthKey })
   },
+  onHide() {
+    this._calendarReleaseAction = null
+  },
   onUnload() {
+    this._calendarReleaseAction = null
     this._calendarRefreshPending = false
     disposeUnsavedChanges(this)
     cancelPagePermissionCheck(this)
@@ -567,29 +571,46 @@ Page({
 
   confirmRelease(action, id, title) {
     if (!id || this.data.isSavingCalendar) return
+    if (this._calendarReleaseAction && isPageNativeActionActive(this, this._calendarReleaseAction)) return
     const records = action === "releaseBlock" ? this.data.allBlocks : this.data.allPriceRules
     const record = records.find((item) => item.id === id)
     if (!record) return
     const expectedVersion = Number(record.version || 1)
     const nativeAction = beginPageNativeAction(this, { requireCurrent: true, exclusiveKey: "calendar-release" })
-    wx.showModal({
-      title,
-      content: "请填写本次操作原因",
-      editable: true,
-      placeholderText: "必填，最多 200 字",
-      confirmText: action === "releaseBlock" ? "释放" : "停用",
-      confirmColor: "#d46868",
-      success: (res) => {
-        if (!isPageNativeActionActive(this, nativeAction)) return
-        if (!res.confirm) return
-        const reason = String(res.content || "").trim()
-        if (!reason) {
-          wx.showToast({ title: "请填写操作原因", icon: "none" })
-          return
-        }
-        this.saveCalendarChange(action, { id, reason, expectedVersion })
-      }
-    })
+    if (!isPageNativeActionActive(this, nativeAction)) return
+    this._calendarReleaseAction = nativeAction
+    const finish = () => {
+      if (this._calendarReleaseAction !== nativeAction) return false
+      this._calendarReleaseAction = null
+      return true
+    }
+    const handleFailure = (error) => {
+      if (!finish() || !isPageNativeActionActive(this, nativeAction)) return
+      if (/cancel/i.test(String(error && (error.errMsg || error.message) || ""))) return
+      wx.showToast({ title: "确认框打开失败", icon: "none" })
+    }
+    try {
+      wx.showModal({
+        title,
+        content: "请填写本次操作原因",
+        editable: true,
+        placeholderText: "必填，最多 200 字",
+        confirmText: action === "releaseBlock" ? "释放" : "停用",
+        confirmColor: "#d46868",
+        success: (res) => {
+          if (!finish() || !isPageNativeActionActive(this, nativeAction) || !res || !res.confirm) return
+          const reason = String(res.content || "").trim()
+          if (!reason) {
+            wx.showToast({ title: "请填写操作原因", icon: "none" })
+            return
+          }
+          this.saveCalendarChange(action, { id, reason, expectedVersion })
+        },
+        fail: handleFailure
+      })
+    } catch (error) {
+      handleFailure(error)
+    }
   },
 
   saveCalendarChange(action, payload) {

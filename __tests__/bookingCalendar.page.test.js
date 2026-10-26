@@ -308,6 +308,140 @@ describe("pages/booking-calendar", () => {
     page.onUnload()
   })
 
+  test.each([["Block", "allBlocks", "releaseBlock"], ["PriceRule", "allPriceRules", "releasePriceRule"]])("连点%s释放时保留首个确认框，后续弹窗调用失败不能吞掉已确认操作", (type, recordsKey, action) => {
+    const requests = []
+    let visibleModal
+    global.wx = {
+      showToast: jest.fn(),
+      showModal: jest.fn((options) => {
+        if (!visibleModal) visibleModal = options
+        else if (options.fail) options.fail({ errMsg: "showModal:fail unavailable" })
+      }),
+      cloud: { callFunction: (request) => requests.push(request) }
+    }
+    const page = createPage(loadPageDefinition(), { [recordsKey]: [{ id: "record", kind: "hold", version: 2 }] })
+    global.getCurrentPages = () => [page]
+    const event = { currentTarget: { dataset: { id: "record" } } }
+    page[`handleRelease${type}`](event)
+    page[`handleRelease${type}`](event)
+    visibleModal.success({ confirm: true, content: "核对后释放" })
+    expect(requests).toHaveLength(1)
+    expect(requests[0].data).toEqual({ action, id: "record", expectedVersion: 2, reason: "核对后释放" })
+    expect(wx.showModal).toHaveBeenCalledTimes(1)
+    page.onUnload()
+  })
+
+  test("释放确认框同步异常时提供重试反馈，后续点击仍可正常确认", () => {
+    let modal
+    global.wx = {
+      showToast: jest.fn(),
+      showModal: jest.fn().mockImplementationOnce(() => { throw new Error("native unavailable") }).mockImplementation((options) => { modal = options })
+    }
+    const page = createPage(loadPageDefinition(), { allBlocks: [{ id: "block", kind: "hold", version: 2 }] })
+    global.getCurrentPages = () => [page]
+    page.saveCalendarChange = jest.fn()
+    const event = { currentTarget: { dataset: { id: "block" } } }
+    expect(() => page.handleReleaseBlock(event)).not.toThrow()
+    expect(wx.showToast).toHaveBeenCalledWith({ title: "确认框打开失败", icon: "none" })
+    page.handleReleaseBlock(event)
+    modal.success({ confirm: true, content: "再次确认" })
+    expect(page.saveCalendarChange).toHaveBeenCalledTimes(1)
+    page.onUnload()
+  })
+
+  test.each(["cancel", "fail-cancel", "fail", "empty"])("释放确认 %s 后不提交，保留草稿并允许再次打开", (outcome) => {
+    const modals = []
+    global.wx = { showToast: jest.fn(), showModal: (options) => modals.push(options) }
+    const blockForm = { vehicleId: "a", reason: "未提交的调整" }
+    const page = createPage(loadPageDefinition(), { allBlocks: [{ id: "block", kind: "hold", version: 2 }], blockForm })
+    global.getCurrentPages = () => [page]
+    page.saveCalendarChange = jest.fn()
+    page.markCalendarFormDirty("blockForm")
+    const event = { currentTarget: { dataset: { id: "block" } } }
+    page.handleReleaseBlock(event)
+    if (outcome === "cancel") modals[0].success({ cancel: true, confirm: false })
+    else if (outcome === "empty") modals[0].success({ confirm: true, content: "  " })
+    else modals[0].fail({ errMsg: outcome === "fail-cancel" ? "showModal:fail cancel" : "showModal:fail unavailable" })
+    expect(page.saveCalendarChange).not.toHaveBeenCalled()
+    expect(page.data.blockForm).toEqual(blockForm)
+    expect(page._hasUnsavedChanges).toBe(true)
+    if (outcome.includes("cancel")) expect(wx.showToast).not.toHaveBeenCalled()
+    else expect(wx.showToast).toHaveBeenCalledWith({ title: outcome === "empty" ? "请填写操作原因" : "确认框打开失败", icon: "none" })
+    page.handleReleaseBlock(event)
+    expect(modals).toHaveLength(2)
+    modals[1].success({ confirm: true, content: "重新核对" })
+    expect(page.saveCalendarChange).toHaveBeenCalledWith("releaseBlock", { id: "block", expectedVersion: 2, reason: "重新核对" })
+    page.onUnload()
+  })
+
+  test("释放弹窗没有回执时切后台再返回可重开，旧回执不能解开新确认任务", () => {
+    const modals = []
+    global.wx = { showToast: jest.fn(), showModal: (options) => modals.push(options) }
+    const page = createPage(loadPageDefinition(), { allBlocks: [{ id: "block", kind: "hold", version: 2 }] })
+    global.getCurrentPages = () => [page]
+    page.saveCalendarChange = jest.fn()
+    const event = { currentTarget: { dataset: { id: "block" } } }
+    page.handleReleaseBlock(event)
+    page.onHide()
+    global.getCurrentPages = () => [page, {}]
+    page.handleReleaseBlock(event)
+    expect(modals).toHaveLength(1)
+    global.getCurrentPages = () => [page]
+    page.onShow()
+    page.handleReleaseBlock(event)
+    expect(modals).toHaveLength(2)
+    modals[0].success({ confirm: true, content: "离开前的操作" })
+    expect(page.saveCalendarChange).not.toHaveBeenCalled()
+    page.handleReleaseBlock(event)
+    expect(modals).toHaveLength(2)
+    modals[1].success({ confirm: true, content: "返回后确认" })
+    expect(page.saveCalendarChange).toHaveBeenCalledTimes(1)
+    expect(page.saveCalendarChange).toHaveBeenCalledWith("releaseBlock", { id: "block", expectedVersion: 2, reason: "返回后确认" })
+    page.onUnload()
+  })
+
+  test("释放确认卸载后迟到的原生失败不弹提示，也不能重新拉起弹窗", () => {
+    let modal
+    global.wx = { showToast: jest.fn(), showModal: jest.fn((options) => { modal = options }) }
+    const page = createPage(loadPageDefinition(), { allBlocks: [{ id: "block", kind: "hold", version: 2 }] })
+    global.getCurrentPages = () => [page]
+    page.saveCalendarChange = jest.fn()
+    const event = { currentTarget: { dataset: { id: "block" } } }
+    page.handleReleaseBlock(event)
+    page.onUnload()
+    const updates = page.setData.mock.calls.length
+    modal.fail({ errMsg: "showModal:fail unavailable" })
+    page.handleReleaseBlock(event)
+    expect(wx.showToast).not.toHaveBeenCalled()
+    expect(wx.showModal).toHaveBeenCalledTimes(1)
+    expect(page.saveCalendarChange).not.toHaveBeenCalled()
+    expect(page.setData).toHaveBeenCalledTimes(updates)
+  })
+
+  test.each([["Block", "allBlocks", "blockForm"], ["PriceRule", "allPriceRules", "priceForm"]])("释放%s与另一条编辑交错时保留新草稿，已结算确认不能再次提交", (type, recordsKey, formKey) => {
+    const requests = []
+    let modal
+    global.wx = { showToast: jest.fn(), showModal: (options) => { modal = options }, cloud: { callFunction: (request) => requests.push(request) } }
+    const records = ["release_record", "edit_record"].map((id) => ({ id, vehicleId: "a", kind: "hold", label: "假期价格", dailyPrice: 800, startDate: "2026-10-01", endDate: "2026-10-02", version: 3 }))
+    const page = createPage(loadPageDefinition(), { vehicles: [{ id: "a" }], [recordsKey]: records })
+    global.getCurrentPages = () => [page]
+    page.fetchBookings = jest.fn()
+    page[`handleRelease${type}`]({ currentTarget: { dataset: { id: "release_record" } } })
+    page[`handleEdit${type}`]({ currentTarget: { dataset: { id: "edit_record" } } })
+    page.handleCalendarFormInput({ currentTarget: { dataset: { form: formKey, field: "reason" } }, detail: { value: "另一条尚未保存的调整" } })
+    const draft = { ...page.data[formKey] }
+    modal.success({ confirm: true, content: "明确释放原记录" })
+    expect(requests).toHaveLength(1)
+    expect(requests[0].data).toMatchObject({ id: "release_record", expectedVersion: 3 })
+    requests[0].success({ result: { ok: true } })
+    expect(page.data[formKey]).toEqual(draft)
+    expect(page._hasUnsavedChanges).toBe(true)
+    expect(page.fetchBookings).toHaveBeenCalledTimes(1)
+    modal.success({ confirm: true, content: "明确释放原记录" })
+    expect(requests).toHaveLength(1)
+    page.onUnload()
+  })
+
   test("释放弹窗提交的是打开时的版本，后台列表刷新不能暗中扩大释放范围", () => {
     let modal
     global.wx = { showModal: (options) => { modal = options } }

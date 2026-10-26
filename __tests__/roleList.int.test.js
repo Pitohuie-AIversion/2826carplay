@@ -162,4 +162,47 @@ describe("cloudfunctions/roleList integration", () => {
     expect(mocks.rolesSkip).toHaveBeenCalledWith(100)
     expect(mocks.rolesSkip).toHaveBeenCalledWith(200)
   })
+
+  test.each([
+    [2000, 99, 20, false, false],
+    [2001, 0, 20, true, true],
+    [2001, 99, 20, true, false],
+    [2001, 100, 0, true, false]
+  ])("%i 条角色的第 %i 页明确标记截断且不引导空页", async (recordCount, page, expectedLength, truncated, hasMore) => {
+    const rolesData = [
+      { _id: "admin", openid: "admin_openid", role: "admin" },
+      ...Array.from({ length: recordCount - 1 }, (_, index) => ({
+        _id: `r${index}`,
+        openid: `user_${String(index).padStart(4, "0")}`,
+        permissions: ["vehicle_manage"],
+        createdByOpenid: "private_creator",
+        updatedByOpenid: "private_editor"
+      }))
+    ]
+    const mocks = createMockDb({ rolesData })
+    const mod = await loadRoleListWith({ openid: "admin_openid", mockDb: mocks.db })
+
+    const res = await mod.main({ page, pageSize: 20 })
+
+    expect(res).toMatchObject({ ok: true, page, pageSize: 20, truncated, hasMore })
+    expect(res.list).toHaveLength(expectedLength)
+    expect(res.list).toEqual(rolesData.slice(0, 2000).slice(page * 20, (page + 1) * 20).map((item) => ({
+      id: item._id,
+      openid: item.openid,
+      isAdmin: item.role === "admin",
+      permissions: item.role === "admin" ? ["admin", "vehicle_manage", "booking_manage"] : ["vehicle_manage"],
+      createdAt: "",
+      updatedAt: ""
+    })))
+    expect(mocks.rolesSkip.mock.calls.map(([offset]) => offset)).toEqual(Array.from({ length: 21 }, (_, index) => index * 100))
+    expect(mocks.rolesSkip.mock.results.map(({ value }) => value.limit.mock.calls[0][0])).toEqual([
+      ...Array(20).fill(100), 1
+    ])
+    expect(mocks.authField.mock.calls[0][0]).not.toHaveProperty("openid")
+    for (const [fields] of mocks.listField.mock.calls) {
+      expect(fields).toMatchObject({ _id: true, openid: true, role: true, roles: true, permissions: true, isAdmin: true, admin: true })
+      expect(fields).not.toHaveProperty("createdByOpenid")
+      expect(fields).not.toHaveProperty("updatedByOpenid")
+    }
+  })
 })

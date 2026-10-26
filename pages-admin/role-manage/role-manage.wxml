@@ -68,6 +68,12 @@
       <view class="section-index">02</view>
     </view>
     <view class="section-desc">优先显示管理员，其余按 OpenID 排序。</view>
+    <view wx:if="{{listTruncated}}" class="role-list-error">仅显示部分成员，仍可输入目标用户 OpenID 管理权限。</view>
+    <view wx:if="{{listError}}" class="role-list-error" aria-role="alert">
+      <view>{{listError}}</view>
+      <view wx:if="{{list.length}}" class="role-list-error-note">当前显示上次读取结果，请重试确认最新权限。</view>
+      <button class="ui-btn ui-btn-ghost role-retry-btn" disabled="{{loading || saving}}" bindtap="handleRetryRoleList" aria-label="重试加载角色列表">重试加载</button>
+    </view>
   <view wx:if="{{(initialLoading || loading) && !list.length}}" class="role-skeleton" aria-hidden="true">
       <view class="role-skeleton-item">
         <view class="role-skeleton-avatar manage-skeleton-pulse"></view>
@@ -112,7 +118,7 @@
         <view wx:else class="admin-tag">全权访问</view>
       </view>
       <button
-        wx:if="{{hasMore}}"
+        wx:if="{{hasMore && !listError}}"
         class="load-more-btn ui-btn ui-btn-ghost"
         loading="{{loading}}"
         disabled="{{loading || saving}}"
@@ -120,9 +126,9 @@
       >
         <view class="role-action-content"><view wx:if="{{!loading}}" class="role-action-native-icon role-more-native-icon" aria-hidden="true"></view><text>{{loading ? '正在加载' : '加载更多'}}</text></view>
       </button>
-      <view wx:else class="role-list-end"><view class="role-complete-native-icon" aria-hidden="true"></view><text>已加载全部成员</text></view>
+      <view wx:elif="{{!listError && !loading}}" class="role-list-end"><view class="role-complete-native-icon" aria-hidden="true"></view><text>{{listTruncated ? '已显示本次查询结果' : '已加载全部成员'}}</text></view>
     </view>
-    <view wx:else class="empty-wrap">
+    <view wx:elif="{{!listError}}" class="empty-wrap">
       <image class="role-empty-emblem" src="/assets/icons/jijing-garage-emblem.png" mode="aspectFill" aria-hidden="true" />
       <view class="role-empty-kicker">NO ACCESS RECORDS</view>
       <view class="empty-title">{{emptyTitle}}</view>

@@ -248,6 +248,7 @@ Page({
   },
   onShow() {
     applyPageCsvFileRemoval(this)
+    this.applyPendingSubscriptionCompletion()
     const mutationFeedback = this._pendingDetailMutationFeedback
     if (mutationFeedback && this.isBookingDetailActive() && isPageCurrent(this)) {
       this._pendingDetailMutationFeedback = null
@@ -339,6 +340,7 @@ Page({
     this._saveRequestSerial = Number(this._saveRequestSerial || 0) + 1
     this._cancelRequestSerial = Number(this._cancelRequestSerial || 0) + 1
     this._subscriptionRequestId = Number(this._subscriptionRequestId || 0) + 1
+    this._pendingSubscriptionCompletion = null
     this._quoteResponseRequestId = Number(this._quoteResponseRequestId || 0) + 1
     this._quoteResponseConflictPending = ""
     this._pendingDetailMutationFeedback = null
@@ -484,6 +486,7 @@ Page({
     }
   },
   handleRequestStatusSubscription() {
+    if (!this.isBookingDetailActive() || !isPageCurrent(this)) return
     const templateId = String(this.data.bookingStatusTemplateId || "").trim()
     if (
       this.data.loading ||
@@ -506,7 +509,10 @@ Page({
       return
     }
     const requestId = Number(this._subscriptionRequestId || 0) + 1
+    const bookingId = this.data.id
+    const nativeAction = beginPageNativeAction(this, { requireCurrent: true })
     this._subscriptionRequestId = requestId
+    this._pendingSubscriptionCompletion = null
     this.clearSubscriptionRequestTimer()
     this.applyState({ subscriptionRequesting: true })
     let settled = false
@@ -516,10 +522,8 @@ Page({
       }
       settled = true
       this.clearSubscriptionRequestTimer()
-      this.applyState({ subscriptionRequesting: false })
-      if (typeof callback === "function") {
-        callback()
-      }
+      this._pendingSubscriptionCompletion = { requestId, bookingId, templateId, nativeAction, callback }
+      this.applyPendingSubscriptionCompletion()
       return true
     }
     this._subscriptionRequestTimer = setTimeout(() => {
@@ -565,6 +569,22 @@ Page({
           icon: "none"
         })
       })
+    }
+  },
+  applyPendingSubscriptionCompletion() {
+    const completion = this._pendingSubscriptionCompletion
+    if (!completion) return
+    if (completion.requestId !== this._subscriptionRequestId) {
+      this._pendingSubscriptionCompletion = null
+      return
+    }
+    if (!isPageNativeActionActive(this, completion.nativeAction)) return
+    this._pendingSubscriptionCompletion = null
+    this.applyState({ subscriptionRequesting: false })
+    if (completion.bookingId === this.data.id &&
+      completion.templateId === String(this.data.bookingStatusTemplateId || "").trim() &&
+      typeof completion.callback === "function") {
+      completion.callback()
     }
   },
   loadDetail(options) {

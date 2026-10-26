@@ -107,6 +107,26 @@ describe.each(EXPORT_PAGES)("%s CSV export lifecycle", (label, modulePath, busyF
     expect(files.has("/data/previous.csv")).toBe(false)
   })
 
+  test("duplicate cloud replies publish one file and discard the other pending save", async () => {
+    page.handleExport()
+    respond(0, "same exported content")
+    respond(0, "same exported content")
+    expect(writes).toHaveLength(2)
+    await finishWrite(1)
+    const publishedPath = page.data.exportFilePath
+    wx.showToast.mockClear()
+    await finishWrite(0)
+    writes[1].success()
+    writes[1].fail(new Error("duplicate native failure"))
+    await flushPromises()
+    expect(page.data.exportFilePath).toBe(publishedPath)
+    expect(files.get(publishedPath)).toBe("same exported content")
+    expect(files.has(writes[0].filePath)).toBe(false)
+    expect(files.size).toBe(1)
+    expect(wx.showToast).not.toHaveBeenCalled()
+    expect(page.data[busyField]).toBe(false)
+  })
+
   test("background export failure stays silent and unlocks retry on return", () => {
     page.handleExport()
     currentPages = [page, {}]

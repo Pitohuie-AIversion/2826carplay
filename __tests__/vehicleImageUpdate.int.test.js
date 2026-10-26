@@ -368,7 +368,8 @@ describe("cloudfunctions/vehicleImageUpdate integration", () => {
       message: "已提交未入库图片核验清理"
     })
     expect(cloud.deleteFile).not.toHaveBeenCalled()
-    expect(mocks.vehiclesDoc).not.toHaveBeenCalled()
+    expect(mocks.vehiclesDoc).toHaveBeenCalledWith("car_1")
+    expect(mocks.update).not.toHaveBeenCalled()
     expect(mocks.queueDoc).toHaveBeenCalledWith(
       expect.stringMatching(/^pending_image_cleanup_[a-f0-9]{32}$/)
     )
@@ -381,6 +382,7 @@ describe("cloudfunctions/vehicleImageUpdate integration", () => {
         },
         source: "vehicleImageUploadCleanup",
         deletionState: "pending",
+        uploadAbandoned: true,
         notBeforeAt: expect.any(Date),
         createdAt: mocks.serverDateValue
       }

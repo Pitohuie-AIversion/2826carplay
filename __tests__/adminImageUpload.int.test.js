@@ -17,6 +17,7 @@ async function setup({ roles = [{ role: "admin" }], vehicles = { car_1: { status
   let currentRoles = roles
   let tail = Promise.resolve()
   const collection = (name) => ({
+    add: jest.fn(async ({ data }) => { const id = `auto_${records.size}`; records.set(`${name}/${id}`, structuredClone(data)); return { _id: id } }),
     doc: (id) => {
       const key = `${name}/${id}`
       const ref = {
@@ -329,6 +330,78 @@ describe("adminImageUpload server authorization and lifecycle", () => {
     expect(queue.notBeforeAt.getTime()).toBe(NOW + 17 * 60 * 1000)
     expect(JSON.stringify(result)).not.toMatch(/secret-|token|authorization/)
     expect([...ctx.records.values()].filter((row) => row.recordType === "chunk")).toHaveLength(0)
+  })
+
+  test("车辆图片关联失败后显式 cleanupUpload 释放未关联成品名额供立即重试", async () => {
+    const ctx = await setup({ vehicles: { car_1: { status: "idle", imageList: Array.from({ length: 8 }, (_, i) => `cloud://old-${i}`) } } })
+    const uploadId = await prepare(ctx)
+    const completed = await ctx.main({ action: "complete", uploadId })
+    expect(completed.ok).toBe(true)
+    expect(await ctx.main(input({ requestId: "retry_after_attach_failure" }))).toMatchObject({ code: "UPLOAD_LIMIT" })
+    const updateImages = require("../cloudfunctions/vehicleImageUpdate").main
+    expect(await updateImages({ id: "car_1", action: "cleanupUpload", fileIds: [completed.fileID] })).toMatchObject({ ok: true })
+    expect(await ctx.main(input())).toMatchObject({ code: "UPLOAD_EXPIRED" })
+    expect(await ctx.main({ action: "complete", uploadId })).toMatchObject({ code: "UPLOAD_EXPIRED" })
+    expect(await ctx.main(input({ requestId: "retry_after_attach_failure" }))).toMatchObject({ ok: true })
+  })
+
+  test("车辆图片关联后移除，begin 和 complete 不再幂等返回已删除的成品", async () => {
+    const ctx = await setup()
+    const uploadId = await prepare(ctx)
+    const completed = await ctx.main({ action: "complete", uploadId })
+    const updateImages = require("../cloudfunctions/vehicleImageUpdate").main
+    ctx.cloud.deleteFile = jest.fn(async ({ fileList }) => ({ fileList: fileList.map((fileID) => { ctx.files.delete(fileID); return { fileID, status: 0 } }) }))
+    expect(await updateImages({ id: "car_1", action: "add", fileIds: [completed.fileID] })).toMatchObject({ ok: true })
+    expect(await updateImages({ id: "car_1", action: "remove", fileId: completed.fileID })).toMatchObject({ ok: true })
+    expect(ctx.files.has(completed.fileID)).toBe(false)
+    expect(await ctx.main(input())).toMatchObject({ ok: false, code: "UPLOAD_EXPIRED" })
+    expect(await ctx.main({ action: "complete", uploadId })).toMatchObject({ ok: false, code: "UPLOAD_EXPIRED" })
+    expect(ctx.cloud.uploadFile).toHaveBeenCalledTimes(1)
+  })
+
+  test.each([false, true])("显式清理与关联先后交错仍保留已引用成品的合法幂等返回（先清理=%s）", async (cleanupFirst) => {
+    const ctx = await setup()
+    const uploadId = await prepare(ctx)
+    const completed = await ctx.main({ action: "complete", uploadId })
+    const updateImages = require("../cloudfunctions/vehicleImageUpdate").main
+    if (cleanupFirst) expect(await updateImages({ id: "car_1", action: "cleanupUpload", fileIds: [completed.fileID] })).toMatchObject({ ok: true })
+    expect(await updateImages({ id: "car_1", action: "add", fileIds: [completed.fileID] })).toMatchObject({ ok: true })
+    expect(await updateImages({ id: "car_1", action: "cleanupUpload", fileIds: [completed.fileID] })).toMatchObject({ ok: true })
+    const guard = [...ctx.records.values()].find((row) => row.fileList && row.fileList.includes(completed.fileID))
+    expect(Boolean(guard.uploadAbandoned)).toBe(cleanupFirst)
+    expect(await ctx.main(input())).toMatchObject({ ok: true, fileID: completed.fileID })
+    expect(await ctx.main({ action: "complete", uploadId })).toMatchObject({ ok: true, fileID: completed.fileID, duplicated: true })
+    expect(ctx.cloud.uploadFile).toHaveBeenCalledTimes(1)
+    expect(ctx.files.has(completed.fileID)).toBe(true)
+  })
+
+  test("完成后的临时分块删除失败不重复写成品，后续自动清理可恢复", async () => {
+    const ctx = await setup()
+    const uploadId = await prepare(ctx)
+    let failed = false
+    ctx.hooks.beforeRemove = async (key) => {
+      if (key === `admin_upload_sessions/${uploadId}_0` && !failed) { failed = true; throw new Error("temporary chunk deletion failure") }
+    }
+    const completed = await ctx.main({ action: "complete", uploadId })
+    expect(completed.ok).toBe(true)
+    expect(ctx.records.has(`admin_upload_sessions/${uploadId}_0`)).toBe(true)
+    expect(await ctx.main({ action: "complete", uploadId })).toMatchObject({ ok: true, fileID: completed.fileID, duplicated: true })
+    expect(ctx.cloud.uploadFile).toHaveBeenCalledTimes(1)
+    jest.setSystemTime(NOW + 18 * 60 * 1000)
+    expect(await ctx.main(input({ requestId: "retry_cleanup_after_complete" }))).toMatchObject({ ok: true })
+    expect(ctx.records.has(`admin_upload_sessions/${uploadId}_0`)).toBe(false)
+    expect(ctx.files.has(completed.fileID)).toBe(true)
+  })
+
+  test("删除标记读取失败时不能释放未关联成品名额或返回成功文件", async () => {
+    const ctx = await setup({ vehicles: { car_1: { status: "idle", imageList: Array.from({ length: 8 }, (_, i) => `cloud://old-${i}`) } } })
+    const uploadId = await prepare(ctx)
+    expect(await ctx.main({ action: "complete", uploadId })).toMatchObject({ ok: true })
+    ctx.hooks.afterRead = async (key) => { if (key.startsWith("pending_file_deletions/")) throw new Error("guard read unavailable") }
+    expect(await ctx.main(input({ requestId: "retry_guard_read_failure" }))).toMatchObject({ code: "INTERNAL_ERROR" })
+    expect(await ctx.main({ action: "complete", uploadId })).toMatchObject({ code: "INTERNAL_ERROR" })
+    expect([...ctx.records.values()].filter((record) => record.recordType === "session")).toHaveLength(1)
+    expect(ctx.cloud.uploadFile).toHaveBeenCalledTimes(1)
   })
 
   test("上传成功但回执丢失，重试校验已有文件而非重复上传", async () => {

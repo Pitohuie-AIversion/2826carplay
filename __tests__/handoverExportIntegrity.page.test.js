@@ -106,7 +106,9 @@ describe("交接留证导出的文件与内容完整性", () => {
       expect(page.data.exportedHandoverPath).toBe(publishedPath)
       expect(files.get(publishedPath)).toBe(writes[1].data)
       expect(files.has(writes[0].filePath)).toBe(false)
-      expect(fileSystem.unlink).toHaveBeenCalledTimes(1)
+      // 超时先回收部分文件，旧写入迟到后再清理它重新写出的文件。
+      expect(fileSystem.unlink).toHaveBeenCalledTimes(2)
+      expect(fileSystem.unlink.mock.calls.every(([request]) => request.filePath === writes[0].filePath)).toBe(true)
       expect(fileSystem.unlink).toHaveBeenCalledWith(expect.objectContaining({ filePath: writes[0].filePath }))
       expect(wx.showToast).not.toHaveBeenCalled()
       expect(page.data.exportingHandover).toBe(false)

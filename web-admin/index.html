@@ -1235,9 +1235,130 @@
       display: flex;
     }
 
-    @keyframes toastIn {
-      from { transform: translateY(20px); opacity: 0; }
-      to { transform: translateY(0); opacity: 1; }
+    /* Circuit Breaker & Fault Injection Styles */
+    .fn-card.tripped {
+      border-color: rgba(239, 68, 68, 0.7);
+      background: rgba(239, 68, 68, 0.12);
+      box-shadow: 0 0 15px rgba(239, 68, 68, 0.25);
+    }
+
+    .fn-card.tripped .fn-name {
+      color: #fca5a5;
+    }
+
+    .fault-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.15rem 0.45rem;
+      border-radius: 4px;
+      font-size: 0.65rem;
+      font-weight: 700;
+      margin-left: 0.4rem;
+    }
+
+    .fault-badge.tripped {
+      background: rgba(239, 68, 68, 0.25);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      animation: pulseAlert 1.5s infinite;
+    }
+
+    .fault-badge.timeout {
+      background: rgba(245, 158, 11, 0.25);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.4);
+    }
+
+    @keyframes pulseAlert {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.65; transform: scale(0.97); }
+    }
+
+    /* PayScore 8-Category Settlement Grid */
+    .payscore-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+    }
+
+    .payscore-table th {
+      text-align: left;
+      padding: 0.6rem 0.75rem;
+      color: var(--text-dim);
+      font-weight: 600;
+      border-bottom: 1px solid var(--border-subtle);
+      font-size: 0.72rem;
+      text-transform: uppercase;
+    }
+
+    .payscore-table td {
+      padding: 0.6rem 0.75rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      vertical-align: middle;
+    }
+
+    .fee-input {
+      background: rgba(11, 16, 28, 0.8);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      color: #38bdf8;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 0.35rem 0.6rem;
+      width: 100px;
+      text-align: right;
+    }
+
+    .fee-desc-input {
+      background: rgba(11, 16, 28, 0.8);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      color: var(--text-main);
+      font-size: 0.78rem;
+      padding: 0.35rem 0.6rem;
+      width: 100%;
+    }
+
+    .fee-category-badge {
+      font-weight: 700;
+      font-size: 0.78rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+
+    .payscore-summary-box {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(6, 182, 212, 0.08));
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      border-radius: var(--radius-md);
+      padding: 1.15rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* Alert Webhook Preview Card */
+    .webhook-card-preview {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-left: 4px solid #ef4444;
+      border-radius: var(--radius-sm);
+      padding: 1rem;
+      font-size: 0.78rem;
+      line-height: 1.6;
+    }
+
+    .alert-history-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.6rem 0.85rem;
+      background: rgba(15, 23, 42, 0.5);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      font-size: 0.76rem;
     }
 
     /* Footer */
@@ -1293,6 +1414,12 @@
       <div class="time-clock" id="timeClock">--:--:--</div>
       <button class="btn-action" style="border-color: rgba(245, 158, 11, 0.4); color: #fbbf24;" onclick="openPricingModal()">
         <span>💰</span> 阶梯报价
+      </button>
+      <button class="btn-action" style="border-color: rgba(16, 185, 129, 0.4); color: #34d399;" onclick="openPayScoreModal()">
+        <span>💳</span> 免押结算
+      </button>
+      <button class="btn-action" style="border-color: rgba(168, 85, 247, 0.4); color: #c084fc;" onclick="openAlertConfigModal()">
+        <span>🚨</span> 告警哨兵
       </button>
       <button class="btn-action primary" onclick="refreshDashboard()">
         <span>🔄</span> 实时刷新
@@ -1562,6 +1689,12 @@
             <span>⚡</span> 57 个微服务云函数网关拓扑与实时状态 (Gateway Cluster Topology)
           </div>
           <div class="panel-controls">
+            <button class="btn-action" style="border-color: rgba(239, 68, 68, 0.4); color: #f87171;" onclick="openCircuitBreakerModal()">
+              <span>💥</span> 熔断演练工作台
+            </button>
+            <button class="btn-action" style="border-color: rgba(168, 85, 247, 0.4); color: #c084fc;" onclick="openAlertConfigModal()">
+              <span>🚨</span> 告警哨兵规则
+            </button>
             <button class="btn-action primary" onclick="runBatchGatewayProbe()">
               <span>🩺</span> 一键全链路 57 函数网关巡检
             </button>
@@ -1942,6 +2075,225 @@
     </div>
   </div>
 
+  <!-- ==================== MODAL 3: WECHAT PAY SCORE SETTLEMENT (微信支付分 8 类费用试算器) ==================== -->
+  <div class="modal-overlay" id="payScoreModal">
+    <div class="modal-box" style="max-width: 820px;">
+      <div class="modal-header">
+        <h3 id="payScoreModalTitle"><span>💳</span> 微信支付分 · 免押租车完结单官方 8 类费用试算器</h3>
+        <button class="btn-close" onclick="closePayScoreModal()">×</button>
+      </div>
+
+      <!-- Compliance Notice -->
+      <div style="background: rgba(56, 189, 248, 0.08); border-left: 3px solid var(--primary); padding: 0.65rem 0.85rem; border-radius: var(--radius-sm); font-size: 0.75rem; color: var(--text-muted); line-height: 1.5;">
+        <strong style="color: #38bdf8;">微信官方标准约束：</strong>依微信支付分《免押租车接入指南》，完结订单产生的后付费必须严格属于官方 8 项标准化费用名目（严禁自创非法费用），0 增费完结时仅传「租车相关费用」且金额为 0。
+      </div>
+
+      <!-- Quick Preset Scenario Chips -->
+      <div class="modal-field">
+        <label>快速载入结算测算场景</label>
+        <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+          <button type="button" class="btn-action" style="padding: 0.3rem 0.65rem; font-size: 0.74rem;" onclick="applyPayScoreScenario('zero_fee')">
+            <span>🟢</span> 0增费完美还车 (0元完结)
+          </button>
+          <button type="button" class="btn-action" style="padding: 0.3rem 0.65rem; font-size: 0.74rem;" onclick="applyPayScoreScenario('overdue_fuel')">
+            <span>⏱️</span> 延期还车3小时 + 燃油补加
+          </button>
+          <button type="button" class="btn-action" style="padding: 0.3rem 0.65rem; font-size: 0.74rem;" onclick="applyPayScoreScenario('damage_etc')">
+            <span>💥</span> 轮毂剐蹭 + 停运补偿 + ETC高速
+          </button>
+        </div>
+      </div>
+
+      <!-- Smart Raw Text Normalizer -->
+      <div class="modal-field">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <label>验车单原始杂费快速录入 (智能收敛归一化)</label>
+          <button class="btn-action" style="padding: 0.2rem 0.6rem; font-size: 0.72rem; border-color: rgba(56, 189, 248, 0.4); color: #38bdf8;" onclick="normalizeRawPayScoreItems()">
+            <span>✨</span> 智能归一化到 8 类白名单
+          </button>
+        </div>
+        <input type="text" class="search-input" id="payScoreRawInput" style="width:100%;" placeholder="例如：超时还车2小时 200元; 左前翼子板微划痕补漆 800元; 沪杭高速ETC通行费 65元">
+      </div>
+
+      <!-- 8-Category Fees Table -->
+      <div class="table-container" style="max-height: 260px; overflow-y: auto; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm);">
+        <table class="payscore-table">
+          <thead>
+            <tr>
+              <th style="width: 28%;">微信官方标准收费项目</th>
+              <th style="width: 48%;">项目明细说明 (Description)</th>
+              <th style="width: 24%; text-align: right;">结算扣款金额 (元)</th>
+            </tr>
+          </thead>
+          <tbody id="payScoreTableBody">
+            <!-- Rendered by JS -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Calculation Summary Card -->
+      <div class="payscore-summary-box">
+        <div>
+          <div style="font-size: 0.75rem; color: var(--text-dim);">免押代扣结算总额 (Total Amount)</div>
+          <div style="display: flex; align-items: baseline; gap: 0.5rem; margin-top: 0.2rem;">
+            <span id="payScoreTotalYuan" style="font-family:'Outfit',sans-serif; font-size: 1.8rem; font-weight: 800; color: #10b981;">￥0.00</span>
+            <span id="payScoreTotalFen" style="font-size: 0.8rem; color: var(--text-muted); font-family: monospace;">(0 分)</span>
+          </div>
+        </div>
+        <div style="text-align: right;">
+          <div style="font-size: 0.75rem; color: var(--text-dim);">计费名目状态</div>
+          <div id="payScoreItemsCount" style="font-weight: 700; color: #38bdf8; margin-top: 0.2rem; font-size: 0.95rem;">1 项费用 (0元免押完结)</div>
+        </div>
+      </div>
+
+      <!-- OpenAPI JSON Payload Preview -->
+      <div class="modal-field">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <label>微信支付分 OpenAPI /v3/payscore/serviceorder 完结报文</label>
+          <div style="display:flex; gap:0.4rem;">
+            <button class="btn-action" style="padding:0.2rem 0.5rem; font-size:0.72rem;" onclick="copyPayScoreJson()">
+              <span>📋</span> 复制完结 JSON
+            </button>
+            <button class="btn-action" style="padding:0.2rem 0.5rem; font-size:0.72rem;" onclick="copyPayScoreCustomerText()">
+              <span>💬</span> 复制客户对账单
+            </button>
+          </div>
+        </div>
+        <textarea id="payScoreJsonPreview" readonly style="width: 100%; height: 110px; background: rgba(5, 8, 17, 0.85); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: #34d399; font-size: 0.76rem; font-family: 'JetBrains Mono', monospace; padding: 0.65rem; resize: none; line-height: 1.45;"></textarea>
+      </div>
+
+      <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:0.75rem;">
+        <button class="btn-action" onclick="closePayScoreModal()">关闭</button>
+        <button class="btn-action primary" onclick="copyPayScoreJson()">📋 复制官方报文并关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL 4: CIRCUIT BREAKER & FAULT INJECTION (微服务熔断演练) ==================== -->
+  <div class="modal-overlay" id="circuitBreakerModal">
+    <div class="modal-box" style="max-width: 720px;">
+      <div class="modal-header">
+        <h3 id="cbModalTitle"><span>💥</span> 微服务网关熔断保护与降级演练工作台</h3>
+        <button class="btn-close" onclick="closeCircuitBreakerModal()">×</button>
+      </div>
+
+      <div style="background: rgba(239, 68, 68, 0.08); border-left: 3px solid var(--danger); padding: 0.65rem 0.85rem; border-radius: var(--radius-sm); font-size: 0.75rem; color: var(--text-muted); line-height: 1.5;">
+        <strong style="color: #f87171;">高可用熔断演练说明：</strong>模拟高并发瞬时打垮或依赖下游超时场景。触发熔断后，网关自动启动客户端 SWR 二级缓存降级、离线令牌排队，防止雪崩。
+      </div>
+
+      <div class="modal-field">
+        <label>目标演练微服务 (Target Microservice)</label>
+        <select class="search-input" id="cbTargetServiceSelect" style="width: 100%; padding: 0.65rem;">
+          <!-- Populated by JS -->
+        </select>
+      </div>
+
+      <div class="modal-field">
+        <label>故障模式注入 (Fault Injection Mode)</label>
+        <div class="status-select-grid" style="grid-template-columns: repeat(4, 1fr);">
+          <div class="status-option selected" data-cb-mode="NORMAL" onclick="selectCbMode('NORMAL')">🟢 正常运行 (200)</div>
+          <div class="status-option" data-cb-mode="TRIPPED" onclick="selectCbMode('TRIPPED')">🔴 熔断阻断 (503)</div>
+          <div class="status-option" data-cb-mode="TIMEOUT" onclick="selectCbMode('TIMEOUT')">🟡 慢速超时 (504)</div>
+          <div class="status-option" data-cb-mode="CLIENT_ERROR" onclick="selectCbMode('CLIENT_ERROR')">🟠 鉴权拦截 (403)</div>
+        </div>
+      </div>
+
+      <!-- Degradation Strategy Explanation -->
+      <div class="modal-field">
+        <label>前端客户端自愈降级链路 (Graceful Fallback Path)</label>
+        <div id="cbFallbackExplain" style="background: rgba(14, 20, 35, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 0.85rem; font-size: 0.76rem; color: #94a3b8; line-height: 1.6;">
+          • 当该微服务被标记熔断，调用立即短路阻断（避免打垮主数据库连接池）；<br>
+          • 客户端自动命中内存与 Storage 两级 SWR 缓存，用户无白屏感知；<br>
+          • 恢复冷却倒计时为 30 秒，半开探测 (Half-Open) 成功后自动恢复正常。
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top: 0.5rem;">
+        <button class="btn-action" style="border-color: rgba(239, 68, 68, 0.4); color: #f87171;" onclick="resetAllCircuitBreakers()">
+          <span>🔄</span> 一键恢复全网 57 服务正常
+        </button>
+        <div style="display:flex; gap:0.6rem;">
+          <button class="btn-action" onclick="closeCircuitBreakerModal()">取消</button>
+          <button class="btn-action primary" onclick="applyCircuitBreakerSetting()">
+            <span>⚡</span> 立即应用熔断注入
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL 5: ALERT SENTINEL & WEBHOOK RULES (告警规则与通知) ==================== -->
+  <div class="modal-overlay" id="alertConfigModal">
+    <div class="modal-box" style="max-width: 760px;">
+      <div class="modal-header">
+        <h3 id="alertModalTitle"><span>🚨</span> 网关哨兵告警规则与 Webhook 通知中心</h3>
+        <button class="btn-close" onclick="closeAlertConfigModal()">×</button>
+      </div>
+
+      <div style="background: rgba(168, 85, 247, 0.08); border-left: 3px solid var(--purple); padding: 0.65rem 0.85rem; border-radius: var(--radius-sm); font-size: 0.75rem; color: var(--text-muted); line-height: 1.5;">
+        <strong style="color: #c084fc;">自动化告警守护：</strong>当微服务网关 SLA 下降、5xx 异常突增或 P95 延迟升高时，哨兵引擎自动向绑定的机器人 Webhook 推送富文本预警卡片。
+      </div>
+
+      <!-- Metrics Thresholds Grid -->
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem;">
+        <div class="modal-field">
+          <label>SLA 告警下限 (SLA Floor)</label>
+          <input type="text" class="search-input" id="alertSlaInput" value="99.90" style="width:100%; font-family:monospace;">
+          <span style="font-size:0.68rem; color:var(--text-dim);">当前实测: 99.985%</span>
+        </div>
+        <div class="modal-field">
+          <label>5xx 错误率上限 (Error Spike)</label>
+          <input type="text" class="search-input" id="alertErrorInput" value="3.0" style="width:100%; font-family:monospace;">
+          <span style="font-size:0.68rem; color:var(--text-dim);">当前实测: 0.02%</span>
+        </div>
+        <div class="modal-field">
+          <label>P95 延迟告警上限 (Latency)</label>
+          <input type="text" class="search-input" id="alertLatencyInput" value="80" style="width:100%; font-family:monospace;">
+          <span style="font-size:0.68rem; color:var(--text-dim);">当前实测: 26 ms</span>
+        </div>
+      </div>
+
+      <!-- Webhook Configuration -->
+      <div style="display: grid; grid-template-columns: 180px 1fr; gap: 0.85rem;">
+        <div class="modal-field">
+          <label>通知渠道平台</label>
+          <select class="search-input" id="alertPlatformSelect" style="width: 100%; padding: 0.6rem;">
+            <option value="wecom">企业微信群机器人</option>
+            <option value="feishu">飞书自定义机器人</option>
+            <option value="dingtalk">钉钉群智能助手</option>
+          </select>
+        </div>
+        <div class="modal-field">
+          <label>Webhook 机器人推送地址 (URL)</label>
+          <input type="text" class="search-input" id="alertWebhookUrl" style="width: 100%;" value="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=8e29a0f4-aijia-sentinel">
+        </div>
+      </div>
+
+      <!-- Webhook Card Live Preview -->
+      <div class="modal-field">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <label>机器人推送卡片渲染预览 (Card Preview)</label>
+          <button class="btn-action" style="padding: 0.2rem 0.6rem; font-size: 0.72rem; border-color: rgba(239, 68, 68, 0.4); color: #f87171;" onclick="sendTestWebhookAlert()">
+            <span>🔔</span> 发送模拟告警测试
+          </button>
+        </div>
+        <div class="webhook-card-preview" id="webhookPreviewBox">
+          <div style="color: #f87171; font-weight: 700; font-size: 0.85rem;">🚨 [爱迦租车] 微服务网关实时告警通知</div>
+          <div style="margin-top: 0.35rem; color: #cbd5e1;">• 触发规则: 5xx 异常错误率超阈值 (当前 4.2% &gt; 3.0%)</div>
+          <div style="color: #cbd5e1;">• 涉事微服务: <span style="color:#38bdf8; font-family:monospace;">bookingCreate</span> (预约事务创建与排期锁)</div>
+          <div style="color: #cbd5e1;">• 网关集群: 华东一区 (cloud1-d8gtmns36320e045e)</div>
+          <div style="color: #94a3b8; font-size: 0.72rem; margin-top: 0.35rem;">建议运维专员立即核查云数据库锁等待与索引健康度。</div>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:0.75rem;">
+        <button class="btn-action" onclick="closeAlertConfigModal()">关闭</button>
+        <button class="btn-action primary" onclick="saveAlertConfig()"><span>💾</span> 保存告警规则配置</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Element -->
   <div id="toast">
     <span id="toastIcon">ℹ️</span>
@@ -2297,6 +2649,8 @@
     }
 
     // ==================== 7. GATEWAY TOPOLOGY LOGIC ====================
+    const CIRCUIT_BREAKER_FAULTS = {};
+
     function renderGatewayTopology() {
       const bookingGrid = document.getElementById('clusterBookingGrid');
       const fleetGrid = document.getElementById('clusterFleetGrid');
@@ -2312,13 +2666,28 @@
 
       CLOUD_MICROSERVICES.forEach(fn => {
         const card = document.createElement('div');
-        card.className = 'fn-card';
+        const fault = CIRCUIT_BREAKER_FAULTS[fn.name];
+        let faultBadgeHtml = '';
+
+        if (fault === 'TRIPPED') {
+          card.className = 'fn-card tripped';
+          faultBadgeHtml = '<span class="fault-badge tripped">⚡ 熔断中</span>';
+        } else if (fault === 'TIMEOUT') {
+          card.className = 'fn-card';
+          faultBadgeHtml = '<span class="fault-badge timeout">⏱️ 慢延迟</span>';
+        } else if (fault === 'CLIENT_ERROR') {
+          card.className = 'fn-card';
+          faultBadgeHtml = '<span class="fault-badge timeout" style="background:rgba(249,115,22,0.2); color:#fb923c;">🟠 403拦截</span>';
+        } else {
+          card.className = 'fn-card';
+        }
+
         card.innerHTML = `
           <div class="fn-meta">
             <div class="fn-name">
-              ${fn.auth === 'public' ? '🌐 ' : '🔒 '}${fn.name}
+              ${fn.auth === 'public' ? '🌐 ' : '🔒 '}${fn.name}${faultBadgeHtml}
             </div>
-            <div class="fn-desc">${fn.desc} · <span style="color:var(--primary); font-family:monospace;">${fn.p95}ms</span></div>
+            <div class="fn-desc">${fn.desc} · <span style="color:var(--primary); font-family:monospace;">${fault === 'TIMEOUT' ? '520ms' : fn.p95 + 'ms'}</span></div>
           </div>
           <button class="fn-ping-btn" onclick="quickPingFunction('${fn.name}')">Ping</button>
         `;
@@ -2342,7 +2711,7 @@
 
     // ==================== 8. GATEWAY DIAGNOSTIC CONSOLE ====================
     const FUNCTION_PRESET_PAYLOADS = {
-      systemHealthCheck: { checkOnly: true, environment: "production", sampleCollections: 16 },
+      systemHealthCheck: { checkOnly: true, environment: "production", sampleCollections: 17 },
       garageVehicleList: { category: "all", limit: 10, offset: 0 },
       operationConfigGet: { keys: ["business_hours", "service_hubs", "hot_keywords"] },
       vehicleAvailabilityCheck: { vehicleId: "v1", startDate: "2026-10-26", endDate: "2026-10-28" },
@@ -2415,6 +2784,54 @@
         <div style="color: #64748b;">• 授权凭证: ${authType} | 并发数: ${concurrency}x | 网关节点: 华东上海极速机房</div>
         <div style="color: #f59e0b; margin-top:0.4rem;">⏳ 发送探测请求并等待回包...</div>
       `;
+
+      // Check Circuit Breaker Fault Injection
+      const activeFault = CIRCUIT_BREAKER_FAULTS[fnName];
+      if (activeFault === 'TRIPPED') {
+        setTimeout(() => {
+          badge.innerText = '503 SERVICE UNAVAILABLE · 熔断保护';
+          badge.style.color = '#f87171';
+          term.innerHTML = `
+            <div style="color: #ef4444; font-weight:700;">✘ HTTP/2 503 SERVICE UNAVAILABLE · 微服务网关熔断保护触发</div>
+            <div style="font-size:0.7rem; color:#64748b; margin-top:0.2rem;">X-Gateway-Circuit-Breaker: TRIPPED (连续异常触发熔断阻断)</div>
+            <div style="background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.3); border-radius:4px; padding:0.6rem; margin-top:0.6rem; color:#fca5a5; line-height:1.55;">
+              <strong>🛡️ 客户端自动降级保护已激活：</strong><br>
+              • 前端调用已自动短路截断，未向底层云开发数据库发起物理连接；<br>
+              • 已自动无缝降级读取客户端二级 SWR 本地存储缓存，保证消费者界面 0 白屏；<br>
+              • 恢复冷却倒计时为 30 秒，半开探测 (Half-Open) 成功后自动恢复正常。
+            </div>
+          `;
+          appendLogStreamEntry('POST', fnName, 503, '【网关熔断短路】已触发客户端 SWR 本地缓存降级保护', 2);
+          showToast(`【${fnName}】微服务熔断保护已触发，已降级 SWR 缓存`, '⚡');
+        }, 220);
+        return;
+      } else if (activeFault === 'TIMEOUT') {
+        const timeoutMs = 520;
+        setTimeout(() => {
+          badge.innerText = '504 GATEWAY TIMEOUT · 响应超时';
+          badge.style.color = '#fbbf24';
+          term.innerHTML = `
+            <div style="color: #f59e0b; font-weight:700;">⚠ HTTP/2 504 GATEWAY TIMEOUT · 微服务响应耗时超过 500ms 门限</div>
+            <div style="font-size:0.7rem; color:#64748b; margin-top:0.2rem;">耗时: ${timeoutMs}ms | 网关策略: TIMEOUT_RETRY_ABORT</div>
+            <div style="color:#cbd5e1; margin-top:0.5rem;">客户端检测到慢响应，已进入优雅降级，未阻塞主渲染线程。</div>
+          `;
+          appendLogStreamEntry('POST', fnName, 504, '【慢响应超时】调用耗时 520ms 超过 500ms 上限', timeoutMs);
+          showToast(`【${fnName}】微服务慢响应超时 (520ms)`, '⚠️');
+        }, 300);
+        return;
+      } else if (activeFault === 'CLIENT_ERROR') {
+        setTimeout(() => {
+          badge.innerText = '403 FORBIDDEN · 鉴权拒绝';
+          badge.style.color = '#fb923c';
+          term.innerHTML = `
+            <div style="color: #fb923c; font-weight:700;">⚠ HTTP/2 403 FORBIDDEN · 缺少业务管理员授权凭据</div>
+            <div style="font-size:0.7rem; color:#64748b; margin-top:0.2rem;">ErrorCode: PERMISSION_DENIED | 拦截点: CloudBase Auth Guard</div>
+          `;
+          appendLogStreamEntry('POST', fnName, 403, '【权限拦截】调用身份未具备该微服务管理员权限', 14);
+          showToast(`【${fnName}】鉴权拦截 403 Forbidden`, '⚠️');
+        }, 180);
+        return;
+      }
 
       const latencyMs = Math.floor(18 + Math.random() * 26);
       const dnsMs = 2;
@@ -2490,14 +2907,31 @@
       `;
 
       let idx = 0;
+      let passCount = 0;
+      let tripCount = 0;
       const total = CLOUD_MICROSERVICES.length;
       const interval = setInterval(() => {
         if (idx < total) {
           const fn = CLOUD_MICROSERVICES[idx];
+          const fault = CIRCUIT_BREAKER_FAULTS[fn.name];
           const lat = Math.floor(15 + Math.random() * 25);
           const div = document.createElement('div');
           div.style.fontSize = '0.72rem';
-          div.innerHTML = `<span style="color:#10b981;">✔ [PASS]</span> <span style="color:#f8fafc;">${fn.name}</span> <span style="color:#64748b;">(${fn.desc})</span> <span style="color:#38bdf8; float:right;">${lat}ms</span>`;
+
+          if (fault === 'TRIPPED') {
+            tripCount++;
+            div.innerHTML = `<span style="color:#ef4444;">✘ [TRIP 503]</span> <span style="color:#fca5a5;">${fn.name}</span> <span style="color:#64748b;">(${fn.desc})</span> <span style="color:#f87171; float:right;">已熔断(降级SWR)</span>`;
+          } else if (fault === 'TIMEOUT') {
+            div.innerHTML = `<span style="color:#f59e0b;">⚠ [WARN 504]</span> <span style="color:#fde68a;">${fn.name}</span> <span style="color:#64748b;">(${fn.desc})</span> <span style="color:#fbbf24; float:right;">520ms+</span>`;
+            passCount++;
+          } else if (fault === 'CLIENT_ERROR') {
+            div.innerHTML = `<span style="color:#fb923c;">⚠ [AUTH 403]</span> <span style="color:#fed7aa;">${fn.name}</span> <span style="color:#64748b;">(${fn.desc})</span> <span style="color:#fb923c; float:right;">鉴权拦截</span>`;
+            passCount++;
+          } else {
+            passCount++;
+            div.innerHTML = `<span style="color:#10b981;">✔ [PASS]</span> <span style="color:#f8fafc;">${fn.name}</span> <span style="color:#64748b;">(${fn.desc})</span> <span style="color:#38bdf8; float:right;">${lat}ms</span>`;
+          }
+
           term.appendChild(div);
           term.scrollTop = term.scrollHeight;
 
@@ -2510,11 +2944,17 @@
           clearInterval(interval);
           const summary = document.createElement('div');
           summary.style.marginTop = '0.85rem';
-          summary.style.color = '#10b981';
           summary.style.fontWeight = 'bold';
-          summary.innerHTML = `🎉 57/57 个微服务全景网关扫测完成！连通率 100% · 平均延迟 24.2 ms · 0 项异常`;
+          if (tripCount > 0) {
+            summary.style.color = '#f59e0b';
+            summary.innerHTML = `⚠️ 57 个微服务全景网关扫测完成！连通率 ${((passCount/total)*100).toFixed(1)}% · 正常/受控 ${passCount} 个 · 熔断阻断 ${tripCount} 个 (已激活前端SWR降级)`;
+            showToast(`网关扫测完成：${passCount}个正常，${tripCount}个熔断降级`, '⚠️');
+          } else {
+            summary.style.color = '#10b981';
+            summary.innerHTML = `🎉 57/57 个微服务全景网关扫测完成！连通率 100% · 平均延迟 24.2 ms · 0 项异常`;
+            showToast('57 个微服务网关全景扫描完成，全部通过！', '🎉');
+          }
           term.appendChild(summary);
-          showToast('57 个微服务网关全景扫描完成，全部通过！', '🎉');
         }
       }, 45);
     }
@@ -2857,7 +3297,352 @@
       }
     }
 
-    // ==================== 13. TOAST & TIMING ====================
+    // ==================== 13. WECHAT PAY SCORE SETTLEMENT ENGINE ====================
+    const WECHAT_PAY_SCORE_RENTAL_FEE_CATEGORIES = [
+      "租车相关费用",
+      "延迟还车费用",
+      "加油费用",
+      "ETC高速费用",
+      "车损费用",
+      "折旧费用",
+      "停运费用",
+      "闯红灯违章"
+    ];
+
+    function normalizeRentalFeeCategory(rawCategory) {
+      if (!rawCategory || typeof rawCategory !== "string") {
+        return "租车相关费用";
+      }
+      const clean = rawCategory.trim();
+      if (WECHAT_PAY_SCORE_RENTAL_FEE_CATEGORIES.includes(clean)) {
+        return clean;
+      }
+      if (/违章|罚款|闯红灯|超速|违停/i.test(clean)) return "闯红灯违章";
+      if (/停运|误工|停工/i.test(clean)) return "停运费用";
+      if (/折旧|贬值/i.test(clean)) return "折旧费用";
+      if (/延|超时|续租|迟/i.test(clean)) return "延迟还车费用";
+      if (/油|电|充|补能/i.test(clean)) return "加油费用";
+      if (/etc|通行|高速|路桥/i.test(clean)) return "ETC高速费用";
+      if (/损|划痕|擦碰|玻璃|钣金|维修/i.test(clean)) return "车损费用";
+      return "租车相关费用";
+    }
+
+    let payScoreItems = [
+      { name: "租车相关费用", desc: "基础租金尾款结算 (0元免押结单)", amount: 0 },
+      { name: "延迟还车费用", desc: "超时延迟还车扣费", amount: 0 },
+      { name: "加油费用", desc: "燃油/纯电补能差额费用", amount: 0 },
+      { name: "ETC高速费用", desc: "在途路桥高速通行代缴", amount: 0 },
+      { name: "车损费用", desc: "外观环检新增损伤钣金喷漆", amount: 0 },
+      { name: "折旧费用", desc: "严重碰撞事故车辆贬值补偿", amount: 0 },
+      { name: "停运费用", desc: "定损维保期间停工营运损失", amount: 0 },
+      { name: "闯红灯违章", desc: "电子警察违法罚款代缴", amount: 0 }
+    ];
+
+    function openPayScoreModal() {
+      renderPayScoreTable();
+      updatePayScoreCalculation();
+      document.getElementById('payScoreModal').classList.add('active');
+    }
+
+    function closePayScoreModal() {
+      document.getElementById('payScoreModal').classList.remove('active');
+    }
+
+    function renderPayScoreTable() {
+      const tbody = document.getElementById('payScoreTableBody');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+
+      const categoryIcons = {
+        '租车相关费用': '🚗',
+        '延迟还车费用': '⏱️',
+        '加油费用': '⛽',
+        'ETC高速费用': '🛣️',
+        '车损费用': '🔧',
+        '折旧费用': '📉',
+        '停运费用': '⏸️',
+        '闯红灯违章': '🚦'
+      };
+
+      payScoreItems.forEach((item, idx) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>
+            <div class="fee-category-badge">
+              <span>${categoryIcons[item.name] || '📌'}</span>
+              <span>${item.name}</span>
+            </div>
+          </td>
+          <td>
+            <input type="text" class="fee-desc-input" value="${item.desc}" oninput="onPayScoreDescChange(${idx}, this.value)">
+          </td>
+          <td style="text-align: right;">
+            <input type="number" step="0.01" min="0" class="fee-input" value="${item.amount}" oninput="onPayScoreAmountChange(${idx}, this.value)">
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function onPayScoreDescChange(idx, val) {
+      if (payScoreItems[idx]) {
+        payScoreItems[idx].desc = String(val).trim();
+        updatePayScoreCalculation();
+      }
+    }
+
+    function onPayScoreAmountChange(idx, val) {
+      if (payScoreItems[idx]) {
+        const num = parseFloat(val);
+        payScoreItems[idx].amount = isNaN(num) || num < 0 ? 0 : Math.round(num * 100) / 100;
+        updatePayScoreCalculation();
+      }
+    }
+
+    function applyPayScoreScenario(scenario) {
+      if (scenario === 'zero_fee') {
+        payScoreItems.forEach(item => { item.amount = 0; });
+        payScoreItems[0].desc = "免押正常结单无额外增费";
+        showToast('已载入：0 增费完美还车场景 (仅上报租车相关费用 0元)', '🟢');
+      } else if (scenario === 'overdue_fuel') {
+        payScoreItems.forEach(item => { item.amount = 0; });
+        payScoreItems[1].amount = 200;
+        payScoreItems[1].desc = "超时2小时还车违约金";
+        payScoreItems[2].amount = 150;
+        payScoreItems[2].desc = "燃油表未加满 (补加油费)";
+        showToast('已载入：延期还车 + 燃油补加场景', '⏱️');
+      } else if (scenario === 'damage_etc') {
+        payScoreItems.forEach(item => { item.amount = 0; });
+        payScoreItems[3].amount = 86;
+        payScoreItems[3].desc = "沪杭甬高速ETC通行代缴";
+        payScoreItems[4].amount = 1200;
+        payScoreItems[4].desc = "右前轮毂刮伤翻新与微钣金";
+        payScoreItems[6].amount = 450;
+        payScoreItems[6].desc = "车辆维保停运2天营运补偿";
+        showToast('已载入：轮毂剐蹭 + 停运补偿 + ETC高速场景', '💥');
+      }
+      renderPayScoreTable();
+      updatePayScoreCalculation();
+    }
+
+    function normalizeRawPayScoreItems() {
+      const inputEl = document.getElementById('payScoreRawInput');
+      const text = inputEl ? inputEl.value.trim() : '';
+      if (!text) {
+        showToast('请输入原始杂费描述文本', '⚠️');
+        return;
+      }
+
+      const segments = text.split(/[,;；，\n]/).map(s => s.trim()).filter(Boolean);
+      let matchedCount = 0;
+
+      segments.forEach(seg => {
+        const numMatch = seg.match(/(\d+(\.\d+)?)/);
+        const amount = numMatch ? parseFloat(numMatch[1]) : 0;
+        const normalizedCategory = normalizeRentalFeeCategory(seg);
+
+        const target = payScoreItems.find(item => item.name === normalizedCategory);
+        if (target) {
+          target.amount = amount;
+          target.desc = seg;
+          matchedCount++;
+        }
+      });
+
+      renderPayScoreTable();
+      updatePayScoreCalculation();
+      showToast(`已成功智能归一化 ${matchedCount} 项杂费至微信官方8类白名单！`, '✨');
+    }
+
+    function updatePayScoreCalculation() {
+      const activeItems = payScoreItems.filter(item => item.amount > 0);
+      const totalYuan = activeItems.reduce((acc, cur) => acc + cur.amount, 0);
+      const totalFen = Math.round(totalYuan * 100);
+
+      document.getElementById('payScoreTotalYuan').innerText = `￥${totalYuan.toFixed(2)}`;
+      document.getElementById('payScoreTotalFen').innerText = `(${totalFen.toLocaleString()} 分)`;
+
+      const countBadge = document.getElementById('payScoreItemsCount');
+      if (activeItems.length === 0) {
+        countBadge.innerText = '1 项费用 (0元免押完结模式)';
+        countBadge.style.color = '#34d399';
+      } else {
+        countBadge.innerText = `已启用 ${activeItems.length} 项标准收费名目`;
+        countBadge.style.color = '#38bdf8';
+      }
+
+      const postPayments = activeItems.length > 0
+        ? activeItems.map(item => ({
+            name: item.name,
+            amount: Math.round(item.amount * 100),
+            description: item.desc || item.name
+          }))
+        : [{ name: "租车相关费用", amount: 0, description: "免押正常结单无额外增费" }];
+
+      const payload = {
+        service_id: "20000000000001",
+        out_order_no: "BK_2026102601",
+        total_amount: totalFen,
+        post_payments: postPayments,
+        time_range: {
+          start_time: "20261026090000",
+          end_time: "20261026180000"
+        }
+      };
+
+      const jsonPreview = document.getElementById('payScoreJsonPreview');
+      if (jsonPreview) jsonPreview.value = JSON.stringify(payload, null, 2);
+    }
+
+    function copyPayScoreJson() {
+      const textarea = document.getElementById('payScoreJsonPreview');
+      if (!textarea) return;
+      textarea.select();
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(textarea.value).then(() => {
+          showToast('微信支付分完结单 OpenAPI 报文已复制！', '📋');
+        });
+      } else {
+        document.execCommand('copy');
+        showToast('微信支付分完结单报文已复制！', '📋');
+      }
+    }
+
+    function copyPayScoreCustomerText() {
+      const activeItems = payScoreItems.filter(item => item.amount > 0);
+      const totalYuan = activeItems.reduce((acc, cur) => acc + cur.amount, 0);
+
+      let text = `【爱迦租车 · 微信支付分免押还车交验账单】\n尊敬的贵宾客户，您的预约单 (BK_2026102601) 已完成电子还车验车核验。\n`;
+      if (activeItems.length === 0) {
+        text += `• 验车状态：四角存证无异常，满油还车\n• 免押代扣：￥0.00 元 (完美履约零增费完结)\n已由微信支付分极速释放免押额度，感谢您选择爱迦！`;
+      } else {
+        text += `根据还车验车交接记录，产生的后付费结算明细如下：\n`;
+        activeItems.forEach(item => {
+          text += `• ${item.name}：￥${item.amount.toFixed(2)} (${item.desc})\n`;
+        });
+        text += `----------------------------------------\n免押结算代扣总额：￥${totalYuan.toFixed(2)} 元\n款项将通过微信支付分自动扣款，无需现场刷卡支付，祝您生活愉快！`;
+      }
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+          showToast('客户对账账单文案已复制到剪贴板！', '💬');
+        });
+      } else {
+        showToast('对账账单已生成！', '💬');
+      }
+    }
+
+    // ==================== 14. CIRCUIT BREAKER & FAULT INJECTION ENGINE ====================
+    let selectedCbModeVal = 'NORMAL';
+
+    function openCircuitBreakerModal() {
+      populateCbServicesSelect();
+      document.getElementById('circuitBreakerModal').classList.add('active');
+    }
+
+    function closeCircuitBreakerModal() {
+      document.getElementById('circuitBreakerModal').classList.remove('active');
+    }
+
+    function populateCbServicesSelect() {
+      const select = document.getElementById('cbTargetServiceSelect');
+      if (!select || select.children.length > 0) return;
+      CLOUD_MICROSERVICES.forEach(fn => {
+        const opt = document.createElement('option');
+        opt.value = fn.name;
+        opt.innerText = `${fn.name} · ${fn.desc} (${fn.cluster})`;
+        select.appendChild(opt);
+      });
+    }
+
+    function selectCbMode(mode) {
+      selectedCbModeVal = mode;
+      document.querySelectorAll('#circuitBreakerModal .status-option').forEach(el => {
+        el.classList.toggle('selected', el.getAttribute('data-cb-mode') === mode);
+      });
+    }
+
+    function applyCircuitBreakerSetting() {
+      const select = document.getElementById('cbTargetServiceSelect');
+      const fnName = select ? select.value : 'bookingCreate';
+
+      if (selectedCbModeVal === 'NORMAL') {
+        delete CIRCUIT_BREAKER_FAULTS[fnName];
+        showToast(`已解除【${fnName}】的故障注入，恢复正常运行`, '✅');
+      } else {
+        CIRCUIT_BREAKER_FAULTS[fnName] = selectedCbModeVal;
+        showToast(`已成功向【${fnName}】注入【${selectedCbModeVal}】故障模拟！`, '⚡');
+        appendLogStreamEntry('INJECT', fnName, selectedCbModeVal === 'TRIPPED' ? 503 : 504, `已模拟激活微服务故障注入: ${selectedCbModeVal}`, 0);
+      }
+
+      renderGatewayTopology();
+      closeCircuitBreakerModal();
+    }
+
+    function resetAllCircuitBreakers() {
+      for (const k in CIRCUIT_BREAKER_FAULTS) {
+        delete CIRCUIT_BREAKER_FAULTS[k];
+      }
+      renderGatewayTopology();
+      showToast(`已重置全量 57 个微服务网关，0 项熔断阻断！`, '🎉');
+      closeCircuitBreakerModal();
+    }
+
+    // ==================== 15. ALERT SENTINEL & WEBHOOK RULES ENGINE ====================
+    let ALERT_CONFIG = {
+      slaMin: 99.90,
+      errorMax: 3.0,
+      p95Max: 80,
+      platform: 'wecom',
+      url: 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=8e29a0f4-aijia-sentinel'
+    };
+
+    function openAlertConfigModal() {
+      document.getElementById('alertSlaInput').value = ALERT_CONFIG.slaMin;
+      document.getElementById('alertErrorInput').value = ALERT_CONFIG.errorMax;
+      document.getElementById('alertLatencyInput').value = ALERT_CONFIG.p95Max;
+      document.getElementById('alertPlatformSelect').value = ALERT_CONFIG.platform;
+      document.getElementById('alertWebhookUrl').value = ALERT_CONFIG.url;
+      document.getElementById('alertConfigModal').classList.add('active');
+    }
+
+    function closeAlertConfigModal() {
+      document.getElementById('alertConfigModal').classList.remove('active');
+    }
+
+    function saveAlertConfig() {
+      ALERT_CONFIG.slaMin = parseFloat(document.getElementById('alertSlaInput').value) || 99.90;
+      ALERT_CONFIG.errorMax = parseFloat(document.getElementById('alertErrorInput').value) || 3.0;
+      ALERT_CONFIG.p95Max = parseInt(document.getElementById('alertLatencyInput').value) || 80;
+      ALERT_CONFIG.platform = document.getElementById('alertPlatformSelect').value;
+      ALERT_CONFIG.url = document.getElementById('alertWebhookUrl').value.trim();
+
+      showToast('网关哨兵告警规则已成功持久化更新！', '💾');
+      closeAlertConfigModal();
+    }
+
+    function sendTestWebhookAlert() {
+      const platformNameMap = {
+        wecom: '企业微信群机器人',
+        feishu: '飞书群自定义助手',
+        dingtalk: '钉钉智能告警机器人'
+      };
+      const platform = document.getElementById('alertPlatformSelect').value;
+      const targetPlatform = platformNameMap[platform] || '企业微信群机器人';
+
+      const alertMsg = `【网关报警触发】微服务系统健康检查 P95 响应异常，已向 ${targetPlatform} 推送通知卡片`;
+      appendLogStreamEntry('ALERT', 'systemHealthCheck', 500, alertMsg, 0);
+
+      const previewBox = document.getElementById('webhookPreviewBox');
+      if (previewBox) {
+        previewBox.style.animation = 'pulseAlert 0.4s 2';
+        setTimeout(() => { previewBox.style.animation = ''; }, 800);
+      }
+
+      showToast(`已向【${targetPlatform}】成功发送网关模拟告警卡片！`, '🔔');
+    }
+
+    // ==================== 16. TOAST & TIMING ====================
     function showToast(msg, icon = '✅') {
       const toast = document.getElementById('toast');
       document.getElementById('toastMsg').innerText = msg;

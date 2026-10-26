@@ -13,10 +13,16 @@ function setup() {
   require("../pages/mine/mine")
   const page = { ...definition, data: { ...definition.data } }
   page.setData = jest.fn((patch) => Object.assign(page.data, patch))
+  page.loadOperationConfig = jest.fn()
+  page.loadOperationSummary = jest.fn()
   let foreground = page
   global.getCurrentPages = () => [foreground]
   const open = () => page.handleMenuTap({ currentTarget: { dataset: { key: "storageCleanup", title: "存储清理" } } })
-  return { page, requests, open, leave: () => { foreground = {} } }
+  return {
+    page, requests, open,
+    leave: () => { foreground = {} },
+    returnToPage: () => { foreground = page; page.onShow() }
+  }
 }
 const fileResult = { ok: true, processed: 3, deleted: 2, failed: 0, preserved: 1, hasMore: true }
 const resultModals = () => wx.showModal.mock.calls.map(([options]) => options).filter((options) => options.title !== "清理存储队列")
@@ -29,6 +35,7 @@ describe("用户中心管理员存储清理", () => {
     delete global.Page
     delete global.wx
     delete global.getCurrentPages
+    delete global.getApp
   })
 
   test("图片任务成功后清理上传会话，最多调用一批并分别显示两项结果", () => {
@@ -84,6 +91,138 @@ describe("用户中心管理员存储清理", () => {
     expect(requests).toHaveLength(1)
     expect(resultModals()).toHaveLength(0)
     expect(wx.showToast).not.toHaveBeenCalled()
+  })
+
+  test("第一步在后台完成，返回交付已完成结果并明确第二步未执行", () => {
+    const { requests, open, leave, returnToPage } = setup()
+    open()
+    leave()
+    requests[0].success({ result: fileResult })
+    expect(resultModals()).toHaveLength(0)
+    expect(wx.hideLoading).not.toHaveBeenCalled()
+
+    returnToPage()
+    expect(requests).toHaveLength(1)
+    expect(resultModals()).toHaveLength(1)
+    expect(resultModals()[0]).toMatchObject({ title: "部分清理未完成" })
+    expect(resultModals()[0].content).toContain("已清理 2 条")
+    expect(resultModals()[0].content).toContain("尚未执行，请再次点击存储清理")
+    expect(wx.hideLoading).toHaveBeenCalledTimes(1)
+    returnToPage()
+    expect(resultModals()).toHaveLength(1)
+    expect(requests).toHaveLength(1)
+    expect(jest.getTimerCount()).toBe(0)
+  })
+
+  test.each(["business", "network", "timeout"])("第一步后台%s失败返回可见反馈且不启动第二步", (kind) => {
+    const { requests, open, leave, returnToPage } = setup()
+    open()
+    leave()
+    if (kind === "business") requests[0].success({ result: { ok: false, message: "权限不足" } })
+    if (kind === "network") requests[0].fail({ errMsg: "network offline" })
+    if (kind === "timeout") jest.advanceTimersByTime(20000)
+    expect(wx.showToast).not.toHaveBeenCalled()
+
+    returnToPage()
+    expect(wx.showToast).toHaveBeenCalledTimes(1)
+    expect(wx.showToast).toHaveBeenCalledWith({ title: kind === "business" ? "权限不足" : "清理未确认，请重试", icon: "none" })
+    expect(requests).toHaveLength(1)
+    expect(resultModals()).toHaveLength(0)
+    returnToPage()
+    expect(wx.showToast).toHaveBeenCalledTimes(1)
+    expect(jest.getTimerCount()).toBe(0)
+  })
+
+  test.each(["success", "business", "network", "timeout"])("第二步后台%s返回仍保留两阶段结果且只交付一次", (kind) => {
+    const { requests, open, leave, returnToPage } = setup()
+    open()
+    requests[0].success({ result: fileResult })
+    leave()
+    if (kind === "success") requests[1].success({ result: { ok: true, removed: 4 } })
+    if (kind === "business") requests[1].success({ result: { ok: false, code: "FORBIDDEN" } })
+    if (kind === "network") requests[1].fail({ errMsg: "network offline" })
+    if (kind === "timeout") jest.advanceTimersByTime(65000)
+    expect(resultModals()).toHaveLength(0)
+
+    returnToPage()
+    expect(resultModals()).toHaveLength(1)
+    expect(resultModals()[0].title).toBe(kind === "success" ? "清理结果" : "部分清理未完成")
+    expect(resultModals()[0].content).toContain("已清理 2 条")
+    expect(resultModals()[0].content).toContain(kind === "success" ? "已清理 4 条过期记录" : "图片任务结果已保留")
+    returnToPage()
+    expect(resultModals()).toHaveLength(1)
+    expect(requests).toHaveLength(2)
+    expect(jest.getTimerCount()).toBe(0)
+  })
+
+  test("第二步仍在途时返回不重发，回执到达后正常显示", () => {
+    const { requests, open, leave, returnToPage, page } = setup()
+    open()
+    requests[0].success({ result: fileResult })
+    leave()
+    returnToPage()
+    expect(page._mineToolActive).toBe(true)
+    expect(requests).toHaveLength(2)
+    expect(resultModals()).toHaveLength(0)
+    requests[1].success({ result: { ok: true, removed: 4 } })
+    expect(resultModals()).toHaveLength(1)
+    returnToPage()
+    expect(resultModals()).toHaveLength(1)
+  })
+
+  test("后台超时后可以发起新清理，旧响应不能覆盖新任务或再次交付", () => {
+    const { requests, open, leave, returnToPage, page } = setup()
+    open()
+    requests[0].success({ result: fileResult })
+    leave()
+    jest.advanceTimersByTime(65000)
+    expect(page._mineToolActive).toBe(false)
+    returnToPage()
+    expect(resultModals()).toHaveLength(1)
+
+    open()
+    expect(page._mineToolActive).toBe(true)
+    expect(requests).toHaveLength(3)
+    requests[1].success({ result: { ok: true, removed: 50 } })
+    expect(page._mineToolActive).toBe(true)
+    expect(resultModals()).toHaveLength(1)
+    requests[2].success({ result: { ...fileResult, deleted: 1 } })
+    requests[3].success({ result: { ok: true, removed: 3 } })
+    expect(resultModals()).toHaveLength(2)
+    expect(resultModals()[1].content).toContain("已清理 1 条")
+    expect(resultModals()[1].content).toContain("已清理 3 条过期记录")
+    returnToPage()
+    expect(resultModals()).toHaveLength(2)
+    expect(page._mineToolActive).toBe(false)
+    expect(jest.getTimerCount()).toBe(0)
+  })
+
+  test("应用退到后台时保留回执，恢复可见后再交付", () => {
+    const { requests, open, returnToPage } = setup()
+    const app = { globalData: { nativeActionAppVisible: true } }
+    global.getApp = () => app
+    open()
+    requests[0].success({ result: fileResult })
+    app.globalData.nativeActionAppVisible = false
+    requests[1].success({ result: { ok: true, removed: 4 } })
+    expect(resultModals()).toHaveLength(0)
+    app.globalData.nativeActionAppVisible = true
+    returnToPage()
+    expect(resultModals()).toHaveLength(1)
+    expect(requests).toHaveLength(2)
+  })
+
+  test("后台回执已暂存后卸载，旧页面不再交付", () => {
+    const { requests, open, leave, returnToPage, page } = setup()
+    open()
+    requests[0].success({ result: fileResult })
+    leave()
+    requests[1].success({ result: { ok: true, removed: 4 } })
+    page.onUnload()
+    returnToPage()
+    expect(resultModals()).toHaveLength(0)
+    expect(wx.showToast).not.toHaveBeenCalled()
+    expect(jest.getTimerCount()).toBe(0)
   })
 
   test.each(["background", "unload"])("第二步期间%s后迟到结果与超时均不弹窗", (state) => {

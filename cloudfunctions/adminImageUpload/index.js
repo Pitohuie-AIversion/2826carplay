@@ -18,7 +18,9 @@ const AUTH_ROLE_FIELDS = {
   isAdmin: true,
   admin: true
 }
-const TARGET_FIELDS = { status: true, imageList: true, latestPickupHandoverId: true }
+const TARGET_FIELDS = { status: true, imageList: true, coverImage: true, latestPickupHandoverId: true }
+const IMAGE_REFERENCE_FIELDS = { imageList: true, coverImage: true }
+const IMAGE_GUARD_FIELDS = { deletionState: true, uploadAbandoned: true }
 const hash = (value) => crypto.createHash("sha256").update(value).digest("hex")
 const time = (value) => value instanceof Date ? value.getTime() : new Date(value).getTime()
 const failure = (code, message) => Object.assign(new Error(message), { businessCode: code })
@@ -29,8 +31,11 @@ const ownerId = (openid) => `owner_${hash(openid).slice(0, 40)}`
 const targetKey = (session) => `target_${hash(`${session.kind}|${session.targetId}|${session.stage}`).slice(0, 40)}`
 const chunkId = (id, index) => `${id}_${index}`
 
-async function read(database, id) {
-  try { return (await database.collection(COLLECTION).doc(id).get()).data || null } catch (error) {
+async function read(database, id, collection = COLLECTION, fields) {
+  try {
+    const document = database.collection(collection).doc(id)
+    return (await (fields ? document.field(fields) : document).get()).data || null
+  } catch (error) {
     if (/DOCUMENT_NOT_FOUND|DATABASE_DOCUMENT_NOT_EXIST|document.*(?:not found|not exist)|文档不存在/i.test(`${error.code || ""} ${error.message || error.errMsg || ""}`)) return null
     throw error
   }
@@ -110,6 +115,7 @@ async function begin(input, openid) {
     if (previous) {
       assert(previous.fingerprint === fingerprint, "IDEMPOTENCY_CONFLICT", "上传编号已绑定其他图片，请重新选择")
       assert(previous.state !== "aborted" && time(previous.expiresAt) > Date.now(), "UPLOAD_EXPIRED", "上传会话已结束，请重新选择图片")
+      assert(await uploadUsable(transaction, previous), "UPLOAD_EXPIRED", "图片已放弃或清理，请重新选择图片")
       return description(previous)
     }
     const current = await target(transaction, fields)
@@ -134,6 +140,7 @@ async function begin(input, openid) {
       const other = await reservedSession(entry)
       if (!other) continue
       if (other.state === "complete" && (fields.kind === "handover" || (current.imageList || []).includes(other.fileID))) continue
+      if (other.state === "complete" && !(await uploadUsable(transaction, other, current))) continue
       targetSessions.push(entry)
     }
     assert(ownerSessions.length < 9, "UPLOAD_LIMIT", "待处理上传过多，请完成或取消后重试")
@@ -191,9 +198,26 @@ async function chunk(input, session) {
   })
 }
 
+function cleanupId(session, fileID) {
+  return `${session.kind === "vehicle" ? "pending_image_cleanup" : "handover_image_cleanup"}_${hash(`${session.targetId}|${fileID}`).slice(0, 32)}`
+}
+
+async function uploadUsable(database, session, vehicle) {
+  const fileID = session.fileID || session.expectedFileID
+  if (!fileID) return true
+  const guard = await read(database, cleanupId(session, fileID), "pending_file_deletions", IMAGE_GUARD_FIELDS)
+  if (!guard) return true
+  if (["deleting", "deleted"].includes(guard.deletionState)) return false
+  if (!guard.uploadAbandoned || session.kind !== "vehicle") return true
+  const current = vehicle || await read(database, session.targetId, "vehicles", IMAGE_REFERENCE_FIELDS)
+  // A delayed attachment is still allowed while cleanup is pending. Its live
+  // reference wins over an earlier abandonment request from a timed-out page.
+  return Boolean(current && ((current.imageList || []).includes(fileID) || current.coverImage === fileID))
+}
+
 function cleanupRecord(session, fileID) {
   const vehicle = session.kind === "vehicle"
-  const id = `${vehicle ? "pending_image_cleanup" : "handover_image_cleanup"}_${hash(`${session.targetId}|${fileID}`).slice(0, 32)}`
+  const id = cleanupId(session, fileID)
   return { id, data: { fileList: [fileID], context: vehicle ? { vehicleId: session.targetId, action: "cleanupUpload" } : { bookingId: session.targetId, stage: session.stage }, source: vehicle ? "vehicleImageUploadCleanup" : "bookingHandoverUploadCleanup", deletionState: "pending", attemptCount: 0, notBeforeAt: new Date(time(session.expiresAt) + LEASE), createdAt: db.serverDate() } }
 }
 
@@ -208,6 +232,7 @@ async function complete(session) {
   const claimed = await db.runTransaction(async (transaction) => {
     const current = await read(transaction, session.uploadId)
     active(current)
+    assert(await uploadUsable(transaction, current), "UPLOAD_EXPIRED", "图片已放弃或清理，请重新选择图片")
     if (current.state === "complete") return current
     assert(current.state !== "completing" || Number(current.leaseUntil) <= Date.now(), "UPLOAD_BUSY", "图片正在校验，请稍后重试")
     assert(current.received === current.chunkCount, "UPLOAD_INCOMPLETE", "图片分块尚未传完")
@@ -241,6 +266,8 @@ async function complete(session) {
         const current = await read(transaction, claimed.uploadId)
         assert(current.token === token && current.state === "completing", "UPLOAD_BUSY", "上传状态已变化")
         const queue = cleanupRecord(claimed, fileID)
+        const guard = await read(transaction, queue.id, "pending_file_deletions", IMAGE_GUARD_FIELDS)
+        assert(!guard || (!guard.uploadAbandoned && !["deleting", "deleted"].includes(guard.deletionState)), "UPLOAD_EXPIRED", "图片已放弃或清理，请重新选择图片")
         await transaction.collection("pending_file_deletions").doc(queue.id).set({ data: queue.data })
         await transaction.collection(COLLECTION).doc(claimed.uploadId).update({ data: { expectedFileID: fileID, digest } })
       })
@@ -265,6 +292,7 @@ async function complete(session) {
     await db.runTransaction(async (transaction) => {
       const current = await read(transaction, claimed.uploadId)
       assert(current.token === token && current.state === "completing", "UPLOAD_BUSY", "上传状态已变化")
+      assert(await uploadUsable(transaction, { ...current, fileID }), "UPLOAD_EXPIRED", "图片已放弃或清理，请重新选择图片")
       await target(transaction, current)
       await transaction.collection(COLLECTION).doc(claimed.uploadId).update({ data: { state: "complete", fileID, leaseUntil: 0 } })
       await releaseOwner(transaction, current)

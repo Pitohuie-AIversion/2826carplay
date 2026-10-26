@@ -1,5 +1,5 @@
 const { closePageCsvPreview, openPageCsvPreview, beginPageCsvFileAction, isPageCsvFileActionActive, markPageCsvFileRemoved, applyPageCsvFileRemoval } = require("../../shared/pageCsvFileActions")
-const { removeCsvFile } = require("../../shared/csvFile")
+const { removeCsvFile, isUserCancelError } = require("../../shared/csvFile")
 const { createPerformanceHelpers } = require('../../shared/performance');
 const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
 const { formatToastTitle } = require("../../shared/uiFeedback")
@@ -1295,6 +1295,7 @@ Page({
       return
     }
     const filePath = `${wx.env.USER_DATA_PATH}/${fileName}`
+    const cleanupWrite = () => removeCsvFile(filePath).catch(() => {})
     let settled = false
     let writeSuccessHandled = false
     const finish = () => {
@@ -1306,6 +1307,8 @@ Page({
       return true
     }
     const fail = () => {
+      if (writeSuccessHandled) return
+      cleanupWrite()
       if (!finish()) return
       this.setData({ exportingHandover: false })
       wx.showToast({ title: "留证单导出失败", icon: "none" })
@@ -1319,7 +1322,7 @@ Page({
         if (writeSuccessHandled) return
         writeSuccessHandled = true
         if (!finish()) {
-          if (typeof fs.unlink === "function") fs.unlink({ filePath, fail: () => {} })
+          cleanupWrite()
           return
         }
         const previousPath = this.data.exportedHandoverPath
@@ -1346,12 +1349,19 @@ Page({
       wx.showToast({ title: "请升级微信后分享", icon: "none" })
       return
     }
-    wx.shareFileMessage({
+    let settled = false
+    const fail = (error) => {
+      if (settled) return
+      settled = true
+      if (!isPageNativeActionActive(this, action) || this.data.exportedHandoverPath !== filePath || isUserCancelError(error)) return
+      wx.showToast({ title: "分享文件失败", icon: "none" })
+    }
+    const shareOptions = {
       filePath,
-      fail: (error) => {
-        if (isPageNativeActionActive(this, action) && !String(error && error.errMsg || "").toLowerCase().includes("cancel")) wx.showToast({ title: "分享文件失败", icon: "none" })
-      }
-    })
+      success: () => { settled = true },
+      fail
+    }
+    try { wx.shareFileMessage(shareOptions) } catch (error) { fail(error) }
   },
   handleDeleteExportedHandover() {
     const filePath = this.data.exportedHandoverPath

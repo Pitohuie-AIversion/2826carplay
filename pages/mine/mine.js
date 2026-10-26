@@ -398,6 +398,7 @@ Page({
   },
 
   onShow() {
+    this.deliverMineToolFeedback()
     this.loadOperationConfig()
     if (
       this.data.permissionsReady &&
@@ -432,6 +433,7 @@ Page({
     this._permissionRequestId = Number(this._permissionRequestId || 0) + 1
     this._summaryRequestId = Number(this._summaryRequestId || 0) + 1
     this._mineToolRequestId = Number(this._mineToolRequestId || 0) + 1
+    this._mineToolDeferredFeedback = null
     this.finishPermissionEffects()
     this.clearPermissionTimer()
     this.clearSummaryTimer()
@@ -677,6 +679,7 @@ Page({
     const requestId = Number(this._mineToolRequestId || 0) + 1
     const nativeAction = beginPageNativeAction(this, { requireCurrent: true })
     this._mineToolRequestId = requestId
+    this._mineToolDeferredFeedback = null
     this._mineToolActive = true
     this.clearMineToolTimer()
     if (typeof wx.showLoading === "function") {
@@ -687,17 +690,22 @@ Page({
     }
 
     let settled = false
-    const finishRequest = () => {
+    const finishRequest = (backgroundCallback) => {
       if (settled || this._mineToolRequestId !== requestId) {
         return false
       }
       settled = true
       const active = isPageNativeActionActive(this, nativeAction)
       this.finishMineToolEffects(active)
+      if (!active && !this._nativeActionsUnloaded && typeof backgroundCallback === "function") {
+        this._mineToolDeferredFeedback = { requestId, nativeAction, deliver: backgroundCallback }
+      }
       return active
     }
     const handleFailure = (message) => {
-      if (!finishRequest()) {
+      if (!finishRequest(typeof input.onBackgroundFailure === "function"
+        ? () => input.onBackgroundFailure(message)
+        : null)) {
         return
       }
       if (typeof input.onFailure === "function") {
@@ -717,10 +725,12 @@ Page({
     const requestOptions = {
       name: input.name,
       success: (res) => {
-        if (!finishRequest()) {
+        const result = res && res.result ? res.result : null
+        if (!finishRequest(typeof input.onBackgroundResult === "function"
+          ? () => input.onBackgroundResult(result)
+          : null)) {
           return
         }
-        const result = res && res.result ? res.result : null
         if (typeof input.onResult === "function") {
           input.onResult(result)
         }
@@ -738,6 +748,19 @@ Page({
     } catch (error) {
       handleFailure(error && (error.errMsg || error.message))
     }
+  },
+
+  deliverMineToolFeedback() {
+    const feedback = this._mineToolDeferredFeedback
+    if (!feedback) return
+    if (this._nativeActionsUnloaded || feedback.requestId !== this._mineToolRequestId) {
+      this._mineToolDeferredFeedback = null
+      return
+    }
+    if (!isPageNativeActionActive(this, feedback.nativeAction)) return
+    this._mineToolDeferredFeedback = null
+    if (typeof wx.hideLoading === "function") wx.hideLoading()
+    feedback.deliver()
   },
 
   clearMineToolTimer() {
@@ -855,6 +878,17 @@ Page({
             loadingTitle: "清理中…",
             timeoutTitle: "清理超时，请重试",
             failureFallback: "清理失败",
+            onBackgroundResult: (result) => {
+              if (result && result.ok) {
+                this.showStorageCleanupResult(result, null, "尚未执行，请再次点击存储清理")
+                return
+              }
+              wx.showToast({
+                title: formatToastTitle(result && result.message, "清理失败"),
+                icon: "none"
+              })
+            },
+            onBackgroundFailure: () => wx.showToast({ title: "清理未确认，请重试", icon: "none" }),
             onResult: (result) => {
               if (!result || !result.ok) {
                 wx.showToast({
@@ -871,7 +905,9 @@ Page({
                 timeoutMs: 65000,
                 timeoutTitle: "清理超时，请重试",
                 onResult: (uploads) => this.showStorageCleanupResult(result, uploads),
-                onFailure: () => this.showStorageCleanupResult(result, null, "清理请求失败或超时，请重试")
+                onFailure: () => this.showStorageCleanupResult(result, null, "清理请求失败或超时，请重试"),
+                onBackgroundResult: (uploads) => this.showStorageCleanupResult(result, uploads),
+                onBackgroundFailure: () => this.showStorageCleanupResult(result, null, "清理请求失败或超时，请重试")
               })
             }
           })

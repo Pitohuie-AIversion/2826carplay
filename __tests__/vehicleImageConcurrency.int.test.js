@@ -106,6 +106,20 @@ describe("vehicle images share a transactional deletion guard", () => {
     expect(state.stores.vehicles.get("car_1").imageList).toEqual([file("a")])
   })
 
+  test("显式清理标记提交前图片已关联，事务重试不把该图片标为放弃", async () => {
+    const state = createState()
+    const id = state.guardId("car_1", file("a"))
+    state.stores.pending_file_deletions.set(id, { fileList: [file("a")], context: { vehicleId: "car_1" }, source: "vehicleImageUploadCleanup", deletionState: "pending" })
+    state.db.beforeCommit = async () => {
+      state.db.beforeCommit = null
+      expect(await state.images.main({ id: "car_1", action: "add", fileIds: [file("a")] })).toMatchObject({ ok: true })
+    }
+    expect(await state.images.main({ id: "car_1", action: "cleanupUpload", fileIds: [file("a")] })).toMatchObject({ ok: true })
+    expect(state.stores.pending_file_deletions.get(id).uploadAbandoned).toBeUndefined()
+    expect(await state.cleanup.main()).toMatchObject({ ok: true, preserved: 1 })
+    expect(state.cloud.deleteFile).not.toHaveBeenCalled()
+  })
+
   test("删除已claim后迟到关联被拒绝，重复cleanup不能重置永久标记", async () => {
     const state = createState()
     const id = state.guardId("car_1", file("a"))

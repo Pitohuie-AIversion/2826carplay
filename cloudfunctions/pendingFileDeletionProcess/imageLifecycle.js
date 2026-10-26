@@ -55,11 +55,16 @@ function createImageLifecycle(db, cloud) {
       const id = guardId(vehicleId, fileId)
       const current = await readDocument(transaction.collection("pending_file_deletions"), id, GUARD_FIELDS)
       if (current && ["deleting", "deleted"].includes(current.deletionState)) return
+      const vehicle = await readDocument(transaction.collection("vehicles"), vehicleId, VEHICLE_REFERENCE_FIELDS)
+      if (vehicle && (uniqueFiles(vehicle.imageList).includes(fileId) || vehicle.coverImage === fileId)) return
       await transaction.collection("pending_file_deletions").doc(id).set({ data: {
         fileList: [fileId], context: { vehicleId, action: "cleanupUpload" },
-        source: "vehicleImageUploadCleanup", deletionState: "pending", notBeforeAt,
+        source: "vehicleImageUploadCleanup", deletionState: "pending", uploadAbandoned: true, notBeforeAt,
         createdAt: db.serverDate()
       } })
+      // Attachment also writes this vehicle; retry against its latest references
+      // if an overlapping attachment committed before this cleanup request.
+      if (vehicle) await transaction.collection("vehicles").doc(vehicleId).update({ data: { imageCleanupAt: db.serverDate() } })
     })
   }
 

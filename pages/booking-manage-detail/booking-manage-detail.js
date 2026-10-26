@@ -1,3 +1,5 @@
+const { closePageCsvPreview, openPageCsvPreview, beginPageCsvFileAction, isPageCsvFileActionActive, markPageCsvFileRemoved, applyPageCsvFileRemoval } = require("../../shared/pageCsvFileActions")
+const { removeCsvFile } = require("../../shared/csvFile")
 const { createPerformanceHelpers } = require('../../shared/performance');
 const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
 const { formatToastTitle } = require("../../shared/uiFeedback")
@@ -30,6 +32,8 @@ const HANDOVER_ANGLES = [
   { angle: "right", label: "右侧" }
 ]
 const HANDOVER_MAX_IMAGE_BYTES = 10 * 1024 * 1024
+const { createImageUploadRequestId, uploadAdminImage } = require("../../shared/adminImageUpload")
+const { chooseImageFiles } = require("../../shared/imageSelection")
 
 
 
@@ -284,6 +288,7 @@ Page({
     })
   },
   onShow() {
+    applyPageCsvFileRemoval(this)
     if (this._handoverExportNeedsReset) {
       this._handoverExportNeedsReset = false
       this.applyState({ exportingHandover: false })
@@ -291,6 +296,13 @@ Page({
     if (this._handoverPhotoNeedsReset) {
       this._handoverPhotoNeedsReset = false
       this.applyState({ handoverLoading: false })
+    }
+    const photoFeedback = this._handoverPhotoDeferredFeedback
+    if (photoFeedback) {
+      this._handoverPhotoDeferredFeedback = null
+      if (isPageNativeActionActive(this, photoFeedback.action) && this.data.id === photoFeedback.bookingId && this.data.handoverStage === photoFeedback.stage) {
+        wx.showToast({ title: photoFeedback.message, icon: "none" })
+      }
     }
     if (typeof this._bookingDetailMutationDeferredResult === "function") {
       const deliverResult = this._bookingDetailMutationDeferredResult
@@ -339,7 +351,10 @@ Page({
       }
     })
   },
+  onHide() { closePageCsvPreview(this) },
+  handleCloseCsvPreview() { closePageCsvPreview(this) },
   onUnload() {
+    closePageCsvPreview(this, { unload: true })
     cancelPagePermissionCheck(this)
     cancelPageNativeActions(this)
     if (
@@ -366,6 +381,9 @@ Page({
     this._handoverRequestId = Number(this._handoverRequestId || 0) + 1
     if (this._handoverPhotoTimer) clearTimeout(this._handoverPhotoTimer)
     this._handoverPhotoTimer = null
+    if (this._handoverUploadTask) this._handoverUploadTask.abort()
+    this._handoverUploadTask = null
+    this._handoverPhotoDeferredFeedback = null
     if (this._handoverExportTimer) clearTimeout(this._handoverExportTimer)
     this._handoverExportTimer = null
     this.cleanupPendingHandoverUploads()
@@ -1031,7 +1049,7 @@ Page({
     this.setData({ "handoverForm.energyType": values[Number(event.detail && event.detail.value)] || "fuel" })
   },
   handleChooseHandoverPhoto(event) {
-    if (this.isBookingDetailInteractionBusy() || !wx.chooseImage || !wx.cloud || !wx.cloud.uploadFile) return
+    if (this.isBookingDetailInteractionBusy() || !wx.cloud || !wx.cloud.callFunction) return
     const angle = String(event.currentTarget.dataset.angle || "")
     const index = this.data.handoverForm.photos.findIndex((item) => item.angle === angle)
     if (index < 0) return
@@ -1047,8 +1065,12 @@ Page({
       settled = true
       if (this._handoverPhotoTimer) clearTimeout(this._handoverPhotoTimer)
       this._handoverPhotoTimer = null
+      this._handoverUploadTask = null
       if (!active) {
         this._handoverPhotoNeedsReset = true
+        if (message && !this._nativeActionsUnloaded) {
+          this._handoverPhotoDeferredFeedback = { action, bookingId, stage, message }
+        }
         return
       }
       this.applyState({ handoverLoading: false })
@@ -1068,11 +1090,24 @@ Page({
           finish("图片格式或大小有误")
           return
         }
-        const cloudPath = `handover-images/${bookingId}/${stage}/${Date.now()}_${Math.random().toString(36).slice(2, 10)}_${angle}.${extension}`
-        this._handoverPhotoTimer = setTimeout(() => finish("图片上传超时"), BOOKING_DETAIL_WRITE_TIMEOUT_MS)
+        const renewTimeout = (timeout = 20000) => {
+          if (settled) return
+          if (this._handoverPhotoTimer) clearTimeout(this._handoverPhotoTimer)
+          this._handoverPhotoTimer = setTimeout(() => {
+            const task = this._handoverUploadTask
+            finish("图片上传超时")
+            if (task) task.abort()
+          }, timeout)
+        }
+        renewTimeout()
         const uploadOptions = {
-          cloudPath,
+          kind: "handover",
+          targetId: bookingId,
+          stage,
+          requestId: createImageUploadRequestId(),
+          extension,
           filePath: path,
+          onProgress: ({ phase }) => renewTimeout(phase === "verifying" ? 65000 : 20000),
           success: (upload) => {
             const fileId = String(upload && upload.fileID || "")
             if (!isActive()) {
@@ -1092,15 +1127,35 @@ Page({
             })
             finish()
           },
-          fail: () => finish("图片上传失败，请重试")
+          fail: (error) => {
+            const match = String(error && error.errMsg || "").match(/^image upload ([A-Z][A-Z0-9_]*)$/)
+            const code = error && typeof error.code === "string" ? error.code : match ? match[1] : ""
+            const titles = {
+              FORBIDDEN: "无图片上传权限",
+              UPLOAD_LIMIT: "上传数量或频次已达限",
+              STATUS_NOT_ALLOWED: "预约状态不允许上传",
+              PICKUP_NOT_CONFIRMED: "请先核对取车记录",
+              NOT_FOUND: "上传目标不存在",
+              UPLOAD_BUSY: "图片处理中，请稍后",
+              UPLOAD_EXPIRED: "上传已过期，请重选",
+              VALIDATION_ERROR: "图片格式或大小有误",
+              INTERNAL_ERROR: "上传服务暂不可用",
+              IDEMPOTENCY_CONFLICT: "请重新选择图片",
+              UPLOAD_INCOMPLETE: "图片未传完，请重选"
+            }
+            finish(Object.prototype.hasOwnProperty.call(titles, code) ? titles[code] : "图片上传失败，请重试")
+          }
         }
-        try { wx.cloud.uploadFile(uploadOptions) } catch (error) { finish("图片上传失败，请重试") }
+        try {
+          const task = uploadAdminImage(uploadOptions)
+          if (!settled) this._handoverUploadTask = task
+        } catch (error) { finish("图片上传失败，请重试") }
       },
       fail: (error) => {
         finish(String(error && error.errMsg || "").includes("cancel") ? "" : "选择图片失败，请重试")
       }
     }
-    try { wx.chooseImage(chooseOptions) } catch (error) { finish("选择图片失败，请重试") }
+    try { chooseImageFiles(chooseOptions) } catch (error) { finish("选择图片失败，请重试") }
   },
   queueHandoverUploadCleanup(fileList, stage, bookingId) {
     const files = (Array.isArray(fileList) ? fileList : []).filter(Boolean)
@@ -1268,6 +1323,7 @@ Page({
           return
         }
         const previousPath = this.data.exportedHandoverPath
+        closePageCsvPreview(this)
         this.setData({ exportedHandoverPath: filePath, exportingHandover: false })
         if (previousPath && previousPath !== filePath && typeof fs.unlink === "function") {
           try { fs.unlink({ filePath: previousPath, fail: () => {} }) } catch (error) {}
@@ -1279,21 +1335,17 @@ Page({
     try { fs.writeFile(writeOptions) } catch (error) { fail() }
   },
   handleOpenExportedHandover() {
-    const filePath = this.data.exportedHandoverPath
-    if (!filePath || typeof wx === "undefined" || typeof wx.openDocument !== "function") return
-    const action = beginPageNativeAction(this, { requireCurrent: true })
-    wx.openDocument({
-      filePath,
-      fileType: "csv",
-      fail: () => {
-        if (isPageNativeActionActive(this, action)) wx.showToast({ title: "打开文件失败", icon: "none" })
-      }
-    })
+    return openPageCsvPreview(this, this.data.exportedHandoverPath, this.data.exportedHandoverFileName, "exportedHandoverPath")
   },
   handleShareExportedHandover() {
     const filePath = this.data.exportedHandoverPath
-    if (!filePath || typeof wx === "undefined" || typeof wx.shareFileMessage !== "function") return
+    if (!filePath || typeof wx === "undefined") return
     const action = beginPageNativeAction(this, { requireCurrent: true })
+    if (!isPageNativeActionActive(this, action)) return
+    if (typeof wx.shareFileMessage !== "function") {
+      wx.showToast({ title: "请升级微信后分享", icon: "none" })
+      return
+    }
     wx.shareFileMessage({
       filePath,
       fail: (error) => {
@@ -1305,23 +1357,19 @@ Page({
     const filePath = this.data.exportedHandoverPath
     if (!filePath) return
     const action = beginPageNativeAction(this, { requireCurrent: true })
-    const fs = typeof wx !== "undefined" && wx.getFileSystemManager ? wx.getFileSystemManager() : null
-    if (fs && typeof fs.unlink === "function") {
-      fs.unlink({
-        filePath,
-        success: () => {
-          if (!isPageNativeActionActive(this, action) || this.data.exportedHandoverPath !== filePath) return
-          this.setData({ exportedHandoverPath: "" })
-          if (typeof wx !== "undefined" && wx.showToast) wx.showToast({ title: "缓存已清理", icon: "none" })
-        },
-        fail: () => {
-          if (!isPageNativeActionActive(this, action) || this.data.exportedHandoverPath !== filePath) return
-          wx.showToast({ title: "清理失败", icon: "none" })
-        }
-      })
-    } else {
-      this.setData({ exportedHandoverPath: "" })
-    }
+    if (!isPageNativeActionActive(this, action)) return
+    const fileAction = beginPageCsvFileAction(this, filePath, {
+      pathField: "exportedHandoverPath",
+      clearFields: ["exportedHandoverFileName", "exportedHandoverStage"]
+    })
+    return removeCsvFile(filePath).then(() => {
+      if (!markPageCsvFileRemoved(this, fileAction) || !isPageNativeActionActive(this, action)) return
+      applyPageCsvFileRemoval(this)
+      wx.showToast({ title: "缓存已清理", icon: "none" })
+    }).catch(() => {
+      if (!isPageCsvFileActionActive(this, fileAction) || !isPageNativeActionActive(this, action)) return
+      wx.showToast({ title: "清理失败", icon: "none" })
+    })
   },
   handleToggleCustomerTag(event) {
     const tag = String((event && event.currentTarget && event.currentTarget.dataset && event.currentTarget.dataset.tag) || "").trim()

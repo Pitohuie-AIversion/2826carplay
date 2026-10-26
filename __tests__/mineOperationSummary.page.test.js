@@ -397,9 +397,9 @@ describe("pages/mine 运营待办角标", () => {
         resultModal(options)
       }),
       cloud: {
-        callFunction: jest.fn(({ success }) => {
+        callFunction: jest.fn(({ name, success }) => {
           success({
-            result: {
+            result: name === "adminImageUpload" ? { ok: true, removed: 4, hasMore: false } : {
               ok: true,
               processed: 3,
               deleted: 1,
@@ -427,7 +427,7 @@ describe("pages/mine 运营待办角标", () => {
     )
     expect(resultModal).toHaveBeenCalledWith({
       title: "清理结果",
-      content: "本次检查 3 条，已清理 1 条，失败 0 条，等待安全核验 1 条，保留在用图片 2 张。队列仍有记录，可稍后再次执行。",
+      content: "图片任务：本次检查 3 条，已清理 1 条，失败 0 条，等待安全核验 1 条，保留在用图片 2 张。图片队列仍有记录，可稍后再次执行。\n\n上传会话及分块：已清理 4 条过期记录。本批过期记录已处理。",
       confirmText: "知道了",
       confirmColor: "#528fff",
       showCancel: false

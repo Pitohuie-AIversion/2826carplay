@@ -1,3 +1,5 @@
+const { closePageCsvPreview, openPageCsvPreview, beginPageCsvFileAction, isPageCsvFileActionActive, markPageCsvFileRemoved, applyPageCsvFileRemoval } = require("../../shared/pageCsvFileActions")
+const { removeCsvFile } = require("../../shared/csvFile")
 const { createPerformanceHelpers } = require('../../shared/performance');
 const { formatToastTitle } = require("../../shared/uiFeedback")
 const { buildVehicleDisplayIdentity } = require("../../shared/vehicle")
@@ -245,6 +247,7 @@ Page({
     this.loadNotificationConfig()
   },
   onShow() {
+    applyPageCsvFileRemoval(this)
     const refreshConfig = this._operationConfigSeenOnShow || this.data.operationConfigFailed
     this._operationConfigSeenOnShow = true
     if (refreshConfig) this.loadNotificationConfig({ force: this.data.operationConfigFailed })
@@ -305,7 +308,10 @@ Page({
       }
     })
   },
+  onHide() { closePageCsvPreview(this) },
+  handleCloseCsvPreview() { closePageCsvPreview(this) },
   onUnload() {
+    closePageCsvPreview(this, { unload: true })
     cancelPageNativeActions(this)
     this._bookingDetailUnloaded = true
     this._cancelConfirmationSerial = Number(this._cancelConfirmationSerial || 0) + 1
@@ -1282,6 +1288,7 @@ Page({
           return
         }
         const previousPath = this.data.exportedHandoverPath
+        closePageCsvPreview(this)
         triggerHapticFeedback("medium")
         this.setData({
           exportingHandover: false,
@@ -1299,21 +1306,17 @@ Page({
     try { fs.writeFile(writeOptions) } catch (error) { fail() }
   },
   handleOpenExportedHandover() {
-    const filePath = this.data.exportedHandoverPath
-    if (!filePath || typeof wx === "undefined" || typeof wx.openDocument !== "function") return
-    const action = beginPageNativeAction(this, { requireCurrent: true })
-    wx.openDocument({
-      filePath,
-      fileType: "csv",
-      fail: () => {
-        if (isPageNativeActionActive(this, action)) wx.showToast({ title: "打开文件失败", icon: "none" })
-      }
-    })
+    return openPageCsvPreview(this, this.data.exportedHandoverPath, this.data.exportedHandoverFileName, "exportedHandoverPath")
   },
   handleShareExportedHandover() {
     const filePath = this.data.exportedHandoverPath
-    if (!filePath || typeof wx === "undefined" || typeof wx.shareFileMessage !== "function") return
+    if (!filePath || typeof wx === "undefined") return
     const action = beginPageNativeAction(this, { requireCurrent: true })
+    if (!isPageNativeActionActive(this, action)) return
+    if (typeof wx.shareFileMessage !== "function") {
+      wx.showToast({ title: "请升级微信后分享", icon: "none" })
+      return
+    }
     wx.shareFileMessage({
       filePath,
       fail: (error) => {
@@ -1325,23 +1328,19 @@ Page({
     const filePath = this.data.exportedHandoverPath
     if (!filePath) return
     const action = beginPageNativeAction(this, { requireCurrent: true })
-    const fs = typeof wx !== "undefined" && wx.getFileSystemManager ? wx.getFileSystemManager() : null
-    if (fs && typeof fs.unlink === "function") {
-      fs.unlink({
-        filePath,
-        success: () => {
-          if (!isPageNativeActionActive(this, action) || this.data.exportedHandoverPath !== filePath) return
-          this.setData({ exportedHandoverPath: "", exportedHandoverFileName: "", exportedHandoverStage: "" })
-          if (typeof wx !== "undefined" && wx.showToast) wx.showToast({ title: "缓存已清理", icon: "none" })
-        },
-        fail: () => {
-          if (!isPageNativeActionActive(this, action) || this.data.exportedHandoverPath !== filePath) return
-          wx.showToast({ title: "清理失败", icon: "none" })
-        }
-      })
-    } else {
-      this.setData({ exportedHandoverPath: "", exportedHandoverFileName: "", exportedHandoverStage: "" })
-    }
+    if (!isPageNativeActionActive(this, action)) return
+    const fileAction = beginPageCsvFileAction(this, filePath, {
+      pathField: "exportedHandoverPath",
+      clearFields: ["exportedHandoverFileName", "exportedHandoverStage"]
+    })
+    return removeCsvFile(filePath).then(() => {
+      if (!markPageCsvFileRemoved(this, fileAction) || !isPageNativeActionActive(this, action)) return
+      applyPageCsvFileRemoval(this)
+      wx.showToast({ title: "缓存已清理", icon: "none" })
+    }).catch(() => {
+      if (!isPageCsvFileActionActive(this, fileAction) || !isPageNativeActionActive(this, action)) return
+      wx.showToast({ title: "清理失败", icon: "none" })
+    })
   },
   handleCopyHandoverSummary(event) {
     const stage = String((event && event.currentTarget && event.currentTarget.dataset && event.currentTarget.dataset.stage) || "").trim()

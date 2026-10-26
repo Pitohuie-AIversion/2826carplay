@@ -584,3 +584,4 @@
     <button class="back-btn ui-btn ui-btn-ghost action-with-icon" bindtap="handleBackBookings"><view class="back-native-icon" aria-hidden="true"></view><text>返回预约列表</text></button>
   </view>
 </view>
+<csv-preview wx:if="{{csvPreview}}" preview="{{csvPreview}}" bindclose="handleCloseCsvPreview" />

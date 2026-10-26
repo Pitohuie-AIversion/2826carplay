@@ -253,3 +253,4 @@
     </view>
   </block>
 </view>
+<csv-preview wx:if="{{csvPreview}}" preview="{{csvPreview}}" bindclose="handleCloseCsvPreview" />

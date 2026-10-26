@@ -26,7 +26,7 @@ describe("project structure check", () => {
 
     expect(result.ok).toBe(true)
     expect(result.pageCount).toBe(26)
-    expect(result.functionCount).toBe(56)
+    expect(result.functionCount).toBe(57)
     expect(result.violations).toEqual([])
   })
 

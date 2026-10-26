@@ -33,9 +33,10 @@ describe("release hygiene", () => {
     const packageConfig = readJson("package.json")
 
     expect(packageConfig.scripts["check:release"]).toBe(
-      "npm run check:structure && npm run check:secrets && npm run check:drafts && npm run check:indexes && npm run check:package && npm test -- --runInBand"
+      "npm run check:structure && npm run check:secrets && npm run check:drafts && npm run check:indexes && npm run cloud:runtime:check && npm run check:package && npm test -- --runInBand"
     )
     expect(packageConfig.scripts["check:drafts"]).toBe("node scripts/contentDraftsValidate.js")
+    expect(packageConfig.scripts["cloud:runtime:check"]).toBe("node scripts/cloudRuntimeCheck.js")
     expect(packageConfig.scripts["bootstrap:seeds"]).toBe("node scripts/bootstrapContentDrafts.js")
     expect(packageConfig.scripts["check:deploy"]).toBe("npm run check:release && npm run bootstrap:seeds")
     expect(packageConfig.scripts["audit:cloud"]).toBe(
@@ -84,7 +85,7 @@ describe("release hygiene", () => {
     expect(violations).toEqual([])
   })
 
-  test("全部云函数使用统一的 Node.js 20 运行时和 SDK", () => {
+  test("全部云函数使用统一的 Node.js 24 运行时和 SDK", () => {
     const cloudbaseConfig = readJson("cloudbaserc.json")
     const functionsRoot = path.join(PROJECT_ROOT, "cloudfunctions")
     const functionDirectories = fs
@@ -103,7 +104,7 @@ describe("release hygiene", () => {
       expect(item).toMatchObject({
         type: "Event",
         handler: "index.main",
-        runtime: "Nodejs20.19",
+        runtime: "Nodejs24.11",
         memorySize: 256,
         installDependency: true
       })

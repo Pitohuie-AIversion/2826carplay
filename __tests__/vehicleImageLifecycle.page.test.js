@@ -1,3 +1,13 @@
+// Page controller tests stub the authenticated transport; its real chunk protocol
+// is covered separately in adminImageUpload.client.test.js.
+jest.mock("../shared/adminImageUpload", () => {
+  const actual = jest.requireActual("../shared/adminImageUpload")
+  if (global.wx && global.wx.cloud && global.wx.cloud.uploadFile && !global.wx.cloud.callFunction) {
+    global.wx.cloud.callFunction = jest.fn()
+  }
+  return { ...actual, uploadAdminImage: (options) => global.wx.cloud.uploadFile(options) }
+})
+
 function setup() {
   jest.resetModules()
   const uploads = []
@@ -54,6 +64,7 @@ describe("车辆图片与状态写入异步生命周期", () => {
     expect(page.data.uploading).toBe(false)
     expect(page.data.failedUploadPaths).toEqual(paths)
     expect(page.data.uploadItems.map((item) => item.status)).toEqual(["failed", "failed"])
+    if (failure === "unavailable") wxMock.cloud.callFunction = jest.fn((options) => requests.push(options))
     page.handleRetryFailedUploads()
     expect(uploads[2].filePath).toBe(paths[0])
   })
@@ -113,7 +124,40 @@ describe("车辆图片与状态写入异步生命周期", () => {
     page.uploadSelectedFiles(["/tmp/one.jpg"], 0)
     uploads[0].fail({ errMsg: "uploadFile:fail network" })
     expect(uploads).toHaveLength(2)
-    expect(uploads[1].cloudPath).not.toBe(uploads[0].cloudPath)
+    expect(uploads[1].requestId).not.toBe(uploads[0].requestId)
+  })
+
+  test("限额拒绝停止整个批次，用户重试成功后清空失败路径并只关联新文件", () => {
+    const { page, uploads, requests } = setup()
+    const paths = ["/tmp/one.jpg", "/tmp/two.jpg"]
+    page.uploadSelectedFiles(paths, 0)
+    uploads[0].fail({ code: "UPLOAD_LIMIT", errMsg: "image upload UPLOAD_LIMIT" })
+    expect(uploads).toHaveLength(1)
+    expect(page.data.uploading).toBe(false)
+    expect(page.data.failedUploadPaths).toEqual(paths)
+    page.handleRetryFailedUploads()
+    expect(uploads).toHaveLength(2)
+    expect(uploads[1].filePath).toBe(paths[0])
+    expect(uploads[1].requestId).not.toBe(uploads[0].requestId)
+    uploads[1].success({ fileID: "cloud://new-one" })
+    expect(uploads[2].filePath).toBe(paths[1])
+    uploads[2].success({ fileID: "cloud://new-two" })
+    expect(requests[0].data).toEqual({ id: "car_1", action: "add", fileIds: ["cloud://new-one", "cloud://new-two"] })
+    requests[0].success({ result: { ok: true, imageList: ["cloud://new-one", "cloud://new-two"], coverImage: "cloud://new-one" } })
+    expect(page.data.failedUploadPaths).toEqual([])
+    expect(page.data.uploading).toBe(false)
+    expect(page.data.uploadProgressText).toBe("图片上传完成")
+    expect(jest.getTimerCount()).toBe(0)
+  })
+
+  test("结构化撤权不能被附带的network文字误判为可自动重试", () => {
+    const { page, uploads } = setup()
+    page.uploadSelectedFiles(["/tmp/one.jpg", "/tmp/two.jpg"], 0)
+    uploads[0].fail({ code: "FORBIDDEN", errMsg: "network permission denied" })
+    expect(uploads).toHaveLength(1)
+    expect(page.data.uploading).toBe(false)
+    expect(page.data.failedUploadPaths).toEqual(["/tmp/one.jpg", "/tmp/two.jpg"])
+    expect(jest.getTimerCount()).toBe(0)
   })
 
   test("超时终止触发同步失败回调时仍只重试一次", () => {

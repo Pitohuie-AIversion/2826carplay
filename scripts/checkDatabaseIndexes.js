@@ -3,10 +3,9 @@ const path = require("path")
 const { colorize, printTable, summarize } = require("./_cloudUtil")
 
 const PROJECT_ROOT = process.cwd()
-const SECURITY_RULES_DIR = path.join(PROJECT_ROOT, "security-rules")
-const DEPLOY_CHECKLIST_PATH = path.join(PROJECT_ROOT, "DEPLOY_CHECKLIST.md")
 
 const EXPECTED_COLLECTIONS = [
+  "admin_upload_sessions",
   "analytics_events",
   "app_configs",
   "audit_logs",
@@ -26,6 +25,8 @@ const EXPECTED_COLLECTIONS = [
 ]
 
 const RECOMMENDED_INDEXES = [
+  { collection: "admin_upload_sessions", fields: ["expiresAt"], unique: false, category: "cleanup", priority: "blocking", requiredInDeclaration: true },
+  { collection: "admin_upload_sessions", fields: ["openid", "expiresAt"], unique: false, category: "cleanup", priority: "blocking", requiredInDeclaration: true },
   { collection: "analytics_events", fields: ["createdAt"], unique: false, category: "performance", priority: "medium" },
   { collection: "audit_logs", fields: ["createdAt"], unique: false, category: "performance", priority: "medium" },
   { collection: "audit_logs", fields: ["action"], unique: false, category: "performance", priority: "low" },
@@ -68,8 +69,9 @@ function indexKey(idx) {
   return `${idx.collection}:${idx.fields.join("+")}${uniqTag}`
 }
 
-function readSecurityRulesManifest() {
-  const manifestPath = path.join(SECURITY_RULES_DIR, "manifest.json")
+function readSecurityRulesManifest(root) {
+  const securityRulesDir = path.join(root, "security-rules")
+  const manifestPath = path.join(securityRulesDir, "manifest.json")
   if (!fs.existsSync(manifestPath)) {
     return { exists: false, collections: [], declaredIndexes: [] }
   }
@@ -83,7 +85,7 @@ function readSecurityRulesManifest() {
     const declaredIndexes = []
     const indexFile = dbSection.indexFile
     if (indexFile) {
-      const idxPath = path.join(SECURITY_RULES_DIR, indexFile)
+      const idxPath = path.join(securityRulesDir, indexFile)
       if (fs.existsSync(idxPath)) {
         try {
           const idxDoc = JSON.parse(fs.readFileSync(idxPath, "utf8"))
@@ -112,12 +114,13 @@ function readSecurityRulesManifest() {
   }
 }
 
-function readDeployChecklistIndexes() {
-  if (!fs.existsSync(DEPLOY_CHECKLIST_PATH)) {
+function readDeployChecklistIndexes(root) {
+  const checklistPath = path.join(root, "DEPLOY_CHECKLIST.md")
+  if (!fs.existsSync(checklistPath)) {
     return { exists: false, foundIndexes: [] }
   }
   try {
-    const content = fs.readFileSync(DEPLOY_CHECKLIST_PATH, "utf8")
+    const content = fs.readFileSync(checklistPath, "utf8")
     const lines = content.split(/\r?\n/)
     const indexLines = lines
       .map((line, n) => ({ line, n }))
@@ -146,7 +149,7 @@ function checkDatabaseIndexes(projectRoot) {
   const warnings = []
   const info = []
 
-  const securityManifest = readSecurityRulesManifest()
+  const securityManifest = readSecurityRulesManifest(root)
   if (!securityManifest.exists) {
     violations.push({
       type: "missing_security_manifest",
@@ -173,7 +176,7 @@ function checkDatabaseIndexes(projectRoot) {
     })
   }
 
-  const checklist = readDeployChecklistIndexes()
+  const checklist = readDeployChecklistIndexes(root)
   const recommendedKeys = new Set(RECOMMENDED_INDEXES.map(indexKey))
   const documentedKeys = new Set(checklist.foundIndexes || [])
 
@@ -189,6 +192,16 @@ function checkDatabaseIndexes(projectRoot) {
     }
   })
   function declaredMatches(recommended) {
+    if (recommended.requiredInDeclaration) {
+      // Cleanup queries need this exact field order; a document mention or a
+      // reversed/unique index is not a substitute for the local declaration.
+      return (securityManifest.declaredIndexes || []).some((idx) =>
+        idx.collection === recommended.collection &&
+        idx.unique === recommended.unique &&
+        idx.fields.length === recommended.fields.length &&
+        idx.fields.every((field, index) => field === recommended.fields[index])
+      )
+    }
     const sortedRec = recommended.fields.slice().sort()
     const uniqTag = recommended.unique ? ":unique" : ""
     const recKey = `${recommended.collection}:${sortedRec.join("+")}${uniqTag}`
@@ -215,7 +228,7 @@ function checkDatabaseIndexes(projectRoot) {
   const blockingIndexes = RECOMMENDED_INDEXES.filter((i) => i.priority === "blocking")
   blockingIndexes.forEach((idx) => {
     const key = indexKey(idx)
-    if (!documentedKeys.has(key)) {
+    if (!idx.requiredInDeclaration && !documentedKeys.has(key)) {
       violations.push({
         type: "blocking_index_undocumented",
         collection: idx.collection,
@@ -226,6 +239,16 @@ function checkDatabaseIndexes(projectRoot) {
       })
     }
     if (!declaredMatches(idx)) {
+      if (idx.requiredInDeclaration) {
+        violations.push({
+          type: "required_index_missing_in_declared",
+          collection: idx.collection,
+          fields: idx.fields,
+          message: `必需索引未在本地 security-rules/database-indexes.json 中正确声明：${idx.collection}(${idx.fields.join("+")}) [非唯一，字段顺序须一致]`,
+          severity: "blocking",
+        })
+        return
+      }
       warnings.push({
         type: "blocking_index_missing_in_declared",
         collection: idx.collection,
@@ -305,11 +328,12 @@ function checkDatabaseIndexes(projectRoot) {
 }
 
 function printReport(result) {
-  const title = colorize("【数据库索引与集合安全巡检 checkDatabaseIndexes】", "bold")
+  const title = colorize("【数据库索引与集合本地声明检查 checkDatabaseIndexes】", "bold")
   console.log(title)
+  console.log("仅检查仓库中的集合与索引声明，未查询云端；通过不代表云端集合、权限或索引已创建生效。")
   console.log("")
 
-  console.log(colorize("【16 个业务集合 × security-rules/manifest.json 覆盖】", "cyan"))
+  console.log(colorize(`【${result.collections.expected} 个集合 × security-rules/manifest.json 声明覆盖】`, "cyan"))
   const collectionRows = result.collections.missing.length === 0
     ? [{ name: "（全部覆盖）", count: result.collections.protectedInManifest }]
     : result.collections.missing.map((name) => ({ name, count: "缺" }))
@@ -322,7 +346,7 @@ function printReport(result) {
   )
 
   console.log("")
-  console.log(colorize("【31 条建议索引优先级与文档状态】", "cyan"))
+  console.log(colorize(`【${result.indexes.recommended} 条索引检查项优先级与文档状态】`, "cyan"))
   const prioLabel = {
     blocking: colorize("阻断", "red"),
     high: colorize("高", "yellow"),
@@ -382,11 +406,11 @@ function printReport(result) {
     result.status === "pass"
       ? colorize("✅ PASS", "green")
       : result.status === "warn"
-      ? colorize("⚠  WARN（可发布，建议补索引）", "yellow")
+      ? colorize("⚠  WARN（本地声明存在建议项）", "yellow")
       : colorize("✖ FAIL（存在阻断项，禁止发布）", "red")
-  console.log(`最终结论：${statusLabel}`)
+  console.log(`本地声明检查结论：${statusLabel}`)
   if (result.status === "warn") {
-    console.log(colorize("  提示：推荐索引属于性能建议，缺少唯一索引的正确性阻断项会单独判定为 FAIL。", "gray"))
+    console.log(colorize("  提示：普通推荐索引属于性能建议；标记必需的本地索引声明及其他阻断项缺失会判定为 FAIL。", "gray"))
   }
 }
 

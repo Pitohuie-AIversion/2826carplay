@@ -8,11 +8,13 @@ const { run: nm } = require("./cloudNmCheck");
 const { run: rc } = require("./cloudRcSync");
 const { run: auth } = require("./cloudAuthAudit");
 const { run: spec } = require("./cloudSpecCheck");
+const { run: runtime } = require("./cloudRuntimeCheck");
 
 const STEPS = [
   { key: "SDK", name: "SDK 版本一致性（cloud:sdk:check）", runner: () => sdk({ cli: false }) },
   { key: "NM", name: "node_modules 残留（cloud:nm:check）", runner: () => nm({ cli: false }) },
   { key: "RC", name: "配置×目录一致性（cloud:rc:sync --dry）", runner: () => rc({ cli: false, flags: { "--dry": true } }) },
+  { key: "RUNTIME", name: "运行时生命周期（cloud:runtime:check）", runner: () => runtime({ cli: false }) },
   { key: "AUTH", name: "权限审计（cloud:auth:audit）", runner: () => auth({ cli: false }) },
   { key: "SPEC", name: "规格体检（cloud:spec:check）", runner: () => spec({ cli: false }) },
 ];
@@ -20,7 +22,7 @@ const STEPS = [
 function run(opts = {}) {
   const _ = opts.cli !== false ? parseArgs(process.argv) : null;
   console.log(colorize("【云端·全景汇总检查 cloud:check】", "bold"));
-  console.log(colorize("（串行跑 SDK / NM / RC / AUTH / SPEC 5 项，不含 cloud:audit 因其耗时）", "gray"));
+  console.log(colorize("（串行跑 SDK / NM / RC / RUNTIME / AUTH / SPEC 6 项，不含 cloud:audit 因其耗时）", "gray"));
   console.log("");
   const rows = [];
   let passed = 0;
@@ -39,6 +41,7 @@ function run(opts = {}) {
     if (s.key === "SDK") note = `target=${res.target} 通过=${res.passed}`;
     if (s.key === "NM") note = `残留=${res.dirty}`;
     if (s.key === "RC") note = `missing=${res.missing.length} extra=${res.extra.length}`;
+    if (s.key === "RUNTIME") note = `问题=${res.issues ? res.issues.length : "检查失败"}`;
     if (s.key === "AUTH") note = `unexpected=${res.unexpected.length}`;
     if (s.key === "SPEC") note = `警告=${res.warnings}`;
     rows.push({

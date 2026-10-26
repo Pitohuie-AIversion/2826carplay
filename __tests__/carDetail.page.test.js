@@ -698,13 +698,16 @@ describe("pages/car-detail 客户侧车辆状态", () => {
     expect(wxss).toContain(".poster-modal-overlay")
   })
 
-  test("保存海报支持授权失败友好提示与成功提示", () => {
+  test("保存海报支持授权失败恢复入口与成功提示", () => {
     let saveCallback = null
     global.wx = {
       saveImageToPhotosAlbum: jest.fn((options) => {
         saveCallback = options
       }),
-      showToast: jest.fn()
+      showToast: jest.fn(),
+      showModal: jest.fn(),
+      openSetting: jest.fn(),
+      getSetting: jest.fn(({ success }) => success({ authSetting: { "scope.writePhotosAlbum": false } }))
     }
     const page = createPage(loadPageDefinition())
     page.setData({ posterImagePath: "wxfile://tmp/poster.png", posterModalVisible: true })
@@ -716,12 +719,10 @@ describe("pages/car-detail 客户侧车辆状态", () => {
       })
     )
 
-    // 1. 模拟相册权限拒绝时给出明确开启提示
+    // 相册授权拒绝后由用户确认打开设置，不自动重复请求。
     saveCallback.fail({ errMsg: "saveImageToPhotosAlbum:fail auth deny" })
-    expect(global.wx.showToast).toHaveBeenCalledWith({
-      title: "请开启相册权限",
-      icon: "none"
-    })
+    expect(global.wx.showModal).toHaveBeenCalledWith(expect.objectContaining({ confirmText: "去设置" }))
+    expect(global.wx.openSetting).not.toHaveBeenCalled()
 
     // 2. 模拟保存成功时提示并关闭弹窗
     saveCallback.success()

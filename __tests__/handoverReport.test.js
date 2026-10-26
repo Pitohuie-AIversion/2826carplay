@@ -1,7 +1,9 @@
 const {
   buildHandoverReport,
   formatHandoverCsvContent,
-  getHandoverFileName
+  getHandoverFileName,
+  WECHAT_PAY_SCORE_RENTAL_FEE_CATEGORIES,
+  normalizeRentalFeeCategory
 } = require("../shared/handoverReport")
 
 describe("handoverReport helper", () => {
@@ -151,5 +153,34 @@ describe("handoverReport helper", () => {
       expect(name).not.toMatch(/[\\/:]/)
       expect(name).toMatch(/^验车留证单_取车_.+\.csv$/)
     })
+  })
+
+  test("微信支付分免押租车 8 类官方后付费收费项目严格白名单校验", () => {
+    expect(WECHAT_PAY_SCORE_RENTAL_FEE_CATEGORIES).toHaveLength(8)
+    expect(WECHAT_PAY_SCORE_RENTAL_FEE_CATEGORIES).toEqual([
+      "租车相关费用",
+      "延迟还车费用",
+      "加油费用",
+      "ETC高速费用",
+      "车损费用",
+      "折旧费用",
+      "停运费用",
+      "闯红灯违章"
+    ])
+    expect(Object.isFrozen(WECHAT_PAY_SCORE_RENTAL_FEE_CATEGORIES)).toBe(true)
+
+    // 测试归一化函数
+    expect(normalizeRentalFeeCategory("租车相关费用")).toBe("租车相关费用")
+    expect(normalizeRentalFeeCategory("超时还车4小时")).toBe("延迟还车费用")
+    expect(normalizeRentalFeeCategory("燃油未加满差额")).toBe("加油费用")
+    expect(normalizeRentalFeeCategory("纯电补能服务费")).toBe("加油费用")
+    expect(normalizeRentalFeeCategory("沪杭高速ETC通行费")).toBe("ETC高速费用")
+    expect(normalizeRentalFeeCategory("前杠擦碰钣金修复")).toBe("车损费用")
+    expect(normalizeRentalFeeCategory("车辆事故贬值费")).toBe("折旧费用")
+    expect(normalizeRentalFeeCategory("修车停工损失")).toBe("停运费用")
+    expect(normalizeRentalFeeCategory("高架超速违章代缴")).toBe("闯红灯违章")
+    expect(normalizeRentalFeeCategory("未知杂费项目")).toBe("租车相关费用")
+    expect(normalizeRentalFeeCategory(null)).toBe("租车相关费用")
+    expect(normalizeRentalFeeCategory("")).toBe("租车相关费用")
   })
 })

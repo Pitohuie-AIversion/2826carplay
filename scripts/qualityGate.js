@@ -5,8 +5,8 @@
  * 1. 结构与文件规范 (checkProjectStructure)
  * 2. 密钥与敏感凭据防线 (checkRepositorySecrets)
  * 3. 运营攻略内容合规校验 (contentDraftsValidate)
- * 4. 16 集合 × 52 复合索引安全规则巡检 (checkDatabaseIndexes)
- * 5. 56 个云函数架构规范与安全鉴权审计 (cloudCheck)
+ * 4. 集合安全规则与索引清单巡检 (checkDatabaseIndexes)
+ * 5. 云函数架构规范、运行时生命周期与安全鉴权审计 (cloudCheck)
  * 6. 小程序主包与分包体积预算 (checkMiniProgramPackage, <= 1.75 MiB)
  * 7. Jest 自动化测试全量回归（数量以本次运行结果为准）
  * 8. 无头全页面组件交互点击仿真
@@ -50,7 +50,7 @@ const STAGES = [
   },
   {
     id: "cloud",
-    name: "阶段 5/9: 云函数架构规范与安全鉴权审计 (56 Functions)",
+    name: "阶段 5/9: 云函数架构、运行时生命周期与安全鉴权审计",
     script: "scripts/cloudCheck.js",
     args: []
   },

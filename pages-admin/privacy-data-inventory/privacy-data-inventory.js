@@ -1,3 +1,4 @@
+const { closePageCsvPreview, openPageCsvPreview } = require("../../shared/pageCsvFileActions")
 const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
 const { formatToastTitle } = require("../../shared/uiFeedback")
 const {
@@ -19,7 +20,7 @@ const { STATUS_TEXT_MAP: BOOKING_STATUS_LABELS } = require("../../shared/booking
 const {
   canShareCsvFile,
   isUserCancelError,
-  openCsvFile,
+
   removeCsvFile,
   saveCsvFile,
   shareCsvFile
@@ -256,7 +257,10 @@ Page({
       }
     })
   },
+  onHide() { closePageCsvPreview(this) },
+  handleCloseCsvPreview() { closePageCsvPreview(this) },
   onUnload() {
+    closePageCsvPreview(this, { unload: true })
     cancelPagePermissionCheck(this)
     cancelPageCsvFileActions(this)
     cancelPageNativeActions(this)
@@ -466,6 +470,7 @@ Page({
                   return
                 }
                 const previousFilePath = this.data.exportFilePath
+                closePageCsvPreview(this)
                 this.setData({
                   exportFilePath: filePath,
                   exportFileName: fileName,
@@ -523,21 +528,8 @@ Page({
     })
   },
   handleOpenExportedFile() {
-    if (this.data.exporting || !this.data.exportFilePath) {
-      return
-    }
-    const filePath = this.data.exportFilePath
-    const action = beginPageCsvFileAction(this, filePath)
-    const nativeAction = beginPageNativeAction(this, { requireCurrent: true })
-    openCsvFile(filePath).catch(() => {
-      if ((!isPageCsvFileActionActive(this, action) || !isPageNativeActionActive(this, nativeAction))) {
-        return
-      }
-      wx.showToast({
-        title: "文件已生成",
-        icon: "none"
-      })
-    })
+    if (this.data.exporting || !this.data.exportFilePath) return
+    return openPageCsvPreview(this, this.data.exportFilePath, this.data.exportFileName)
   },
   handleDeleteExportedFile() {
     const filePath = String(this.data.exportFilePath || "")

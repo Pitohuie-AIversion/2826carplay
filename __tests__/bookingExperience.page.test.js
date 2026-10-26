@@ -73,6 +73,54 @@ describe("预约表单人性化体验", () => {
     expect(page.data.formProgress.phoneComplete).toBe(true)
   })
 
+  test("主动清除本机联系人只删除联系记忆，保留已填表单与其他缓存", () => {
+    const saved = { userName: "张先生", phone: "13800138000" }
+    const storage = new Map([["lastBookingContact", saved], ["bookings_snapshot", [{ id: "booking_1" }]]])
+    global.wx = {
+      getStorageSync: jest.fn((key) => storage.get(key)),
+      removeStorageSync: jest.fn((key) => storage.delete(key)), showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition())
+    page.loadSavedContact()
+    page.handleUseSavedContact()
+    const form = { ...page.data.form }
+    page.handleClearSavedContact()
+    expect(storage.has("lastBookingContact")).toBe(false)
+    expect(storage.get("bookings_snapshot")).toEqual([{ id: "booking_1" }])
+    expect(page._savedContact).toBeNull()
+    expect(page.data.savedContactAvailable).toBe(false)
+    expect(page.data.form).toEqual(form)
+    expect(wx.showToast).toHaveBeenLastCalledWith({ title: "已清除本机联系人", icon: "none" })
+    const reopened = createPage(loadPageDefinition())
+    reopened.loadSavedContact()
+    expect(reopened.data.savedContactAvailable).toBe(false)
+  })
+
+  test("本地删除失败不误报成功，也不清掉内存中的联系人", () => {
+    const saved = { userName: "张先生", phone: "13800138000" }
+    global.wx = {
+      getStorageSync: jest.fn(() => saved),
+      removeStorageSync: jest.fn(() => { throw new Error("storage failure") }), showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition())
+    page.loadSavedContact()
+    page.handleClearSavedContact()
+    expect(page._savedContact).toEqual(saved)
+    expect(page.data.savedContactAvailable).toBe(true)
+    expect(wx.showToast).toHaveBeenLastCalledWith({ title: "清除失败，请重试", icon: "none" })
+  })
+
+  test.each(["hidden", "unloaded", "submitting"])("%s 页面不清除联系人", (state) => {
+    global.wx = { removeStorageSync: jest.fn(), showToast: jest.fn() }
+    const page = createPage(loadPageDefinition())
+    global.getCurrentPages = () => state === "hidden" ? [page, {}] : [page]
+    if (state === "unloaded") page.onUnload()
+    if (state === "submitting") page.data.isSubmitting = true
+    page.handleClearSavedContact()
+    expect(wx.removeStorageSync).not.toHaveBeenCalled()
+    expect(wx.showToast).not.toHaveBeenCalled()
+  })
+
   test("常用日期快捷按钮可安排三天行程并提供即时手机号提示", () => {
     global.wx = {}
     const page = createPage(loadPageDefinition())
@@ -87,6 +135,7 @@ describe("预约表单人性化体验", () => {
     expect(wxml).toContain("field-inline-error")
     expect(wxml).toContain('data-action="three-days"')
     expect(wxml).toContain("使用上次联系人")
+    expect(wxml).toContain('bindtap="handleClearSavedContact"')
   })
 
   test.each([

@@ -1,4 +1,16 @@
 {
+  "admin_upload_sessions": [
+    {
+      "name": "admin_upload_sessions_expiresAt",
+      "unique": false,
+      "fields": [{ "field": "expiresAt", "order": "asc" }]
+    },
+    {
+      "name": "admin_upload_sessions_openid_expiresAt",
+      "unique": false,
+      "fields": [{ "field": "openid", "order": "asc" }, { "field": "expiresAt", "order": "asc" }]
+    }
+  ],
   "content_guides": [
     {
       "name": "content_guides_slug_unique",

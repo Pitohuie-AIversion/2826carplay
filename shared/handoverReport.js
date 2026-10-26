@@ -181,10 +181,50 @@ function getHandoverFileName(bookingInput, handoverInput) {
   return `验车留证单_${stage}_${bookingId}_${today}_${REPORT_SESSION_ID}_${reportExportSerial}.csv`
 }
 
+/**
+ * 微信支付分「免押租车」官方标准 8 类后付费收费项目规范
+ * 微信官方《免押租车业务类目接入指南》严格约束：完结免押租车订单后付费项目必须属于以下 8 类标准化费用名称之一，严禁自创非法费用项
+ */
+const WECHAT_PAY_SCORE_RENTAL_FEE_CATEGORIES = Object.freeze([
+  "租车相关费用",
+  "延迟还车费用",
+  "加油费用",
+  "ETC高速费用",
+  "车损费用",
+  "折旧费用",
+  "停运费用",
+  "闯红灯违章"
+])
+
+/**
+ * 辅助映射函数：将验车/还车产生的各类结算费用项，安全归一化对齐到微信支付分官方 8 类收费项目白名单
+ * @param {string} rawCategory - 原始业务费用名称或关键字
+ * @returns {string} 归一化后的微信官方标准费用项名称
+ */
+function normalizeRentalFeeCategory(rawCategory) {
+  if (!rawCategory || typeof rawCategory !== "string") {
+    return "租车相关费用"
+  }
+  const clean = rawCategory.trim()
+  if (WECHAT_PAY_SCORE_RENTAL_FEE_CATEGORIES.includes(clean)) {
+    return clean
+  }
+  if (/违章|罚款|闯红灯|超速|违停/i.test(clean)) return "闯红灯违章"
+  if (/停运|误工|停工/i.test(clean)) return "停运费用"
+  if (/折旧|贬值/i.test(clean)) return "折旧费用"
+  if (/延|超时|续租|迟/i.test(clean)) return "延迟还车费用"
+  if (/油|电|充|补能/i.test(clean)) return "加油费用"
+  if (/etc|通行|高速|路桥/i.test(clean)) return "ETC高速费用"
+  if (/损|划痕|擦碰|玻璃|钣金|维修/i.test(clean)) return "车损费用"
+  return "租车相关费用"
+}
+
 module.exports = {
   buildHandoverReport,
   formatHandoverCsvContent,
   getHandoverFileName,
   DAMAGE_TYPE_LABELS,
-  PART_LABELS
+  PART_LABELS,
+  WECHAT_PAY_SCORE_RENTAL_FEE_CATEGORIES,
+  normalizeRentalFeeCategory
 }

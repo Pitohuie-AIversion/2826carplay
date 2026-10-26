@@ -1,5 +1,9 @@
 const CSV_SESSION_ID = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
 let csvSaveSerial = 0
+const CSV_PREVIEW_MAX_BYTES = 128 * 1024
+const CSV_PREVIEW_MAX_ROWS = 100
+const CSV_PREVIEW_MAX_COLUMNS = 30
+const CSV_PREVIEW_MAX_CELL_CHARS = 2000
 
 function getErrorMessage(error) {
   if (!error) {
@@ -51,7 +55,11 @@ async function saveCsvFile(options) {
   const filePath = `${basePath}/csv_${CSV_SESSION_ID}_${csvSaveSerial}.csv`
 
   return new Promise((resolve, reject) => {
+    let settled = false
+    let writeSuccessHandled = false
     const fail = (error) => {
+      if (settled) return
+      settled = true
       removeCsvFile(filePath).catch(() => {})
       reject(error)
     }
@@ -59,7 +67,16 @@ async function saveCsvFile(options) {
       filePath,
       data: String(input.csvText || ""),
       encoding: "utf8",
-      success: () => resolve({ filePath, fileName }),
+      success: () => {
+        if (writeSuccessHandled) return
+        writeSuccessHandled = true
+        if (settled) {
+          removeCsvFile(filePath).catch(() => {})
+          return
+        }
+        settled = true
+        resolve({ filePath, fileName })
+      },
       fail
     }
     try {
@@ -107,20 +124,107 @@ async function removeCsvFile(filePath) {
   })
 }
 
+function parseCsvPreview(text, options) {
+  const source = String(text || "").replace(/^\ufeff/, "")
+  const partial = Boolean(options && options.partial)
+  const rows = []
+  let row = [], field = "", quoted = false, touched = false, clipped = false
+  let truncated = partial
+  const append = (value) => {
+    touched = true
+    if (field.length < CSV_PREVIEW_MAX_CELL_CHARS) field += value
+    else clipped = truncated = true
+  }
+  const finishField = () => {
+    if (row.length < CSV_PREVIEW_MAX_COLUMNS) row.push(field + (clipped ? "…" : ""))
+    else truncated = true
+    field = ""
+    clipped = false
+  }
+  const finishRow = () => {
+    finishField()
+    if (rows.length >= CSV_PREVIEW_MAX_ROWS) { truncated = true; return false }
+    rows.push(row)
+    row = []
+    touched = false
+    return true
+  }
+  for (let i = 0; i < source.length; i += 1) {
+    const character = source[i]
+    if (character === '"') {
+      touched = true
+      if (quoted && source[i + 1] === '"') { append('"'); i += 1 }
+      else if (quoted || !field) quoted = !quoted
+      else append(character)
+    } else if (character === "," && !quoted) {
+      touched = true
+      finishField()
+    } else if ((character === "\r" || character === "\n") && !quoted) {
+      if (!finishRow()) break
+      if (character === "\r" && source[i + 1] === "\n") i += 1
+    } else append(character)
+  }
+  if (!partial && quoted) throw new Error("CSV 内容不完整")
+  if (!partial && (touched || row.length || field)) finishRow()
+  return { rows, truncated }
+}
+
+// CSV is not a supported openDocument format. Read a bounded prefix for the in-page viewer.
 function openCsvFile(filePath) {
-  return new Promise((resolve, reject) => {
-    if (typeof wx.openDocument !== "function") {
-      reject(new Error("当前环境不支持打开文件"))
-      return
+  let cancel = () => {}
+  const promise = new Promise((resolve, reject) => {
+    let settled = false
+    let timer = null
+    const finish = (error, value) => {
+      if (settled) return
+      settled = true
+      if (timer) clearTimeout(timer)
+      if (error) reject(error)
+      else resolve(value)
     }
-    wx.openDocument({
-      filePath,
-      fileType: "csv",
-      showMenu: true,
-      success: resolve,
-      fail: reject
-    })
+    cancel = () => finish(null, { rows: [], truncated: false })
+    try {
+      const base = String(wx.env && wx.env.USER_DATA_PATH || "").replace(/\\/g, "/").replace(/\/+$/, "")
+      const target = String(filePath || "").replace(/\\/g, "/")
+      if (!base || !target.startsWith(`${base}/`) || !/\.csv$/i.test(target) ||
+          target.slice(base.length + 1).split("/").some((part) => part === "." || part === "..")) {
+        throw new Error("仅支持预览小程序目录内的 CSV 文件")
+      }
+      const fs = wx.getFileSystemManager && wx.getFileSystemManager()
+      if (!fs || typeof fs.stat !== "function" || typeof fs.readFile !== "function") throw new Error("当前环境不支持文件预览")
+      timer = setTimeout(() => finish(new Error("预览读取超时")), 10000)
+      fs.stat({
+        path: target,
+        success: (result) => {
+          if (settled) return
+          const size = result && result.stats && result.stats.size
+          if (!Number.isFinite(size) || size < 0) { finish(new Error("无法读取文件大小")); return }
+          if (!size) { finish(null, { rows: [], truncated: false }); return }
+          try {
+            fs.readFile({
+              filePath: target,
+              encoding: "utf8",
+              position: 0,
+              length: Math.min(size, CSV_PREVIEW_MAX_BYTES),
+              success: (read) => {
+                if (settled) return
+                try {
+                  const content = String(read && read.data || "")
+                  finish(null, parseCsvPreview(content.slice(0, CSV_PREVIEW_MAX_BYTES), {
+                    partial: size > CSV_PREVIEW_MAX_BYTES || content.length > CSV_PREVIEW_MAX_BYTES
+                  }))
+                } catch (error) { finish(error) }
+              },
+              fail: (error) => finish(error)
+            })
+          } catch (error) { finish(error) }
+        },
+        fail: (error) => finish(error)
+      })
+    } catch (error) { finish(error) }
   })
+  promise.cancel = () => cancel()
+  return promise
 }
 
 function shareCsvFile(filePath, fileName) {
@@ -139,11 +243,13 @@ function shareCsvFile(filePath, fileName) {
 }
 
 module.exports = {
+  CSV_PREVIEW_MAX_BYTES,
   canShareCsvFile,
   ensureCsvFileName,
   getErrorMessage,
   isUserCancelError,
   openCsvFile,
+  parseCsvPreview,
   removeCsvFile,
   saveCsvFile,
   shareCsvFile

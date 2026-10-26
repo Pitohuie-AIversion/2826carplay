@@ -1,0 +1,19 @@
+<view class="csv-mask" catchtouchmove="handleMaskMove">
+  <view class="csv-panel" aria-role="dialog" aria-label="CSV 文件预览">
+    <view class="csv-heading">
+      <text class="csv-title">{{preview.fileName}}</text>
+      <button class="csv-close" bindtap="handleClose" aria-label="关闭文件预览">关闭</button>
+    </view>
+    <text wx:if="{{preview.loading}}" class="csv-status">正在读取文件…</text>
+    <text wx:elif="{{!preview.rows.length}}" class="csv-status">暂无可预览的完整内容，可分享原文件查看。</text>
+    <scroll-view wx:else class="csv-scroll" scroll-x="{{true}}" scroll-y="{{true}}" enhanced="{{true}}" show-scrollbar="{{false}}" aria-label="文件内容，可上下左右滑动查看">
+      <view class="csv-table">
+        <view wx:for="{{displayRows}}" wx:for-item="row" wx:key="index" class="csv-row {{row.index === 0 ? 'csv-first-row' : ''}}">
+          <text wx:for="{{row.cells}}" wx:for-item="cell" wx:key="index" class="csv-cell" selectable="{{true}}">{{cell.text}}</text>
+        </view>
+      </view>
+    </scroll-view>
+    <text wx:if="{{preview.truncated}}" class="csv-note horizontal-scroll-cue">可上下左右滑动。仅预览部分内容（最多 100 行、30 列，长内容已省略）。分享原文件可查看完整内容。</text>
+    <text wx:else class="csv-note horizontal-scroll-cue">可上下左右滑动查看各行各列。预览不会修改原文件。</text>
+  </view>
+</view>

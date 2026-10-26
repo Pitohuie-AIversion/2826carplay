@@ -23,6 +23,8 @@ describe.each(EXPORT_PAGES)("%s CSV export lifecycle", (label, modulePath, busyF
     requests = []
     files = new Map()
     fileSystem = {
+      stat: jest.fn(({ path, success, fail }) => files.has(path) ? success({ stats: { size: Buffer.byteLength(files.get(path)) } }) : fail(new Error("file unavailable"))),
+      readFile: jest.fn(({ filePath, success }) => success({ data: files.get(filePath) })),
       writeFile: jest.fn((options) => writes.push(options)),
       unlink: jest.fn(({ filePath, success }) => {
         files.delete(filePath)
@@ -166,10 +168,12 @@ describe.each(EXPORT_PAGES)("%s CSV export lifecycle", (label, modulePath, busyF
 
   test("opening failure is reported as a failure and share cancellation stays silent", async () => {
     Object.assign(page.data, { exportFilePath: "/data/old.csv", exportFileName: "old.csv" })
-    wx.openDocument.mockImplementationOnce(() => { throw new Error("file unavailable") })
+    fileSystem.stat.mockImplementationOnce(({ fail }) => fail(new Error("file unavailable")))
     page.handleOpenExportedFile()
     await flushPromises()
     expect(wx.showToast).toHaveBeenCalledWith({ title: "文件打开失败", icon: "none" })
+    expect(fileSystem.stat).toHaveBeenCalledWith(expect.objectContaining({ path: "/data/old.csv" }))
+    expect(wx.openDocument).not.toHaveBeenCalled()
     wx.showToast.mockClear()
     wx.openDocument.mockClear()
     wx.shareFileMessage.mockImplementationOnce(({ fail }) => fail({ errMsg: "shareFileMessage:fail cancel" }))

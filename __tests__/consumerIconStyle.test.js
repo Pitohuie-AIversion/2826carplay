@@ -340,7 +340,8 @@ describe("用户主流程原生图标", () => {
       }
     })
 
-    expect(styleFiles).toHaveLength(32)
+    expect(styleFiles).toHaveLength(33)
+    expect(styleFiles).toContain(path.join("components", "csv-preview", "csv-preview.wxss"))
     expect(fontSizeDeclarationCount).toBeGreaterThanOrEqual(700)
     expect(undersizedDeclarations).toEqual([])
   })
@@ -473,14 +474,19 @@ describe("用户主流程原生图标", () => {
         expect(markup).toContain('aria-label="')
         expect(source).toMatch(/(?:ui-scroll-cue|horizontal-scroll-cue|section-scroll-cue)/)
 
-        if (!markup.includes('class="trend-scroll"')) {
+        // 图表与 CSV 表格自由滚动；筛选栏才需要将当前选项滚动到可见位置。
+        if (!markup.includes('class="trend-scroll"') && !markup.includes('class="csv-scroll"')) {
           expect(markup).toContain("scroll-with-animation")
           expect(markup).toContain('scroll-into-view="')
+        }
+        if (markup.includes('class="csv-scroll"')) {
+          expect(markup).toContain('scroll-y="{{true}}"')
+          expect(source).toContain("可上下左右滑动")
         }
       })
     })
 
-    expect(horizontalScrollCount).toBe(13)
+    expect(horizontalScrollCount).toBe(14)
   })
 
   test("全站用户可见缺省值不使用技术双短横或 N/A", () => {
@@ -619,7 +625,7 @@ describe("用户主流程原生图标", () => {
     let infoModalCount = 0
 
     allSources.forEach((source) => {
-      extractBalancedCallBodies(source, "wx.showModal({").forEach((body) => {
+      extractModalHeaders(source).forEach(({ header: body }) => {
         if (!/showCancel\s*:\s*false/.test(body)) {
           return
         }
@@ -633,7 +639,22 @@ describe("用户主流程原生图标", () => {
       })
     })
 
-    expect(infoModalCount).toBe(23)
+    expect(infoModalCount).toBe(21)
+  })
+
+  test("纯信息弹窗计数不包含回调中嵌套提示的确认弹窗", () => {
+    const source = `wx.showModal({
+      title: "确认清理",
+      success: () => {
+        wx.showModal({
+          title: "清理完成",
+          showCancel: false
+        })
+      }
+    })`
+    const headers = extractModalHeaders(source)
+    expect(headers).toHaveLength(2)
+    expect(headers.filter(({ header }) => /showCancel\s*:\s*false/.test(header))).toHaveLength(1)
   })
 
   test("动态轻提示保留短消息并为长消息使用业务回退", () => {
@@ -696,7 +717,19 @@ describe("用户主流程原生图标", () => {
     )
     const bookingDetailSource = read("pages/booking-detail/booking-detail.js")
 
-    expect(currentOnlyActionCount).toBe(111)
+    // 六个 CSV 入口迁入共享守卫；新增联系人清理与工具请求各保留一个页面守卫。
+    expect(currentOnlyActionCount).toBe(107)
+    const csvActions = read("shared/pageCsvFileActions.js")
+    expect(csvActions).toContain("beginPageNativeAction(page, { requireCurrent: true })")
+    expect(csvActions).toContain("isPageNativeActionActive(page, nativeAction)")
+    ;[
+      "pages/booking-detail/booking-detail.js",
+      "pages/booking-manage-detail/booking-manage-detail.js",
+      "pages/booking-manage/booking-manage.js",
+      "pages-admin/audit-log-manage/audit-log-manage.js",
+      "pages-admin/error-log-manage/error-log-manage.js",
+      "pages-admin/privacy-data-inventory/privacy-data-inventory.js"
+    ].forEach((relativePath) => expect(read(relativePath)).toContain("return openPageCsvPreview(this,"))
     expect(bookingDetailSource).toContain("isPageCurrent(this)")
     expect(read("app.js")).toContain("nativeActionAppVisible = false")
     expect(read("app.js")).toContain("nativeActionAppVisible = true")
@@ -798,7 +831,7 @@ describe("用户主流程原生图标", () => {
 
   test("图片选择与文件分享会静默处理用户主动取消", () => {
     const vehicleSource = read("pages-admin/vehicle-detail-manage/vehicle-detail-manage.js")
-    const chooseImageCalls = extractBalancedCallBodies(vehicleSource, "wx.chooseImage({")
+    const chooseImageCalls = extractBalancedCallBodies(vehicleSource, "chooseImageFiles({")
     const csvSharePages = [
       "pages/booking-manage/booking-manage.js",
       "pages-admin/audit-log-manage/audit-log-manage.js",
@@ -808,8 +841,18 @@ describe("用户主流程原生图标", () => {
 
     expect(chooseImageCalls).toHaveLength(1)
     expect(chooseImageCalls[0]).toMatch(/fail:/)
+    expect(chooseImageCalls[0]).toContain("isPageNativeActionActive(this, action)")
     expect(chooseImageCalls[0]).toContain("isUserCancelError(error)")
     expect(chooseImageCalls[0]).toContain("选择图片失败，请重试")
+    const imageSelection = read("shared/imageSelection.js")
+    const mediaCalls = extractBalancedCallBodies(imageSelection, "wx.chooseMedia({")
+    const fallbackCalls = extractBalancedCallBodies(imageSelection, "wx.chooseImage({")
+    expect(mediaCalls).toHaveLength(1)
+    expect(fallbackCalls).toHaveLength(1)
+    expect(imageSelection).toContain("const fail = once(input.fail)")
+    expect(mediaCalls[0]).toContain('mediaType: ["image"]')
+    expect(mediaCalls[0]).toMatch(/\bfail\s*$/)
+    expect(fallbackCalls[0]).toMatch(/\bfail\s*$/)
     csvSharePages.forEach((relativePath) => {
       expect(read(relativePath)).toContain("isUserCancelError(error)")
     })

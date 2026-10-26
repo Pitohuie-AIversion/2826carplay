@@ -7,6 +7,7 @@ const { requestCloudRead } = require("../../shared/cloudReadRequest")
 const { resolveServiceHub, hasHubCoordinates } = require("../../shared/locations")
 const { onNetworkReconnect } = require("../../shared/networkStatus")
 const { triggerHapticFeedback } = require("../../shared/hapticFeedback")
+const { handleAlbumSaveError } = require("../../shared/albumPermission")
 const {
   activatePageNativeActions,
   beginPageNativeAction,
@@ -1725,15 +1726,7 @@ Page({
         },
         fail: (err) => {
           if (!isPageNativeActionActive(this, action) || !isActive()) return
-          const msg = String((err && (err.errMsg || err.message)) || "").toLowerCase()
-          if (msg.includes("cancel")) {
-            return
-          }
-          if (msg.includes("auth") || msg.includes("authorize") || msg.includes("denied")) {
-            wx.showToast({ title: "请开启相册权限", icon: "none" })
-            return
-          }
-          wx.showToast({ title: "保存未完成", icon: "none" })
+          handleAlbumSaveError(this, err, isActive)
         }
       })
     } else {

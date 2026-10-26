@@ -65,6 +65,29 @@ describe("shared/csvFile", () => {
     }))
   })
 
+  test.each(["late-fail", "throw-after-success"])("写入已交付后 %s 不删除已导出的文件", async (mode) => {
+    const files = new Set()
+    let write
+    const unlink = jest.fn(({ filePath, success }) => { files.delete(filePath); success() })
+    global.wx = {
+      env: { USER_DATA_PATH: "/user-data" },
+      getFileSystemManager: () => ({
+        unlink,
+        writeFile: (options) => {
+          write = options
+          files.add(options.filePath)
+          options.success()
+          if (mode === "throw-after-success") throw new Error("bridge completed then threw")
+        }
+      })
+    }
+    const helper = loadModule()
+    const result = await helper.saveCsvFile({ fileName: "saved.csv", csvText: "private,content" })
+    if (mode === "late-fail") write.fail(new Error("duplicate failure"))
+    expect(files.has(result.filePath)).toBe(true)
+    expect(unlink).not.toHaveBeenCalled()
+  })
+
   test("文件系统初始化异常作为 Promise 失败返回", async () => {
     global.wx = { getFileSystemManager: () => { throw new Error("fs unavailable") } }
     const helper = loadModule()

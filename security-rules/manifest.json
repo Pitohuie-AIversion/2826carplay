@@ -3,6 +3,7 @@
     "ruleFile": "database-deny-client.json",
     "indexFile": "database-indexes.json",
     "collections": [
+      "admin_upload_sessions",
       "analytics_events",
       "app_configs",
       "audit_logs",
@@ -26,6 +27,8 @@
     "publicReadPrefix": "vehicle-images/",
     "privateUploadPrefix": "handover-images/",
     "maxUploadBytes": 10485760,
+    "uploadFunction": "adminImageUpload",
+    "clientWriteEnabled": false,
     "allowedImageExtensions": ["jpg", "jpeg", "png", "webp"]
   },
   "functions": {

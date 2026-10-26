@@ -1,3 +1,4 @@
+const { closePageCsvPreview, openPageCsvPreview } = require("../../shared/pageCsvFileActions")
 const { activatePageNativeActions, beginPageNativeAction, cancelPageNativeActions, isPageNativeActionActive } = require("../../shared/pageNativeAction")
 const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
 const { formatToastTitle, buildSummaryRows } = require("../../shared/uiFeedback")
@@ -13,7 +14,7 @@ const { formatDisplayTime } = require("../../shared/formatTime")
 const {
   canShareCsvFile,
   isUserCancelError,
-  openCsvFile,
+
   removeCsvFile,
   saveCsvFile,
   shareCsvFile
@@ -167,7 +168,10 @@ Page({
       wx.stopPullDownRefresh()
     })
   },
+  onHide() { closePageCsvPreview(this) },
+  handleCloseCsvPreview() { closePageCsvPreview(this) },
   onUnload() {
+    closePageCsvPreview(this, { unload: true })
     cancelPageNativeActions(this)
     cancelPagePermissionCheck(this)
     cancelPageCsvFileActions(this)
@@ -321,6 +325,7 @@ Page({
               return
             }
             const previousFilePath = this.data.exportFilePath
+            closePageCsvPreview(this)
             this.setData({
               exporting: false,
               exportFilePath: filePath,
@@ -379,21 +384,8 @@ Page({
     })
   },
   handleOpenExportedFile() {
-    if (this.data.exporting || !this.data.exportFilePath) {
-      return
-    }
-    const filePath = this.data.exportFilePath
-    const action = beginPageCsvFileAction(this, filePath)
-    const nativeAction = beginPageNativeAction(this, { requireCurrent: true })
-    openCsvFile(filePath).catch(() => {
-      if ((!isPageCsvFileActionActive(this, action) || !isPageNativeActionActive(this, nativeAction))) {
-        return
-      }
-      wx.showToast({
-        title: "文件打开失败",
-        icon: "none"
-      })
-    })
+    if (this.data.exporting || !this.data.exportFilePath) return
+    return openPageCsvPreview(this, this.data.exportFilePath, this.data.exportFileName)
   },
   handleDeleteExportedFile() {
     const filePath = String(this.data.exportFilePath || "")

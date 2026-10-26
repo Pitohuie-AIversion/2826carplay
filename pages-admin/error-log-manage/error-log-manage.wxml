@@ -149,3 +149,4 @@
     <button wx:if="{{keyword || currentFunc !== 'all'}}" class="empty-reset-btn ui-btn ui-btn-ghost" bindtap="handleResetFilters"><view class="reset-native-icon" aria-hidden="true"></view>重置筛选</button>
   </view>
 </view>
+<csv-preview wx:if="{{csvPreview}}" preview="{{csvPreview}}" bindclose="handleCloseCsvPreview" />

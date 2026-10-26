@@ -1,3 +1,13 @@
+// Page controller tests stub the authenticated transport; its real chunk protocol
+// is covered separately in adminImageUpload.client.test.js.
+jest.mock("../shared/adminImageUpload", () => {
+  const actual = jest.requireActual("../shared/adminImageUpload")
+  if (global.wx && global.wx.cloud && global.wx.cloud.uploadFile && !global.wx.cloud.callFunction) {
+    global.wx.cloud.callFunction = jest.fn()
+  }
+  return { ...actual, uploadAdminImage: (options) => global.wx.cloud.uploadFile(options) }
+})
+
 function loadPage(name, overrides = {}) {
   jest.resetModules()
   let definition

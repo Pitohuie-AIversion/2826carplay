@@ -66,7 +66,7 @@
 .garage-clear-native-icon::after { transform: rotate(-45deg); }
 .garage-status-native-icon { width: 22rpx; height: 25rpx; border: 2rpx solid currentColor; border-radius: 4rpx; }
 .garage-status-native-icon::before { position: absolute; top: 6rpx; left: 4rpx; width: 10rpx; height: 2rpx; border-radius: 999rpx; background: currentColor; box-shadow: 0 6rpx 0 currentColor, 0 12rpx 0 currentColor; content: ""; }
-.garage-list-end { display: flex; align-items: center; justify-content: center; margin-top: 22rpx; color: #586373; font-size: 17rpx; line-height: 1.5; letter-spacing: 1rpx; }
+.garage-list-end { display: flex; align-items: center; justify-content: center; margin-top: 22rpx; color: #98a6b8; font-size: 24rpx; line-height: 1.6; letter-spacing: 1rpx; }
 .garage-complete-native-icon { position: relative; width: 20rpx; height: 20rpx; margin-right: 8rpx; border: 2rpx solid currentColor; border-radius: 50%; box-sizing: border-box; }
 .garage-complete-native-icon::after { position: absolute; top: 3rpx; left: 6rpx; width: 4rpx; height: 8rpx; border-right: 2rpx solid currentColor; border-bottom: 2rpx solid currentColor; content: ""; transform: rotate(45deg); }
 .garage-state-icon { position: relative; width: 54rpx; height: 54rpx; margin: 0 auto 18rpx; color: #648ac1; box-sizing: border-box; }

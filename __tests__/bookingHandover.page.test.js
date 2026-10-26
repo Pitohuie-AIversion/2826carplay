@@ -1,3 +1,13 @@
+// Page controller tests stub the authenticated transport; its real chunk protocol
+// is covered separately in adminImageUpload.client.test.js.
+jest.mock("../shared/adminImageUpload", () => {
+  const actual = jest.requireActual("../shared/adminImageUpload")
+  if (global.wx && global.wx.cloud && global.wx.cloud.uploadFile && !global.wx.cloud.callFunction) {
+    global.wx.cloud.callFunction = jest.fn()
+  }
+  return { ...actual, uploadAdminImage: (options) => global.wx.cloud.uploadFile(options) }
+})
+
 const fs = require("fs")
 const path = require("path")
 
@@ -84,7 +94,7 @@ describe("Phase 14 预约交接页面", () => {
 
   test("同毫秒上传同角度仍使用不同云路径，旧图清理同步异常不丢失新图", () => {
     jest.useFakeTimers().setSystemTime(new Date("2026-09-30T00:00:00Z"))
-    const uploadFile = jest.fn(({ cloudPath, success }) => success({ fileID: `cloud://env/${cloudPath}` }))
+    const uploadFile = jest.fn(({ requestId, success }) => success({ fileID: `cloud://env/${requestId}` }))
     const page = loadPage("../pages/booking-manage-detail/booking-manage-detail.js", {
       chooseImage: jest.fn(({ success }) => success({ tempFilePaths: ["temp/front.jpg"], tempFiles: [{ size: 100 }] })),
       cloud: { uploadFile, callFunction: jest.fn(() => { throw new Error("cleanup SDK unavailable") }) }
@@ -96,7 +106,7 @@ describe("Phase 14 预约交接页面", () => {
     const first = page.data.handoverForm.photos[0].fileId
     expect(() => page.handleChooseHandoverPhoto(event)).not.toThrow()
     expect(uploadFile).toHaveBeenCalledTimes(2)
-    expect(uploadFile.mock.calls[0][0].cloudPath).not.toBe(uploadFile.mock.calls[1][0].cloudPath)
+    expect(uploadFile.mock.calls[0][0].requestId).not.toBe(uploadFile.mock.calls[1][0].requestId)
     expect(page.data.handoverForm.photos[0].fileId).not.toBe(first)
     expect(page.data.handoverLoading).toBe(false)
     expect(() => page.onUnload()).not.toThrow()

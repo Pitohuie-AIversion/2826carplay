@@ -13,6 +13,7 @@ describe("production security rules", () => {
     const manifest = readJson("manifest.json")
     const databaseRule = readJson(manifest.database.ruleFile)
     const expectedCollections = [
+      "admin_upload_sessions",
       "analytics_events",
       "app_configs",
       "audit_logs",
@@ -59,28 +60,17 @@ describe("production security rules", () => {
     expect(directDatabaseAccess).toEqual([])
   })
 
-  test("云存储仅开放车辆图片且限制登录身份、归属和大小", () => {
+  test("云存储仅公开车辆图片，全部客户端写入由鉴权上传云函数接管", () => {
     const manifest = readJson("manifest.json")
     const storageRule = readJson(manifest.storage.ruleFile)
 
     expect(storageRule.read).toContain("vehicle-images")
-    expect(storageRule.write).toContain("auth != null")
-    expect(storageRule.write).toContain("auth.loginType != 'ANONYMOUS'")
-    expect(storageRule.write).toContain("resource.openid == auth.openid")
-    expect(storageRule.write).toContain("resource.openid == auth.uid")
-    // CloudBase does not reliably expose resource.size during the upload
-    // authorization phase. Keep the client-side limit from the manifest,
-    // but do not make otherwise valid uploads depend on this server field.
-    expect(storageRule.write).not.toContain("resource.size")
-    expect(storageRule.write).toContain("/\\.jpg$/")
-    expect(storageRule.write).toContain("/\\.jpeg$/")
-    expect(storageRule.write).toContain("/\\.png$/")
-    expect(storageRule.write).toContain("/\\.webp$/")
-    expect(storageRule.write).not.toContain("(?:")
-    expect(storageRule.write).not.toContain("$/i")
+    expect(storageRule.write).toBe(false)
     expect(manifest.storage).toMatchObject({
       publicReadPrefix: "vehicle-images/",
       maxUploadBytes: 10485760,
+      uploadFunction: "adminImageUpload",
+      clientWriteEnabled: false,
       allowedImageExtensions: ["jpg", "jpeg", "png", "webp"]
     })
   })
@@ -179,9 +169,8 @@ describe("production security rules", () => {
     manifest.storage.allowedImageExtensions.forEach((extension) => {
       expect(uploadSource).toContain(`"${extension}"`)
     })
-    expect(uploadSource).toContain(
-      "const cloudPath = `vehicle-images/${vehicleId}/${Date.now()}_${sessionId}_${index}_${retryCount}.${extension}`"
-    )
+    expect(uploadSource).toContain("uploadAdminImage(")
+    expect(uploadSource).not.toContain("wx.cloud.uploadFile(")
   })
 
   test("安全规则、测试和开发文档不会进入小程序上传包", () => {

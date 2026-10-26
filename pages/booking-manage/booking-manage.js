@@ -1,3 +1,4 @@
+const { closePageCsvPreview, openPageCsvPreview } = require("../../shared/pageCsvFileActions")
 const { cancelPagePermissionCheck, requirePagePermission } = require("../../shared/pageAuth")
 const { isUserCancelError, removeCsvFile, saveCsvFile } = require("../../shared/csvFile")
 const { formatToastTitle, calculateRatioSegments } = require("../../shared/uiFeedback")
@@ -288,7 +289,10 @@ Page({
       this._cancelOperationConfigRequest = null
     }
   },
+  onHide() { closePageCsvPreview(this) },
+  handleCloseCsvPreview() { closePageCsvPreview(this) },
   onUnload() {
+    closePageCsvPreview(this, { unload: true })
     cancelPagePermissionCheck(this)
     cancelPageCsvFileActions(this)
     cancelPageNativeActions(this)
@@ -507,6 +511,7 @@ Page({
           return
         }
         const previousFilePath = this.data.exportFilePath
+        closePageCsvPreview(this)
         this.setData({
           loading: false,
           exportFilePath: filePath,
@@ -670,39 +675,7 @@ Page({
     this.openCsvFile(filePath)
   },
   openCsvFile(filePath) {
-    const action = beginPageCsvFileAction(this, filePath)
-    const nativeAction = beginPageNativeAction(this, { requireCurrent: true })
-    const open = wx.openDocument
-    if (typeof open === "function") {
-      const openOptions = {
-        filePath,
-        fileType: "csv",
-        showMenu: true,
-        success: () => {},
-        fail: () => {
-          if (!isPageCsvFileActionActive(this, action) || !isPageNativeActionActive(this, nativeAction)) {
-            return
-          }
-          wx.showToast({
-            title: "文件打开失败",
-            icon: "none"
-          })
-        }
-      }
-      try {
-        open(openOptions)
-      } catch (error) {
-        openOptions.fail(error)
-      }
-      return
-    }
-    if (!isPageCsvFileActionActive(this, action) || !isPageNativeActionActive(this, nativeAction)) {
-      return
-    }
-    wx.showToast({
-      title: "暂不支持打开",
-      icon: "none"
-    })
+    return openPageCsvPreview(this, filePath, this.data.exportFileName)
   },
   handleRemarkInput(event) {
     const index = Number(event.currentTarget.dataset.index)

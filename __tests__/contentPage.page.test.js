@@ -141,6 +141,11 @@ describe("pages/content-page 服务指南", () => {
     page.onLoad({ type: "privacy" })
     const original = page.data.content
     expect(original).toContain("个人信息")
+    expect(original).toContain("OpenID、车辆编号和收藏时间")
+    expect(original).toContain("清除本机联系人")
+    expect(original).toContain("当前已填表单和云端预约不会因此删除")
+    expect(original).toContain("不主动读取已有剪切板内容")
+    expect(original).toContain("提交申请不会立即自动删除云端记录")
     request.fail({ errMsg: "network unavailable" })
     expect(page.data.content).toBe(original)
     expect(page.data.contentError).toBe("")

@@ -4,11 +4,23 @@
   "functionRoot": "./cloudfunctions",
   "functions": [
     {
+      "name": "adminImageUpload",
+      "type": "Event",
+      "handler": "index.main",
+      "timeout": 60,
+      "runtime": "Nodejs24.11",
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ]
+    },
+    {
       "name": "analyticsCleanup",
       "type": "Event",
       "handler": "index.main",
       "timeout": 20,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -27,7 +39,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 20,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -39,7 +51,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 15,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -51,7 +63,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 15,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -63,7 +75,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 20,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -75,7 +87,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 15,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -87,7 +99,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 20,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -99,7 +111,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 20,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -111,7 +123,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 20,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -123,7 +135,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 20,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -135,7 +147,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 20,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -147,7 +159,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 15,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -159,7 +171,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 15,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -171,7 +183,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 20,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -183,7 +195,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 20,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -195,7 +207,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 15,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -207,7 +219,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 15,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -219,7 +231,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 15,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -231,7 +243,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 20,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -243,7 +255,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 15,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -255,7 +267,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 15,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -267,7 +279,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 15,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -279,7 +291,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 15,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -291,7 +303,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 15,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -303,7 +315,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 15,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -315,7 +327,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 15,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -327,7 +339,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 15,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -339,7 +351,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 20,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -358,7 +370,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 15,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -370,7 +382,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 15,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -382,7 +394,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 15,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -394,7 +406,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 15,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -406,7 +418,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 15,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -418,7 +430,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 15,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -430,7 +442,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 15,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -449,7 +461,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 15,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -461,7 +473,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 15,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -473,7 +485,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 20,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -485,7 +497,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 15,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -497,7 +509,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 15,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -509,7 +521,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 15,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -521,7 +533,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 15,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -533,7 +545,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 15,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -545,7 +557,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 20,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -564,7 +576,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 15,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -576,7 +588,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 20,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -588,7 +600,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 15,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -600,7 +612,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 15,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -612,7 +624,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 15,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -624,7 +636,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 20,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -636,7 +648,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 20,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -646,7 +658,7 @@
     {
       "name": "vehiclePublicDetail",
       "type": "Event",
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "handler": "index.main",
       "timeout": 20,
       "memorySize": 256,
@@ -660,7 +672,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 15,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -672,7 +684,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 15,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -684,7 +696,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 15,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
@@ -696,7 +708,7 @@
       "type": "Event",
       "handler": "index.main",
       "timeout": 15,
-      "runtime": "Nodejs20.19",
+      "runtime": "Nodejs24.11",
       "memorySize": 256,
       "installDependency": true,
       "ignore": [

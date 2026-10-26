@@ -55,6 +55,7 @@ let failedCount = 0
 let activeSimulatedPage = null
 const loadedPages = []
 const cloudCalls = []
+const mockUploadSessions = new Map()
 
 function logSuite(title) {
   console.log(`\n${c.bold}${c.cyan}┌── ${title}${c.reset}`)
@@ -62,6 +63,16 @@ function logSuite(title) {
 
 function simulateClick(desc, actionFn) {
   totalSimulated++
+  const pass = () => {
+    passedCount++
+    console.log(`│  ${c.green}✓${c.reset} [CLICK] ${desc}`)
+  }
+  const fail = (err) => {
+    failedCount++
+    console.error(`│  ${c.red}✗${c.reset} [FAIL]  ${desc}`)
+    console.error(`│     ${c.red}Error: ${err.message}${c.reset}`)
+    process.exitCode = 1
+  }
   try {
     // Each case clicks the currently displayed page. Navigation in a preceding
     // case must not leave this case interacting with a hidden page instance.
@@ -69,32 +80,69 @@ function simulateClick(desc, actionFn) {
       pageStack.length = 0
       pageStack.push(activeSimulatedPage)
     }
-    actionFn()
-    passedCount++
-    console.log(`│  ${c.green}✓${c.reset} [CLICK] ${desc}`)
+    const result = actionFn()
+    if (result && typeof result.then === "function") return result.then(pass, fail)
+    pass()
   } catch (err) {
-    failedCount++
-    console.error(`│  ${c.red}✗${c.reset} [FAIL]  ${desc}`)
-    console.error(`│     ${c.red}Error: ${err.message}${c.reset}`)
-    process.exitCode = 1
+    fail(err)
   }
 }
 
 // 模拟全局微信与 App 运行沙箱
 const storage = {}
+const mockLocalFiles = new Map()
+const mockImageBytes = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64")
+function localFileBytes(filePath) {
+  if (mockLocalFiles.has(filePath)) return Buffer.from(mockLocalFiles.get(filePath), "utf8")
+  if (/\.(jpg|jpeg|png)$/i.test(filePath)) return mockImageBytes
+  throw new Error("local file not found")
+}
 const mockFs = {
   accessSync: () => {},
+  stat: ({ path, success, fail }) => {
+    try { success({ stats: { size: localFileBytes(path).length } }) }
+    catch (error) { if (fail) fail(error) }
+  },
+  readFile: ({ filePath, encoding, position = 0, length, success, fail }) => {
+    try {
+      const bytes = localFileBytes(filePath)
+      const content = bytes.subarray(position, length === undefined ? bytes.length : position + length)
+      global.wx._lastLocalRead = { filePath, encoding, position, length }
+      success({ data: encoding ? content.toString(encoding === "utf-8" ? "utf8" : encoding) : content.buffer.slice(content.byteOffset, content.byteOffset + content.byteLength) })
+    } catch (error) { if (fail) fail(error) }
+  },
   saveFile: ({ tempFilePath, success }) => {
     if (success) success({ savedFilePath: tempFilePath.replace("tmp_", "saved_") })
   },
-  unlink: ({ success, complete } = {}) => {
+  unlink: ({ filePath, success, complete } = {}) => {
+    mockLocalFiles.delete(filePath)
     if (typeof success === "function") success()
     if (typeof complete === "function") complete()
   },
-  writeFile: ({ success, complete } = {}) => {
+  writeFile: ({ filePath, data, success, complete } = {}) => {
+    mockLocalFiles.set(filePath, String(data || ""))
     if (typeof success === "function") success()
     if (typeof complete === "function") complete()
   }
+}
+
+function prepareCsvPreview(page, handover = false) {
+  const filePath = "wxfile://usr/preview.csv"
+  mockLocalFiles.set(filePath, 'name,note\ncustomer,"first\nsecond"')
+  global.wx._lastLocalRead = null
+  page.setData(handover
+    ? { exportedHandoverPath: filePath, exportedHandoverFileName: "preview.csv", exportingHandover: false }
+    : { exportFilePath: filePath, exportFileName: "preview.csv", loading: false, exporting: false })
+}
+
+async function verifyCsvPreview(page) {
+  for (let i = 0; i < 4; i += 1) await Promise.resolve()
+  const preview = page.data.csvPreview
+  const read = global.wx._lastLocalRead
+  if (!read || read.encoding !== "utf8" || read.length > 128 * 1024) throw new Error("CSV preview did not use a bounded local read")
+  if (!preview || preview.loading || preview.rows[1][1] !== "first\nsecond") throw new Error("CSV preview did not show the parsed file content")
+  page.handleCloseCsvPreview()
+  if (page.data.csvPreview !== null) throw new Error("CSV preview retained content after close")
 }
 
 const appInstance = {
@@ -162,14 +210,17 @@ global.wx = {
   },
   chooseMedia: ({ success }) => {
     if (typeof success === "function") {
-      success({ tempFiles: [{ tempFilePath: "wxfile://tmp_photo.jpg", size: 102400 }] })
+      success({ tempFiles: [{ tempFilePath: "wxfile://tmp_photo.png", size: mockImageBytes.length }] })
     }
   },
   downloadFile: ({ success, complete }) => {
     if (typeof success === "function") success({ statusCode: 200, tempFilePath: "wxfile://tmp_download.csv" })
     if (typeof complete === "function") complete({ statusCode: 200, tempFilePath: "wxfile://tmp_download.csv" })
   },
-  openDocument: ({ success }) => { if (typeof success === "function") success() },
+  openDocument: ({ fileType, success }) => {
+    if (fileType && !["doc", "docx", "xls", "xlsx", "ppt", "pptx", "pdf"].includes(fileType)) throw new Error("unsupported openDocument fileType")
+    if (typeof success === "function") success()
+  },
   shareFileMessage: ({ success }) => { if (typeof success === "function") success() },
   enableAlertBeforeUnload: () => {},
   disableAlertBeforeUnload: () => {},
@@ -190,7 +241,25 @@ global.wx = {
     callFunction: ({ name, data, success, complete }) => {
       cloudCalls.push({ name, data })
       let result = { ok: true }
-      if (name === "garageVehicleList") {
+      if (name === "adminImageUpload") {
+        if (data.action === "begin") {
+          const uploadId = `sim_${mockUploadSessions.size + 1}`
+          mockUploadSessions.set(uploadId, { ...data, chunks: [] })
+          result = { ok: true, uploadId, chunkSize: 192 * 1024, chunkCount: Math.ceil(data.size / (192 * 1024)) }
+        } else if (data.action === "chunk") {
+          const session = mockUploadSessions.get(data.uploadId)
+          if (!session) throw new Error("上传必须先创建鉴权会话")
+          session.chunks[data.index] = Buffer.from(data.data, "base64")
+        } else if (data.action === "complete") {
+          const session = mockUploadSessions.get(data.uploadId)
+          if (!session || !Buffer.concat(session.chunks).equals(mockImageBytes)) throw new Error("上传分块内容不完整")
+          result.fileID = `cloud://prod-garage-env/${session.kind === "vehicle" ? "vehicle-images" : "handover-images"}/${session.targetId}/${session.stage ? `${session.stage}/` : ""}${Date.now()}_1.${session.extension}`
+        } else if (data.action === "cleanup") {
+          result = { ok: true, removed: 0, hasMore: false }
+        } else if (data.action === "abort") {
+          mockUploadSessions.delete(data.uploadId)
+        }
+      } else if (name === "garageVehicleList") {
         result = {
           ok: true,
           total: 2,
@@ -456,18 +525,18 @@ global.wx = {
 // 深度 path-resolving setData 实现（完美模拟微信 setData 路径操作如 'form.plateNumber'）
 function applySetData(targetData, patch, cb) {
   Object.keys(patch || {}).forEach((key) => {
-    if (key.includes(".")) {
-      const parts = key.split(".")
+    if (key.includes(".") || key.includes("[")) {
+      const parts = key.replace(/\[(\d+)\]/g, ".$1").split(".")
       let curr = targetData
       for (let i = 0; i < parts.length - 1; i++) {
         if (!curr[parts[i]] || typeof curr[parts[i]] !== "object") {
-          curr[parts[i]] = {}
+          curr[parts[i]] = /^\d+$/.test(parts[i + 1]) ? [] : {}
         }
         curr = curr[parts[i]]
       }
       curr[parts[parts.length - 1]] = patch[key]
     }
-    targetData[key] = patch[key]
+    else targetData[key] = patch[key]
   })
   if (typeof cb === "function") cb()
 }
@@ -1041,18 +1110,22 @@ simulateClick("点击导出客户专属验车留证单 (handleExportHandoverRepo
   bookingDetailPage.handleExportHandoverReport(makeEvent({ stage: "pickup" }))
 })
 
+for (let i = 0; i < 4; i += 1) await Promise.resolve()
 simulateClick("点击打开已导出的验车留证单 (handleOpenExportedHandover)", () => {
-  bookingDetailPage.setData({ exportedHandoverPath: "wxfile://user/report.csv" })
+  prepareCsvPreview(bookingDetailPage, true)
   bookingDetailPage.handleOpenExportedHandover()
 })
+await verifyCsvPreview(bookingDetailPage)
 
 simulateClick("点击转发分享验车留证单 (handleShareExportedHandover)", () => {
   bookingDetailPage.handleShareExportedHandover()
 })
 
-simulateClick("点击清理已导出留证单缓存 (handleDeleteExportedHandover)", () => {
-  bookingDetailPage.handleDeleteExportedHandover()
-  if (bookingDetailPage.data.exportedHandoverPath) throw new Error("留证单缓存路径未清空")
+await simulateClick("点击清理已导出留证单缓存 (handleDeleteExportedHandover)", async () => {
+  const filePath = bookingDetailPage.data.exportedHandoverPath
+  if (!filePath || !mockLocalFiles.has(filePath)) throw new Error("未准备真实留证单缓存")
+  await bookingDetailPage.handleDeleteExportedHandover()
+  if (bookingDetailPage.data.exportedHandoverPath || mockLocalFiles.has(filePath)) throw new Error("留证单缓存未清空")
 })
 
 simulateClick("点击接受最新报价明细 (handleConfirmQuote)", () => {
@@ -1580,10 +1653,12 @@ simulateClick("点击导出预约台账 CSV (handleExport)", () => {
   bmPage.handleExport()
 })
 
+for (let i = 0; i < 4; i += 1) await Promise.resolve()
 simulateClick("点击打开导出的 CSV 报表 (handleOpenExportedFile)", () => {
-  bmPage.setData({ exportedFilePath: "wxfile://tmp_download.csv" })
+  prepareCsvPreview(bmPage)
   bmPage.handleOpenExportedFile()
 })
+await verifyCsvPreview(bmPage)
 
 simulateClick("点击分享导出的 CSV 文件 (handleShareExportedFile)", () => {
   bmPage.setData({ exportedFilePath: "wxfile://tmp_download.csv" })
@@ -1671,7 +1746,11 @@ simulateClick("录入交接表单当前里程数 (handleHandoverInput: mileageKm
 })
 
 simulateClick("点击拍照/上传验车照片 (handleChooseHandoverPhoto)", () => {
+  const start = cloudCalls.length
   bmdPage.handleChooseHandoverPhoto(makeEvent({ angle: "front" }))
+  const actions = cloudCalls.slice(start).filter((call) => call.name === "adminImageUpload").map((call) => call.data.action)
+  if (actions.join(",") !== "begin,chunk,complete") throw new Error("交接照片未完成鉴权分块上传")
+  if (!bmdPage.data.handoverForm.photos[0].fileId.startsWith("cloud://")) throw new Error("交接照片未回填")
 })
 
 simulateClick("点击全屏预览验车照片 (handlePreviewHandoverPhoto)", () => {
@@ -1690,20 +1769,22 @@ simulateClick("点击导出交接验车留证单 (handleExportHandoverReport)", 
   bmdPage.handleExportHandoverReport(makeEvent({ id: "ho-001" }))
 })
 
+for (let i = 0; i < 4; i += 1) await Promise.resolve()
 simulateClick("点击打开导出的验车留证单 (handleOpenExportedHandover)", () => {
-  bmdPage.setData({ exportedHandoverPath: "wxfile://tmp_handover.csv" })
+  prepareCsvPreview(bmdPage, true)
   bmdPage.handleOpenExportedHandover()
 })
+await verifyCsvPreview(bmdPage)
 
 simulateClick("点击转发分享导出的验车留证单 (handleShareExportedHandover)", () => {
-  bmdPage.setData({ exportedHandoverPath: "wxfile://tmp_handover.csv" })
   bmdPage.handleShareExportedHandover()
 })
 
-simulateClick("点击清理本地验车留证单缓存 (handleDeleteExportedHandover)", () => {
-  bmdPage.setData({ exportedHandoverPath: "wxfile://tmp_handover.csv" })
-  bmdPage.handleDeleteExportedHandover()
-  if (bmdPage.data.exportedHandoverPath) throw new Error("留证单缓存未清除")
+await simulateClick("点击清理本地验车留证单缓存 (handleDeleteExportedHandover)", async () => {
+  const filePath = bmdPage.data.exportedHandoverPath
+  if (!filePath || !mockLocalFiles.has(filePath)) throw new Error("未准备真实留证单缓存")
+  await bmdPage.handleDeleteExportedHandover()
+  if (bmdPage.data.exportedHandoverPath || mockLocalFiles.has(filePath)) throw new Error("留证单缓存未清除")
 })
 
 simulateClick("点击为客户打上跟进标签 (handleToggleCustomerTag: 高意向)", () => {
@@ -1952,7 +2033,11 @@ simulateClick("点击跳转编辑车辆 (handleEdit)", () => {
 })
 
 simulateClick("点击批量上传车辆新照片 (handleUploadImages)", () => {
+  const start = cloudCalls.length
   vdmPage.handleUploadImages()
+  const calls = cloudCalls.slice(start)
+  if (calls.filter((call) => call.name === "adminImageUpload").map((call) => call.data.action).join(",") !== "begin,chunk,complete") throw new Error("车辆照片未完成鉴权分块上传")
+  if (!calls.some((call) => call.name === "vehicleImageUpdate")) throw new Error("车辆图片上传后未关联车辆")
 })
 
 simulateClick("点击取消正在进行的文件上传 (handleCancelUpload)", () => {
@@ -2162,10 +2247,12 @@ simulateClick("点击导出安全审计台账 CSV (handleExport)", () => {
   almPage.handleExport()
 })
 
+for (let i = 0; i < 4; i += 1) await Promise.resolve()
 simulateClick("点击打开导出的审计报表 (handleOpenExportedFile)", () => {
-  almPage.setData({ exportedFilePath: "wxfile://tmp_download.csv" })
+  prepareCsvPreview(almPage)
   almPage.handleOpenExportedFile()
 })
+await verifyCsvPreview(almPage)
 
 simulateClick("点击转发分享审计报表 (handleShareExportedFile)", () => {
   almPage.setData({ exportedFilePath: "wxfile://tmp_download.csv" })
@@ -2210,10 +2297,12 @@ simulateClick("点击导出错误排查台账 CSV (handleExport)", () => {
   elmPage.handleExport()
 })
 
+for (let i = 0; i < 4; i += 1) await Promise.resolve()
 simulateClick("点击打开导出的错误排查文件 (handleOpenExportedFile)", () => {
-  elmPage.setData({ exportedFilePath: "wxfile://tmp_download.csv" })
+  prepareCsvPreview(elmPage)
   elmPage.handleOpenExportedFile()
 })
+await verifyCsvPreview(elmPage)
 
 simulateClick("点击分享错误排查文件 (handleShareExportedFile)", () => {
   elmPage.setData({ exportedFilePath: "wxfile://tmp_download.csv" })
@@ -2298,10 +2387,12 @@ simulateClick("个人数据文件保存后确认导出完成", () => {
   if (exportCalls[0].data.exportToken !== "a".repeat(40)) throw new Error("导出确认令牌未透传")
 })
 
+for (let i = 0; i < 4; i += 1) await Promise.resolve()
 simulateClick("点击打开导出的台账报表 (handleOpenExportedFile)", () => {
-  pdiPage.setData({ exportedFilePath: "wxfile://tmp_download.csv" })
+  prepareCsvPreview(pdiPage)
   pdiPage.handleOpenExportedFile()
 })
+await verifyCsvPreview(pdiPage)
 
 simulateClick("点击分享导出的台账报表 (handleShareExportedFile)", () => {
   pdiPage.setData({ exportedFilePath: "wxfile://tmp_download.csv" })

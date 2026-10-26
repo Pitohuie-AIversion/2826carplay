@@ -260,3 +260,4 @@
     <button wx:if="{{keyword || currentStatus !== 'all' || currentPriority !== 'all' || currentCoordination !== 'all'}}" class="empty-reset-btn ui-btn ui-btn-ghost" bindtap="handleReset"><view class="booking-action-content"><view class="reset-native-icon" aria-hidden="true"></view><text>清除筛选</text></view></button>
   </view>
 </view>
+<csv-preview wx:if="{{csvPreview}}" preview="{{csvPreview}}" bindclose="handleCloseCsvPreview" />

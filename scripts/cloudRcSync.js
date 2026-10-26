@@ -6,21 +6,28 @@ const {
   colorize,
 } = require("./_cloudUtil");
 
-const DEFAULT_RUNTIME = process.env.CLOUD_DEFAULT_RUNTIME || "Nodejs20.19";
+const { DEFAULT_RUNTIME, checkRuntimeConfiguration } = require("./cloudRuntimeCheck");
+const SYNC_RUNTIME = process.env.CLOUD_DEFAULT_RUNTIME === undefined ? DEFAULT_RUNTIME : process.env.CLOUD_DEFAULT_RUNTIME;
 const DEFAULT_TIMEOUT = Number(process.env.CLOUD_DEFAULT_TIMEOUT || 15);
 const DEFAULT_MEMORY = Number(process.env.CLOUD_DEFAULT_MEM || 256);
 
 function makeDefaultFn(name) {
-  return {
+  const fn = {
     name,
     type: "Event",
-    runtime: DEFAULT_RUNTIME,
+    runtime: SYNC_RUNTIME,
     handler: "index.main",
     timeout: DEFAULT_TIMEOUT,
     memorySize: DEFAULT_MEMORY,
     installDependency: true,
     ignore: ["node_modules/**"],
   };
+  const result = checkRuntimeConfiguration({ functions: [fn] });
+  if (result.exitCode !== 0) {
+    const issue = result.issues[0];
+    throw new Error(`${issue.code}: ${issue.message}`);
+  }
+  return fn;
 }
 
 function run(opts = {}) {

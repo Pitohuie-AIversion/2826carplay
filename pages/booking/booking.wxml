@@ -167,6 +167,9 @@
     <button wx:if="{{savedContactAvailable}}" class="saved-contact-button" bindtap="handleUseSavedContact" hover-class="booking-link-pressed">
       使用上次联系人
     </button>
+    <button wx:if="{{savedContactAvailable}}" class="clear-saved-contact-button" bindtap="handleClearSavedContact" disabled="{{isSubmitting}}" hover-class="booking-link-pressed" aria-label="清除本机保存的上次联系人，保留当前已填表单">
+      清除本机联系人
+    </button>
     <view class="form-item">
       <view class="form-label-row">
         <view class="form-label">姓名</view>

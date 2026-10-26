@@ -338,6 +338,22 @@ Page({
     wx.showToast({ title: "已填入上次联系人", icon: "none" })
   },
 
+  handleClearSavedContact() {
+    if (this.data.isSubmitting || this.data.submitSuccess) return
+    const action = beginPageNativeAction(this, { requireCurrent: true })
+    if (!isPageNativeActionActive(this, action)) return
+    try {
+      if (typeof wx.removeStorageSync !== "function") throw new Error("storage unavailable")
+      wx.removeStorageSync(LAST_BOOKING_CONTACT_KEY)
+    } catch (error) {
+      wx.showToast({ title: "清除失败，请重试", icon: "none" })
+      return
+    }
+    this._savedContact = null
+    this.setData({ savedContactAvailable: false })
+    wx.showToast({ title: "已清除本机联系人", icon: "none" })
+  },
+
   loadOperationConfig(options) {
     this.cancelOperationConfigRequest()
     this.applyState({ operationConfigLoading: true, operationConfigFailed: false })

@@ -31,7 +31,7 @@ const MENU_ITEMS = [
   { key: "errorLogManage", title: "错误日志", desc: "查看云函数异常记录，便于线上排障", section: "系统管理", sectionKicker: "SYSTEM", icon: "alert" },
   { key: "systemHealth", title: "上线检查", desc: "只读检查云环境数据与关键配置", section: "系统管理", sectionKicker: "SYSTEM", icon: "check" },
   { key: "privacyRequestManage", title: "隐私申请处理", desc: "处理用户个人信息查询、更正与删除申请", section: "系统管理", sectionKicker: "SYSTEM", icon: "shield" },
-  { key: "storageCleanup", title: "存储清理", desc: "重试清理删除失败的车辆图片", section: "系统管理", sectionKicker: "SYSTEM", icon: "trash" },
+  { key: "storageCleanup", title: "存储清理", desc: "清理图片任务与过期上传数据", section: "系统管理", sectionKicker: "SYSTEM", icon: "trash" },
   { key: "getOpenid", title: "查询 OpenID", desc: "获取当前微信用户的 OpenID 并复制", section: "账户工具", sectionKicker: "UTILITIES", icon: "key" },
   { key: "bootstrapAdmin", title: "初始化管理员", desc: "仅限首次配置时使用，自动把当前账号设为首个管理员", section: "账户工具", sectionKicker: "UTILITIES", icon: "lock" }
 ]
@@ -675,6 +675,7 @@ Page({
     }
 
     const requestId = Number(this._mineToolRequestId || 0) + 1
+    const nativeAction = beginPageNativeAction(this, { requireCurrent: true })
     this._mineToolRequestId = requestId
     this._mineToolActive = true
     this.clearMineToolTimer()
@@ -691,11 +692,16 @@ Page({
         return false
       }
       settled = true
-      this.finishMineToolEffects()
-      return true
+      const active = isPageNativeActionActive(this, nativeAction)
+      this.finishMineToolEffects(active)
+      return active
     }
     const handleFailure = (message) => {
       if (!finishRequest()) {
+        return
+      }
+      if (typeof input.onFailure === "function") {
+        input.onFailure(message)
         return
       }
       wx.showToast({
@@ -706,7 +712,7 @@ Page({
 
     this._mineToolTimer = setTimeout(() => {
       handleFailure(input.timeoutTitle || "操作超时，请重试")
-    }, MINE_TOOL_TIMEOUT_MS)
+    }, input.timeoutMs || MINE_TOOL_TIMEOUT_MS)
 
     const requestOptions = {
       name: input.name,
@@ -741,12 +747,33 @@ Page({
     }
   },
 
-  finishMineToolEffects() {
+  finishMineToolEffects(hideLoading = true) {
     this.clearMineToolTimer()
-    if (this._mineToolActive && typeof wx.hideLoading === "function") {
+    if (hideLoading && this._mineToolActive && typeof wx.hideLoading === "function") {
       wx.hideLoading()
     }
     this._mineToolActive = false
+  },
+
+  showStorageCleanupResult(files, uploads, uploadFailure) {
+    const details = [
+      `图片任务：本次检查 ${files.processed || 0} 条，已清理 ${files.deleted || 0} 条，失败 ${files.failed || 0} 条`
+    ]
+    if (files.deferred) details.push(`等待安全核验 ${files.deferred} 条`)
+    if (files.preserved) details.push(`保留在用图片 ${files.preserved} 张`)
+    if (files.invalid) details.push(`移除无效任务 ${files.invalid} 条`)
+    const fileMessage = `${details.join("，")}。${files.hasMore ? "图片队列仍有记录，可稍后再次执行。" : "当前图片队列已检查完毕。"}`
+    const uploadOk = uploads && uploads.ok === true
+    const uploadMessage = uploadOk
+      ? `上传会话及分块：已清理 ${uploads.removed || 0} 条过期记录。${uploads.hasMore ? "仍有记录，请再次执行清理。" : "本批过期记录已处理。"}`
+      : `上传会话及分块：${uploadFailure || "清理失败，请重试"}。图片任务结果已保留。`
+    wx.showModal({
+      title: uploadOk && !files.failed ? "清理结果" : "部分清理未完成",
+      content: `${fileMessage}\n\n${uploadMessage}`,
+      confirmText: "知道了",
+      confirmColor: "#528fff",
+      showCancel: false
+    })
   },
 
   navigateToPage(url) {
@@ -814,7 +841,7 @@ Page({
       })
       wx.showModal({
         title: "清理存储队列",
-        content: "将重试删除此前清理失败的车辆图片，每次最多处理 5 条。确认继续？",
+        content: "先检查最多 5 条图片清理任务，再清理一批过期上传会话及分块（最多扫描 50 条记录）。在用图片会保留。确认继续？",
         confirmText: "确认清理",
         confirmColor: "#d46868",
         success: (modalRes) => {
@@ -837,26 +864,14 @@ Page({
                 return
               }
 
-              const details = [
-                `本次检查 ${result.processed || 0} 条`,
-                `已清理 ${result.deleted || 0} 条`,
-                `失败 ${result.failed || 0} 条`
-              ]
-              if (result.deferred) {
-                details.push(`等待安全核验 ${result.deferred} 条`)
-              }
-              if (result.preserved) {
-                details.push(`保留在用图片 ${result.preserved} 张`)
-              }
-              if (result.invalid) {
-                details.push(`移除无效任务 ${result.invalid} 条`)
-              }
-              wx.showModal({
-                title: "清理结果",
-                content: `${details.join("，")}。${result.hasMore ? "队列仍有记录，可稍后再次执行。" : "当前队列已检查完毕。"}`,
-                confirmText: "知道了",
-                confirmColor: "#528fff",
-                showCancel: false
+              this.runMineTool({
+                name: "adminImageUpload",
+                data: { action: "cleanup" },
+                loadingTitle: "清理上传数据…",
+                timeoutMs: 65000,
+                timeoutTitle: "清理超时，请重试",
+                onResult: (uploads) => this.showStorageCleanupResult(result, uploads),
+                onFailure: () => this.showStorageCleanupResult(result, null, "清理请求失败或超时，请重试")
               })
             }
           })

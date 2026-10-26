@@ -8,6 +8,8 @@ const {
   isPageNativeActionActive
 } = require("../../shared/pageNativeAction")
 const { formatDisplayTime } = require("../../shared/formatTime")
+const { createImageUploadRequestId, uploadAdminImage } = require("../../shared/adminImageUpload")
+const { chooseImageFiles } = require("../../shared/imageSelection")
 const MAX_IMAGE_UPLOAD_BYTES = 10 * 1024 * 1024
 const MAX_IMAGE_COUNT = 9
 const ALLOWED_IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp"])
@@ -91,7 +93,27 @@ function isUserCancelError(error) {
   const message = error && (error.errMsg || error.message || error)
   return String(message || "").toLowerCase().includes("cancel")
 }
+const UPLOAD_ERROR_TITLES = {
+  FORBIDDEN: "无图片上传权限",
+  UPLOAD_LIMIT: "上传数量或频次已达限",
+  STATUS_NOT_ALLOWED: "车辆状态不允许上传",
+  NOT_FOUND: "上传目标不存在",
+  UPLOAD_BUSY: "图片处理中，请稍后",
+  UPLOAD_EXPIRED: "上传已过期，请重选",
+  VALIDATION_ERROR: "图片格式或大小有误",
+  INTERNAL_ERROR: "上传服务暂不可用",
+  IDEMPOTENCY_CONFLICT: "请重新选择图片",
+  UPLOAD_INCOMPLETE: "图片未传完，请重选"
+}
+const UPLOAD_BATCH_STOP_CODES = new Set(["FORBIDDEN", "UPLOAD_LIMIT", "STATUS_NOT_ALLOWED", "NOT_FOUND"])
+function getCloudUploadBusinessCode(error) {
+  if (error && typeof error.code === "string") return error.code
+  const match = String(error && error.errMsg || "").match(/^image upload ([A-Z][A-Z0-9_]*)$/)
+  return match ? match[1] : ""
+}
 function getCloudUploadErrorTitle(error) {
+  const code = getCloudUploadBusinessCode(error)
+  if (Object.prototype.hasOwnProperty.call(UPLOAD_ERROR_TITLES, code)) return UPLOAD_ERROR_TITLES[code]
   const message = String(
     error && (error.errMsg || error.message || error.errCode || error)
       ? error.errMsg || error.message || error.errCode || error
@@ -118,6 +140,8 @@ function shouldRetryCloudUpload(error, retryCount) {
   if (Number(retryCount) >= MAX_UPLOAD_RETRY_COUNT) {
     return false
   }
+  if (Object.prototype.hasOwnProperty.call(UPLOAD_ERROR_TITLES, getCloudUploadBusinessCode(error)) ||
+      /^image upload [A-Z][A-Z0-9_]*$/.test(String(error && error.errMsg || ""))) return false
   const message = String(
     error && (error.errMsg || error.message || error.errCode || error)
       ? error.errMsg || error.message || error.errCode || error
@@ -737,7 +761,7 @@ Page({
       return
     }
     const action = beginPageNativeAction(this, { requireCurrent: true, exclusiveKey: "vehicle-image-selection" })
-    wx.chooseImage({
+    chooseImageFiles({
       count: remain,
       sizeType: ["compressed"],
       sourceType: ["album", "camera"],
@@ -782,7 +806,7 @@ Page({
     if (!isPageNativeActionActive(this, action)) {
       return
     }
-    if (!wx.cloud || typeof wx.cloud.uploadFile !== "function") {
+    if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       wx.showToast({
         title: "云上传能力未初始化",
         icon: "none"
@@ -795,6 +819,7 @@ Page({
     }
     const uploadedFileIds = []
     const failedFiles = []
+    let batchStopError = null
     const vehicleId = String(this.data.id || "").trim()
     const sessionId = Number(this._vehicleUploadSessionId || 0) + 1
     this._vehicleUploadSessionId = sessionId
@@ -849,7 +874,8 @@ Page({
         const summary = {
           failedUploadPaths,
           allFilePaths: selectedPaths.slice(),
-          uploadedCount: uploadedFileIds.length
+          uploadedCount: uploadedFileIds.length,
+          ...(batchStopError ? { uploadErrorTitle: getCloudUploadErrorTitle(batchStopError) } : {})
         }
         this.persistImageChange(
           { action: "add", fileIds: uploadedFileIds },
@@ -862,11 +888,11 @@ Page({
       this.setData({
         uploading: false,
         failedUploadPaths,
-        uploadProgressText: this._uploadCancelled ? "上传已取消，可重试未完成图片" : "本次图片均未上传成功"
+        uploadProgressText: this._uploadCancelled ? "上传已取消，可重试未完成图片" : batchStopError ? getCloudUploadErrorTitle(batchStopError) : "本次图片均未上传成功"
       })
       const firstError = failedFiles[0] && failedFiles[0].error
       wx.showToast({
-        title: this._uploadCancelled ? "已取消上传" : getCloudUploadErrorTitle(firstError),
+        title: this._uploadCancelled ? "已取消上传" : getCloudUploadErrorTitle(batchStopError || firstError),
         icon: "none"
       })
     }
@@ -892,7 +918,7 @@ Page({
       }
       const filePath = selectedPaths[index]
       const extension = getFileExtension(filePath)
-      const cloudPath = `vehicle-images/${vehicleId}/${Date.now()}_${sessionId}_${index}_${retryCount}.${extension}`
+      const requestId = createImageUploadRequestId()
       updateItem(index, "uploading", retryCount ? "正在重试" : "上传中")
       let uploadSettled = false
       let uploadTimeoutId = null
@@ -930,6 +956,15 @@ Page({
           }
           failedFiles.push({ filePath, error })
           updateItem(index, this._uploadCancelled ? "cancelled" : "failed", this._uploadCancelled ? "已取消" : "上传失败")
+          if (!this._uploadCancelled && UPLOAD_BATCH_STOP_CODES.has(getCloudUploadBusinessCode(error))) {
+            batchStopError = error
+            for (let remaining = index + 1; remaining < selectedPaths.length; remaining += 1) {
+              failedFiles.push({ filePath: selectedPaths[remaining], error })
+              updateItem(remaining, "failed", "未上传")
+            }
+            finishBatch()
+            return
+          }
           uploadNext(index + 1)
         }, abortTask)
       }
@@ -940,9 +975,22 @@ Page({
         handleUploadFailure({ errMsg: "uploadFile:fail cancel" })
       }
       try {
-        uploadTask = wx.cloud.uploadFile({
-          cloudPath,
+        uploadTask = uploadAdminImage({
+          kind: "vehicle",
+          targetId: vehicleId,
+          requestId,
+          extension,
           filePath,
+          onProgress: ({ loaded, total, phase }) => {
+            if (uploadSettled) return
+            if (uploadTimeoutId) clearTimeout(uploadTimeoutId)
+            uploadTimeoutId = setTimeout(() => {
+              handleUploadFailure({ errMsg: "image upload timeout" }, true)
+            }, phase === "verifying" ? 65000 : CLOUD_UPLOAD_TIMEOUT_MS)
+            if (isPageNativeActionActive(this, action)) {
+              updateItem(index, "uploading", phase === "verifying" ? "正在校验图片" : `上传中 ${Math.floor(loaded * 100 / total)}%`)
+            }
+          },
           success: (uploadRes) => {
             if (!uploadRes || !uploadRes.fileID) {
               handleUploadFailure({ errMsg: "uploadFile:fail invalid response" })
@@ -1172,9 +1220,11 @@ Page({
             uploading: false,
             failedUploadPaths: uploadSummary && uploadSummary.failedUploadPaths ? uploadSummary.failedUploadPaths : [],
             uploadProgressText: actionPayload.action === "add"
-              ? uploadSummary && uploadSummary.failedUploadPaths && uploadSummary.failedUploadPaths.length
-                ? `已上传 ${uploadSummary.uploadedCount} 张，${uploadSummary.failedUploadPaths.length} 张可重试`
-                : "图片上传完成"
+              ? uploadSummary && uploadSummary.uploadErrorTitle
+                ? `已上传 ${uploadSummary.uploadedCount} 张；${uploadSummary.uploadErrorTitle}`
+                : uploadSummary && uploadSummary.failedUploadPaths && uploadSummary.failedUploadPaths.length
+                  ? `已上传 ${uploadSummary.uploadedCount} 张，${uploadSummary.failedUploadPaths.length} 张可重试`
+                  : "图片上传完成"
               : this.data.uploadProgressText,
             detail: formatDetail({
               ...currentDetail,
@@ -1193,11 +1243,13 @@ Page({
                 ? "封面已更新"
                 : actionPayload.action === "remove"
                   ? "图片已移除"
-                  : partialUpload
-                    ? failedCount
-                      ? `成功 ${uploadSummary.uploadedCount} 张，失败 ${failedCount} 张`
-                      : `已上传，跳过 ${skippedCount} 张`
-                    : "图片已上传",
+                  : uploadSummary && uploadSummary.uploadErrorTitle
+                    ? uploadSummary.uploadErrorTitle
+                    : partialUpload
+                      ? failedCount
+                        ? `成功 ${uploadSummary.uploadedCount} 张，失败 ${failedCount} 张`
+                        : `已上传，跳过 ${skippedCount} 张`
+                      : "图片已上传",
             icon: partialUpload ? "none" : "success",
             duration: partialUpload ? 2200 : 1500
           })

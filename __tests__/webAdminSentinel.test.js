@@ -627,4 +627,35 @@ describe('Web Admin Gateway Sentinel & Operations Center', () => {
       sharedDate.getChinaToday('2026-10-26T20:00:00Z')
     );
   });
+
+  test('预约 7 态生命周期旅程与 AGENTS.md 架构守卫 (applyState同步内存/防原型污染/pageNativeAction切页保护) 与 shared 完全一致', () => {
+    const sharedStatus = require('../shared/bookingStatus');
+    const sharedPerf = require('../shared/performance');
+
+    const res = JSON.parse(vm.runInContext('JSON.stringify(openArchitectureGuardModal("quoted"))', sandbox));
+
+    expect(res.statusText).toBe(sharedStatus.mapStatusText('quoted'));
+    expect(res.canCancel).toBe(sharedStatus.canCancelBooking('quoted'));
+    expect(res.canEdit).toBe(sharedStatus.canEditBooking('quoted'));
+    expect(res.maskedPhoneSample).toBe(sharedStatus.maskPhone('13800138000'));
+    expect(res.journey).toEqual(sharedStatus.buildJourneyProgress('quoted'));
+    expect(res.steps).toEqual(sharedStatus.buildProgressSteps('quoted'));
+    expect(res.guidance).toEqual(sharedStatus.buildStatusGuidance('quoted', 'detail'));
+    expect(res.listSummary).toEqual({ ongoing: 2, completed: 1, cancelled: 1 });
+
+    // Verify AGENTS.md runtime guardrails
+    expect(res.guardrailsVerification).toEqual({
+      syncMemoryUpdatedCity: '上海',
+      syncMemoryArrayItem: 'Porsche 911',
+      prototypePollutionBlocked: true,
+      nativeActionActiveBeforeUnload: true,
+      nativeActionBlockedAfterUnload: true
+    });
+
+    // Verify deepMergePatch parity
+    const merged = JSON.parse(
+      vm.runInContext('JSON.stringify(deepMergePatch({ a: { x: 1, y: 2 } }, { a: { y: 9 }, b: 3 }))', sandbox)
+    );
+    expect(merged).toEqual(sharedPerf.deepMergePatch({ a: { x: 1, y: 2 } }, { a: { y: 9 }, b: 3 }));
+  });
 });

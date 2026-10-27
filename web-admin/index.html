@@ -2336,6 +2336,9 @@
           </div>
           <div class="panel-controls">
             <input type="text" class="search-input" id="reconcileSearchInput" placeholder="搜索预约单号 / 车型 / 城市..." oninput="filterReconcileBookings()" style="width: 210px;">
+            <button class="btn-action" style="border-color: rgba(16, 185, 129, 0.4); color: #34d399;" onclick="openArchitectureGuardModal()">
+              <span>⚡</span> 状态机旅程与架构守卫
+            </button>
             <button class="btn-action" style="border-color: rgba(56, 189, 248, 0.4); color: #38bdf8;" onclick="openWorkbenchServiceModal()">
               <span>🧭</span> 协调工作台与网点配置
             </button>
@@ -3296,6 +3299,51 @@
         <span style="font-size:0.72rem; color:var(--text-dim);">自动过滤已取消订单，精准识别同车跨天重叠冲突与无障碍 ARIA 描述</span>
         <div style="display:flex; gap:0.65rem;">
           <button class="btn-action" onclick="closeMonthCalendarModal()">关闭</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 16: Booking Status Journey & AGENTS.md Runtime Guardrails Simulator -->
+  <div class="modal-overlay" id="architectureGuardModal">
+    <div class="modal-card" style="max-width: 840px;">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span>⚡</span> 预约 7 态生命周期旅程与 AGENTS.md 核心架构守卫仿真中心
+        </div>
+        <button class="modal-close" onclick="closeArchitectureGuardModal()">×</button>
+      </div>
+      <div class="modal-subtitle">
+        对齐 <code style="color:#38bdf8;">shared/bookingStatus.js</code> (7态引导与5步旅程)、<code style="color:#34d399;">shared/performance.js</code> (applyState 内存同步优先与原型链污染防御) 及 <code style="color:#fbbf24;">shared/pageNativeAction.js</code> (切页脏写拦截)。
+      </div>
+
+      <div class="modal-field">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.45rem;">
+          <label style="margin-bottom:0;">🔄 预约生命周期状态切换演练 (buildJourneyProgress &amp; buildProgressSteps)</label>
+          <select class="search-input" id="archBookingStatusSelect" style="width: 240px; padding: 0.35rem 0.6rem; font-size: 0.75rem;" onchange="onArchBookingStatusChange(this.value)">
+            <option value="pending">pending (待联系 · 4%)</option>
+            <option value="contacted">contacted (已联系 · 50%)</option>
+            <option value="quoted">quoted (已报价 · 67%)</option>
+            <option value="adjustment_requested">adjustment_requested (待调整 · 67%)</option>
+            <option value="confirmed">confirmed (已确认 · 90%)</option>
+            <option value="completed">completed (已完成 · 100%)</option>
+            <option value="cancelled">cancelled (已取消 · 100%)</option>
+          </select>
+        </div>
+        <div id="archJourneyStepsBar" style="display:flex; gap:0.4rem; flex-wrap:wrap; margin-bottom:0.55rem;">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+
+      <div class="modal-field">
+        <label>🛡️ AGENTS.md 运行时守卫自检快照 (applyState 同步更新 / __proto__ 拦截 / pageNativeAction 切页保护)</label>
+        <textarea id="archGuardResultBox" readonly style="width: 100%; height: 155px; background: rgba(5, 8, 17, 0.85); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: #34d399; font-size: 0.73rem; font-family: 'JetBrains Mono', monospace; padding: 0.65rem; resize: none; line-height: 1.45;"></textarea>
+      </div>
+
+      <div class="modal-footer" style="display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-size:0.72rem; color:var(--text-dim);">100% 遵循 AGENTS.md 状态与事件时序守卫、异步生命周期及切页保护准则</span>
+        <div style="display:flex; gap:0.65rem;">
+          <button class="btn-action" onclick="closeArchitectureGuardModal()">关闭</button>
         </div>
       </div>
     </div>
@@ -8512,6 +8560,300 @@
 
     function closeMonthCalendarModal() {
       const modal = document.getElementById('monthCalendarModal');
+      if (modal) modal.classList.remove('open');
+    }
+
+    // ==================== 15G. BOOKING STATUS JOURNEY & AGENTS.MD RUNTIME GUARDRAILS (对齐 shared/bookingStatus.js, performance.js, pageNativeAction.js, cloudDataCache.js) ====================
+    const BOOKING_STATUS_TEXT_MAP = {
+      pending: '待联系',
+      contacted: '已联系',
+      quoted: '已报价',
+      adjustment_requested: '待调整',
+      confirmed: '已确认',
+      completed: '已完成',
+      cancelled: '已取消'
+    };
+
+    const BOOKING_STATUS_CLASS_MAP = {
+      pending: 'status-pending',
+      contacted: 'status-contacted',
+      quoted: 'status-quoted',
+      adjustment_requested: 'status-adjustment-requested',
+      confirmed: 'status-confirmed',
+      completed: 'status-completed',
+      cancelled: 'status-cancelled'
+    };
+
+    function mapStatusText(status) {
+      const value = String(status || '').trim();
+      return BOOKING_STATUS_TEXT_MAP[value] || '待联系';
+    }
+
+    function mapStatusClass(status) {
+      const value = String(status || '').trim();
+      return BOOKING_STATUS_CLASS_MAP[value] || 'status-pending';
+    }
+
+    function canCancelBooking(status) {
+      const value = String(status || '').trim();
+      return ['pending', 'contacted', 'quoted', 'adjustment_requested', 'confirmed'].includes(value);
+    }
+
+    function canEditBooking(status) {
+      const value = String(status || '').trim();
+      return value === 'pending' || value === 'contacted';
+    }
+
+    const GUIDANCE_LIST_MAP = {
+      pending: { title: '等待顾问联系', desc: '预约已提交，请保持手机畅通；联系前可修改资料或取消预约。', tone: 'pending' },
+      contacted: { title: '正在确认行程', desc: '顾问已联系，请按沟通结果确认档期、价格与取还车安排。', tone: 'contacted' },
+      quoted: { title: '报价待确认', desc: '请进入详情核对费用并确认或申请调整。', tone: 'quoted' },
+      adjustment_requested: { title: '报价调整中', desc: '顾问正在根据你的说明重新报价。', tone: 'adjustment' },
+      confirmed: { title: '报价已确认', desc: '所选档期已保留，尚未付款或签署合同，请关注后续安排。', tone: 'confirmed' },
+      completed: { title: '本次行程已完成', desc: '预约流程已结束，可返回车库继续浏览其他车辆。', tone: 'completed' },
+      cancelled: { title: '本次预约已取消', desc: '该记录已结束，如仍有用车需求可重新选择车辆提交预约。', tone: 'cancelled' }
+    };
+
+    const GUIDANCE_DETAIL_MAP = {
+      pending: { title: '等待顾问联系', desc: '预约已提交，请保持手机畅通；联系前仍可修改本次预约的联系信息。', tone: 'pending' },
+      contacted: { title: '正在确认行程', desc: '顾问已联系，请按沟通结果确认车辆档期、价格与取还车安排。', tone: 'contacted' },
+      quoted: { title: '报价等待确认', desc: '顾问已发送费用明细，请核对报价后确认或提出调整；确认不代表付款。', tone: 'quoted' },
+      adjustment_requested: { title: '顾问正在调整报价', desc: '调整申请已提交，顾问重新发送报价后可再次确认。', tone: 'adjustment' },
+      confirmed: { title: '报价已确认', desc: '报价已确认，所选档期已为你保留；尚未付款或签署合同，请与顾问确认后续安排。', tone: 'confirmed' },
+      completed: { title: '本次行程已完成', desc: '预约流程已经结束，感谢使用爱迦租车服务。', tone: 'completed' },
+      cancelled: { title: '本次预约已取消', desc: '该预约已结束，如仍有用车需求，可返回车库重新选择车辆。', tone: 'cancelled' }
+    };
+
+    function buildStatusGuidance(status, options = {}) {
+      const value = String(status || 'pending').trim() || 'pending';
+      const isDetail = typeof options === 'string' ? options === 'detail' : Boolean(options && (options.isDetail || options.mode === 'detail'));
+      const map = isDetail ? GUIDANCE_DETAIL_MAP : GUIDANCE_LIST_MAP;
+      return map[value] || map.pending;
+    }
+
+    function buildJourneyProgress(status) {
+      const value = String(status || 'pending').trim() || 'pending';
+      const progressMap = {
+        pending: { stageText: '第 1 阶段 · 等待联系', width: '4%', tone: 'pending', stepOneClass: 'journey-step-current', stepTwoClass: 'journey-step-upcoming', stepThreeClass: 'journey-step-upcoming' },
+        contacted: { stageText: '第 2 阶段 · 行程确认', width: '50%', tone: 'contacted', stepOneClass: 'journey-step-complete', stepTwoClass: 'journey-step-current', stepThreeClass: 'journey-step-upcoming' },
+        quoted: { stageText: '第 2 阶段 · 报价确认', width: '67%', tone: 'quoted', stepOneClass: 'journey-step-complete', stepTwoClass: 'journey-step-current', stepThreeClass: 'journey-step-upcoming' },
+        adjustment_requested: { stageText: '第 2 阶段 · 报价调整', width: '67%', tone: 'adjustment', stepOneClass: 'journey-step-complete', stepTwoClass: 'journey-step-current', stepThreeClass: 'journey-step-upcoming' },
+        confirmed: { stageText: '第 3 阶段 · 方案已确认', width: '90%', tone: 'confirmed', stepOneClass: 'journey-step-complete', stepTwoClass: 'journey-step-complete', stepThreeClass: 'journey-step-current' },
+        completed: { stageText: '第 3 阶段 · 行程完成', width: '100%', tone: 'completed', stepOneClass: 'journey-step-complete', stepTwoClass: 'journey-step-complete', stepThreeClass: 'journey-step-current' },
+        cancelled: { stageText: '流程已结束', width: '100%', tone: 'cancelled', stepOneClass: 'journey-step-complete', stepTwoClass: 'journey-step-upcoming', stepThreeClass: 'journey-step-cancelled' }
+      };
+      return progressMap[value] || progressMap.pending;
+    }
+
+    function buildProgressSteps(status) {
+      const value = String(status || 'pending').trim() || 'pending';
+      const cancelled = value === 'cancelled';
+      const indexMap = { pending: 0, contacted: 1, quoted: 2, adjustment_requested: 2, confirmed: 3, completed: 4 };
+      const activeIndex = cancelled ? 1 : (indexMap[value] === undefined ? 0 : indexMap[value]);
+      const labels = cancelled
+        ? ['预约已提交', '预约已取消', '流程已结束']
+        : ['预约已提交', '顾问联系', '收到报价', '确认方案', '行程完成'];
+      return labels.map((label, index) => {
+        let stateClass = 'progress-upcoming';
+        if (index < activeIndex) stateClass = 'progress-done';
+        else if (index === activeIndex) stateClass = cancelled ? 'progress-cancelled' : 'progress-current';
+        return {
+          key: `${value}-${index}`,
+          label,
+          marker: `${index + 1}`,
+          showCheck: index < activeIndex,
+          showCancelledMark: cancelled && index === activeIndex,
+          stateClass,
+          isLast: index === labels.length - 1
+        };
+      });
+    }
+
+    function buildListSummary(list) {
+      return (Array.isArray(list) ? list : []).reduce(
+        (summary, item) => {
+          const status = String((item && item.status) || 'pending').trim();
+          if (status === 'completed') summary.completed += 1;
+          else if (status === 'cancelled') summary.cancelled += 1;
+          else summary.ongoing += 1;
+          return summary;
+        },
+        { ongoing: 0, completed: 0, cancelled: 0 }
+      );
+    }
+
+    function normalizePhone(value) {
+      const phone = String(value || '').trim();
+      const digitCount = phone.replace(/\D/g, '').length;
+      if (!/^\+?[0-9-]{6,20}$/.test(phone) || digitCount < 6 || digitCount > 15) return '';
+      return phone;
+    }
+
+    function maskPhone(value) {
+      const phone = String(value || '').trim();
+      return /^1\d{10}$/.test(phone) ? `${phone.slice(0, 3)}****${phone.slice(-4)}` : phone || '—';
+    }
+
+    // AGENTS.md Guardrails: applyState & deepMergePatch (对齐 shared/performance.js)
+    function isPlainObject(value) {
+      if (value === null || typeof value !== 'object') return false;
+      const proto = Object.getPrototypeOf(value);
+      return proto === Object.prototype || proto === null;
+    }
+
+    function deepMergePatch(target, patch) {
+      if (!isPlainObject(patch)) return patch;
+      const result = isPlainObject(target) ? Object.assign({}, target) : {};
+      Object.keys(patch).forEach(key => {
+        const value = patch[key];
+        if (Object.prototype.hasOwnProperty.call(result, key) && isPlainObject(value) && isPlainObject(result[key])) {
+          result[key] = deepMergePatch(result[key], value);
+        } else {
+          result[key] = value;
+        }
+      });
+      return result;
+    }
+
+    function statePath(key) {
+      const parts = String(key).replace(/\[(\d+)\]/g, '.$1').split('.');
+      return parts.some(part => !part || ['__proto__', 'prototype', 'constructor'].includes(part)) ? [] : parts;
+    }
+
+    function applyPatchToTarget(target, patch) {
+      if (!target || typeof target !== 'object' || !isPlainObject(patch)) return;
+      Object.keys(patch).forEach(key => {
+        const parts = statePath(key);
+        if (!parts.length || patch[key] === undefined) return;
+        let current = target;
+        for (let j = 0; j < parts.length - 1; j++) {
+          const part = parts[j];
+          if (!current[part] || typeof current[part] !== 'object') {
+            current[part] = /^\d+$/.test(parts[j + 1]) ? [] : {};
+          }
+          current = current[part];
+        }
+        current[parts[parts.length - 1]] = patch[key];
+      });
+    }
+
+    // AGENTS.md Guardrails: pageNativeAction (对齐 shared/pageNativeAction.js)
+    function activatePageNativeActions(page) {
+      if (!page || typeof page !== 'object') return;
+      page._nativeActionsUnloaded = false;
+      page._nativeActionLifecycleSerial = Number(page._nativeActionLifecycleSerial || 0) + 1;
+      page._nativeActionExclusiveSerials = {};
+    }
+
+    function beginPageNativeAction(page, options) {
+      if (!page || typeof page !== 'object') return null;
+      const config = options && typeof options === 'object' ? options : {};
+      const exclusiveKey = String(config.exclusiveKey || '').trim();
+      let exclusiveSerial = 0;
+      if (exclusiveKey) {
+        if (!page._nativeActionExclusiveSerials || typeof page._nativeActionExclusiveSerials !== 'object') {
+          page._nativeActionExclusiveSerials = {};
+        }
+        exclusiveSerial = Number(page._nativeActionExclusiveSerials[exclusiveKey] || 0) + 1;
+        page._nativeActionExclusiveSerials[exclusiveKey] = exclusiveSerial;
+      }
+      return {
+        lifecycleSerial: Number(page._nativeActionLifecycleSerial || 0),
+        requireCurrent: Boolean(config.requireCurrent),
+        exclusiveKey,
+        exclusiveSerial
+      };
+    }
+
+    function isPageNativeActionActive(page, action) {
+      if (!page || !action || page._nativeActionsUnloaded === true) return false;
+      if (Number(page._nativeActionLifecycleSerial || 0) !== action.lifecycleSerial) return false;
+      if (
+        action.exclusiveKey &&
+        Number(page._nativeActionExclusiveSerials && page._nativeActionExclusiveSerials[action.exclusiveKey]) !== action.exclusiveSerial
+      ) {
+        return false;
+      }
+      return true;
+    }
+
+    function cancelPageNativeActions(page) {
+      if (!page || typeof page !== 'object') return;
+      page._nativeActionsUnloaded = true;
+      page._nativeActionLifecycleSerial = Number(page._nativeActionLifecycleSerial || 0) + 1;
+      page._nativeActionExclusiveSerials = {};
+    }
+
+    function onArchBookingStatusChange(status = 'quoted') {
+      const journey = buildJourneyProgress(status);
+      const steps = buildProgressSteps(status);
+      const guidance = buildStatusGuidance(status, 'detail');
+      const listSummary = buildListSummary([
+        { status: 'pending' },
+        { status: 'confirmed' },
+        { status: 'completed' },
+        { status: 'cancelled' }
+      ]);
+
+      // Run live AGENTS.md guardrails self-test
+      const mockPage = { data: { filter: { city: '杭州' }, list: [] } };
+      activatePageNativeActions(mockPage);
+      const action1 = beginPageNativeAction(mockPage, { exclusiveKey: 'phoneCall' });
+      const activeBeforeUnload = isPageNativeActionActive(mockPage, action1);
+      applyPatchToTarget(mockPage.data, {
+        'filter.city': '上海',
+        'list[0].title': 'Porsche 911',
+        '__proto__.polluted': 'blocked'
+      });
+      cancelPageNativeActions(mockPage);
+      const activeAfterUnload = isPageNativeActionActive(mockPage, action1);
+
+      const barEl = document.getElementById('archJourneyStepsBar');
+      if (barEl) {
+        barEl.innerHTML = steps.map(s => `
+          <span class="status-pill ${s.stateClass === 'progress-done' || s.stateClass === 'progress-current' ? 'active' : 'maint'}">
+            ${s.marker}. ${s.label} (${s.stateClass})
+          </span>
+        `).join('');
+      }
+
+      const result = {
+        status,
+        statusText: mapStatusText(status),
+        canCancel: canCancelBooking(status),
+        canEdit: canEditBooking(status),
+        maskedPhoneSample: maskPhone('13800138000'),
+        journey,
+        steps,
+        guidance,
+        listSummary,
+        guardrailsVerification: {
+          syncMemoryUpdatedCity: mockPage.data.filter.city,
+          syncMemoryArrayItem: mockPage.data.list[0].title,
+          prototypePollutionBlocked: ({}).polluted === undefined,
+          nativeActionActiveBeforeUnload: activeBeforeUnload,
+          nativeActionBlockedAfterUnload: activeAfterUnload === false
+        }
+      };
+
+      const boxEl = document.getElementById('archGuardResultBox');
+      if (boxEl) {
+        boxEl.value = JSON.stringify(result, null, 2);
+      }
+      return result;
+    }
+
+    function openArchitectureGuardModal(defaultStatus = 'quoted') {
+      const sel = document.getElementById('archBookingStatusSelect');
+      if (sel) sel.value = defaultStatus;
+      const res = onArchBookingStatusChange(defaultStatus);
+      const modal = document.getElementById('architectureGuardModal');
+      if (modal) modal.classList.add('open');
+      return res;
+    }
+
+    function closeArchitectureGuardModal() {
+      const modal = document.getElementById('architectureGuardModal');
       if (modal) modal.classList.remove('open');
     }
 

@@ -1815,6 +1815,9 @@
             </div>
             <div class="panel-controls">
               <input type="text" class="search-input" id="vehicleSearch" placeholder="搜索车型 / 车牌号..." oninput="filterVehicles()">
+              <button class="btn-action" style="border-color: rgba(245, 158, 11, 0.4); color: #fbbf24;" onclick="openMaintenanceAlertModal()">
+                <span>🔧</span> 维保年检与运营预警
+              </button>
               <button class="btn-action" style="border-color: rgba(56, 189, 248, 0.4); color: #38bdf8;" onclick="openCalendarConflictModal()">
                 <span>🛡️</span> 47天跨度与冲突校验
               </button>
@@ -3056,6 +3059,59 @@
     </div>
   </div>
 
+  <!-- Modal 12: Fleet Maintenance Health & 4-Dimensional Operation Alerts Center -->
+  <div class="modal-overlay" id="maintenanceAlertModal">
+    <div class="modal-card" style="max-width: 820px;">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span>🔧</span> 车队维保年检健康看板与四维运营预警雷达
+        </div>
+        <button class="modal-close" onclick="closeMaintenanceAlertModal()">×</button>
+      </div>
+      <div class="modal-subtitle">
+        对齐 <code style="color:#fbbf24;">shared/vehicleMaintenance.js</code> 与 <code style="color:#38bdf8;">shared/operationAlerts.js</code>，实时核算保养/年检倒计时及四维运营超时预警（待跟进 &gt;24h / 报价临期 ≤48h / 维保临期 ≤30d / 协调超时 &gt;48h）。
+      </div>
+
+      <div id="maintenanceSummaryCards" style="display:grid; grid-template-columns:repeat(4, 1fr); gap:0.65rem; margin-bottom:0.9rem;">
+        <!-- Populated dynamically -->
+      </div>
+
+      <div class="modal-field">
+        <label>🚨 四维智能运营预警雷达 (computeAlerts 按 HIGH / MEDIUM / LOW 优先级排序)</label>
+        <div id="operationAlertsBoard" style="display:grid; grid-template-columns:repeat(2, 1fr); gap:0.6rem;">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+
+      <div class="modal-field">
+        <label>🏎️ 车队维保与年检周期台账 (支持一键登记维保完工并顺延 180 天周期)</label>
+        <div style="max-height: 220px; overflow-y: auto; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); background: rgba(5, 8, 17, 0.7);">
+          <table class="fleet-table" style="font-size: 0.75rem;">
+            <thead>
+              <tr>
+                <th>车辆与牌照</th>
+                <th>保养到期 (archiveDate)</th>
+                <th>年检到期 (archiveReview)</th>
+                <th>健康评级与诊断提示</th>
+                <th>整备动作</th>
+              </tr>
+            </thead>
+            <tbody id="maintenanceFleetTableBody">
+              <!-- Populated dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-size:0.72rem; color:var(--text-dim);">基准核算时钟：2026-10-26 · 预警阈值：24h / 48h / 30d / 48h</span>
+        <div style="display:flex; gap:0.65rem;">
+          <button class="btn-action" onclick="closeMaintenanceAlertModal()">关闭</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Element -->
   <div id="toast">
     <span id="toastIcon">ℹ️</span>
@@ -3138,14 +3194,14 @@
 
     // ==================== 2. VEHICLE DATA (运力大盘档案矩阵) ====================
     const DEFAULT_VEHICLES = [
-      { id: 'v1', name: 'Porsche 911 GT3 RS', plate: '浙A·88888', category: '赛道超级跑车', dailyRate: 4500, hasLongTermInterest: true, longTermDays: 7, status: 'rented', statusText: '租赁中', schedule: '今日 18:00 归还待检', lockedDays: ['2026-10-25', '2026-10-26'] },
-      { id: 'v2', name: 'Ferrari 488 Pista', plate: '浙A·77777', category: '中置V8跑车', dailyRate: 8800, hasLongTermInterest: false, longTermDays: 2, status: 'maintenance', statusText: '整备中', schedule: '今日 16:30 释放 (机油保养)', lockedDays: ['2026-10-25'] },
-      { id: 'v3', name: 'Lamborghini Huracán EVO', plate: '浙A·99999', category: 'V10四驱跑车', dailyRate: 7500, hasLongTermInterest: true, longTermDays: 15, status: 'active', statusText: '空闲待租', schedule: '全档期可用 · 已预约半月试驾', lockedDays: [] },
-      { id: 'v4', name: 'McLaren 720S Performance', plate: '浙A·66666', category: '碳纤维单体壳超跑', dailyRate: 6800, hasLongTermInterest: false, longTermDays: 3, status: 'active', statusText: '空闲待租', schedule: '明日 10:00 已有预订', lockedDays: ['2026-10-26'] },
-      { id: 'v5', name: 'Aston Martin DBS Superleggera', plate: '浙A·55555', category: 'GT旗舰跑车', dailyRate: 5800, hasLongTermInterest: true, longTermDays: 30, status: 'reserved', statusText: '已确认待取', schedule: '明日 09:00 客户提车 (月租专案)', lockedDays: ['2026-10-26'] },
-      { id: 'v6', name: 'Mercedes-AMG G63', plate: '浙A·22222', category: '全地形越野', dailyRate: 4200, hasLongTermInterest: false, longTermDays: 3, status: 'rented', statusText: '租赁中', schedule: '后天 14:00 归还', lockedDays: ['2026-10-25', '2026-10-26', '2026-10-27'] },
-      { id: 'v7', name: 'Rolls-Royce Ghost', plate: '浙A·11111', category: '顶级行政座驾', dailyRate: 9800, hasLongTermInterest: false, longTermDays: 1, status: 'active', statusText: '空闲待租', schedule: '全档期可用', lockedDays: [] },
-      { id: 'v8', name: 'Bentley Continental GT', plate: '浙A·33333', category: '超豪华运动轿跑', dailyRate: 4800, hasLongTermInterest: false, longTermDays: 2, status: 'active', statusText: '空闲待租', schedule: '本周末已预订', lockedDays: ['2026-10-31', '2026-11-01'] }
+      { id: 'v1', name: 'Porsche 911 GT3 RS', plate: '浙A·88888', category: '赛道超级跑车', dailyRate: 4500, hasLongTermInterest: true, longTermDays: 7, status: 'rented', statusText: '租赁中', schedule: '今日 18:00 归还待检', lockedDays: ['2026-10-25', '2026-10-26'], archiveDate: '2026-11-20', archiveReview: '2027-05-15' },
+      { id: 'v2', name: 'Ferrari 488 Pista', plate: '浙A·77777', category: '中置V8跑车', dailyRate: 8800, hasLongTermInterest: false, longTermDays: 2, status: 'maintenance', statusText: '整备中', schedule: '今日 16:30 释放 (机油保养)', lockedDays: ['2026-10-25'], archiveDate: '2026-10-29', archiveReview: '2027-03-10' },
+      { id: 'v3', name: 'Lamborghini Huracán EVO', plate: '浙A·99999', category: 'V10四驱跑车', dailyRate: 7500, hasLongTermInterest: true, longTermDays: 15, status: 'active', statusText: '空闲待租', schedule: '全档期可用 · 已预约半月试驾', lockedDays: [], archiveDate: '2027-02-18', archiveReview: '2027-06-30' },
+      { id: 'v4', name: 'McLaren 720S Performance', plate: '浙A·66666', category: '碳纤维单体壳超跑', dailyRate: 6800, hasLongTermInterest: false, longTermDays: 3, status: 'active', statusText: '空闲待租', schedule: '明日 10:00 已有预订', lockedDays: ['2026-10-26'], archiveDate: '2026-12-12', archiveReview: '2027-04-20' },
+      { id: 'v5', name: 'Aston Martin DBS Superleggera', plate: '浙A·55555', category: 'GT旗舰跑车', dailyRate: 5800, hasLongTermInterest: true, longTermDays: 30, status: 'reserved', statusText: '已确认待取', schedule: '明日 09:00 客户提车 (月租专案)', lockedDays: ['2026-10-26'], archiveDate: '2027-01-15', archiveReview: '2027-08-01' },
+      { id: 'v6', name: 'Mercedes-AMG G63', plate: '浙A·22222', category: '全地形越野', dailyRate: 4200, hasLongTermInterest: false, longTermDays: 3, status: 'rented', statusText: '租赁中', schedule: '后天 14:00 归还', lockedDays: ['2026-10-25', '2026-10-26', '2026-10-27'], archiveDate: '2026-11-08', archiveReview: '2026-12-20' },
+      { id: 'v7', name: 'Rolls-Royce Ghost', plate: '浙A·11111', category: '顶级行政座驾', dailyRate: 9800, hasLongTermInterest: false, longTermDays: 1, status: 'active', statusText: '空闲待租', schedule: '全档期可用', lockedDays: [], archiveDate: '2027-03-22', archiveReview: '2027-09-10' },
+      { id: 'v8', name: 'Bentley Continental GT', plate: '浙A·33333', category: '超豪华运动轿跑', dailyRate: 4800, hasLongTermInterest: false, longTermDays: 2, status: 'active', statusText: '空闲待租', schedule: '本周末已预订', lockedDays: ['2026-10-31', '2026-11-01'], archiveDate: '2026-10-24', archiveReview: '2027-01-18' }
     ];
     const VEHICLES = JSON.parse(JSON.stringify(DEFAULT_VEHICLES));
     const FLEET_SCHEDULE_STORAGE_KEY = 'AIJIA_FLEET_SCHEDULE_STATE';
@@ -3157,7 +3213,9 @@
           status: v.status,
           statusText: v.statusText,
           schedule: v.schedule,
-          lockedDays: Array.isArray(v.lockedDays) ? v.lockedDays : []
+          lockedDays: Array.isArray(v.lockedDays) ? v.lockedDays : [],
+          archiveDate: v.archiveDate || '',
+          archiveReview: v.archiveReview || ''
         }));
         localStorage.setItem(FLEET_SCHEDULE_STORAGE_KEY, JSON.stringify(snapshot));
       } catch (e) {
@@ -3405,6 +3463,11 @@
         }
         tierTagsHtml += `<span class="tier-pill">周租9折</span> <span class="tier-pill">月租75折</span>`;
 
+        const maintHealth = typeof calculateMaintenanceHealth === 'function'
+          ? calculateMaintenanceHealth(item, new Date('2026-10-26T00:00:00'))
+          : { urgency: 'healthy', tip: '维保状态正常' };
+        const maintColor = maintHealth.urgency === 'urgent' ? '#f87171' : (maintHealth.urgency === 'upcoming' ? '#fbbf24' : '#34d399');
+
         tr.innerHTML = `
           <td>
             <div class="vehicle-info">
@@ -3425,7 +3488,10 @@
             </div>
           </td>
           <td><span class="status-pill ${item.status}">${item.statusText}</span></td>
-          <td><span style="font-size:0.8rem; color:var(--text-dim); font-family:'JetBrains Mono',monospace;">${item.schedule}</span></td>
+          <td>
+            <div style="font-size:0.8rem; color:var(--text-dim); font-family:'JetBrains Mono',monospace;">${item.schedule}</div>
+            <div style="font-size:0.68rem; color:${maintColor}; margin-top:0.2rem;">🔧 ${maintHealth.tip}</div>
+          </td>
           <td>
             <div style="display:flex; gap:0.4rem;">
               <button class="btn-action" style="padding:0.25rem 0.55rem; font-size:0.75rem;" onclick="openScheduleModal('${item.id}')">
@@ -5693,6 +5759,8 @@
                 if (saved.statusText) target.statusText = saved.statusText;
                 if (saved.schedule) target.schedule = saved.schedule;
                 if (Array.isArray(saved.lockedDays)) target.lockedDays = saved.lockedDays;
+                if (saved.archiveDate) target.archiveDate = saved.archiveDate;
+                if (saved.archiveReview) target.archiveReview = saved.archiveReview;
               }
             });
           }
@@ -6431,6 +6499,329 @@
         navigator.clipboard.writeText(text).catch(() => {});
       }
       showToast('已复制 17 集合合规个人数据台账 JSON 到剪贴板！', '📋');
+    }
+
+    // ==================== 15C. FLEET MAINTENANCE HEALTH & 4-DIMENSIONAL OPERATION ALERTS (对齐 shared/vehicleMaintenance.js & shared/operationAlerts.js) ====================
+    const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+    const OVERDUE_PENDING_HOURS = 24;
+    const QUOTE_EXPIRY_WARNING_HOURS = 48;
+    const MAINTENANCE_WARNING_DAYS = 30;
+    const COORDINATION_OVERDUE_HOURS = 48;
+
+    function parseLocalDate(dateStr) {
+      if (!dateStr || typeof dateStr !== 'string') return null;
+      const m = dateStr.trim().match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+      if (!m) return null;
+      const y = Number(m[1]);
+      const mon = Number(m[2]) - 1;
+      const d = Number(m[3]);
+      const dt = new Date(y, mon, d);
+      return dt.getFullYear() === y && dt.getMonth() === mon && dt.getDate() === d ? dt : null;
+    }
+
+    function calculateDaysDiff(targetDateStr, baseDateInput) {
+      const target = parseLocalDate(targetDateStr);
+      if (!target) return null;
+      const base = baseDateInput instanceof Date ? baseDateInput : new Date();
+      const baseMidnight = new Date(base.getFullYear(), base.getMonth(), base.getDate());
+      const targetMidnight = new Date(target.getFullYear(), target.getMonth(), target.getDate());
+      return Math.round((targetMidnight.getTime() - baseMidnight.getTime()) / ONE_DAY_MS);
+    }
+
+    function calculateMaintenanceHealth(vehicleInput, baseDate) {
+      const vehicle = vehicleInput && typeof vehicleInput === 'object' ? vehicleInput : {};
+      const archiveDate = vehicle.archiveDate || '';
+      const archiveReview = vehicle.archiveReview || '';
+
+      const daysToMaintenance = calculateDaysDiff(archiveDate, baseDate);
+      const daysToReview = calculateDaysDiff(archiveReview, baseDate);
+
+      let urgency = 'untracked';
+      let tip = '维保日期待录入';
+      let isOverdue = false;
+
+      if (daysToMaintenance !== null || daysToReview !== null) {
+        const minDays = Math.min(
+          daysToMaintenance !== null ? daysToMaintenance : Infinity,
+          daysToReview !== null ? daysToReview : Infinity
+        );
+        const dueTask = daysToMaintenance === daysToReview ? '保养和年检'
+          : minDays === daysToReview ? '年检' : '保养';
+
+        if (minDays < 0) {
+          urgency = 'urgent';
+          isOverdue = true;
+          tip = `${dueTask}已逾期 ${Math.abs(minDays)} 天`;
+        } else if (minDays <= 7) {
+          urgency = 'urgent';
+          tip = minDays === 0 ? `今日${dueTask}到期` : `${minDays} 天内需${dueTask}`;
+        } else if (minDays <= 30) {
+          urgency = 'upcoming';
+          tip = `${minDays} 天内需${dueTask}`;
+        } else {
+          urgency = 'healthy';
+          tip = '维保状态正常';
+        }
+      }
+
+      return {
+        vehicleId: String(vehicle.id || vehicle._id || ''),
+        daysToMaintenance,
+        daysToReview,
+        urgency,
+        tip,
+        isOverdue,
+        archiveDate,
+        archiveReview
+      };
+    }
+
+    function buildFleetMaintenanceSummary(vehicles, baseDate) {
+      const list = Array.isArray(vehicles) ? vehicles : [];
+      let urgentCount = 0;
+      let upcomingCount = 0;
+      let healthyCount = 0;
+      let untrackedCount = 0;
+
+      list.forEach(v => {
+        const health = calculateMaintenanceHealth(v, baseDate);
+        if (health.urgency === 'urgent') urgentCount++;
+        else if (health.urgency === 'upcoming') upcomingCount++;
+        else if (health.urgency === 'healthy') healthyCount++;
+        else untrackedCount++;
+      });
+
+      return {
+        total: list.length,
+        urgentCount,
+        upcomingCount,
+        healthyCount,
+        untrackedCount,
+        attentionRequired: urgentCount + upcomingCount
+      };
+    }
+
+    function computeAlerts(bookings, vehicles, options) {
+      const now = (options && options.now) || Date.now();
+      const bList = Array.isArray(bookings) ? bookings : [];
+      const vList = Array.isArray(vehicles) ? vehicles : [];
+      const alerts = [];
+      const getTime = d => {
+        const t = new Date(d).getTime();
+        return Number.isNaN(t) ? null : t;
+      };
+
+      // 1. Overdue pending (> 24h)
+      const overduePending = bList.filter(b => {
+        if (String(b.status || '').trim() !== 'pending') return false;
+        const t = getTime(b.createdAt);
+        return t !== null && now - t > OVERDUE_PENDING_HOURS * 36e5;
+      });
+      if (overduePending.length > 0) {
+        const oldest = overduePending.reduce((a, b) => (getTime(a.createdAt) < getTime(b.createdAt) ? a : b));
+        const hoursAgo = Math.floor((now - getTime(oldest.createdAt)) / 36e5);
+        alerts.push({
+          type: 'overdue_pending',
+          urgency: 'high',
+          title: `${overduePending.length} 条预约超 ${OVERDUE_PENDING_HOURS}h 未联系`,
+          desc: `最早一条已等待 ${hoursAgo} 小时，建议尽快跟进`,
+          actionRoute: '/pages/booking-workbench/booking-workbench',
+          actionLabel: '进入工作台',
+          relatedId: oldest._id || oldest.id || '',
+          count: overduePending.length
+        });
+      }
+
+      // 2. Expiring quotes (<= 48h)
+      const expiringQuotes = bList.filter(b => {
+        if (String(b.status || '').trim() !== 'quoted') return false;
+        const q = b.latestQuote || b.quote;
+        if (!q || !q.validUntil) return false;
+        const t = getTime(q.validUntil);
+        return t !== null && t - now > 0 && t - now <= QUOTE_EXPIRY_WARNING_HOURS * 36e5;
+      });
+      if (expiringQuotes.length > 0) {
+        const getQ = item => getTime((item.latestQuote || item.quote || {}).validUntil);
+        const soonest = expiringQuotes.reduce((a, b) => (getQ(a) < getQ(b) ? a : b));
+        const hoursLeft = Math.floor((getQ(soonest) - now) / 36e5);
+        alerts.push({
+          type: 'expiring_quote',
+          urgency: 'medium',
+          title: `${expiringQuotes.length} 条报价即将过期`,
+          desc: `最近一条将在 ${hoursLeft} 小时后失效`,
+          actionRoute: '/pages/booking-manage/booking-manage',
+          actionLabel: '查看报价',
+          relatedId: soonest._id || soonest.id || '',
+          count: expiringQuotes.length
+        });
+      }
+
+      // 3. Maintenance due (<= 30d)
+      const maintenanceDue = vList.filter(v => {
+        const d = v.archiveDate || v.nextMaintenanceDate;
+        if (!d) return false;
+        const t = getTime(d);
+        return t !== null && t - now >= 0 && t - now <= MAINTENANCE_WARNING_DAYS * 864e5;
+      });
+      if (maintenanceDue.length > 0) {
+        const getV = v => getTime(v.archiveDate || v.nextMaintenanceDate);
+        const nearest = maintenanceDue.reduce((a, b) => (getV(a) < getV(b) ? a : b));
+        const daysLeft = Math.floor((getV(nearest) - now) / 864e5);
+        alerts.push({
+          type: 'maintenance_due',
+          urgency: 'low',
+          title: `${maintenanceDue.length} 辆车维保临期`,
+          desc: `最近一辆将在 ${daysLeft} 天后到期`,
+          actionRoute: '/pages-admin/vehicle-manage/vehicle-manage',
+          actionLabel: '查看车辆',
+          relatedId: nearest._id || nearest.id || '',
+          count: maintenanceDue.length
+        });
+      }
+
+      // 4. Overdue coordination (> 48h)
+      const overdueCoordination = bList.filter(b => {
+        if (String(b.coordinationStatus || '').trim() !== 'pending') return false;
+        const t = getTime(b.coordinationUpdatedAt || b.createdAt);
+        return t !== null && now - t > COORDINATION_OVERDUE_HOURS * 36e5;
+      });
+      if (overdueCoordination.length > 0) {
+        alerts.push({
+          type: 'overdue_coordination',
+          urgency: 'medium',
+          title: `${overdueCoordination.length} 条协调超 ${COORDINATION_OVERDUE_HOURS}h 未处理`,
+          desc: '长时间待协调可能影响客户体验',
+          actionRoute: '/pages/booking-workbench/booking-workbench',
+          actionLabel: '进入工作台',
+          relatedId: overdueCoordination[0]._id || overdueCoordination[0].id || '',
+          count: overdueCoordination.length
+        });
+      }
+
+      const PRIORITY = { high: 1, medium: 2, low: 3 };
+      alerts.sort((a, b) => (PRIORITY[a.urgency] || 9) - (PRIORITY[b.urgency] || 9));
+      return alerts;
+    }
+
+    const OPERATION_ALERT_SAMPLE_BOOKINGS = [
+      {
+        _id: 'BK_20261024_91',
+        status: 'pending',
+        createdAt: '2026-10-24T18:00:00Z',
+        customerName: '沈先生'
+      },
+      {
+        _id: 'BK_20261025_42',
+        status: 'quoted',
+        createdAt: '2026-10-25T10:00:00Z',
+        latestQuote: { validUntil: '2026-10-27T06:00:00Z', amount: 18600 }
+      },
+      {
+        _id: 'BK_20261023_77',
+        status: 'confirmed',
+        coordinationStatus: 'pending',
+        coordinationUpdatedAt: '2026-10-23T20:00:00Z'
+      }
+    ];
+
+    function renderMaintenanceAlertModal() {
+      const baseDate = new Date('2026-10-26T00:00:00');
+      const baseNowMs = new Date('2026-10-26T12:00:00Z').getTime();
+      const summary = buildFleetMaintenanceSummary(VEHICLES, baseDate);
+      const alerts = computeAlerts(OPERATION_ALERT_SAMPLE_BOOKINGS, VEHICLES, { now: baseNowMs });
+
+      const cardsEl = document.getElementById('maintenanceSummaryCards');
+      if (cardsEl) {
+        cardsEl.innerHTML = `
+          <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 0.7rem;">
+            <div style="font-size: 0.72rem; color: var(--text-dim);">监控运力总数</div>
+            <div style="font-size: 1.35rem; font-weight: 700; color: #f8fafc; font-family: 'JetBrains Mono', monospace;">${summary.total} 辆</div>
+          </div>
+          <div style="background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.35); border-radius: var(--radius-sm); padding: 0.7rem;">
+            <div style="font-size: 0.72rem; color: #fca5a5;">紧急/逾期 (≤7天)</div>
+            <div style="font-size: 1.35rem; font-weight: 700; color: #f87171; font-family: 'JetBrains Mono', monospace;">${summary.urgentCount} 辆</div>
+          </div>
+          <div style="background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: var(--radius-sm); padding: 0.7rem;">
+            <div style="font-size: 0.72rem; color: #fcd34d;">临期预警 (8-30天)</div>
+            <div style="font-size: 1.35rem; font-weight: 700; color: #fbbf24; font-family: 'JetBrains Mono', monospace;">${summary.upcomingCount} 辆</div>
+          </div>
+          <div style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: var(--radius-sm); padding: 0.7rem;">
+            <div style="font-size: 0.72rem; color: #6ee7b7;">维保健康 (&gt;30天)</div>
+            <div style="font-size: 1.35rem; font-weight: 700; color: #34d399; font-family: 'JetBrains Mono', monospace;">${summary.healthyCount} 辆</div>
+          </div>
+        `;
+      }
+
+      const boardEl = document.getElementById('operationAlertsBoard');
+      if (boardEl) {
+        boardEl.innerHTML = alerts.map(a => {
+          const borderCol = a.urgency === 'high' ? 'rgba(239, 68, 68, 0.45)' : (a.urgency === 'medium' ? 'rgba(245, 158, 11, 0.45)' : 'rgba(56, 189, 248, 0.45)');
+          const tagCol = a.urgency === 'high' ? '#f87171' : (a.urgency === 'medium' ? '#fbbf24' : '#38bdf8');
+          return `
+            <div style="background: rgba(15, 23, 42, 0.82); border: 1px solid ${borderCol}; border-radius: var(--radius-sm); padding: 0.65rem;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.25rem;">
+                <strong style="color:${tagCol}; font-size:0.78rem;">[${a.urgency.toUpperCase()}] ${a.title}</strong>
+                <span style="font-size:0.68rem; color:var(--text-dim); font-family:'JetBrains Mono',monospace;">${a.type}</span>
+              </div>
+              <div style="font-size:0.73rem; color:var(--text-main); margin-bottom:0.25rem;">${a.desc}</div>
+              <div style="font-size:0.68rem; color:var(--text-muted);">关联单据/车辆：<code style="color:#cbd5e1;">${a.relatedId}</code> · 路由：<code>${a.actionRoute}</code></div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      const tbodyEl = document.getElementById('maintenanceFleetTableBody');
+      if (tbodyEl) {
+        tbodyEl.innerHTML = VEHICLES.map(v => {
+          const h = calculateMaintenanceHealth(v, baseDate);
+          const badgeClass = h.urgency === 'urgent' ? 'maint' : (h.urgency === 'upcoming' ? 'rented' : 'active');
+          return `
+            <tr>
+              <td><strong>${v.name}</strong> <span style="color:var(--text-dim);">(${v.plate})</span></td>
+              <td style="font-family:'JetBrains Mono',monospace;">${h.archiveDate || '-'} (${h.daysToMaintenance !== null ? h.daysToMaintenance + 'd' : '-'})</td>
+              <td style="font-family:'JetBrains Mono',monospace;">${h.archiveReview || '-'} (${h.daysToReview !== null ? h.daysToReview + 'd' : '-'})</td>
+              <td><span class="status-pill ${badgeClass}">${h.tip}</span></td>
+              <td>
+                <button class="btn-action" style="padding:0.2rem 0.5rem; font-size:0.7rem;" onclick="completeVehicleMaintenance('${v.id}')">
+                  <span>✅</span> 登记维保完工
+                </button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      }
+
+      return { summary, alerts };
+    }
+
+    function openMaintenanceAlertModal() {
+      const result = renderMaintenanceAlertModal();
+      const modal = document.getElementById('maintenanceAlertModal');
+      if (modal) modal.classList.add('open');
+      return result;
+    }
+
+    function closeMaintenanceAlertModal() {
+      const modal = document.getElementById('maintenanceAlertModal');
+      if (modal) modal.classList.remove('open');
+    }
+
+    function completeVehicleMaintenance(vehicleId) {
+      const target = VEHICLES.find(v => v.id === vehicleId);
+      if (!target) return null;
+      target.archiveDate = addDaysIso('2026-10-26', 180);
+      if (target.status === 'maintenance') {
+        target.status = 'active';
+        target.statusText = '空闲待租';
+        target.schedule = '已完成保养整备 · 全档期可用';
+      }
+      persistFleetSchedules();
+      renderVehicles(VEHICLES);
+      const updatedState = renderMaintenanceAlertModal();
+      recordProbeHistory('vehicleUpdateStatus', 200, 24, 'MAINT_DONE');
+      appendLogStreamEntry('FLEET_MAINT', 'vehicleUpdateStatus', 200, `车辆 ${target.name} (${target.plate}) 已完成维保登记，下次保养顺延至 ${target.archiveDate}`, 24);
+      showToast(`已完成【${target.name}】保养整备登记，下次保养周期顺延至 ${target.archiveDate}！`, '🔧');
+      return { vehicle: target, summary: updatedState.summary };
     }
 
     // ==================== 16. TOAST & TIMING ====================

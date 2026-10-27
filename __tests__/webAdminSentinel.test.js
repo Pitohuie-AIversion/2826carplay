@@ -424,4 +424,40 @@ describe('Web Admin Gateway Sentinel & Operations Center', () => {
     );
     expect(errOver8).toBe('连租折扣最多设置 8 档');
   });
+
+  test('车队维保年检健康核算与四维运营预警雷达 (calculateMaintenanceHealth / buildFleetMaintenanceSummary / computeAlerts) 与 shared 完全一致', () => {
+    const sharedMaint = require('../shared/vehicleMaintenance');
+    const sharedAlerts = require('../shared/operationAlerts');
+
+    const baseDateStr = '2026-10-26T00:00:00';
+    const baseNowMs = new Date('2026-10-26T12:00:00Z').getTime();
+
+    const vehicles = JSON.parse(vm.runInContext('JSON.stringify(DEFAULT_VEHICLES)', sandbox));
+    const sampleBookings = JSON.parse(vm.runInContext('JSON.stringify(OPERATION_ALERT_SAMPLE_BOOKINGS)', sandbox));
+
+    const expectedSummary = sharedMaint.buildFleetMaintenanceSummary(vehicles, new Date(baseDateStr));
+    const actualModalState = vm.runInContext('openMaintenanceAlertModal()', sandbox);
+
+    expect(actualModalState.summary).toEqual(expectedSummary);
+    expect(actualModalState.summary.total).toBe(8);
+    expect(actualModalState.summary.urgentCount).toBe(2);
+    expect(actualModalState.summary.upcomingCount).toBe(2);
+    expect(actualModalState.summary.healthyCount).toBe(4);
+    expect(actualModalState.summary.attentionRequired).toBe(4);
+
+    const expectedAlerts = sharedAlerts.computeAlerts(sampleBookings, vehicles, { now: baseNowMs });
+    expect(JSON.parse(JSON.stringify(actualModalState.alerts))).toEqual(expectedAlerts);
+    expect(actualModalState.alerts.map(a => a.type)).toEqual([
+      'overdue_pending',
+      'expiring_quote',
+      'overdue_coordination',
+      'maintenance_due'
+    ]);
+
+    // Complete maintenance on v2 (Ferrari 488 Pista) and verify state transition
+    const maintDone = vm.runInContext('completeVehicleMaintenance("v2")', sandbox);
+    expect(maintDone.vehicle.archiveDate).toBe('2027-04-24');
+    expect(maintDone.vehicle.status).toBe('active');
+    expect(maintDone.summary.urgentCount).toBe(1);
+  });
 });

@@ -1703,6 +1703,16 @@ simulateClick("一键应用智能推荐画像标签 (handleApplyAllRecommendedTa
   bmdPage.handleApplyAllRecommendedTags()
 })
 
+simulateClick("重复点击添加建议标签只保存一次，并保留人工标签", () => {
+  bmdPage.setData({ booking: { ...bmdPage.data.booking, tags: ["老客户"], tagBaseline: ["老客户"], tagMap: { "老客户": true } } })
+  const event = makeEvent({ tag: "长租意向", recommended: true })
+  const before = cloudCalls.length
+  bmdPage.handleToggleCustomerTag(event)
+  bmdPage.handleToggleCustomerTag(event)
+  if (cloudCalls.length !== before + 1) throw new Error("重复推荐标签点击没有保持幂等")
+  if (!bmdPage.data.booking.tags.includes("长租意向") || !bmdPage.data.booking.tags.includes("老客户")) throw new Error("推荐标签或人工标签被误删")
+})
+
 simulateClick("外呼客户联系电话 (handleCallPhone)", () => {
   bmdPage.handleCallPhone()
 })
@@ -2229,6 +2239,25 @@ simulateClick("点击提交保存全局参数 (handleSubmit)", () => {
   cmPage.handleSubmit()
 })
 
+simulateClick("原生加载提示异常时保存配置仍可完成并继续编辑", () => {
+  const originalShowLoading = wx.showLoading
+  const originalHideLoading = wx.hideLoading
+  const before = cloudCalls.filter((call) => call.name === "operationConfigUpdate").length
+  try {
+    wx.showLoading = () => { throw new Error("native loading unavailable") }
+    wx.hideLoading = () => { throw new Error("native loading unavailable") }
+    cmPage.handleInput(makeEvent({ field: "serviceHoursText" }, { value: "每日 09:00–19:00" }))
+    cmPage.handleSubmit()
+    if (cmPage.data.saving || cmPage.data.isDirty) throw new Error("加载提示异常阻断了保存回执")
+    if (cloudCalls.filter((call) => call.name === "operationConfigUpdate").length !== before + 1) throw new Error("未发送配置保存请求")
+    cmPage.handleInput(makeEvent({ field: "serviceHoursText" }, { value: "每日 10:00–18:00" }))
+    if (!cmPage.data.isDirty || cmPage.data.form.serviceHoursText !== "每日 10:00–18:00") throw new Error("保存后无法继续编辑")
+  } finally {
+    wx.showLoading = originalShowLoading
+    wx.hideLoading = originalHideLoading
+  }
+})
+
 simulateClick("点击重置还原参数表单 (handleReset)", () => {
   cmPage.handleReset()
 })
@@ -2244,8 +2273,14 @@ simulateClick("点击执行一键健康度体检 (handleRefresh)", () => {
   shPage.handleRefresh()
 })
 
-simulateClick("点击展开/折叠手动排查详情视图 (handleManualToggle)", () => {
-  shPage.handleManualToggle(makeEvent({ key: "backup" }))
+simulateClick("点击勾选人工确认项:「数据库索引」(handleManualToggle: indexes)", () => {
+  shPage.handleManualToggle(makeEvent({ key: "indexes" }))
+  if (shPage.data.manualCompletedCount !== 1) throw new Error("人工确认项 indexes 未勾选生效")
+})
+
+simulateClick("点击勾选人工确认项:「安全规则禁直连」(handleManualToggle: security)", () => {
+  shPage.handleManualToggle(makeEvent({ key: "security" }))
+  if (shPage.data.manualCompletedCount !== 2) throw new Error("人工确认项 security 未勾选生效")
 })
 
 logSuite("25. 分包页面: pages-admin/audit-log-manage/audit-log-manage (安全审计日志)")
@@ -2382,6 +2417,31 @@ simulateClick("点击重置全部隐私审批筛选 (handleResetFilters)", () =>
 
 simulateClick("点击审批通过隐私请求 (handleRequestAction: approve)", () => {
   prmPage.handleRequestAction(makeEvent({ id: "req-001" }))
+})
+
+simulateClick("隐私处理原因框显示时连点另一申请，仍只提交原申请", () => {
+  const originalShowActionSheet = wx.showActionSheet
+  const originalShowModal = wx.showModal
+  const before = cloudCalls.filter((call) => call.name === "privacyRequestUpdateStatus").length
+  const menus = []
+  let reason
+  try {
+    wx.showActionSheet = (options) => menus.push(options)
+    wx.showModal = (options) => { reason = options }
+    prmPage.setData({ list: ["req-confirm-a", "req-confirm-b"].map((id) => ({ id, canHandle: true, status: "pending", type: "correction" })) })
+    prmPage.handleRequestAction(makeEvent({ id: "req-confirm-a" }))
+    if (menus.length !== 1) throw new Error("未打开原申请菜单")
+    menus[0].success({ tapIndex: 2 })
+    if (!reason) throw new Error("未进入处理原因填写")
+    prmPage.handleRequestAction(makeEvent({ id: "req-confirm-b" }))
+    if (menus.length !== 1) throw new Error("连点打开了第二个处理菜单")
+    reason.success({ confirm: true, content: "请补充需要更正的信息" })
+    const writes = cloudCalls.filter((call) => call.name === "privacyRequestUpdateStatus")
+    if (writes.length !== before + 1 || writes[writes.length - 1].data.id !== "req-confirm-a") throw new Error("原申请确认被吞掉或提交错申请")
+  } finally {
+    wx.showActionSheet = originalShowActionSheet
+    wx.showModal = originalShowModal
+  }
 })
 
 simulateClick("点击一键复制申请人 OpenID (handleCopyOpenid)", () => {

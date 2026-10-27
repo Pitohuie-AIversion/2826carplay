@@ -1559,6 +1559,114 @@
       border-color: var(--border-bright);
     }
 
+    /* Intelligent Customer Tag Pills */
+    .cust-tag-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.2rem;
+      padding: 0.14rem 0.48rem;
+      border-radius: 9999px;
+      font-size: 0.68rem;
+      font-weight: 600;
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      background: rgba(148, 163, 184, 0.12);
+      color: #cbd5e1;
+      white-space: nowrap;
+    }
+
+    .cust-tag-pill.tag-longterm {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border-color: rgba(16, 185, 129, 0.35);
+    }
+
+    .cust-tag-pill.tag-delivery {
+      background: rgba(56, 189, 248, 0.15);
+      color: #38bdf8;
+      border-color: rgba(56, 189, 248, 0.35);
+    }
+
+    .cust-tag-pill.tag-crosscity {
+      background: rgba(168, 85, 247, 0.15);
+      color: #c084fc;
+      border-color: rgba(168, 85, 247, 0.35);
+    }
+
+    .cust-tag-pill.tag-high {
+      background: rgba(239, 68, 68, 0.15);
+      color: #f87171;
+      border-color: rgba(239, 68, 68, 0.35);
+    }
+
+    .cust-tag-pill.tag-vip {
+      background: rgba(245, 158, 11, 0.15);
+      color: #fbbf24;
+      border-color: rgba(245, 158, 11, 0.35);
+    }
+
+    /* Handover 4-Corner Inspection Cards */
+    .corner-photos-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.65rem;
+    }
+
+    @media (max-width: 768px) {
+      .corner-photos-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    .corner-photo-card {
+      background: rgba(11, 16, 28, 0.8);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 0.65rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+
+    .corner-photo-card .corner-badge {
+      font-size: 0.68rem;
+      font-weight: 700;
+      color: var(--primary);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .corner-photo-card .corner-hash {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      color: var(--text-dim);
+      word-break: break-all;
+    }
+
+    /* Collection Inspector Badges */
+    .whitelist-pill {
+      display: inline-block;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.28);
+      color: #38bdf8;
+      padding: 0.15rem 0.45rem;
+      border-radius: 4px;
+      margin: 0.15rem;
+    }
+
+    .index-item-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(11, 16, 28, 0.7);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 0.45rem 0.75rem;
+      font-size: 0.75rem;
+    }
+
     /* Footer */
     footer.app-footer {
       border-top: 1px solid var(--border-subtle);
@@ -1590,7 +1698,7 @@
       </button>
       <button class="nav-tab-btn" data-view="gateway" onclick="switchView('gateway')">
         <span>⚡</span> 微服务网关监控
-        <span class="tab-badge">57/57</span>
+        <span class="tab-badge" id="navGatewayBadge">57/57</span>
       </button>
       <button class="nav-tab-btn" data-view="diagnostic" onclick="switchView('diagnostic')">
         <span>🩺</span> 在线接口拨测
@@ -1886,7 +1994,14 @@
           <div class="panel-title">
             <span>⚡</span> 57 个微服务云函数网关拓扑与实时状态 (Gateway Cluster Topology)
           </div>
+          <div class="filter-tabs" id="gatewayFilterTabs">
+            <button class="filter-tab active" data-gw-filter="all" onclick="setGatewayFilter('all')">全部 (<span id="gwCountAll">57</span>)</button>
+            <button class="filter-tab" data-gw-filter="public" onclick="setGatewayFilter('public')">🌐 公开白名单 (<span id="gwCountPublic">5</span>)</button>
+            <button class="filter-tab" data-gw-filter="auth" onclick="setGatewayFilter('auth')">🔒 鉴权私有 (<span id="gwCountAuth">52</span>)</button>
+            <button class="filter-tab" data-gw-filter="fault" onclick="setGatewayFilter('fault')">⚡ 故障注入中 (<span id="gwCountFault">0</span>)</button>
+          </div>
           <div class="panel-controls">
+            <input type="text" class="search-input" id="gatewaySearchInput" placeholder="搜索函数名 / 描述..." oninput="filterGatewayFunctions()" style="width: 190px;">
             <button class="btn-action" style="border-color: rgba(239, 68, 68, 0.4); color: #f87171;" onclick="openCircuitBreakerModal()">
               <span>💥</span> 熔断演练工作台
             </button>
@@ -2154,7 +2269,7 @@
       <section class="panel">
         <div class="panel-header">
           <div class="panel-title">
-            <span>📦</span> 17 个核心业务 NoSQL 集合数据资产全景大盘 (Data Collections Matrix)
+            <span>📦</span> 17 个核心业务 NoSQL 集合数据资产全景大盘 (点击集合卡片审查零信任规则与复合索引)
           </div>
           <div class="panel-controls">
             <button class="btn-action" onclick="exportData('bookings')">
@@ -2168,6 +2283,47 @@
 
         <div class="collections-grid" id="collectionsGrid">
           <!-- Populated by JS -->
+        </div>
+      </section>
+
+      <!-- 核心预约订单对账、客户画像智能标签与四角存证交接台账 -->
+      <section class="panel" id="bookingsReconcilePanel" style="margin-top: 1.5rem;">
+        <div class="panel-header">
+          <div class="panel-title">
+            <span>🧾</span> 核心预约订单对账、智能客户画像标签与四角存证交接台账 (Booking Reconciliation &amp; Handover Ledger)
+          </div>
+          <div class="filter-tabs" id="reconcileFilterTabs">
+            <button class="filter-tab active" data-rec-tag="all" onclick="setReconcileTagFilter('all')">全部订单 (<span id="recCountAll">6</span>)</button>
+            <button class="filter-tab" data-rec-tag="长租意向" onclick="setReconcileTagFilter('长租意向')">⭐ 长租意向</button>
+            <button class="filter-tab" data-rec-tag="需要送车" onclick="setReconcileTagFilter('需要送车')">🚚 需要送车</button>
+            <button class="filter-tab" data-rec-tag="跨城用车" onclick="setReconcileTagFilter('跨城用车')">🛣️ 跨城用车</button>
+            <button class="filter-tab" data-rec-tag="高意向" onclick="setReconcileTagFilter('高意向')">🔥 高意向</button>
+            <button class="filter-tab" data-rec-tag="老客户" onclick="setReconcileTagFilter('老客户')">👑 老客户</button>
+          </div>
+          <div class="panel-controls">
+            <input type="text" class="search-input" id="reconcileSearchInput" placeholder="搜索预约单号 / 车型 / 城市..." oninput="filterReconcileBookings()" style="width: 210px;">
+            <button class="btn-action" onclick="exportHandoverEvidenceCsv()">
+              <span>📸</span> 导出验车存证对账单
+            </button>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table class="fleet-table" id="reconcileTable">
+            <thead>
+              <tr>
+                <th>预约单号与客户</th>
+                <th>预订座驾与城市</th>
+                <th>租期与结算金额</th>
+                <th>智能客户画像标签 (shared/bookingTags)</th>
+                <th>四角存证与交接状态</th>
+                <th>核验与免押结算操作</th>
+              </tr>
+            </thead>
+            <tbody id="reconcileTableBody">
+              <!-- Rendered dynamically by renderReconcileBookings() -->
+            </tbody>
+          </table>
         </div>
       </section>
     </div>
@@ -2206,11 +2362,16 @@
         <input type="text" class="search-input" style="width:100%" id="modalScheduleNote" placeholder="例如：10月1日国庆首日已留档...">
       </div>
 
-      <div class="modal-footer">
-        <button class="btn-action" onclick="closeScheduleModal()">取消</button>
-        <button class="btn-action primary" onclick="saveScheduleChanges()">
-          <span>💾</span> 保存并同步到云端
+      <div class="modal-footer" style="display:flex; justify-content:space-between; align-items:center;">
+        <button class="btn-action" style="font-size:0.74rem; color:var(--text-muted);" onclick="resetFleetSchedules()">
+          <span>🔄</span> 恢复默认排期
         </button>
+        <div style="display:flex; gap:0.65rem;">
+          <button class="btn-action" onclick="closeScheduleModal()">取消</button>
+          <button class="btn-action primary" onclick="saveScheduleChanges()">
+            <span>💾</span> 保存并持久化
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -2299,6 +2460,20 @@
       <!-- Compliance Notice -->
       <div style="background: rgba(56, 189, 248, 0.08); border-left: 3px solid var(--primary); padding: 0.65rem 0.85rem; border-radius: var(--radius-sm); font-size: 0.75rem; color: var(--text-muted); line-height: 1.5;">
         <strong style="color: #38bdf8;">微信官方标准约束：</strong>依微信支付分《免押租车接入指南》，完结订单产生的后付费必须严格属于官方 8 项标准化费用名目（严禁自创非法费用），0 增费完结时仅传「租车相关费用」且金额为 0。
+      </div>
+
+      <!-- Associated Booking Selector -->
+      <div class="modal-field" style="display:grid; grid-template-columns: 1fr 1fr; gap: 0.85rem;">
+        <div>
+          <label>关联预约订单号 (Out Order No)</label>
+          <select class="search-input" id="payScoreBookingSelect" style="width: 100%; padding: 0.55rem;" onchange="onPayScoreBookingChange(this.value)">
+            <!-- Populated by JS -->
+          </select>
+        </div>
+        <div>
+          <label>预订车型与免押履约周期</label>
+          <input type="text" class="search-input" id="payScoreBookingMeta" readonly style="width: 100%; padding: 0.55rem; color: var(--primary);" value="Porsche 911 GT3 RS · 2026-10-26 ~ 10-28">
+        </div>
       </div>
 
       <!-- Quick Preset Scenario Chips -->
@@ -2421,6 +2596,14 @@
         </div>
       </div>
 
+      <!-- Active Faults Real-time List with Half-Open Probe -->
+      <div class="modal-field">
+        <label>当前已注入故障服务实时清单 (支持一键 Half-Open 半开探测恢复)</label>
+        <div id="cbActiveFaultsBox" style="background: rgba(11, 16, 28, 0.75); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 0.65rem; max-height: 140px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.4rem;">
+          <div style="color: var(--text-dim); font-size: 0.75rem; text-align: center; padding: 0.35rem;">全网 57 个微服务均处于 NORMAL (200) 健康状态</div>
+        </div>
+      </div>
+
       <!-- Action Buttons -->
       <div style="display:flex; justify-content:space-between; align-items:center; margin-top: 0.5rem;">
         <button class="btn-action" style="border-color: rgba(239, 68, 68, 0.4); color: #f87171;" onclick="resetAllCircuitBreakers()">
@@ -2523,6 +2706,123 @@
     </div>
   </div>
 
+  <!-- ==================== MODAL 6: COLLECTION SCHEMA & SECURITY RULES INSPECTOR (集合零信任规则与索引审查器) ==================== -->
+  <div class="modal-overlay" id="collectionInspectorModal">
+    <div class="modal-box" style="max-width: 780px;">
+      <div class="modal-header">
+        <h3 id="collModalTitle"><span>🛡️</span> NoSQL 集合 Schema · 零信任权限与复合索引审查</h3>
+        <button class="btn-close" onclick="closeCollectionInspector()">×</button>
+      </div>
+
+      <div style="background: rgba(16, 185, 129, 0.08); border-left: 3px solid var(--success); padding: 0.65rem 0.85rem; border-radius: var(--radius-sm); font-size: 0.75rem; color: var(--text-muted); line-height: 1.5;">
+        <strong style="color: #34d399;">客户端零信任直连封禁策略 (security-rules/database-deny-client.json)：</strong>全量 17 个云数据库集合强制设定客户端直连 <code>{"read": false, "write": false}</code>，所有读写必须经由 57 个服务端云函数执行 RBAC 鉴权与字段白名单过滤。
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem;">
+        <div class="modal-field">
+          <label>客户端安全规则 (Client Security Rule)</label>
+          <pre id="collSecurityRuleBox" style="background: rgba(5, 8, 17, 0.85); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 0.65rem; color: #34d399; font-family: 'JetBrains Mono', monospace; font-size: 0.74rem; margin: 0;">{
+  "read": false,
+  "write": false
+}</pre>
+        </div>
+        <div class="modal-field">
+          <label>集合存储与合规基线概览</label>
+          <div id="collMetaSummaryBox" style="background: rgba(15, 23, 42, 0.75); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 0.65rem; font-size: 0.76rem; color: var(--text-muted); line-height: 1.6;">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-field">
+        <label>云数据库复合与唯一索引定义 (security-rules/database-indexes.json)</label>
+        <div id="collIndexesListBox" style="display: flex; flex-direction: column; gap: 0.45rem;">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <div class="modal-field">
+        <label>服务端输出脱敏白名单字段 (Server-Side Projection Whitelist)</label>
+        <div id="collWhitelistFieldsBox" style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <div class="modal-field">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <label>标准脱敏文档结构示例 (Desensitized Document Sample)</label>
+          <button type="button" class="btn-action" style="padding: 0.2rem 0.55rem; font-size: 0.72rem;" onclick="copyCollectionSampleJson()">
+            <span>📋</span> 复制 Schema 示例
+          </button>
+        </div>
+        <textarea id="collSampleJsonBox" readonly style="width: 100%; height: 125px; background: rgba(5, 8, 17, 0.85); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: #38bdf8; font-size: 0.75rem; font-family: 'JetBrains Mono', monospace; padding: 0.65rem; resize: none; line-height: 1.45;"></textarea>
+      </div>
+
+      <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:0.75rem;">
+        <button class="btn-action" onclick="closeCollectionInspector()">关闭</button>
+        <button class="btn-action primary" onclick="copyCollectionSampleJson()"><span>📋</span> 复制结构并关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL 7: HANDOVER 4-CORNER EVIDENCE INSPECTOR (电子交接四角存证核验工作台) ==================== -->
+  <div class="modal-overlay" id="handoverEvidenceModal">
+    <div class="modal-box" style="max-width: 820px;">
+      <div class="modal-header">
+        <h3 id="handoverModalTitle"><span>📸</span> 电子验车交接单 · 四角存证核验与孤儿文件保护审计</h3>
+        <button class="btn-close" onclick="closeHandoverEvidenceModal()">×</button>
+      </div>
+
+      <div id="handoverMetaBanner" style="background: rgba(56, 189, 248, 0.08); border-left: 3px solid var(--primary); padding: 0.65rem 0.85rem; border-radius: var(--radius-sm); font-size: 0.75rem; color: var(--text-muted); line-height: 1.55;">
+        <!-- Populated by JS -->
+      </div>
+
+      <!-- 4-Corner Evidence Cards -->
+      <div class="modal-field">
+        <label>取还车四角标准存证图集与云存储文件指纹 (4-Corner Evidence &amp; Cloud FileIDs)</label>
+        <div class="corner-photos-grid" id="handoverCornerGrid">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <!-- Telemetry & Reference Protection -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem;">
+        <div class="modal-field">
+          <label>仪表盘里程 / 燃油电量 / 车况复核</label>
+          <div id="handoverTelemetryBox" style="background: rgba(15, 23, 42, 0.75); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 0.7rem; font-size: 0.76rem; color: var(--text-main); line-height: 1.65;">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+        <div class="modal-field">
+          <label>版本乐观锁与云存储引用完整性 (pending_file_deletions Guard)</label>
+          <div id="handoverGuardBox" style="background: rgba(15, 23, 42, 0.75); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 0.7rem; font-size: 0.76rem; color: var(--text-main); line-height: 1.65;">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-field">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <label>电子交接留证归档摘要 (可一键复制发给客户或财务归档)</label>
+          <button type="button" class="btn-action" style="padding: 0.2rem 0.55rem; font-size: 0.72rem;" onclick="copyHandoverSummaryText()">
+            <span>📋</span> 复制存证核验报告
+          </button>
+        </div>
+        <textarea id="handoverSummaryText" readonly style="width: 100%; height: 90px; background: rgba(5, 8, 17, 0.85); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: #34d399; font-size: 0.75rem; font-family: 'JetBrains Mono', monospace; padding: 0.65rem; resize: none; line-height: 1.45;"></textarea>
+      </div>
+
+      <div class="modal-footer" style="display:flex; justify-content:space-between; align-items:center;">
+        <button class="btn-action" style="border-color: rgba(16, 185, 129, 0.4); color: #34d399;" onclick="launchPayScoreFromHandover()">
+          <span>💳</span> 跳转该订单微信支付分免押结算
+        </button>
+        <div style="display:flex; gap:0.65rem;">
+          <button class="btn-action" onclick="closeHandoverEvidenceModal()">关闭</button>
+          <button class="btn-action primary" onclick="copyHandoverSummaryText()"><span>📋</span> 复制存证单并关闭</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Element -->
   <div id="toast">
     <span id="toastIcon">ℹ️</span>
@@ -2604,7 +2904,7 @@
     ];
 
     // ==================== 2. VEHICLE DATA (运力大盘档案矩阵) ====================
-    const VEHICLES = [
+    const DEFAULT_VEHICLES = [
       { id: 'v1', name: 'Porsche 911 GT3 RS', plate: '浙A·88888', category: '赛道超级跑车', dailyRate: 4500, hasLongTermInterest: true, longTermDays: 7, status: 'rented', statusText: '租赁中', schedule: '今日 18:00 归还待检', lockedDays: ['2026-10-25', '2026-10-26'] },
       { id: 'v2', name: 'Ferrari 488 Pista', plate: '浙A·77777', category: '中置V8跑车', dailyRate: 8800, hasLongTermInterest: false, longTermDays: 2, status: 'maintenance', statusText: '整备中', schedule: '今日 16:30 释放 (机油保养)', lockedDays: ['2026-10-25'] },
       { id: 'v3', name: 'Lamborghini Huracán EVO', plate: '浙A·99999', category: 'V10四驱跑车', dailyRate: 7500, hasLongTermInterest: true, longTermDays: 15, status: 'active', statusText: '空闲待租', schedule: '全档期可用 · 已预约半月试驾', lockedDays: [] },
@@ -2614,26 +2914,194 @@
       { id: 'v7', name: 'Rolls-Royce Ghost', plate: '浙A·11111', category: '顶级行政座驾', dailyRate: 9800, hasLongTermInterest: false, longTermDays: 1, status: 'active', statusText: '空闲待租', schedule: '全档期可用', lockedDays: [] },
       { id: 'v8', name: 'Bentley Continental GT', plate: '浙A·33333', category: '超豪华运动轿跑', dailyRate: 4800, hasLongTermInterest: false, longTermDays: 2, status: 'active', statusText: '空闲待租', schedule: '本周末已预订', lockedDays: ['2026-10-31', '2026-11-01'] }
     ];
+    const VEHICLES = JSON.parse(JSON.stringify(DEFAULT_VEHICLES));
+    const FLEET_SCHEDULE_STORAGE_KEY = 'AIJIA_FLEET_SCHEDULE_STATE';
 
-    // ==================== 3. 17 COLLECTIONS DATA (17大业务集合资产) ====================
+    function persistFleetSchedules() {
+      try {
+        const snapshot = VEHICLES.map(v => ({
+          id: v.id,
+          status: v.status,
+          statusText: v.statusText,
+          schedule: v.schedule,
+          lockedDays: Array.isArray(v.lockedDays) ? v.lockedDays : []
+        }));
+        localStorage.setItem(FLEET_SCHEDULE_STORAGE_KEY, JSON.stringify(snapshot));
+      } catch (e) {
+        console.warn('Failed to persist fleet schedules:', e);
+      }
+    }
+
+    function resetFleetSchedules() {
+      try {
+        localStorage.removeItem(FLEET_SCHEDULE_STORAGE_KEY);
+      } catch (e) {}
+      DEFAULT_VEHICLES.forEach((def, idx) => {
+        Object.assign(VEHICLES[idx], JSON.parse(JSON.stringify(def)));
+      });
+      if (currentEditingVehicle) {
+        const match = VEHICLES.find(v => v.id === currentEditingVehicle.id);
+        if (match) {
+          currentEditingVehicle = match;
+          selectModalStatus(match.status);
+          const noteEl = document.getElementById('modalScheduleNote');
+          if (noteEl) noteEl.value = match.schedule;
+          renderDayGrid();
+        }
+      }
+      renderVehicles(VEHICLES);
+      showToast('已恢复全车队默认排期与日锁状态', '🔄');
+    }
+
+    // ==================== 3. 17 COLLECTIONS DATA (17大业务集合资产与零信任索引矩阵) ====================
     const COLLECTIONS_INFO = [
-      { key: 'vehicles', label: '车队资产档案', count: 8, size: '240 KB', rules: '已白盒覆盖', indexes: 2 },
-      { key: 'bookings', label: '预约核心订单', count: 326, size: '1.8 MB', rules: '已白盒覆盖', indexes: 6 },
-      { key: 'booking_quotes', label: '磋商报价版本', count: 184, size: '820 KB', rules: '已白盒覆盖', indexes: 3 },
-      { key: 'booking_handovers', label: '交接留证单据', count: 142, size: '4.2 MB', rules: '已白盒覆盖', indexes: 2 },
-      { key: 'vehicle_calendar_days', label: '按日占用锁表', count: 482, size: '640 KB', rules: '已白盒覆盖', indexes: 2 },
-      { key: 'vehicle_availability_blocks', label: '档期屏蔽区间', count: 48, size: '110 KB', rules: '已白盒覆盖', indexes: 2 },
-      { key: 'vehicle_price_rules', label: '特殊阶梯价格规则', count: 24, size: '85 KB', rules: '已白盒覆盖', indexes: 1 },
-      { key: 'roles', label: '管理权限矩阵', count: 6, size: '15 KB', rules: '已白盒覆盖', indexes: 1 },
-      { key: 'audit_logs', label: '安全审计日志', count: 1840, size: '3.6 MB', rules: '已白盒覆盖', indexes: 2 },
-      { key: 'error_logs', label: '系统异常日志', count: 218, size: '540 KB', rules: '已白盒覆盖', indexes: 2 },
-      { key: 'favorites', label: '租客收藏清单', count: 890, size: '320 KB', rules: '已白盒覆盖', indexes: 2 },
-      { key: 'privacy_requests', label: '隐私合规工单', count: 14, size: '48 KB', rules: '已白盒覆盖', indexes: 2 },
-      { key: 'analytics_events', label: '匿名行为埋点', count: 28400, size: '16.4 MB', rules: '已白盒覆盖', indexes: 1 },
-      { key: 'app_configs', label: '全局运营参数', count: 4, size: '32 KB', rules: '已白盒覆盖', indexes: 2 },
-      { key: 'content_guides', label: '用车攻略指引', count: 5, size: '180 KB', rules: '已白盒覆盖', indexes: 3 },
-      { key: 'pending_file_deletions', label: '待清除孤儿文件', count: 0, size: '0 KB', rules: '已白盒覆盖', indexes: 2 },
-      { key: 'admin_upload_sessions', label: '分块上传临时会话', count: 12, size: '28 KB', rules: '已白盒覆盖', indexes: 2 }
+      {
+        key: 'vehicles', label: '车队资产档案', count: 8, size: '240 KB', rules: '已白盒覆盖', indexes: 2,
+        indexDetails: [
+          { name: 'idx_vehicles_status_city_order_updatedAt', unique: false, keys: 'status(ASC), city(ASC), displayOrder(ASC), updatedAt(DESC)' },
+          { name: 'idx_vehicles_plateNumber', unique: true, keys: 'plateNumber(ASC)' }
+        ],
+        whitelistFields: ['_id', 'name', 'brand', 'category', 'city', 'dailyRate', 'deposit', 'status', 'coverFileId', 'galleryFileIds', 'specs', 'displayOrder', 'imageRevision'],
+        sampleDoc: { _id: 'v1', name: 'Porsche 911 GT3 RS', plateNumber: '浙A·88888', city: '杭州', status: 'active', dailyRate: 4500, deposit: 30000, imageRevision: 4 }
+      },
+      {
+        key: 'bookings', label: '预约核心订单', count: 326, size: '1.8 MB', rules: '已白盒覆盖', indexes: 6,
+        indexDetails: [
+          { name: 'idx_bookings_status_createdAt', unique: false, keys: 'status(ASC), createdAt(DESC)' },
+          { name: 'idx_bookings_vehicleId_startDate_endDate', unique: false, keys: 'vehicleId(ASC), startDate(ASC), endDate(ASC)' },
+          { name: 'idx_bookings_userOpenid_createdAt', unique: false, keys: 'userOpenid(ASC), createdAt(DESC)' }
+        ],
+        whitelistFields: ['_id', 'bookingNo', 'vehicleId', 'vehicleName', 'city', 'startDate', 'endDate', 'rentalDays', 'status', 'maskedPhone', 'pickupLocation', 'totalAmount', 'intelligentTags', 'handoverImageRevision'],
+        sampleDoc: { _id: 'BK_2026102501', vehicleId: 'v1', vehicleName: 'Porsche 911 GT3 RS', city: '杭州', startDate: '2026-10-26', endDate: '2026-11-02', rentalDays: 7, status: 'CONFIRMED', maskedPhone: '157****0090', intelligentTags: ['长租意向', '需要送车', '高意向'] }
+      },
+      {
+        key: 'booking_quotes', label: '磋商报价版本', count: 184, size: '820 KB', rules: '已白盒覆盖', indexes: 3,
+        indexDetails: [
+          { name: 'idx_quotes_bookingId_revision', unique: true, keys: 'bookingId(ASC), quoteRevision(DESC)' },
+          { name: 'idx_quotes_status_updatedAt', unique: false, keys: 'status(ASC), updatedAt(DESC)' }
+        ],
+        whitelistFields: ['_id', 'bookingId', 'quoteRevision', 'originalAmount', 'discountRate', 'finalAmount', 'tierLabel', 'adminRemark', 'status', 'createdAt'],
+        sampleDoc: { _id: 'QT_20261025_01', bookingId: 'BK_2026102501', quoteRevision: 2, originalAmount: 31500, discountRate: 0.9, finalAmount: 28350, tierLabel: '周租专享90折', status: 'ACCEPTED' }
+      },
+      {
+        key: 'booking_handovers', label: '交接留证单据', count: 142, size: '4.2 MB', rules: '已白盒覆盖', indexes: 2,
+        indexDetails: [
+          { name: 'idx_handovers_bookingId_stage', unique: true, keys: 'bookingId(ASC), stage(ASC)' },
+          { name: 'idx_handovers_createdAt', unique: false, keys: 'createdAt(DESC)' }
+        ],
+        whitelistFields: ['_id', 'bookingId', 'stage', 'cornerPhotos', 'odometerKm', 'fuelPercent', 'handoverImageRevision', 'inspectorId', 'verifiedAt'],
+        sampleDoc: { _id: 'HO_20261025_01', bookingId: 'BK_2026102501', stage: 'PICKUP_AND_RETURN', cornerPhotos: ['left_front', 'right_front', 'left_rear', 'right_rear'], odometerKm: 8420, fuelPercent: 100, handoverImageRevision: 2 }
+      },
+      {
+        key: 'vehicle_calendar_days', label: '按日占用锁表', count: 482, size: '640 KB', rules: '已白盒覆盖', indexes: 2,
+        indexDetails: [
+          { name: 'idx_calendar_vehicleId_date', unique: true, keys: 'vehicleId(ASC), dateStr(ASC)' },
+          { name: 'idx_calendar_bookingId', unique: false, keys: 'bookingId(ASC)' }
+        ],
+        whitelistFields: ['_id', 'vehicleId', 'dateStr', 'lockType', 'bookingId', 'lockedBy', 'updatedAt'],
+        sampleDoc: { _id: 'v1_2026-10-26', vehicleId: 'v1', dateStr: '2026-10-26', lockType: 'BOOKING_HOLD', bookingId: 'BK_2026102501' }
+      },
+      {
+        key: 'vehicle_availability_blocks', label: '档期屏蔽区间', count: 48, size: '110 KB', rules: '已白盒覆盖', indexes: 2,
+        indexDetails: [
+          { name: 'idx_blocks_vehicleId_start_end', unique: false, keys: 'vehicleId(ASC), startDate(ASC), endDate(ASC)' }
+        ],
+        whitelistFields: ['_id', 'vehicleId', 'startDate', 'endDate', 'reason', 'maxSpanDaysGuard', 'createdAt'],
+        sampleDoc: { _id: 'BLK_2026_09', vehicleId: 'v2', startDate: '2026-10-25', endDate: '2026-10-26', reason: '赛道刹车片与机油整备', maxSpanDaysGuard: 47 }
+      },
+      {
+        key: 'vehicle_price_rules', label: '特殊阶梯价格规则', count: 24, size: '85 KB', rules: '已白盒覆盖', indexes: 1,
+        indexDetails: [
+          { name: 'idx_price_rules_vehicleId_minDays', unique: true, keys: 'vehicleId(ASC), minDays(ASC)' }
+        ],
+        whitelistFields: ['_id', 'vehicleId', 'minDays', 'discountRate', 'tierName', 'enabled'],
+        sampleDoc: { _id: 'PR_v1_7d', vehicleId: 'v1', minDays: 7, discountRate: 0.9, tierName: '周租专享90折', enabled: true }
+      },
+      {
+        key: 'roles', label: '管理权限矩阵', count: 6, size: '15 KB', rules: '已白盒覆盖', indexes: 1,
+        indexDetails: [
+          { name: 'idx_roles_openid_status_role', unique: false, keys: 'openid(ASC), status(ASC), role(ASC)' }
+        ],
+        whitelistFields: ['_id', 'role', 'status', 'maskedOpenid', 'permissions', 'grantedBy', 'updatedAt'],
+        sampleDoc: { _id: 'role_admin_01', role: 'super_admin', status: 'active', maskedOpenid: 'o8X9_****_7a2B', permissions: ['ALL_57_MICROSERVICES'] }
+      },
+      {
+        key: 'audit_logs', label: '安全审计日志', count: 1840, size: '3.6 MB', rules: '已白盒覆盖', indexes: 2,
+        indexDetails: [
+          { name: 'idx_audit_action_createdAt', unique: false, keys: 'action(ASC), createdAt(DESC)' },
+          { name: 'idx_audit_targetId', unique: false, keys: 'targetId(ASC), createdAt(DESC)' }
+        ],
+        whitelistFields: ['_id', 'action', 'actorRole', 'targetCollection', 'targetId', 'summary', 'createdAt'],
+        sampleDoc: { _id: 'AUD_20261026_88', action: 'bookingHandoverSubmit', actorRole: 'admin', targetCollection: 'bookings', targetId: 'BK_2026102501', summary: '完成四角存证交接核验' }
+      },
+      {
+        key: 'error_logs', label: '系统异常日志', count: 218, size: '540 KB', rules: '已白盒覆盖', indexes: 2,
+        indexDetails: [
+          { name: 'idx_error_fnName_createdAt', unique: false, keys: 'functionName(ASC), createdAt(DESC)' }
+        ],
+        whitelistFields: ['_id', 'functionName', 'errorCode', 'message', 'traceId', 'createdAt'],
+        sampleDoc: { _id: 'ERR_20261026_02', functionName: 'bookingCreate', errorCode: 'CALENDAR_CONFLICT', message: '目标日期区间存在已锁定排期', traceId: 'gw_trace_99281' }
+      },
+      {
+        key: 'favorites', label: '租客收藏清单', count: 890, size: '320 KB', rules: '已白盒覆盖', indexes: 2,
+        indexDetails: [
+          { name: 'idx_fav_openid_vehicleId', unique: true, keys: 'openid(ASC), vehicleId(ASC)' }
+        ],
+        whitelistFields: ['_id', 'vehicleId', 'status', 'updatedAt'],
+        sampleDoc: { _id: 'FAV_8812', vehicleId: 'v3', status: 'favorited', updatedAt: '2026-10-25T12:00:00Z' }
+      },
+      {
+        key: 'privacy_requests', label: '隐私合规工单', count: 14, size: '48 KB', rules: '已白盒覆盖', indexes: 2,
+        indexDetails: [
+          { name: 'idx_privacy_status_createdAt', unique: false, keys: 'status(ASC), createdAt(DESC)' }
+        ],
+        whitelistFields: ['_id', 'requestType', 'status', 'maskedOpenid', 'inventoryScopeCount', 'processedAt'],
+        sampleDoc: { _id: 'PRV_202610_04', requestType: 'DATA_EXPORT_AND_ERASE', status: 'COMPLETED', maskedOpenid: 'o8X9_****_3c9F', inventoryScopeCount: 17 }
+      },
+      {
+        key: 'analytics_events', label: '匿名行为埋点', count: 28400, size: '16.4 MB', rules: '已白盒覆盖', indexes: 1,
+        indexDetails: [
+          { name: 'idx_analytics_eventDate_eventName', unique: false, keys: 'eventDate(DESC), eventName(ASC)' }
+        ],
+        whitelistFields: ['_id', 'eventName', 'sourceChannel', 'scene', 'contentKey', 'ttlDays', 'createdAt'],
+        sampleDoc: { _id: 'EVT_99201', eventName: 'booking_submit_success', sourceChannel: 'wechat_share', scene: 'content_card', ttlDays: 90 }
+      },
+      {
+        key: 'app_configs', label: '全局运营参数', count: 4, size: '32 KB', rules: '已白盒覆盖', indexes: 2,
+        indexDetails: [
+          { name: 'idx_app_configs_key', unique: true, keys: 'key(ASC)' },
+          { name: 'idx_app_configs_type_updatedAt', unique: false, keys: 'type(ASC), updatedAt(DESC)' }
+        ],
+        whitelistFields: ['_id', 'key', 'type', 'value', 'revision', 'updatedAt'],
+        sampleDoc: { _id: 'CFG_service_hubs', key: 'service_hubs', type: 'operation', value: ['杭州西湖旗舰中心', '上海虹桥交付中心'], revision: 6 }
+      },
+      {
+        key: 'content_guides', label: '用车攻略指引', count: 5, size: '180 KB', rules: '已白盒覆盖', indexes: 3,
+        indexDetails: [
+          { name: 'idx_content_guides_status_order_updatedAt', unique: false, keys: 'status(ASC), displayOrder(ASC), updatedAt(DESC)' },
+          { name: 'idx_content_guides_key', unique: true, keys: 'key(ASC)' }
+        ],
+        whitelistFields: ['_id', 'key', 'title', 'category', 'status', 'recommendedVehicleIds', 'displayOrder'],
+        sampleDoc: { _id: 'GD_track_day', key: 'track-day-prep', title: '超跑赛道日驾驶与暖胎全指南', status: 'published', recommendedVehicleIds: ['v1', 'v2'] }
+      },
+      {
+        key: 'pending_file_deletions', label: '待清除孤儿文件', count: 0, size: '0 KB', rules: '已白盒覆盖', indexes: 2,
+        indexDetails: [
+          { name: 'idx_pending_file_deletions_status_nextRetryAt', unique: false, keys: 'status(ASC), nextRetryAt(ASC)' },
+          { name: 'idx_pending_file_deletions_fileId', unique: true, keys: 'fileId(ASC)' }
+        ],
+        whitelistFields: ['_id', 'fileId', 'sourceCollection', 'status', 'referenceCountChecked', 'nextRetryAt'],
+        sampleDoc: { _id: 'PFD_001', fileId: 'cloud://cloud1-d8g.7368/vehicles/old_cover.jpg', sourceCollection: 'vehicles', status: 'PENDING_VERIFY', referenceCountChecked: true }
+      },
+      {
+        key: 'admin_upload_sessions', label: '分块上传临时会话', count: 12, size: '28 KB', rules: '已白盒覆盖', indexes: 2,
+        indexDetails: [
+          { name: 'idx_admin_upload_sessions_uploadId_actorOpenid', unique: false, keys: 'uploadId(ASC), actorOpenid(ASC)' },
+          { name: 'idx_admin_upload_sessions_status_expiresAt', unique: false, keys: 'status(ASC), expiresAt(ASC)' }
+        ],
+        whitelistFields: ['_id', 'uploadId', 'targetScope', 'totalChunks', 'receivedChunks', 'status', 'expiresAt'],
+        sampleDoc: { _id: 'UPS_20261026_09', uploadId: 'up_911gt3_gallery', targetScope: 'vehicle_gallery', totalChunks: 4, receivedChunks: 4, status: 'MERGED' }
+      }
     ];
 
     // ==================== 4. CLOUD BASE INITIALIZATION ====================
@@ -2666,6 +3134,7 @@
         initDiagnosticConsole();
       } else if (viewName === 'data') {
         renderCollectionsGrid();
+        renderReconcileBookings();
       }
     }
 
@@ -2868,7 +3337,8 @@
       const noteVal = document.getElementById('modalScheduleNote').value.trim();
       if (noteVal) currentEditingVehicle.schedule = noteVal;
 
-      showToast(`已成功保存【${currentEditingVehicle.name}】的排期与日历锁`, '✅');
+      persistFleetSchedules();
+      showToast(`已成功保存并持久化【${currentEditingVehicle.name}】的排期与日历锁`, '✅');
       closeScheduleModal();
       renderVehicles(VEHICLES);
     }
@@ -2879,8 +3349,47 @@
 
     // ==================== 7. GATEWAY TOPOLOGY LOGIC ====================
     const CIRCUIT_BREAKER_FAULTS = {};
+    let currentGatewayFilter = 'all';
+
+    function setGatewayFilter(mode) {
+      currentGatewayFilter = mode;
+      document.querySelectorAll('#gatewayFilterTabs .filter-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-gw-filter') === mode);
+      });
+      renderGatewayTopology();
+    }
+
+    function filterGatewayFunctions() {
+      renderGatewayTopology();
+    }
+
+    function updateGatewayCountsAndBadge() {
+      const total = CLOUD_MICROSERVICES.length;
+      const publicCount = CLOUD_MICROSERVICES.filter(f => f.auth === 'public').length;
+      const authCount = CLOUD_MICROSERVICES.filter(f => f.auth === 'auth').length;
+      const faultKeys = Object.keys(CIRCUIT_BREAKER_FAULTS);
+      const faultCount = faultKeys.length;
+      const healthyCount = total - faultCount;
+
+      const elAll = document.getElementById('gwCountAll');
+      if (elAll) elAll.innerText = total;
+      const elPub = document.getElementById('gwCountPublic');
+      if (elPub) elPub.innerText = publicCount;
+      const elAuth = document.getElementById('gwCountAuth');
+      if (elAuth) elAuth.innerText = authCount;
+      const elFault = document.getElementById('gwCountFault');
+      if (elFault) elFault.innerText = faultCount;
+
+      const navBadge = document.getElementById('navGatewayBadge');
+      if (navBadge) {
+        navBadge.innerText = `${healthyCount}/${total}`;
+        navBadge.style.background = faultCount > 0 ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.15)';
+        navBadge.style.color = faultCount > 0 ? '#f87171' : '#34d399';
+      }
+    }
 
     function renderGatewayTopology() {
+      updateGatewayCountsAndBadge();
       const bookingGrid = document.getElementById('clusterBookingGrid');
       const fleetGrid = document.getElementById('clusterFleetGrid');
       const govGrid = document.getElementById('clusterGovernanceGrid');
@@ -2893,9 +3402,21 @@
       govGrid.innerHTML = '';
       obsGrid.innerHTML = '';
 
+      const searchEl = document.getElementById('gatewaySearchInput');
+      const query = searchEl && searchEl.value ? searchEl.value.toLowerCase().trim() : '';
+
       CLOUD_MICROSERVICES.forEach(fn => {
-        const card = document.createElement('div');
         const fault = CIRCUIT_BREAKER_FAULTS[fn.name];
+
+        if (currentGatewayFilter === 'public' && fn.auth !== 'public') return;
+        if (currentGatewayFilter === 'auth' && fn.auth !== 'auth') return;
+        if (currentGatewayFilter === 'fault' && !fault) return;
+
+        if (query && !fn.name.toLowerCase().includes(query) && !fn.desc.toLowerCase().includes(query)) {
+          return;
+        }
+
+        const card = document.createElement('div');
         let faultBadgeHtml = '';
 
         if (fault === 'TRIPPED') {
@@ -3414,28 +3935,539 @@
       }, 1600);
     }
 
-    // ==================== 10. DATA ASSETS VIEW ====================
+    // ==================== 10. DATA ASSETS, COLLECTION INSPECTOR & BOOKING RECONCILIATION ====================
     function renderCollectionsGrid() {
       const grid = document.getElementById('collectionsGrid');
-      if (!grid || grid.children.length > 0) return;
+      if (!grid) return;
+      grid.innerHTML = '';
 
       COLLECTIONS_INFO.forEach(col => {
         const card = document.createElement('div');
         card.className = 'coll-card';
+        card.onclick = () => openCollectionInspector(col.key);
         card.innerHTML = `
           <div class="coll-top">
             <span class="coll-name">${col.key}</span>
-            <span class="status-pill active" style="font-size:0.65rem;">${col.rules}</span>
+            <span class="status-pill active" style="font-size:0.65rem;">🔒 零信任保护</span>
           </div>
           <div style="font-size:0.75rem; color:var(--text-muted);">${col.label}</div>
           <div class="coll-count">${col.count.toLocaleString()} <span style="font-size:0.75rem; font-weight:normal; color:var(--text-dim);">条文档</span></div>
           <div class="coll-info">
-            <span>存储容量: ${col.size}</span>
-            <span>合规索引: ${col.indexes} 条</span>
+            <span>存储: ${col.size}</span>
+            <span style="color:var(--primary);">索引: ${col.indexes} 条 · 审查 →</span>
           </div>
         `;
         grid.appendChild(card);
       });
+    }
+
+    let currentInspectedCollection = null;
+
+    function openCollectionInspector(key) {
+      const col = COLLECTIONS_INFO.find(c => c.key === key) || COLLECTIONS_INFO[0];
+      currentInspectedCollection = col;
+
+      const titleEl = document.getElementById('collModalTitle');
+      if (titleEl) {
+        titleEl.innerHTML = `<span>🛡️</span> 集合 Schema 与零信任审查 · <span style="color:#38bdf8; font-family:'JetBrains Mono',monospace;">${col.key}</span> (${col.label})`;
+      }
+
+      const ruleBox = document.getElementById('collSecurityRuleBox');
+      if (ruleBox) {
+        ruleBox.innerText = JSON.stringify({ read: false, write: false }, null, 2);
+      }
+
+      const metaBox = document.getElementById('collMetaSummaryBox');
+      if (metaBox) {
+        metaBox.innerHTML = `
+          • 集合标识: <strong style="color:#f8fafc; font-family:monospace;">${col.key}</strong> (${col.label})<br>
+          • 在库文档: <strong style="color:#38bdf8;">${col.count.toLocaleString()} 条</strong> · 占用空间: <strong>${col.size}</strong><br>
+          • 权限模式: <strong style="color:#34d399;">客户端 0 直连 · 服务端 RBAC 白盒守卫</strong>
+        `;
+      }
+
+      const idxBox = document.getElementById('collIndexesListBox');
+      if (idxBox) {
+        idxBox.innerHTML = '';
+        (col.indexDetails || []).forEach(idx => {
+          const row = document.createElement('div');
+          row.className = 'index-item-row';
+          row.innerHTML = `
+            <div>
+              <span style="color:#f8fafc; font-weight:600;">${idx.name}</span>
+              <span style="color:var(--text-dim); margin-left:0.5rem;">[${idx.keys}]</span>
+            </div>
+            <span class="status-pill ${idx.unique ? 'reserved' : 'active'}" style="font-size:0.65rem;">${idx.unique ? 'UNIQUE 唯一索引' : 'COMPOUND 复合索引'}</span>
+          `;
+          idxBox.appendChild(row);
+        });
+      }
+
+      const wlBox = document.getElementById('collWhitelistFieldsBox');
+      if (wlBox) {
+        wlBox.innerHTML = '';
+        (col.whitelistFields || []).forEach(field => {
+          const span = document.createElement('span');
+          span.className = 'whitelist-pill';
+          span.innerText = field;
+          wlBox.appendChild(span);
+        });
+      }
+
+      const sampleBox = document.getElementById('collSampleJsonBox');
+      if (sampleBox) {
+        sampleBox.value = JSON.stringify(col.sampleDoc || {}, null, 2);
+      }
+
+      document.getElementById('collectionInspectorModal').classList.add('active');
+    }
+
+    function closeCollectionInspector() {
+      document.getElementById('collectionInspectorModal').classList.remove('active');
+    }
+
+    function copyCollectionSampleJson() {
+      const box = document.getElementById('collSampleJsonBox');
+      if (!box) return;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(box.value).then(() => {
+          showToast(`已复制【${currentInspectedCollection ? currentInspectedCollection.key : '集合'}】脱敏 Schema 示例！`, '📋');
+        });
+      } else {
+        showToast('已选中集合 Schema 示例', '📋');
+      }
+    }
+
+    // ==================== 智能客户画像标签引擎 (对齐 shared/bookingTags.js) ====================
+    const BOOKING_TAG_DEFINITIONS = [
+      { key: 'long_term', label: '长租意向' },
+      { key: 'delivery', label: '需要送车' },
+      { key: 'cross_city', label: '跨城用车' },
+      { key: 'high_intent', label: '高意向' },
+      { key: 'repeat_customer', label: '老客户' }
+    ];
+
+    function deriveBookingIntelligentTags(booking = {}) {
+      if (!booking || typeof booking !== 'object') return [];
+      const tags = new Set();
+
+      if (Array.isArray(booking.intelligentTags)) {
+        booking.intelligentTags.forEach(t => { if (t) tags.add(String(t).trim()); });
+      }
+      if (Array.isArray(booking.tags)) {
+        booking.tags.forEach(t => { if (t) tags.add(String(t).trim()); });
+      }
+
+      const rentalDays = Number(booking.rentalDays || booking.days || 0);
+      if (rentalDays >= 7 || booking.isLongTerm === true) {
+        tags.add('长租意向');
+      }
+
+      const combinedText = [
+        booking.pickupLocation,
+        booking.returnLocation,
+        booking.remark,
+        booking.userRemark,
+        booking.adminRemark,
+        booking.deliveryAddress,
+        booking.coordinationNote
+      ].filter(Boolean).join(' ');
+
+      if (booking.needDelivery === true || booking.deliveryType === 'delivery' || /送车|上门|机场接|高铁站|虹桥交付|萧山机场|配送/.test(combinedText)) {
+        tags.add('需要送车');
+      }
+
+      const pickupCity = String(booking.pickupCity || booking.city || '').trim();
+      const returnCity = String(booking.returnCity || '').trim();
+      if ((pickupCity && returnCity && pickupCity !== returnCity) || booking.isCrossCity === true || /跨城|异地还车|异地|沪杭|杭沪|苏杭/.test(combinedText)) {
+        tags.add('跨城用车');
+      }
+
+      const status = String(booking.status || '').toUpperCase();
+      const quoteCount = Number(booking.quoteCount || booking.quoteRevision || 0);
+      if (booking.isHighIntent === true || quoteCount >= 2 || ['CONFIRMED', 'IN_PROGRESS', 'RENTED', 'COMPLETED', 'HANDOVER_DONE'].includes(status)) {
+        tags.add('高意向');
+      }
+
+      const historyOrders = Number(booking.customerOrderCount || booking.repeatCount || 0);
+      if (booking.isRepeatCustomer === true || historyOrders >= 2 || /老客户|复购|常客|VIP会员/.test(combinedText)) {
+        tags.add('老客户');
+      }
+
+      const orderedLabels = BOOKING_TAG_DEFINITIONS.map(d => d.label);
+      return orderedLabels.filter(label => tags.has(label));
+    }
+
+    function autoTagBooking(booking = {}) {
+      if (!booking || typeof booking !== 'object') return booking;
+      const derived = deriveBookingIntelligentTags(booking);
+      return Object.assign({}, booking, { intelligentTags: derived });
+    }
+
+    const RECONCILE_BOOKINGS = [
+      {
+        bookingId: 'BK_2026102601',
+        customerName: '陈先生 (VIP)',
+        maskedPhone: '157****0090',
+        vehicleId: 'v1',
+        vehicleName: 'Porsche 911 GT3 RS',
+        city: '杭州',
+        pickupCity: '杭州',
+        returnCity: '杭州',
+        pickupLocation: '杭州西湖旗舰店送车上门',
+        startDate: '2026-10-26',
+        endDate: '2026-11-02',
+        rentalDays: 7,
+        totalAmount: 28350,
+        deposit: 30000,
+        status: 'CONFIRMED',
+        statusText: '已交接在租',
+        customerOrderCount: 4,
+        quoteRevision: 2,
+        handoverImageRevision: 3,
+        odometerPickupKm: 8420,
+        odometerReturnKm: 8685,
+        fuelPickupPercent: 100,
+        fuelReturnPercent: 100,
+        postPaymentPreset: 'zero_fee',
+        cornerPhotos: [
+          { pos: '左前 45° (Left Front)', fileId: 'cloud://cloud1-d8g/handovers/BK_2026102601/lf_rev3.jpg', verified: '0 划痕 · 原厂车漆完好', time: '2026-10-26 09:05:12' },
+          { pos: '右前 45° (Right Front)', fileId: 'cloud://cloud1-d8g/handovers/BK_2026102601/rf_rev3.jpg', verified: '0 划痕 · 碳陶刹车盘正常', time: '2026-10-26 09:05:28' },
+          { pos: '左后 45° (Left Rear)', fileId: 'cloud://cloud1-d8g/handovers/BK_2026102601/lr_rev3.jpg', verified: '0 划痕 · 尾翼锁止正常', time: '2026-10-26 09:05:45' },
+          { pos: '右后 45° (Right Rear)', fileId: 'cloud://cloud1-d8g/handovers/BK_2026102601/rr_rev3.jpg', verified: '0 划痕 · 米其林Cup2胎纹7.2mm', time: '2026-10-26 09:06:02' }
+        ]
+      },
+      {
+        bookingId: 'BK_2026102502',
+        customerName: '林女士',
+        maskedPhone: '138****8888',
+        vehicleId: 'v2',
+        vehicleName: 'Ferrari 488 Pista',
+        city: '上海',
+        pickupCity: '上海',
+        returnCity: '杭州',
+        pickupLocation: '上海虹桥交付区 (沪杭跨城异地还车)',
+        startDate: '2026-10-25',
+        endDate: '2026-10-27',
+        rentalDays: 2,
+        totalAmount: 17600,
+        deposit: 50000,
+        status: 'COMPLETED',
+        statusText: '还车待结算',
+        customerOrderCount: 1,
+        quoteRevision: 2,
+        handoverImageRevision: 2,
+        odometerPickupKm: 5120,
+        odometerReturnKm: 5460,
+        fuelPickupPercent: 100,
+        fuelReturnPercent: 82,
+        postPaymentPreset: 'overdue_fuel',
+        cornerPhotos: [
+          { pos: '左前 45° (Left Front)', fileId: 'cloud://cloud1-d8g/handovers/BK_2026102502/lf_rev2.jpg', verified: '完好无损', time: '2026-10-25 10:12:00' },
+          { pos: '右前 45° (Right Front)', fileId: 'cloud://cloud1-d8g/handovers/BK_2026102502/rf_rev2.jpg', verified: '完好无损', time: '2026-10-25 10:12:18' },
+          { pos: '左后 45° (Left Rear)', fileId: 'cloud://cloud1-d8g/handovers/BK_2026102502/lr_rev2.jpg', verified: '完好无损', time: '2026-10-25 10:12:35' },
+          { pos: '右后 45° (Right Rear)', fileId: 'cloud://cloud1-d8g/handovers/BK_2026102502/rr_rev2.jpg', verified: '完好 · 还车油量差18%待补能', time: '2026-10-27 19:45:10' }
+        ]
+      },
+      {
+        bookingId: 'BK_2026102503',
+        customerName: '周总 (企业长租)',
+        maskedPhone: '186****6666',
+        vehicleId: 'v3',
+        vehicleName: 'Lamborghini Huracán EVO',
+        city: '杭州',
+        pickupCity: '杭州',
+        returnCity: '杭州',
+        pickupLocation: '萧山机场VIP通道接车送车',
+        startDate: '2026-10-28',
+        endDate: '2026-11-12',
+        rentalDays: 15,
+        totalAmount: 95625,
+        deposit: 40000,
+        status: 'CONFIRMED',
+        statusText: '半月长租已锁档',
+        customerOrderCount: 3,
+        quoteRevision: 3,
+        handoverImageRevision: 1,
+        odometerPickupKm: 6310,
+        odometerReturnKm: 6310,
+        fuelPickupPercent: 100,
+        fuelReturnPercent: 100,
+        postPaymentPreset: 'zero_fee',
+        cornerPhotos: [
+          { pos: '左前 45° (Left Front)', fileId: 'cloud://cloud1-d8g/handovers/BK_2026102503/lf_rev1.jpg', verified: '整备封存完好', time: '2026-10-26 08:30:00' },
+          { pos: '右前 45° (Right Front)', fileId: 'cloud://cloud1-d8g/handovers/BK_2026102503/rf_rev1.jpg', verified: '整备封存完好', time: '2026-10-26 08:30:15' },
+          { pos: '左后 45° (Left Rear)', fileId: 'cloud://cloud1-d8g/handovers/BK_2026102503/lr_rev1.jpg', verified: '整备封存完好', time: '2026-10-26 08:30:29' },
+          { pos: '右后 45° (Right Rear)', fileId: 'cloud://cloud1-d8g/handovers/BK_2026102503/rr_rev1.jpg', verified: '整备封存完好', time: '2026-10-26 08:30:44' }
+        ]
+      },
+      {
+        bookingId: 'BK_2026102408',
+        customerName: '吴先生',
+        maskedPhone: '139****2048',
+        vehicleId: 'v5',
+        vehicleName: 'Aston Martin DBS Superleggera',
+        city: '杭州',
+        pickupCity: '杭州',
+        returnCity: '上海',
+        pickupLocation: '钱江新城尊享送车上门 (跨城往返)',
+        startDate: '2026-11-01',
+        endDate: '2026-11-30',
+        rentalDays: 30,
+        totalAmount: 130500,
+        deposit: 45000,
+        status: 'CONFIRMED',
+        statusText: '月租专案已确认',
+        customerOrderCount: 5,
+        quoteRevision: 2,
+        handoverImageRevision: 2,
+        odometerPickupKm: 3890,
+        odometerReturnKm: 3890,
+        fuelPickupPercent: 100,
+        fuelReturnPercent: 100,
+        postPaymentPreset: 'zero_fee',
+        cornerPhotos: [
+          { pos: '左前 45° (Left Front)', fileId: 'cloud://cloud1-d8g/handovers/BK_2026102408/lf_rev2.jpg', verified: '车衣覆膜完好', time: '2026-10-25 16:00:11' },
+          { pos: '右前 45° (Right Front)', fileId: 'cloud://cloud1-d8g/handovers/BK_2026102408/rf_rev2.jpg', verified: '车衣覆膜完好', time: '2026-10-25 16:00:25' },
+          { pos: '左后 45° (Left Rear)', fileId: 'cloud://cloud1-d8g/handovers/BK_2026102408/lr_rev2.jpg', verified: '碳纤维扩散器完好', time: '2026-10-25 16:00:41' },
+          { pos: '右后 45° (Right Rear)', fileId: 'cloud://cloud1-d8g/handovers/BK_2026102408/rr_rev2.jpg', verified: '四出排气阀门正常', time: '2026-10-25 16:00:55' }
+        ]
+      },
+      {
+        bookingId: 'BK_2026102305',
+        customerName: '郑先生',
+        maskedPhone: '135****9191',
+        vehicleId: 'v6',
+        vehicleName: 'Mercedes-AMG G63',
+        city: '杭州',
+        pickupCity: '杭州',
+        returnCity: '杭州',
+        pickupLocation: '爱迦西湖中心自提',
+        startDate: '2026-10-25',
+        endDate: '2026-10-28',
+        rentalDays: 3,
+        totalAmount: 11970,
+        deposit: 25000,
+        status: 'RENTED',
+        statusText: '在租核验中',
+        customerOrderCount: 2,
+        quoteRevision: 1,
+        handoverImageRevision: 2,
+        odometerPickupKm: 12400,
+        odometerReturnKm: 12920,
+        fuelPickupPercent: 100,
+        fuelReturnPercent: 95,
+        postPaymentPreset: 'damage_etc',
+        cornerPhotos: [
+          { pos: '左前 45° (Left Front)', fileId: 'cloud://cloud1-d8g/handovers/BK_2026102305/lf_rev2.jpg', verified: '完好', time: '2026-10-25 09:20:00' },
+          { pos: '右前 45° (Right Front)', fileId: 'cloud://cloud1-d8g/handovers/BK_2026102305/rf_rev2.jpg', verified: '右前22寸锻造轮毂轻微擦痕(已登记)', time: '2026-10-26 17:10:00' },
+          { pos: '左后 45° (Left Rear)', fileId: 'cloud://cloud1-d8g/handovers/BK_2026102305/lr_rev2.jpg', verified: '完好', time: '2026-10-25 09:20:30' },
+          { pos: '右后 45° (Right Rear)', fileId: 'cloud://cloud1-d8g/handovers/BK_2026102305/rr_rev2.jpg', verified: '外挂备胎罩完好', time: '2026-10-25 09:20:45' }
+        ]
+      }
+    ].map(b => autoTagBooking(b));
+
+    let currentReconcileTagFilter = 'all';
+    let currentHandoverBooking = null;
+
+    function setReconcileTagFilter(tag) {
+      currentReconcileTagFilter = tag;
+      document.querySelectorAll('#reconcileFilterTabs .filter-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-rec-tag') === tag);
+      });
+      renderReconcileBookings();
+    }
+
+    function filterReconcileBookings() {
+      renderReconcileBookings();
+    }
+
+    function renderReconcileBookings() {
+      const tbody = document.getElementById('reconcileTableBody');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+
+      const countEl = document.getElementById('recCountAll');
+      if (countEl) countEl.innerText = RECONCILE_BOOKINGS.length;
+
+      const searchEl = document.getElementById('reconcileSearchInput');
+      const query = searchEl && searchEl.value ? searchEl.value.toLowerCase().trim() : '';
+
+      const tagClassMap = {
+        '长租意向': 'tag-longterm',
+        '需要送车': 'tag-delivery',
+        '跨城用车': 'tag-crosscity',
+        '高意向': 'tag-highintent',
+        '老客户': 'tag-repeat'
+      };
+
+      const filtered = RECONCILE_BOOKINGS.filter(b => {
+        if (currentReconcileTagFilter !== 'all' && !(b.intelligentTags || []).includes(currentReconcileTagFilter)) {
+          return false;
+        }
+        if (query) {
+          const hay = `${b.bookingId} ${b.customerName} ${b.vehicleName} ${b.city} ${b.pickupLocation}`.toLowerCase();
+          if (!hay.includes(query)) return false;
+        }
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-dim); padding:1.5rem;">未找到符合画像标签或关键词的预约单</td></tr>';
+        return;
+      }
+
+      filtered.forEach(b => {
+        const tr = document.createElement('tr');
+        const tagsHtml = (b.intelligentTags || []).map(t => `<span class="cust-tag-pill ${tagClassMap[t] || ''}">${t}</span>`).join(' ');
+        tr.innerHTML = `
+          <td>
+            <div style="font-weight:700; color:#f8fafc; font-family:'JetBrains Mono',monospace;">${b.bookingId}</div>
+            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.15rem;">${b.customerName} · ${b.maskedPhone}</div>
+          </td>
+          <td>
+            <div style="font-weight:600; color:#38bdf8;">${b.vehicleName}</div>
+            <div style="font-size:0.73rem; color:var(--text-dim); margin-top:0.15rem;">📍 ${b.pickupLocation}</div>
+          </td>
+          <td>
+            <div style="font-weight:700; color:#fbbf24;">￥${b.totalAmount.toLocaleString()} <span style="font-size:0.72rem; color:var(--text-dim); font-weight:normal;">(${b.rentalDays}天)</span></div>
+            <div style="font-size:0.72rem; color:var(--text-dim); font-family:monospace;">${b.startDate} ~ ${b.endDate}</div>
+          </td>
+          <td>
+            <div style="display:flex; flex-wrap:wrap; gap:0.3rem;">${tagsHtml}</div>
+          </td>
+          <td>
+            <span class="status-pill active" style="font-size:0.7rem;">📸 四角存证 4/4 (Rev.${b.handoverImageRevision})</span>
+            <div style="font-size:0.7rem; color:var(--text-dim); margin-top:0.2rem;">${b.statusText} · 孤儿保护受控</div>
+          </td>
+          <td>
+            <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
+              <button class="btn-action" style="padding:0.25rem 0.55rem; font-size:0.73rem;" onclick="openHandoverEvidenceModal('${b.bookingId}')">
+                <span>📸</span> 验车存证
+              </button>
+              <button class="btn-action" style="padding:0.25rem 0.55rem; font-size:0.73rem; border-color:rgba(16,185,129,0.4); color:#34d399;" onclick="openPayScoreModal('${b.bookingId}')">
+                <span>💳</span> 免押结算
+              </button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function openHandoverEvidenceModal(bookingId) {
+      const b = RECONCILE_BOOKINGS.find(item => item.bookingId === bookingId) || RECONCILE_BOOKINGS[0];
+      currentHandoverBooking = b;
+
+      const titleEl = document.getElementById('handoverModalTitle');
+      if (titleEl) {
+        titleEl.innerHTML = `<span>📸</span> 四角存证核验与孤儿文件保护审计 · <span style="color:#38bdf8; font-family:monospace;">${b.bookingId}</span>`;
+      }
+
+      const bannerEl = document.getElementById('handoverMetaBanner');
+      if (bannerEl) {
+        bannerEl.innerHTML = `
+          <strong style="color:#38bdf8;">订单交接核验档案：</strong>${b.vehicleName} · 客户 ${b.customerName} (${b.maskedPhone}) · 履约周期 <code>${b.startDate} ~ ${b.endDate} (${b.rentalDays}天)</code> · 智能画像标签：<strong>${(b.intelligentTags || []).join(' / ')}</strong>
+        `;
+      }
+
+      const gridEl = document.getElementById('handoverCornerGrid');
+      if (gridEl) {
+        gridEl.innerHTML = '';
+        (b.cornerPhotos || []).forEach(photo => {
+          const card = document.createElement('div');
+          card.className = 'corner-photo-card';
+          card.innerHTML = `
+            <div class="corner-photo-header">
+              <span style="font-weight:700; color:#f8fafc;">📐 ${photo.pos}</span>
+              <span class="status-pill active" style="font-size:0.65rem;">SHA256 已验真</span>
+            </div>
+            <div style="font-family:'JetBrains Mono',monospace; font-size:0.7rem; color:#38bdf8; word-break:break-all;">${photo.fileId}</div>
+            <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.72rem; color:var(--text-muted); margin-top:0.2rem;">
+              <span>🔍 ${photo.verified}</span>
+              <span style="color:var(--text-dim); font-family:monospace;">${photo.time}</span>
+            </div>
+          `;
+          gridEl.appendChild(card);
+        });
+      }
+
+      const teleEl = document.getElementById('handoverTelemetryBox');
+      if (teleEl) {
+        const diffKm = Math.max(0, (b.odometerReturnKm || b.odometerPickupKm) - b.odometerPickupKm);
+        teleEl.innerHTML = `
+          • 提车仪表里程: <strong>${b.odometerPickupKm.toLocaleString()} km</strong> → 还车里程: <strong>${b.odometerReturnKm.toLocaleString()} km</strong> (行驶 ${diffKm} km)<br>
+          • 提车燃油/电量: <strong>${b.fuelPickupPercent}%</strong> → 还车油量: <strong style="color:${b.fuelReturnPercent < 100 ? '#fbbf24' : '#34d399'};">${b.fuelReturnPercent}%</strong><br>
+          • 交接地点: ${b.pickupLocation}
+        `;
+      }
+
+      const guardEl = document.getElementById('handoverGuardBox');
+      if (guardEl) {
+        guardEl.innerHTML = `
+          • 交接图集乐观锁版本: <code>handoverImageRevision = ${b.handoverImageRevision}</code><br>
+          • 云存储引用计数校验: <strong style="color:#34d399;">4/4 张四角存证受 booking_handovers 强引用保护</strong><br>
+          • 孤儿清理队列状态: <code>pending_file_deletions</code> 零误删风险
+        `;
+      }
+
+      const summaryEl = document.getElementById('handoverSummaryText');
+      if (summaryEl) {
+        summaryEl.value = `【爱迦租车 · 四角存证电子验车交接单】\n订单编号：${b.bookingId} | 座驾：${b.vehicleName} | 客户：${b.customerName} (${b.maskedPhone})\n租期：${b.startDate} 至 ${b.endDate} (${b.rentalDays}天) | 画像标签：${(b.intelligentTags || []).join('、')}\n四角存证：4/4 张高分原图已上链存证 (handoverImageRevision: v${b.handoverImageRevision})\n里程核验：${b.odometerPickupKm}km -> ${b.odometerReturnKm}km | 油量核验：${b.fuelPickupPercent}% -> ${b.fuelReturnPercent}%`;
+      }
+
+      document.getElementById('handoverEvidenceModal').classList.add('active');
+    }
+
+    function closeHandoverEvidenceModal() {
+      document.getElementById('handoverEvidenceModal').classList.remove('active');
+    }
+
+    function copyHandoverSummaryText() {
+      const box = document.getElementById('handoverSummaryText');
+      if (!box) return;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(box.value).then(() => {
+          showToast('四角存证电子交接核验单已复制到剪贴板！', '📋');
+        });
+      } else {
+        showToast('四角存证交接核验单已生成！', '📋');
+      }
+    }
+
+    function launchPayScoreFromHandover() {
+      const bookingId = currentHandoverBooking ? currentHandoverBooking.bookingId : 'BK_2026102601';
+      closeHandoverEvidenceModal();
+      openPayScoreModal(bookingId);
+    }
+
+    function exportHandoverEvidenceCsv() {
+      let csv = '\uFEFF预约单号,客户称谓,脱敏电话,车型名称,用车城市,租期天数,订单总额(元),智能画像标签,四角存证版本,提车里程(km),还车里程(km),还车油量(%)\n';
+      RECONCILE_BOOKINGS.forEach(b => {
+        csv += [
+          `"${b.bookingId}"`,
+          `"${b.customerName}"`,
+          `"${b.maskedPhone}"`,
+          `"${b.vehicleName}"`,
+          `"${b.city}"`,
+          `"${b.rentalDays}"`,
+          `"${b.totalAmount}"`,
+          `"${(b.intelligentTags || []).join('|')}"`,
+          `"Rev.${b.handoverImageRevision}"`,
+          `"${b.odometerPickupKm}"`,
+          `"${b.odometerReturnKm}"`,
+          `"${b.fuelReturnPercent}%"`
+        ].join(',') + '\n';
+      });
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `爱迦租车_四角存证与画像对账台账_${Date.now()}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      showToast('已导出四角存证与智能画像对账 CSV 台账！', '📸');
     }
 
     // ==================== 11. EXPORT DATA (17列脱敏CSV) ====================
@@ -3648,7 +4680,41 @@
       { name: "闯红灯违章", desc: "电子警察违法罚款代缴", amount: 0 }
     ];
 
-    function openPayScoreModal() {
+    let currentPayScoreBookingId = 'BK_2026102601';
+
+    function populatePayScoreBookingSelect() {
+      const select = document.getElementById('payScoreBookingSelect');
+      if (!select || select.children.length > 0) return;
+      RECONCILE_BOOKINGS.forEach(b => {
+        const opt = document.createElement('option');
+        opt.value = b.bookingId;
+        opt.innerText = `${b.bookingId} · ${b.customerName} (${b.vehicleName})`;
+        select.appendChild(opt);
+      });
+    }
+
+    function onPayScoreBookingChange(bookingId) {
+      currentPayScoreBookingId = bookingId || 'BK_2026102601';
+      const b = RECONCILE_BOOKINGS.find(item => item.bookingId === currentPayScoreBookingId) || RECONCILE_BOOKINGS[0];
+      const metaEl = document.getElementById('payScoreBookingMeta');
+      if (metaEl && b) {
+        metaEl.value = `${b.vehicleName} · ${b.startDate} ~ ${b.endDate} (${b.rentalDays}天)`;
+      }
+      if (b && b.postPaymentPreset) {
+        applyPayScoreScenario(b.postPaymentPreset);
+      } else {
+        updatePayScoreCalculation();
+      }
+    }
+
+    function openPayScoreModal(bookingId) {
+      populatePayScoreBookingSelect();
+      if (bookingId) {
+        currentPayScoreBookingId = bookingId;
+      }
+      const select = document.getElementById('payScoreBookingSelect');
+      if (select) select.value = currentPayScoreBookingId;
+      onPayScoreBookingChange(currentPayScoreBookingId);
       renderPayScoreTable();
       updatePayScoreCalculation();
       document.getElementById('payScoreModal').classList.add('active');
@@ -3791,7 +4857,7 @@
 
       const payload = {
         service_id: "20000000000001",
-        out_order_no: "BK_2026102601",
+        out_order_no: currentPayScoreBookingId || "BK_2026102601",
         total_amount: totalFen,
         post_payments: postPayments,
         time_range: {
@@ -3821,8 +4887,9 @@
     function copyPayScoreCustomerText() {
       const activeItems = payScoreItems.filter(item => item.amount > 0);
       const totalYuan = activeItems.reduce((acc, cur) => acc + cur.amount, 0);
+      const orderNo = currentPayScoreBookingId || 'BK_2026102601';
 
-      let text = `【爱迦租车 · 微信支付分免押还车交验账单】\n尊敬的贵宾客户，您的预约单 (BK_2026102601) 已完成电子还车验车核验。\n`;
+      let text = `【爱迦租车 · 微信支付分免押还车交验账单】\n尊敬的贵宾客户，您的预约单 (${orderNo}) 已完成电子还车验车核验。\n`;
       if (activeItems.length === 0) {
         text += `• 验车状态：四角存证无异常，满油还车\n• 免押代扣：￥0.00 元 (完美履约零增费完结)\n已由微信支付分极速释放免押额度，感谢您选择爱迦！`;
       } else {
@@ -3854,8 +4921,46 @@
       }
     }
 
+    function renderActiveFaultsInModal() {
+      const box = document.getElementById('cbActiveFaultsBox');
+      if (!box) return;
+      const entries = Object.entries(CIRCUIT_BREAKER_FAULTS);
+      if (entries.length === 0) {
+        box.innerHTML = '<div style="color: var(--text-dim); font-size: 0.75rem; text-align: center; padding: 0.35rem;">全网 57 个微服务均处于 NORMAL (200) 健康状态</div>';
+        return;
+      }
+      box.innerHTML = '';
+      entries.forEach(([fnName, mode]) => {
+        const row = document.createElement('div');
+        row.className = 'probe-history-item';
+        const modeLabel = mode === 'TRIPPED' ? '🔴 503 熔断阻断' : mode === 'TIMEOUT' ? '🟡 504 慢超时' : '🟠 403 鉴权拦截';
+        row.innerHTML = `
+          <div style="display:flex; align-items:center; gap:0.6rem;">
+            <span style="font-family:'JetBrains Mono',monospace; font-weight:700; color:#f8fafc;">${fnName}</span>
+            <span style="font-size:0.72rem; color:#f87171;">${modeLabel}</span>
+          </div>
+          <button type="button" class="btn-action" style="padding:0.15rem 0.55rem; font-size:0.68rem; border-color:rgba(16,185,129,0.4); color:#34d399;" onclick="probeAndRecoverService('${fnName}')">
+            🩺 Half-Open 探测恢复
+          </button>
+        `;
+        box.appendChild(row);
+      });
+    }
+
+    function probeAndRecoverService(fnName) {
+      if (!fnName) return;
+      delete CIRCUIT_BREAKER_FAULTS[fnName];
+      persistCircuitBreakerFaults();
+      renderActiveFaultsInModal();
+      renderGatewayTopology();
+      appendLogStreamEntry('RECOVER', fnName, 200, '【Half-Open 半开探测成功】微服务已解除熔断并恢复主链路连接', 19);
+      recordProbeHistory(fnName, 200, 19, 'Half-Open 半开探测通过 · 熔断已自愈恢复');
+      showToast(`【${fnName}】半开探测 (Half-Open) 200 OK，已自动恢复正常！`, '🟢');
+    }
+
     function openCircuitBreakerModal() {
       populateCbServicesSelect();
+      renderActiveFaultsInModal();
       document.getElementById('circuitBreakerModal').classList.add('active');
     }
 
@@ -3905,6 +5010,7 @@
       }
 
       persistCircuitBreakerFaults();
+      renderActiveFaultsInModal();
       renderGatewayTopology();
       closeCircuitBreakerModal();
     }
@@ -3914,6 +5020,7 @@
         delete CIRCUIT_BREAKER_FAULTS[k];
       }
       persistCircuitBreakerFaults();
+      renderActiveFaultsInModal();
       renderGatewayTopology();
       showToast(`已重置全量 57 个微服务网关，0 项熔断阻断！`, '🎉');
       closeCircuitBreakerModal();
@@ -3965,6 +5072,28 @@
       } catch (e) {
         console.warn('Failed to load circuit breaker faults from localStorage', e);
       }
+
+      try {
+        const rawFleet = localStorage.getItem(FLEET_SCHEDULE_STORAGE_KEY);
+        if (rawFleet) {
+          const parsedFleet = JSON.parse(rawFleet);
+          if (Array.isArray(parsedFleet)) {
+            parsedFleet.forEach(saved => {
+              const target = VEHICLES.find(v => v.id === saved.id);
+              if (target) {
+                if (saved.status) target.status = saved.status;
+                if (saved.statusText) target.statusText = saved.statusText;
+                if (saved.schedule) target.schedule = saved.schedule;
+                if (Array.isArray(saved.lockedDays)) target.lockedDays = saved.lockedDays;
+              }
+            });
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to load fleet schedules from localStorage', e);
+      }
+
+      updateGatewayCountsAndBadge();
     }
 
     function persistAlertConfig() {

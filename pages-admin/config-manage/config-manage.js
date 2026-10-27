@@ -153,6 +153,7 @@ Page({
     form: buildForm(DEFAULT_CONFIG)
   },
   onLoad() {
+    this._configManageUnloaded = false
     requirePagePermission(this, {
       required: "canManageConfig",
       noPermissionMessage: "无权访问运营配置",
@@ -162,7 +163,13 @@ Page({
     })
   },
   onShow() {
+    if (this._configManageUnloaded) return
     syncUnsavedChanges(this)
+    const feedback = this._pendingConfigSaveFeedback
+    if (feedback && isPageCurrent(this)) {
+      this._pendingConfigSaveFeedback = null
+      if (feedback.requestId === this._configSaveRequestId) wx.showToast(feedback.options)
+    }
   },
   onPullDownRefresh() {
     if (!this.data.pageAuthorized) {
@@ -189,6 +196,8 @@ Page({
     this.hideConfigSaveLoading()
   },
   onUnload() {
+    this._configManageUnloaded = true
+    this._pendingConfigSaveFeedback = null
     cancelPagePermissionCheck(this)
     disposeUnsavedChanges(this)
     this._configLoadRequestId = Number(this._configLoadRequestId || 0) + 1
@@ -265,6 +274,7 @@ Page({
           })
           return
         }
+        this._pendingConfigSaveFeedback = null
         this.setData({
           loading: false,
           hasLoadedConfig: true,
@@ -296,6 +306,7 @@ Page({
     if (!field) {
       return
     }
+    this._pendingConfigSaveFeedback = null
     this.setData({
       [`form.${field}`]: String((event.detail && event.detail.value) || ""),
       isDirty: true
@@ -306,6 +317,7 @@ Page({
     return !this.data.loading && !this.data.saving && this.data.hasLoadedConfig && !this.data.loadFailed
   },
   updateServiceHubs(serviceHubs) {
+    this._pendingConfigSaveFeedback = null
     this.setData({ "form.serviceHubs": serviceHubs, isDirty: true })
     markUnsaved(this, "运营配置尚未保存，确定离开吗？")
   },
@@ -358,6 +370,7 @@ Page({
       })
       return
     }
+    this._pendingConfigSaveFeedback = null
     this.setData({
       form: buildForm(DEFAULT_CONFIG),
       isDirty: true
@@ -372,7 +385,7 @@ Page({
     this.fetchConfig(undefined, { replaceConflict: this.data.saveConflict })
   },
   handleSubmit() {
-    if (this.data.loading || this.data.saving) {
+    if (this._configManageUnloaded || !isPageCurrent(this) || this.data.loading || this.data.saving) {
       return
     }
     if (!this.data.hasLoadedConfig || this.data.loadFailed) {
@@ -436,19 +449,27 @@ Page({
       })
       return
     }
+    this._pendingConfigSaveFeedback = null
     this.setData({ saving: true })
     // The write may commit even if this page times out or is unloaded before its response.
     clearOperationConfigCache()
     const requestId = Number(this._configSaveRequestId || 0) + 1
     this._configSaveRequestId = requestId
     this.finishConfigSaveRequestEffects()
-    wx.showLoading({
-      title: "保存中…",
-      mask: true
-    })
-    this._configSaveLoadingVisible = true
+    try {
+      wx.showLoading({
+        title: "保存中…",
+        mask: true
+      })
+      this._configSaveLoadingVisible = true
+    } catch (error) {
+      // The button still shows saving while the request runs without the native overlay.
+      this._configSaveLoadingVisible = false
+    }
     const showSaveToast = (options) => {
+      if (this._configManageUnloaded || this._configSaveRequestId !== requestId) return
       if (isPageCurrent(this)) wx.showToast(options)
+      else this._pendingConfigSaveFeedback = { requestId, options }
     }
     let settled = false
     const finishRequest = () => {
@@ -544,7 +565,11 @@ Page({
   hideConfigSaveLoading() {
     if (this._configSaveLoadingVisible) {
       this._configSaveLoadingVisible = false
-      wx.hideLoading()
+      try {
+        wx.hideLoading()
+      } catch (error) {
+        // Native feedback must not prevent the save result or timeout from settling.
+      }
     }
   }
 })

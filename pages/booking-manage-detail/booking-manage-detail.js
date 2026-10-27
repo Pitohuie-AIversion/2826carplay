@@ -1395,7 +1395,8 @@ Page({
     })
   },
   handleToggleCustomerTag(event) {
-    const tag = String((event && event.currentTarget && event.currentTarget.dataset && event.currentTarget.dataset.tag) || "").trim()
+    const dataset = event && event.currentTarget && event.currentTarget.dataset || {}
+    const tag = String(dataset.tag || "").trim()
     if (!tag || !this.data.id) return
     const booking = this.data.booking || {}
     if (["completed", "cancelled"].includes(booking.status)) return
@@ -1412,6 +1413,7 @@ Page({
     const idx = currentTags.indexOf(tag)
     let nextTags
     if (idx >= 0) {
+      if (dataset.recommended === true) return
       nextTags = currentTags.filter((t) => t !== tag)
     } else {
       if (currentTags.length >= 5) {

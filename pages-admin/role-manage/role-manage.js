@@ -62,6 +62,7 @@ Page({
     emptyDesc: "当前只有管理员或尚未分配运营权限"
   },
   onLoad() {
+    this._roleManageUnloaded = false
     requirePagePermission(this, {
       required: "canManageRoles",
       noPermissionMessage: "无权访问权限管理",
@@ -72,6 +73,11 @@ Page({
   },
   onShow() {
     syncUnsavedChanges(this)
+    const feedback = this._pendingRoleSaveFeedback
+    if (feedback && !this._roleManageUnloaded && isPageCurrent(this)) {
+      this._pendingRoleSaveFeedback = null
+      if (feedback.requestId === this._roleSaveRequestId) wx.showToast(feedback.options)
+    }
   },
   onPullDownRefresh() {
     if (!this.data.pageAuthorized || this.isRoleInteractionBusy()) {
@@ -86,6 +92,8 @@ Page({
     this.hideRoleSaveLoading()
   },
   onUnload() {
+    this._roleManageUnloaded = true
+    this._pendingRoleSaveFeedback = null
     disposeUnsavedChanges(this)
     cancelPagePermissionCheck(this)
     this._roleListRequestId = Number(this._roleListRequestId || 0) + 1
@@ -95,6 +103,11 @@ Page({
   },
   showRoleToast(options) {
     if (isPageCurrent(this)) wx.showToast(options)
+  },
+  showRoleSaveFeedback(options, requestId) {
+    if (this._roleManageUnloaded || requestId !== this._roleSaveRequestId) return
+    if (isPageCurrent(this)) wx.showToast(options)
+    else this._pendingRoleSaveFeedback = { requestId, options }
   },
   isRoleInteractionBusy() {
     return Boolean(
@@ -229,6 +242,7 @@ Page({
     if (this.isRoleInteractionBusy() || this.data.editingOpenid) {
       return
     }
+    this._pendingRoleSaveFeedback = null
     this.setData({
       formOpenid: String((event.detail && event.detail.value) || "").trim()
     })
@@ -244,6 +258,7 @@ Page({
     }
     const selected = normalizeStringArray(this.data.selectedPermissions)
     const nextSelected = selected.includes(value) ? selected.filter((item) => item !== value) : selected.concat(value)
+    this._pendingRoleSaveFeedback = null
     this.setData({
       selectedPermissions: nextSelected,
       permissionOptions: buildPermissionOptions(nextSelected)
@@ -266,6 +281,7 @@ Page({
       })
       return
     }
+    this._pendingRoleSaveFeedback = null
     this.setData({
       editingOpenid: openid,
       formOpenid: openid,
@@ -278,6 +294,7 @@ Page({
     if (this.isRoleInteractionBusy()) {
       return
     }
+    this._pendingRoleSaveFeedback = null
     this.setData({
       editingOpenid: "",
       formOpenid: "",
@@ -287,7 +304,7 @@ Page({
     clearUnsaved(this)
   },
   handleSubmit() {
-    if (this.isRoleInteractionBusy()) {
+    if (this._roleManageUnloaded || !isPageCurrent(this) || this.isRoleInteractionBusy()) {
       return
     }
     const openid = String(this.data.formOpenid || "").trim()
@@ -308,15 +325,19 @@ Page({
     const permissions = normalizeStringArray(this.data.selectedPermissions)
     const requestId = Number(this._roleSaveRequestId || 0) + 1
     this._roleSaveRequestId = requestId
+    this._pendingRoleSaveFeedback = null
     this.finishRoleSaveRequestEffects()
     this.setData({ saving: true })
     // The write can commit even if its response arrives after timeout or unload.
     clearPagePermissionCache()
-    wx.showLoading({
-      title: "保存中…",
-      mask: true
-    })
-    this._roleSaveLoadingVisible = true
+    if (typeof wx.showLoading === "function") {
+      try {
+        wx.showLoading({ title: "保存中…", mask: true })
+        this._roleSaveLoadingVisible = true
+      } catch (error) {
+        this._roleSaveLoadingVisible = false
+      }
+    }
     let settled = false
     const finishRequest = () => {
       if (settled || this._roleSaveRequestId !== requestId) {
@@ -330,10 +351,10 @@ Page({
       if (!finishRequest()) {
         return
       }
-      this.showRoleToast({
+      this.showRoleSaveFeedback({
         title: message,
         icon: "none"
-      })
+      }, requestId)
       this.setData({ saving: false })
     }
     this._roleSaveRequestTimer = setTimeout(() => {
@@ -352,19 +373,19 @@ Page({
           return
         }
         if (!result || !result.ok) {
-          this.showRoleToast({
+          this.showRoleSaveFeedback({
             title: formatToastTitle(result && result.message, "保存失败"),
             icon: "none"
-          })
+          }, requestId)
           this.setData({ saving: false })
           return
         }
-        this.showRoleToast({
-          title: formatToastTitle(result.message, "保存成功"),
-          icon: "success"
-        })
         this.setData({ saving: false })
         this.handleResetForm()
+        this.showRoleSaveFeedback({
+          title: formatToastTitle(result.message, "保存成功"),
+          icon: "success"
+        }, requestId)
         this.fetchRoleList()
       },
       fail: (error) => {
@@ -403,7 +424,9 @@ Page({
   hideRoleSaveLoading() {
     if (this._roleSaveLoadingVisible) {
       this._roleSaveLoadingVisible = false
-      wx.hideLoading()
+      try {
+        if (typeof wx.hideLoading === "function") wx.hideLoading()
+      } catch (error) {}
     }
   }
 })

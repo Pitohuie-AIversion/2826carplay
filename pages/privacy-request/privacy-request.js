@@ -296,6 +296,12 @@ Page({
             })
             return
           }
+          this.applyConfirmedRequest({
+            id: result.id,
+            type: requestType,
+            description,
+            status: result.status
+          }, true)
           clearUnsaved(this)
           this._submissionSnapshot = null
           this.setData({
@@ -450,6 +456,7 @@ Page({
             }
             return
           }
+          this.applyConfirmedRequest({ id: requestId, status: "cancelled" })
           wx.showToast({
             title: "申请已撤回",
             icon: "none"
@@ -478,6 +485,24 @@ Page({
     this._cancelRequestTimer = null
   },
 
+  applyConfirmedRequest(item, allowInsert) {
+    const id = typeof item.id === "string" ? item.id.trim() : ""
+    if (!id || !Object.prototype.hasOwnProperty.call(STATUS_META, item.status)) return
+    const list = this.data.list
+    const exists = list.some((record) => record.id === id)
+    if (!exists && !allowInsert) return
+    const nextList = exists
+      ? list.map((record) => record.id === id ? { ...record, ...item, id } : record)
+      : [{ ...item, id }, ...list]
+    this._preservePrivacyMutationResult = true
+    this.applyRequestList(nextList)
+    if (typeof wx.setStorageSync === "function") {
+      try {
+        wx.setStorageSync("privacy_requests_snapshot", this.data.list.slice(0, this.data.pageSize || 20))
+      } catch (e) {}
+    }
+  },
+
   applyRequestList(list, options) {
     const input = options && typeof options === "object" ? options : {}
     const filter =
@@ -501,7 +526,8 @@ Page({
 
   fetchList(options) {
     const input = options && typeof options === "object" ? options : {}
-    const append = Boolean(input.append)
+    const preserveFacts = Boolean(this._preservePrivacyMutationResult)
+    const append = Boolean(input.append) && !preserveFacts
     const nextPage = append ? this.data.page + 1 : 0
     const requestId = Number(this._listRequestId || 0) + 1
     this._listRequestId = requestId
@@ -543,7 +569,7 @@ Page({
         loading: false,
         loadError: String(message || "申请记录加载失败")
       })
-      if (!append) {
+      if (!append && !preserveFacts) {
         this.applyRequestList([], {
           filter: this.data.currentFilter,
           page: 0,
@@ -567,13 +593,13 @@ Page({
           return
         }
         const result = res && res.result ? res.result : null
-        if (!result || !result.ok) {
+        if (!result || !result.ok || !Array.isArray(result.list)) {
           this.setData({
             initialLoading: false,
             loading: false,
             loadError: (result && result.message) || "申请记录加载失败"
           })
-          if (!append) {
+          if (!append && !preserveFacts) {
             this.applyRequestList([], {
               filter: this.data.currentFilter,
               page: 0,
@@ -583,10 +609,9 @@ Page({
           return
         }
 
-        const list = Array.isArray(result.list)
-          ? result.list
-          : []
+        const list = result.list
         const nextList = append ? this.data.list.concat(list) : list
+        if (!append) this._preservePrivacyMutationResult = false
         if (!append && typeof wx !== "undefined" && typeof wx.setStorageSync === "function") {
           try { wx.setStorageSync("privacy_requests_snapshot", nextList) } catch (e) {}
         }

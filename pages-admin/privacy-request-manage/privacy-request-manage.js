@@ -108,7 +108,11 @@ Page({
       this.fetchList()
     }
   },
+  onHide() {
+    this._privacyManageConfirmationAction = null
+  },
   onUnload() {
+    this._privacyManageConfirmationAction = null
     cancelPagePermissionCheck(this)
     cancelPageNativeActions(this)
     this._privacyManageListRequestId =
@@ -266,6 +270,7 @@ Page({
     if (!item || !item.canHandle || this.data.loading || this.data.updatingId) {
       return
     }
+    if (this._privacyManageConfirmationAction && isPageNativeActionActive(this, this._privacyManageConfirmationAction)) return
     const canComplete = item.type !== "access" || Boolean(item.dataExportedAt)
     const actions = []
     if (item.status === "pending") {
@@ -279,53 +284,72 @@ Page({
       requireCurrent: true,
       exclusiveKey: "privacy-status-confirmation"
     })
-    wx.showActionSheet({
-      alertText: "选择申请处理结果",
-      itemList: actions.map((action) => action.label),
-      itemColor: "#528fff",
-      success: (res) => {
-        if (!isPageNativeActionActive(this, nativeAction) || !res) {
-          return
-        }
-        const action = actions[res.tapIndex]
-        if (!action) {
-          return
-        }
-        if (action.status === "processing") {
-          this.updateStatus(item, action.status, "")
-          return
-        }
-        this.promptResolution(item, action)
-      }
-    })
+    if (!isPageNativeActionActive(this, nativeAction)) return
+    this._privacyManageConfirmationAction = nativeAction
+    const handleFailure = (error) => this.failPrivacyManageConfirmation(nativeAction, error)
+    try {
+      wx.showActionSheet({
+        alertText: "选择申请处理结果",
+        itemList: actions.map((action) => action.label),
+        itemColor: "#528fff",
+        success: (res) => {
+          if (!this.finishPrivacyManageConfirmation(nativeAction) || !isPageNativeActionActive(this, nativeAction) || !res) return
+          const action = actions[res.tapIndex]
+          if (!action) return
+          if (action.status === "processing") {
+            this.updateStatus(item, action.status, "")
+            return
+          }
+          this.promptResolution(item, action)
+        },
+        fail: handleFailure
+      })
+    } catch (error) {
+      handleFailure(error)
+    }
   },
   promptResolution(item, action) {
+    if (this.data.loading || this.data.updatingId || this._privacyManageWriteActive) return
+    if (this._privacyManageConfirmationAction && isPageNativeActionActive(this, this._privacyManageConfirmationAction)) return
     const nativeAction = beginPageNativeAction(this, {
       requireCurrent: true,
       exclusiveKey: "privacy-status-confirmation"
     })
-    wx.showModal({
-      title: action.status === "completed" ? "填写处理结果" : "填写未通过原因",
-      content: "该说明会展示给申请用户，请清晰说明处理结果或后续方式。",
-      confirmText: action.status === "completed" ? "提交结果" : "确认驳回",
-      confirmColor: action.status === "completed" ? "#528fff" : "#d46868",
-      editable: true,
-      placeholderText: action.status === "completed" ? "例如：已完成核验并通过客服反馈" : "例如：依法需保留相关交易记录",
-      success: (res) => {
-        if (!isPageNativeActionActive(this, nativeAction) || !res || !res.confirm) {
-          return
-        }
-        const note = String(res.content || "").trim()
-        if (note.length < 2) {
-          wx.showToast({
-        title: "说明至少 2 字",
-            icon: "none"
-          })
-          return
-        }
-        this.updateStatus(item, action.status, note)
-      }
-    })
+    if (!isPageNativeActionActive(this, nativeAction)) return
+    this._privacyManageConfirmationAction = nativeAction
+    const handleFailure = (error) => this.failPrivacyManageConfirmation(nativeAction, error)
+    try {
+      wx.showModal({
+        title: action.status === "completed" ? "填写处理结果" : "填写未通过原因",
+        content: "该说明会展示给申请用户，请清晰说明处理结果或后续方式。",
+        confirmText: action.status === "completed" ? "提交结果" : "确认驳回",
+        confirmColor: action.status === "completed" ? "#528fff" : "#d46868",
+        editable: true,
+        placeholderText: action.status === "completed" ? "例如：已完成核验并通过客服反馈" : "例如：依法需保留相关交易记录",
+        success: (res) => {
+          if (!this.finishPrivacyManageConfirmation(nativeAction) || !isPageNativeActionActive(this, nativeAction) || !res || !res.confirm) return
+          const note = String(res.content || "").trim()
+          if (note.length < 2) {
+            wx.showToast({ title: "说明至少 2 字", icon: "none" })
+            return
+          }
+          this.updateStatus(item, action.status, note)
+        },
+        fail: handleFailure
+      })
+    } catch (error) {
+      handleFailure(error)
+    }
+  },
+  finishPrivacyManageConfirmation(action) {
+    if (this._privacyManageConfirmationAction !== action) return false
+    this._privacyManageConfirmationAction = null
+    return true
+  },
+  failPrivacyManageConfirmation(action, error) {
+    if (!this.finishPrivacyManageConfirmation(action) || !isPageNativeActionActive(this, action)) return
+    if (/cancel/i.test(String(error && (error.errMsg || error.message) || ""))) return
+    wx.showToast({ title: "操作窗口打开失败", icon: "none" })
   },
   updateStatus(item, status, resolutionNote) {
     if (

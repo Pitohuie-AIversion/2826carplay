@@ -22,30 +22,45 @@ describe('Web Admin Gateway Sentinel & Operations Center', () => {
     expect(mainScript).toBeDefined();
     inlineJs = mainScript[1];
 
-    const mockEl = {
+    const createMockElement = () => ({
       style: {},
       classList: {
         add: jest.fn(),
         remove: jest.fn(),
         toggle: jest.fn()
       },
-      appendChild: jest.fn(),
+      children: [],
+      appendChild: jest.fn(function (child) {
+        this.children.push(child);
+        return child;
+      }),
+      setAttribute: jest.fn(),
       innerText: '',
-      innerHTML: '',
+      _innerHTML: '',
+      get innerHTML() { return this._innerHTML; },
+      set innerHTML(value) {
+        this._innerHTML = String(value);
+        this.children.length = 0;
+      },
       value: ''
-    };
+    });
+    const elements = new Map();
 
     const window = {
       location: { href: 'http://localhost' },
       localStorage: {
         _store: {},
         getItem(key) { return this._store[key] || null; },
-        setItem(key, val) { this._store[key] = String(val); }
+        setItem(key, val) { this._store[key] = String(val); },
+        removeItem(key) { delete this._store[key]; }
       },
       document: {
-        getElementById: jest.fn(() => mockEl),
+        getElementById: jest.fn((id) => {
+          if (!elements.has(id)) elements.set(id, createMockElement());
+          return elements.get(id);
+        }),
         querySelectorAll: jest.fn(() => []),
-        createElement: jest.fn(() => ({ ...mockEl, setAttribute: jest.fn() }))
+        createElement: jest.fn(createMockElement)
       }
     };
 
@@ -174,5 +189,87 @@ describe('Web Admin Gateway Sentinel & Operations Center', () => {
     expect(parsed.errorMax).toBe(1.5);
     expect(parsed.p95Max).toBe(60);
     expect(parsed.platform).toBe('feishu');
+  });
+
+  test('智能客户画像标签引擎 (deriveBookingIntelligentTags & autoTagBooking) 与 shared/bookingTags.js 一致', () => {
+    const tags = vm.runInContext(`
+      deriveBookingIntelligentTags({
+        rentalDays: 15,
+        pickupCity: '杭州',
+        returnCity: '上海',
+        pickupLocation: '萧山机场送车上门',
+        status: 'CONFIRMED',
+        customerOrderCount: 3
+      })
+    `, sandbox);
+
+    expect(Array.from(tags)).toEqual(['长租意向', '需要送车', '跨城用车', '高意向', '老客户']);
+
+    const taggedBooking = vm.runInContext(`
+      autoTagBooking({
+        bookingId: 'BK_TEST_01',
+        rentalDays: 7,
+        pickupLocation: '西湖门店自提',
+        status: 'PENDING'
+      })
+    `, sandbox);
+    expect(Array.from(taggedBooking.intelligentTags)).toEqual(['长租意向']);
+  });
+
+  test('17个业务集合零信任规则、复合索引与脱敏字段白名单审查器完整就绪', () => {
+    const colCount = vm.runInContext('COLLECTIONS_INFO.length', sandbox);
+    expect(colCount).toBe(17);
+
+    const allHaveMetadata = vm.runInContext(`
+      COLLECTIONS_INFO.every(c => Array.isArray(c.indexDetails) && c.indexDetails.length > 0 && Array.isArray(c.whitelistFields) && c.whitelistFields.length > 0 && c.sampleDoc)
+    `, sandbox);
+    expect(allHaveMetadata).toBe(true);
+
+    vm.runInContext('openCollectionInspector("bookings")', sandbox);
+    const inspectedKey = vm.runInContext('currentInspectedCollection.key', sandbox);
+    expect(inspectedKey).toBe('bookings');
+  });
+
+  test('四角存证交接核验台账与微信支付分订单联动结算', () => {
+    const bookingsCount = vm.runInContext('RECONCILE_BOOKINGS.length', sandbox);
+    expect(bookingsCount).toBeGreaterThanOrEqual(5);
+
+    vm.runInContext('openHandoverEvidenceModal("BK_2026102502")', sandbox);
+    const activeBookingId = vm.runInContext('currentHandoverBooking.bookingId', sandbox);
+    expect(activeBookingId).toBe('BK_2026102502');
+    const cornerCount = vm.runInContext('currentHandoverBooking.cornerPhotos.length', sandbox);
+    expect(cornerCount).toBe(4);
+
+    vm.runInContext('launchPayScoreFromHandover()', sandbox);
+    const payScoreOrderNo = vm.runInContext('currentPayScoreBookingId', sandbox);
+    expect(payScoreOrderNo).toBe('BK_2026102502');
+    const select = sandbox.document.getElementById('payScoreBookingSelect');
+    expect(select.value).toBe('BK_2026102502');
+    expect(select.children).toHaveLength(bookingsCount);
+    expect(new Set(select.children.map(option => option.value)).size).toBe(bookingsCount);
+    vm.runInContext('launchPayScoreFromHandover()', sandbox);
+    expect(select.children).toHaveLength(bookingsCount);
+  });
+
+  test('微服务熔断 Half-Open 半开探测自愈恢复与车队排期持久化', () => {
+    vm.runInContext(`
+      CIRCUIT_BREAKER_FAULTS['vehicleCalendarManage'] = 'TRIPPED';
+      persistCircuitBreakerFaults();
+    `, sandbox);
+    expect(vm.runInContext('CIRCUIT_BREAKER_FAULTS["vehicleCalendarManage"]', sandbox)).toBe('TRIPPED');
+
+    vm.runInContext('probeAndRecoverService("vehicleCalendarManage")', sandbox);
+    expect(vm.runInContext('CIRCUIT_BREAKER_FAULTS["vehicleCalendarManage"]', sandbox)).toBeUndefined();
+
+    vm.runInContext(`
+      VEHICLES[0].status = 'maintenance';
+      VEHICLES[0].schedule = '赛道日后底盘整备';
+      persistFleetSchedules();
+    `, sandbox);
+    const fleetStored = JSON.parse(sandbox.localStorage.getItem('AIJIA_FLEET_SCHEDULE_STATE'));
+    expect(fleetStored[0].status).toBe('maintenance');
+
+    vm.runInContext('resetFleetSchedules()', sandbox);
+    expect(vm.runInContext('VEHICLES[0].status', sandbox)).toBe('rented');
   });
 });

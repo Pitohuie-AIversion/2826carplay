@@ -103,7 +103,13 @@ Page({
   },
 
   onShow() {
-    if (this.data.loading || this._bookingCancelTimer) {
+    if (!isPageCurrent(this)) return
+    if (this._pendingBookingCancelFeedback) {
+      const title = this._pendingBookingCancelFeedback
+      this._pendingBookingCancelFeedback = ""
+      wx.showToast({ title, icon: "none" })
+    }
+    if (this._bookingCancelTimer || (this.data.loading && !(this._bookingsNeedRefresh && this._bookingsLoadTimer))) {
       return
     }
     const now = Date.now()
@@ -142,6 +148,7 @@ Page({
     }
     this._bookingsRequestId = Number(this._bookingsRequestId || 0) + 1
     this._bookingCancelSerial = Number(this._bookingCancelSerial || 0) + 1
+    this._pendingBookingCancelFeedback = ""
     this.finishBookingsLoadEffects()
     this.clearBookingCancelTimer()
     if (this._perf && typeof this._perf.dispose === 'function') {
@@ -167,7 +174,14 @@ Page({
   },
 
   loadList(input) {
+    if (this._bookingCancelTimer) {
+      if (input && typeof input.done === "function") {
+        try { input.done() } catch (error) {}
+      }
+      return
+    }
     const append = Boolean(input && input.append)
+    const keepExisting = append || Boolean(this._preserveBookingCancelResult)
     const nextPage = append ? this.data.page + 1 : 0
     const requestId = Number(this._bookingsRequestId || 0) + 1
     this._bookingsRequestId = requestId
@@ -179,11 +193,11 @@ Page({
         loading: false,
         loadFailed: true,
         loadErrorText: "云能力未初始化，请稍后重试",
-        list: [],
-        visibleList: [],
-        listSummary: buildListSummary([]),
-        page: 0,
-        hasMore: false
+        list: keepExisting ? this.data.list : [],
+        visibleList: keepExisting ? this.data.visibleList : [],
+        listSummary: keepExisting ? this.data.listSummary : buildListSummary([]),
+        page: keepExisting ? this.data.page : 0,
+        hasMore: keepExisting ? this.data.hasMore : false
       })
       if (input && typeof input.done === "function") {
         try {
@@ -214,7 +228,7 @@ Page({
       if (!finishRequest()) {
         return
       }
-      wx.showToast({
+      if (isPageCurrent(this)) wx.showToast({
         title: "加载失败",
         icon: "none"
       })
@@ -223,11 +237,11 @@ Page({
         loading: false,
         loadFailed: true,
         loadErrorText: String(message || "预约列表加载失败，请稍后重试"),
-        list: append ? this.data.list : [],
-        visibleList: append ? this.data.visibleList : [],
-        listSummary: append ? this.data.listSummary : buildListSummary([]),
-        page: append ? this.data.page : 0,
-        hasMore: append ? this.data.hasMore : false
+        list: keepExisting ? this.data.list : [],
+        visibleList: keepExisting ? this.data.visibleList : [],
+        listSummary: keepExisting ? this.data.listSummary : buildListSummary([]),
+        page: keepExisting ? this.data.page : 0,
+        hasMore: keepExisting ? this.data.hasMore : false
       })
     }
 
@@ -247,7 +261,7 @@ Page({
         }
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
-          wx.showToast({
+          if (isPageCurrent(this)) wx.showToast({
           title: formatToastTitle(result && result.message, "加载失败"),
             icon: "none"
           })
@@ -256,11 +270,11 @@ Page({
             loading: false,
             loadFailed: true,
             loadErrorText: (result && result.message) || "预约列表加载失败，请稍后重试",
-            list: append ? this.data.list : [],
-            visibleList: append ? this.data.visibleList : [],
-            listSummary: append ? this.data.listSummary : buildListSummary([]),
-            page: append ? this.data.page : 0,
-            hasMore: append ? this.data.hasMore : false
+            list: keepExisting ? this.data.list : [],
+            visibleList: keepExisting ? this.data.visibleList : [],
+            listSummary: keepExisting ? this.data.listSummary : buildListSummary([]),
+            page: keepExisting ? this.data.page : 0,
+            hasMore: keepExisting ? this.data.hasMore : false
           })
           return
         }
@@ -280,6 +294,7 @@ Page({
           }
         })
         const nextList = append ? this.data.list.concat(list) : list
+        if (!append) this._preserveBookingCancelResult = false
         if (!append && typeof wx !== "undefined" && typeof wx.setStorageSync === "function") {
           try {
             wx.setStorageSync("bookings_last_snapshot", nextList)
@@ -422,12 +437,15 @@ Page({
       requireCurrent: true,
       exclusiveKey: "booking-cancel-confirmation"
     })
+    let confirmationSettled = false
     wx.showModal({
       title: "取消预约",
       content: "已完成的预约不可取消。确认取消当前预约吗？",
       confirmText: "确认取消",
       confirmColor: "#d46868",
       success: (res) => {
+        if (confirmationSettled) return
+        confirmationSettled = true
         if (!isPageNativeActionActive(this, action) || !res || !res.confirm) {
           return
         }
@@ -439,7 +457,7 @@ Page({
 
   cancelBooking(id) {
     const bookingId = String(id || "").trim()
-    if (!bookingId || this.data.loading) {
+    if (!bookingId || this.data.loading || this._bookingCancelTimer) {
       return
     }
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
@@ -452,6 +470,7 @@ Page({
 
     const cancelSerial = Number(this._bookingCancelSerial || 0) + 1
     this._bookingCancelSerial = cancelSerial
+    this._pendingBookingCancelFeedback = ""
     this.clearBookingCancelTimer()
     this.applyState({
       loading: true
@@ -470,10 +489,12 @@ Page({
       if (!finishRequest()) {
         return
       }
-      wx.showToast({
-        title: formatToastTitle(message, "取消失败"),
+      const title = formatToastTitle(message, "取消失败")
+      if (isPageCurrent(this)) wx.showToast({
+        title,
         icon: "none"
       })
+      else this._pendingBookingCancelFeedback = title
       this.applyState({
         loading: false
       })
@@ -492,21 +513,41 @@ Page({
         }
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
-          wx.showToast({
-          title: formatToastTitle(result && result.message, "取消失败"),
+          const title = formatToastTitle(result && result.message, "取消失败")
+          if (isPageCurrent(this)) wx.showToast({
+            title,
             icon: "none"
           })
+          else this._pendingBookingCancelFeedback = title
           this.applyState({
             loading: false
           })
           return
         }
 
+        const nextList = this.data.list.map((item) => item.id === bookingId ? {
+          ...item,
+          status: "cancelled",
+          statusText: mapStatusText("cancelled"),
+          statusClass: mapStatusClass("cancelled"),
+          canCancel: false,
+          statusGuidance: buildStatusGuidance("cancelled"),
+          journeyProgress: buildJourneyProgress("cancelled")
+        } : item)
+        this._preserveBookingCancelResult = true
+        this.applyBookingList(nextList, { loading: false })
+        if (typeof wx.setStorageSync === "function") {
+          try { wx.setStorageSync("bookings_last_snapshot", nextList.slice(0, this.data.pageSize || 20)) } catch (error) {}
+        }
+        if (!isPageCurrent(this)) {
+          this._pendingBookingCancelFeedback = "预约已取消"
+          this._bookingsNeedRefresh = true
+          return
+        }
         wx.showToast({
           title: "预约已取消",
           icon: "none"
         })
-        this.applyState({ loading: false })
         this.loadList()
       },
       fail: (error) => {

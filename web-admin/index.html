@@ -701,7 +701,8 @@
       padding: 1.5rem;
     }
 
-    .modal-overlay.active {
+    .modal-overlay.active,
+    .modal-overlay.open {
       display: flex;
     }
 
@@ -2408,11 +2409,21 @@
         <button class="btn-close" onclick="closePricingModal()">×</button>
       </div>
 
-      <div class="modal-field">
-        <label>选择测算车型与基础日租</label>
-        <select class="search-input" id="simVehicleSelect" style="width: 100%; padding: 0.65rem;" onchange="updateSimulation()">
-          <!-- Populated by JS -->
-        </select>
+      <div style="display:grid; grid-template-columns: 1.3fr 1fr; gap: 0.85rem;">
+        <div class="modal-field">
+          <label>选择测算车型与基础日租</label>
+          <select class="search-input" id="simVehicleSelect" style="width: 100%; padding: 0.65rem;" onchange="updateSimulation()">
+            <!-- Populated by JS -->
+          </select>
+        </div>
+        <div class="modal-field">
+          <label>季节/周末动态定价策略 (shared/rentalPricing.js)</label>
+          <select class="search-input" id="simPricingSeasonSelect" style="width: 100%; padding: 0.65rem;" onchange="updateSimulation()">
+            <option value="standard">🟢 平时标准基础日租 (Multiplier 1.0x)</option>
+            <option value="weekend">🔥 含周末峰值动态溢价 (五/六/日 +15%)</option>
+            <option value="holiday">🎉 含黄金周节假日溢价 (前3日 +30%)</option>
+          </select>
+        </div>
       </div>
 
       <div class="modal-field">
@@ -2452,6 +2463,9 @@
             <span id="simDiscountedTotal" style="font-family:'Outfit',sans-serif; font-size: 1.85rem; font-weight: 800; color: #fbbf24; text-shadow: 0 0 20px rgba(245, 158, 11, 0.35);">￥28,350</span>
           </div>
           <div id="simDailyAverage" style="font-size: 0.82rem; color: var(--primary);">折合仅 ￥4,050 / 天</div>
+        </div>
+        <div id="simDynamicBreakdownBox" style="font-size: 0.72rem; color: var(--text-muted); background: rgba(5, 8, 17, 0.65); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 0.5rem 0.65rem; font-family: 'JetBrains Mono', monospace;">
+          <!-- Populated by calculateDynamicRentalPricing -->
         </div>
       </div>
 
@@ -4981,17 +4995,180 @@
       updateSimulation();
     }
 
-    function calculateRentalDiscount(originalTotal, days) {
-      if (days >= 30) {
-        return { rate: 0.75, label: '月租尊享 75折' };
-      } else if (days >= 15) {
-        return { rate: 0.85, label: '半月特惠 85折' };
-      } else if (days >= 7) {
-        return { rate: 0.90, label: '周租专享 90折' };
-      } else if (days >= 3) {
-        return { rate: 0.95, label: '连租特惠 95折' };
+    const MAX_RENTAL_DISCOUNT_TIERS = 8;
+    const DEFAULT_RENTAL_DISCOUNT_TIERS = [
+      { minDays: 3, discountRate: 0.95 },
+      { minDays: 7, discountRate: 0.90 },
+      { minDays: 15, discountRate: 0.85 },
+      { minDays: 30, discountRate: 0.75 }
+    ];
+
+    function validateRentalDiscountTiers(input) {
+      if (!Array.isArray(input) || input.length > MAX_RENTAL_DISCOUNT_TIERS) {
+        return '连租折扣最多设置 8 档';
       }
-      return { rate: 1.0, label: '标准日租 (无折扣)' };
+      const days = new Set();
+      for (const tier of input) {
+        if (!tier || !Number.isInteger(tier.minDays) || tier.minDays < 2 || tier.minDays > 90) {
+          return '连租天数需为 2-90 的整数';
+        }
+        if (!Number.isFinite(tier.discountRate) || tier.discountRate < 0.01 || tier.discountRate > 0.99 ||
+            Math.abs(tier.discountRate * 100 - Math.round(tier.discountRate * 100)) > 1e-8) {
+          return '折扣需为 0.1-9.9 折，最多一位小数';
+        }
+        if (days.has(tier.minDays)) return '连租天数不能重复';
+        days.add(tier.minDays);
+      }
+      return '';
+    }
+
+    function normalizeRentalDiscountTiers(input) {
+      const tiers = Array.isArray(input) && input.length > 0 ? input : DEFAULT_RENTAL_DISCOUNT_TIERS;
+      if (validateRentalDiscountTiers(tiers)) return [];
+      return tiers.map(tier => ({
+        minDays: tier.minDays,
+        discountRate: tier.discountRate,
+        label: `连租满${tier.minDays}天 ${Number((tier.discountRate * 10).toFixed(1))}折`
+      })).sort((a, b) => b.minDays - a.minDays);
+    }
+
+    function getRentalDiscountTier(daysCount, tiers) {
+      const days = Number.isInteger(daysCount) ? daysCount : 0;
+      return normalizeRentalDiscountTiers(tiers).find(t => days >= t.minDays) || null;
+    }
+
+    function calculateRentalDiscount(originalTotal, days, tiers) {
+      const raw = Number.isFinite(originalTotal) && originalTotal > 0 ? originalTotal : 0;
+      const tier = getRentalDiscountTier(Number(days) || 0, tiers);
+      if (!tier || raw === 0) {
+        return {
+          hasDiscount: false,
+          discountTier: null,
+          discountRate: 1.0,
+          discountLabel: '标准日租 (无折扣)',
+          rate: 1.0,
+          label: '标准日租 (无折扣)',
+          originalTotal: raw,
+          savingsAmount: 0,
+          discountedTotal: raw
+        };
+      }
+      const discountedTotal = Math.round(raw * tier.discountRate);
+      const savingsAmount = raw - discountedTotal;
+      return {
+        hasDiscount: savingsAmount > 0,
+        discountTier: {
+          minDays: tier.minDays,
+          discountRate: tier.discountRate,
+          label: tier.label,
+          savingsAmount
+        },
+        discountRate: tier.discountRate,
+        discountLabel: tier.label,
+        rate: tier.discountRate,
+        label: tier.label,
+        originalTotal: raw,
+        savingsAmount,
+        discountedTotal
+      };
+    }
+
+    function addDaysIso(dateStr, offsetDays) {
+      const parts = String(dateStr || '2026-10-26').split('-').map(Number);
+      const d = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2] + offsetDays));
+      const yyyy = d.getUTCFullYear();
+      const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+      const dd = String(d.getUTCDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    }
+
+    function calculateDynamicRentalPricing(baseDailyRate, startDate, endDate, options = {}) {
+      const baseRate = Number.isFinite(baseDailyRate) && baseDailyRate > 0 ? Math.round(baseDailyRate) : 0;
+      const range = expandDateRangeIso(startDate, endDate);
+      const daysCount = range.validOrder ? range.spanDays : 0;
+      if (baseRate === 0 || daysCount === 0) {
+        return {
+          rentalDays: daysCount,
+          baseDailyRate: baseRate,
+          dailyBreakdown: [],
+          originalTotal: 0,
+          hasDiscount: false,
+          discountTier: null,
+          discountRate: 1,
+          discountLabel: '',
+          savingsAmount: 0,
+          discountedTotal: 0
+        };
+      }
+      const {
+        tiers = DEFAULT_RENTAL_DISCOUNT_TIERS,
+        weekendMultiplier = 1,
+        holidayRules = [],
+        customDateRates = {}
+      } = options;
+
+      const dailyBreakdown = [];
+      let currentDate = startDate;
+      let originalTotal = 0;
+
+      for (let i = 0; i < daysCount; i++) {
+        const parts = currentDate.split('-').map(Number);
+        const dateObj = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
+        const dayOfWeek = dateObj.getUTCDay();
+        const isWeekend = dayOfWeek === 5 || dayOfWeek === 6 || dayOfWeek === 0;
+
+        let rate = baseRate;
+        let ruleTag = 'base';
+        let ruleDesc = '平时价';
+        let multiplier = 1;
+
+        if (customDateRates && Object.prototype.hasOwnProperty.call(customDateRates, currentDate)) {
+          rate = Math.round(Number(customDateRates[currentDate]) || baseRate);
+          ruleTag = 'custom';
+          ruleDesc = '专享价';
+          multiplier = baseRate > 0 ? Number((rate / baseRate).toFixed(2)) : 1;
+        } else {
+          const matchedHoliday = Array.isArray(holidayRules)
+            ? holidayRules.find(h => h && h.startDate && h.endDate && currentDate >= h.startDate && currentDate <= h.endDate)
+            : null;
+          if (matchedHoliday) {
+            multiplier = Number(matchedHoliday.multiplier) || 1;
+            rate = Math.round(baseRate * multiplier);
+            ruleTag = 'holiday';
+            ruleDesc = matchedHoliday.name || '节假日';
+          } else if (isWeekend && weekendMultiplier > 1) {
+            multiplier = weekendMultiplier;
+            rate = Math.round(baseRate * multiplier);
+            ruleTag = 'weekend';
+            ruleDesc = '周末峰值';
+          }
+        }
+
+        originalTotal += rate;
+        dailyBreakdown.push({
+          date: currentDate,
+          dayOfWeek,
+          ruleTag,
+          ruleDesc,
+          multiplier,
+          rate
+        });
+        currentDate = addDaysIso(currentDate, 1);
+      }
+
+      const discountInfo = calculateRentalDiscount(originalTotal, daysCount, tiers);
+      return {
+        rentalDays: daysCount,
+        baseDailyRate: baseRate,
+        dailyBreakdown,
+        originalTotal,
+        hasDiscount: discountInfo.hasDiscount,
+        discountTier: discountInfo.discountTier,
+        discountRate: discountInfo.discountRate,
+        discountLabel: discountInfo.discountLabel,
+        savingsAmount: discountInfo.savingsAmount,
+        discountedTotal: discountInfo.discountedTotal
+      };
     }
 
     function updateSimulation() {
@@ -4999,12 +5176,28 @@
       const vId = select ? select.value : (currentSimVehicle ? currentSimVehicle.id : 'v1');
       currentSimVehicle = VEHICLES.find(v => v.id === vId) || VEHICLES[0];
 
+      const seasonSel = document.getElementById('simPricingSeasonSelect');
+      const seasonMode = (seasonSel && seasonSel.value) || 'standard';
+
       const days = currentSimDays;
       const dailyRate = currentSimVehicle.dailyRate || 4500;
-      const rawTotal = dailyRate * days;
-      const { rate, label } = calculateRentalDiscount(rawTotal, days);
-      const discountedTotal = Math.round(rawTotal * rate);
-      const savings = rawTotal - discountedTotal;
+      const startDate = '2026-10-26';
+      const endDate = addDaysIso(startDate, days - 1);
+
+      const dynamicOptions = {
+        tiers: DEFAULT_RENTAL_DISCOUNT_TIERS,
+        weekendMultiplier: seasonMode === 'weekend' ? 1.15 : 1,
+        holidayRules: seasonMode === 'holiday'
+          ? [{ name: '黄金周峰值', startDate: '2026-10-26', endDate: '2026-10-28', multiplier: 1.30 }]
+          : []
+      };
+
+      const pricing = calculateDynamicRentalPricing(dailyRate, startDate, endDate, dynamicOptions);
+      const rawTotal = pricing.originalTotal;
+      const discountedTotal = pricing.discountedTotal;
+      const savings = pricing.savingsAmount;
+      const rate = pricing.discountRate;
+      const label = pricing.discountLabel || '标准日租 (无折扣)';
       const avgPerDay = Math.round(discountedTotal / days);
 
       document.getElementById('simDaysDisplay').innerText = `${days} 天`;
@@ -5012,13 +5205,21 @@
       document.getElementById('simTierLabel').innerText = label;
       document.getElementById('simSavingsAmount').innerText = savings > 0 ? `-￥${savings.toLocaleString()}` : '￥0';
       document.getElementById('simDiscountedTotal').innerText = `￥${discountedTotal.toLocaleString()}`;
-      document.getElementById('simDailyAverage').innerText = `折合仅 ￥${avgPerDay.toLocaleString()} / 天 ${savings > 0 ? `(日均立省 ￥${(dailyRate - avgPerDay).toLocaleString()})` : ''}`;
+      document.getElementById('simDailyAverage').innerText = `折合仅 ￥${avgPerDay.toLocaleString()} / 天 ${savings > 0 ? `(累计立省 ￥${savings.toLocaleString()})` : ''}`;
+
+      const breakdownEl = document.getElementById('simDynamicBreakdownBox');
+      if (breakdownEl) {
+        const weekendCount = pricing.dailyBreakdown.filter(d => d.ruleTag === 'weekend').length;
+        const holidayCount = pricing.dailyBreakdown.filter(d => d.ruleTag === 'holiday').length;
+        const baseCount = pricing.dailyBreakdown.filter(d => d.ruleTag === 'base').length;
+        breakdownEl.innerHTML = `📊 动态定价分解 (${startDate} ~ ${endDate})：平时价 ${baseCount} 天 · 周末溢价 ${weekendCount} 天 · 节假日溢价 ${holidayCount} 天 | 连租档位上限：${MAX_RENTAL_DISCOUNT_TIERS} 档`;
+      }
 
       const quoteText = `【爱迦租车 · 专属管家尊享报价】
 尊敬的贵宾客户，为您测算的预约方案如下：
 • 预订车型：${currentSimVehicle.name} (${currentSimVehicle.category})
 • 基础日租：￥${dailyRate.toLocaleString()} / 天
-• 租赁周期：${days} 天 ${rate < 1 ? `(已享【${label}】)` : ''}
+• 租赁周期：${days} 天 (${startDate} ~ ${endDate}) ${rate < 1 ? `(已享【${label}】)` : ''}
 • 原标准价：￥${rawTotal.toLocaleString()}
 • 连租让利：${savings > 0 ? `-￥${savings.toLocaleString()}` : '无'}
 • 折后总价：￥${discountedTotal.toLocaleString()} (折合 ￥${avgPerDay.toLocaleString()}/天)
@@ -5026,6 +5227,7 @@
 
       const textarea = document.getElementById('simQuoteText');
       if (textarea) textarea.value = quoteText;
+      return pricing;
     }
 
     function copyQuoteText() {

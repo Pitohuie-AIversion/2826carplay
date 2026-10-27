@@ -393,4 +393,35 @@ describe('Web Admin Gateway Sentinel & Operations Center', () => {
     expect(dryDeployRes.exitCode).toBe(0);
     expect(dryDeployRes.mode).toBe('dry-run');
   });
+
+  test('节假日与周末动态定价试算引擎 (calculateDynamicRentalPricing) 与 shared/rentalPricing.js 一致', () => {
+    const sharedPricing = require('../shared/rentalPricing');
+    const options = {
+      tiers: [
+        { minDays: 3, discountRate: 0.95 },
+        { minDays: 7, discountRate: 0.90 }
+      ],
+      weekendMultiplier: 1.15,
+      holidayRules: [{ name: '黄金周峰值', startDate: '2026-10-26', endDate: '2026-10-28', multiplier: 1.30 }]
+    };
+
+    const expected = sharedPricing.calculateDynamicRentalPricing(4500, '2026-10-26', '2026-11-01', options);
+    const actual = vm.runInContext(
+      `calculateDynamicRentalPricing(4500, "2026-10-26", "2026-11-01", ${JSON.stringify(options)})`,
+      sandbox
+    );
+
+    expect(actual.rentalDays).toBe(expected.rentalDays);
+    expect(actual.originalTotal).toBe(expected.originalTotal);
+    expect(actual.discountedTotal).toBe(expected.discountedTotal);
+    expect(actual.savingsAmount).toBe(expected.savingsAmount);
+    expect(actual.discountLabel).toBe(expected.discountLabel);
+    expect(actual.dailyBreakdown.length).toBe(7);
+
+    const errOver8 = vm.runInContext(
+      `validateRentalDiscountTiers(Array.from({ length: 9 }, (_, i) => ({ minDays: i + 2, discountRate: 0.9 })))`,
+      sandbox
+    );
+    expect(errOver8).toBe('连租折扣最多设置 8 档');
+  });
 });

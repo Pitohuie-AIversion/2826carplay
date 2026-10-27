@@ -8817,6 +8817,12 @@
         `).join('');
       }
 
+      const lruSample = createLRU(2);
+      lruSample.set('img1', 'local://1');
+      lruSample.set('img2', 'local://2');
+      lruSample.get('img1'); // touch img1 -> img2 becomes oldest
+      lruSample.set('img3', 'local://3'); // evicts img2
+
       const result = {
         status,
         statusText: mapStatusText(status),
@@ -8832,7 +8838,15 @@
           syncMemoryArrayItem: mockPage.data.list[0].title,
           prototypePollutionBlocked: ({}).polluted === undefined,
           nativeActionActiveBeforeUnload: activeBeforeUnload,
-          nativeActionBlockedAfterUnload: activeAfterUnload === false
+          nativeActionBlockedAfterUnload: activeAfterUnload === false,
+          lruEvictedOldest: !lruSample.has('img2') && lruSample.has('img1') && lruSample.has('img3'),
+          optimizedImageUrlSample: formatOptimizedImageUrl('https://cdn.example.com/car.jpg', { width: 750, height: 500, mode: 'cut' }),
+          normalizedBrandingSample: normalizeConfigBranding({
+            brandName: '极境车库尊享',
+            rentalTerms: { depositText: '极境车库免押政策' }
+          }),
+          extractedNetworkErrorSample: extractErrorMessage({ errMsg: 'cloud.callFunction:fail network timeout' }),
+          releaseVersion: CURRENT_VERSION
         }
       };
 
@@ -8841,6 +8855,138 @@
         boxEl.value = JSON.stringify(result, null, 2);
       }
       return result;
+    }
+
+    // Aligned with shared/imageCache.js, shared/operationConfigRequest.js, shared/cloudClient.js & shared/versionMigration.js
+    const MAX_MEMORY_CACHE = 80;
+    const MAX_LOCAL_CACHE = 120;
+    const CURRENT_VERSION = '1.2.0';
+    const RELEASE_NOTES = {
+      version: CURRENT_VERSION,
+      releaseDate: '2026-10-19',
+      title: '爱迦租车 v1.2.0 尊享对比矩阵与交验车留证闭环升级',
+      highlights: [
+        '【验车留证】预约详情全面支持客户专属交验车留证事实备忘复制、环检损伤结构化呈现与留证单 (CSV) 导出、查看及分享',
+        '【心仪对比】心仪收藏夹引入车型对比矩阵、参数差异高亮过滤（只看差异）、生成尊享对比长图海报与管家一键核价闭环',
+        '【预约触感】预约列表与预约工作台全流程接入分类轻量震动触感反馈与页面卡片分享能力',
+        '【大盘运维】运营管理端大盘新增新车录入、全局参数配置与系统健康巡检一键运维通道',
+        '【专属管家】预约详情与全流程支持一键致电专属管家与紧急救援通道'
+      ]
+    };
+
+    function createLRU(max) {
+      const map = new Map();
+      return {
+        get(key) {
+          if (!map.has(key)) return undefined;
+          const value = map.get(key);
+          map.delete(key);
+          map.set(key, value);
+          return value;
+        },
+        set(key, value) {
+          if (map.has(key)) map.delete(key);
+          map.set(key, value);
+          while (map.size > max) {
+            const firstKey = map.keys().next().value;
+            map.delete(firstKey);
+          }
+        },
+        has(key) {
+          return map.has(key);
+        },
+        delete(key) {
+          return map.delete(key);
+        },
+        keys() {
+          return Array.from(map.keys());
+        },
+        size() {
+          return map.size;
+        },
+        oldestKey() {
+          return map.keys().next().value;
+        }
+      };
+    }
+
+    function formatOptimizedImageUrl(url, options = {}) {
+      if (!url || typeof url !== 'string') return '';
+      if (
+        url.startsWith('wxfile://') ||
+        url.startsWith('http://usr/') ||
+        url.startsWith('http://tmp/') ||
+        url.startsWith('/') ||
+        url.startsWith('data:')
+      ) {
+        return url;
+      }
+      if (url.includes('imageMogr2')) return url;
+
+      const { width, height, quality = 82, format = 'webp', mode = 'thumbnail' } = options;
+      const params = [];
+
+      if (width && height) {
+        if (mode === 'cut') {
+          params.push(`cut/${width}x${height}`);
+        } else {
+          params.push(`thumbnail/${width}x${height}`);
+        }
+      } else if (width) {
+        params.push(`thumbnail/${width}x`);
+      } else if (height) {
+        params.push(`thumbnail/x${height}`);
+      }
+
+      if (format) {
+        params.push(`format/${format}`);
+      }
+      if (quality) {
+        params.push(`quality/${quality}`);
+      }
+
+      if (params.length === 0) return url;
+
+      const mogr = `imageMogr2/${params.join('/')}`;
+      const separator = url.includes('?') ? '&' : '?';
+      return `${url}${separator}${mogr}`;
+    }
+
+    function normalizeConfigBranding(config) {
+      const result = { ...config };
+      const normalizeText = (text) => text.replace(/极境车库/g, '爱迦租车').replace(/极境/g, '爱迦');
+      const displayFields = [
+        'brandName', 'mineUserDesc', 'garagePageTitle', 'garagePageSubtitle',
+        'announcementText', 'faqContent', 'rulesContent', 'bookingPrivacyTip'
+      ];
+      displayFields.forEach((key) => {
+        if (typeof result[key] === 'string') result[key] = normalizeText(result[key]);
+      });
+      if (config.rentalTerms && typeof config.rentalTerms === 'object' && !Array.isArray(config.rentalTerms)) {
+        result.rentalTerms = { ...config.rentalTerms };
+        const rentalFields = [
+          'includedText', 'protectionText', 'serviceFeeText', 'deliveryFeeText', 'depositText',
+          'cancellationText', 'overtimeText', 'energyText', 'estimateDisclaimer'
+        ];
+        rentalFields.forEach((key) => {
+          if (typeof result.rentalTerms[key] === 'string') result.rentalTerms[key] = normalizeText(result.rentalTerms[key]);
+        });
+      }
+      return result;
+    }
+
+    function extractErrorMessage(error, fallback = '请求失败，请稍后重试') {
+      if (!error) return fallback;
+      if (typeof error === 'string') return error;
+      if (typeof error.message === 'string' && error.message) return error.message;
+      if (typeof error.errMsg === 'string' && error.errMsg) {
+        const rawMsg = error.errMsg;
+        if (rawMsg.includes('network') || rawMsg.includes('timeout') || rawMsg.includes('fail')) {
+          return '网络连接不稳定，请检查后重试';
+        }
+        return rawMsg;
+      }
+      return fallback;
     }
 
     function openArchitectureGuardModal(defaultStatus = 'quoted') {

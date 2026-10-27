@@ -644,12 +644,14 @@ describe('Web Admin Gateway Sentinel & Operations Center', () => {
     expect(res.listSummary).toEqual({ ongoing: 2, completed: 1, cancelled: 1 });
 
     // Verify AGENTS.md runtime guardrails
-    expect(res.guardrailsVerification).toEqual({
+    expect(res.guardrailsVerification).toMatchObject({
       syncMemoryUpdatedCity: '上海',
       syncMemoryArrayItem: 'Porsche 911',
       prototypePollutionBlocked: true,
       nativeActionActiveBeforeUnload: true,
-      nativeActionBlockedAfterUnload: true
+      nativeActionBlockedAfterUnload: true,
+      lruEvictedOldest: true,
+      releaseVersion: '1.2.0'
     });
 
     // Verify deepMergePatch parity
@@ -657,5 +659,56 @@ describe('Web Admin Gateway Sentinel & Operations Center', () => {
       vm.runInContext('JSON.stringify(deepMergePatch({ a: { x: 1, y: 2 } }, { a: { y: 9 }, b: 3 }))', sandbox)
     );
     expect(merged).toEqual(sharedPerf.deepMergePatch({ a: { x: 1, y: 2 } }, { a: { y: 9 }, b: 3 }));
+  });
+
+  test('数据万象 WebP 动态裁剪、LRU 淘汰算法、品牌文案归一化、云端错误提取与版本迁移日志与 shared 完全一致', () => {
+    const sharedImg = require('../shared/imageCache');
+    const sharedCloud = require('../shared/cloudClient');
+    const sharedVer = require('../shared/versionMigration');
+
+    // 1. formatOptimizedImageUrl parity
+    const remoteUrl = 'https://cdn.example.com/vehicle/taycan.jpg';
+    expect(vm.runInContext(`formatOptimizedImageUrl("${remoteUrl}", { width: 750, height: 500, mode: "cut" })`, sandbox)).toBe(
+      sharedImg.formatOptimizedImageUrl(remoteUrl, { width: 750, height: 500, mode: 'cut' })
+    );
+    expect(vm.runInContext('formatOptimizedImageUrl("wxfile://tmp_123.jpg", { width: 400 })', sandbox)).toBe(
+      sharedImg.formatOptimizedImageUrl('wxfile://tmp_123.jpg', { width: 400 })
+    );
+
+    // 2. normalizeConfigBranding parity
+    const legacyCfg = {
+      brandName: '极境车库尊享出行',
+      announcementText: '欢迎来到极境体验中心',
+      contactPhone: '400-888-2826',
+      rentalTerms: {
+        depositText: '极境车库四角存证免押',
+        overtimeText: '极境超时计费标准'
+      }
+    };
+    const normalized = JSON.parse(
+      vm.runInContext(`JSON.stringify(normalizeConfigBranding(${JSON.stringify(legacyCfg)}))`, sandbox)
+    );
+    expect(normalized).toEqual({
+      brandName: '爱迦租车尊享出行',
+      announcementText: '欢迎来到爱迦体验中心',
+      contactPhone: '400-888-2826',
+      rentalTerms: {
+        depositText: '爱迦租车四角存证免押',
+        overtimeText: '爱迦超时计费标准'
+      }
+    });
+
+    // 3. extractErrorMessage parity
+    expect(vm.runInContext('extractErrorMessage({ errMsg: "cloud.callFunction:fail timeout" })', sandbox)).toBe(
+      sharedCloud.extractErrorMessage({ errMsg: 'cloud.callFunction:fail timeout' })
+    );
+    expect(vm.runInContext('extractErrorMessage({ message: "库存不足" })', sandbox)).toBe(
+      sharedCloud.extractErrorMessage({ message: '库存不足' })
+    );
+
+    // 4. Version migration & RELEASE_NOTES parity
+    const releaseNotes = JSON.parse(vm.runInContext('JSON.stringify(RELEASE_NOTES)', sandbox));
+    expect(releaseNotes).toEqual(sharedVer.RELEASE_NOTES);
+    expect(vm.runInContext('CURRENT_VERSION', sandbox)).toBe(sharedVer.CURRENT_VERSION);
   });
 });

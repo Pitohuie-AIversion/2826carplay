@@ -8846,7 +8846,16 @@
             rentalTerms: { depositText: '极境车库免押政策' }
           }),
           extractedNetworkErrorSample: extractErrorMessage({ errMsg: 'cloud.callFunction:fail network timeout' }),
-          releaseVersion: CURRENT_VERSION
+          releaseVersion: CURRENT_VERSION,
+          ratioSegmentsSample: calculateRatioSegments([
+            { key: 'a', label: 'A', value: 1 },
+            { key: 'b', label: 'B', value: 1 },
+            { key: 'c', label: 'C', value: 1 }
+          ]),
+          formattedToastTitleSample: formatToastTitle('由于当前网络超时导致车辆排期读取失败，请稍后重试', '加载失败'),
+          hasWxKfValidSample: hasWxKfConfig({ wxKfCorpId: 'ww1234567890abcdef', wxKfExtInfo: 'https://work.weixin.qq.com/kfid/kfc01' }),
+          analyticsAllowedEventCount: ALLOWED_EVENTS.length,
+          maxUploadChunkBytes: MAX_CHUNK_BYTES
         }
       };
 
@@ -8873,6 +8882,181 @@
         '【专属管家】预约详情与全流程支持一键致电专属管家与紧急救援通道'
       ]
     };
+
+    // Aligned with shared/uiFeedback.js, shared/formatTime.js, shared/analytics.js, shared/customerService.js & shared/adminImageUpload.js
+    const MAX_TOAST_TITLE_LENGTH = 10;
+    const DEFAULT_TOAST_TITLE = '操作失败';
+    const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+    const MAX_CHUNK_BYTES = 192 * 1024;
+    let _imageUploadRequestSerial = 0;
+
+    const ALLOWED_EVENTS = [
+      'garage_view',
+      'vehicle_detail',
+      'booking_start',
+      'booking_submit',
+      'favorite_add',
+      'pricing_view',
+      'rental_rules_view',
+      'trusted_profile_view',
+      'phone_call',
+      'kf_chat',
+      'share',
+      'availability_available',
+      'availability_conflict',
+      'availability_shortage',
+      'price_change_view',
+      'availability_unknown',
+      'content_view',
+      'content_vehicle_click',
+      'share_open',
+      'content_booking_start',
+      'content_booking_submit'
+    ];
+    const CONTENT_EVENTS = ['content_view', 'content_vehicle_click', 'share_open', 'content_booking_start', 'content_booking_submit'];
+    const CONTENT_ID_REQUIRED_EVENTS = ['content_view', 'content_vehicle_click', 'content_booking_start', 'content_booking_submit'];
+    const TRACK_COOLDOWN_MS = 5000;
+
+    function createImageUploadRequestId() {
+      _imageUploadRequestSerial += 1;
+      return `image_${Date.now().toString(36)}_${_imageUploadRequestSerial}_${Math.random().toString(36).slice(2, 10)}`;
+    }
+
+    function hasWxKfConfig(config) {
+      const cfg = config && typeof config === 'object' ? config : {};
+      const corpId = String(cfg.wxKfCorpId || '').trim();
+      const extInfo = String(cfg.wxKfExtInfo || '').trim();
+      return isCustomerServiceCorpId(corpId) && isCustomerServiceUrl(extInfo);
+    }
+
+    function formatToastTitle(value, fallback) {
+      const normalize = (v) => String(v || '').trim().replace(/\s+/g, ' ');
+      const truncate = (v) => {
+        const chars = Array.from(v);
+        return chars.length <= MAX_TOAST_TITLE_LENGTH ? v : `${chars.slice(0, MAX_TOAST_TITLE_LENGTH - 1).join('')}…`;
+      };
+      const fallbackTitle = normalize(fallback) || DEFAULT_TOAST_TITLE;
+      const title = normalize(value);
+      if (title && Array.from(title).length <= MAX_TOAST_TITLE_LENGTH) {
+        return title;
+      }
+      return truncate(fallbackTitle);
+    }
+
+    function calculateRatioSegments(segments, customTotal) {
+      const items = Array.isArray(segments) ? segments : [];
+      const total = Number.isFinite(customTotal) && customTotal > 0
+        ? customTotal
+        : items.reduce((sum, item) => sum + (Number(item && item.value) || 0), 0);
+
+      if (!total) {
+        return items.map((item) => ({
+          ...item,
+          percent: 0,
+          percentText: '0%'
+        }));
+      }
+
+      const rawPercents = items.map((item) => ((Number(item && item.value) || 0) / total) * 100);
+      const targetSum = Math.round(rawPercents.reduce((sum, val) => sum + val, 0));
+      const floors = rawPercents.map((val) => Math.floor(val));
+      let remain = targetSum - floors.reduce((sum, n) => sum + n, 0);
+      const order = rawPercents
+        .map((value, index) => ({
+          index,
+          frac: value - floors[index]
+        }))
+        .sort((a, b) => b.frac - a.frac);
+
+      const percents = floors.slice();
+      for (let i = 0; i < remain && i < order.length; i++) {
+        percents[order[i].index] += 1;
+      }
+
+      return items.map((item, index) => ({
+        ...item,
+        percent: percents[index],
+        percentText: `${percents[index]}%`
+      }));
+    }
+
+    function buildSummaryRows(summary) {
+      return String(summary || '')
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => {
+          const separatorIndex = line.indexOf('：');
+          if (separatorIndex < 0) {
+            return { label: '详情', value: line };
+          }
+          return {
+            label: line.slice(0, separatorIndex),
+            value: line.slice(separatorIndex + 1) || '—'
+          };
+        });
+    }
+
+    function normalizeStringArray(input) {
+      if (!Array.isArray(input)) return [];
+      const result = [];
+      input.forEach((item) => {
+        const value = String(item || '').trim();
+        if (value && !result.includes(value)) {
+          result.push(value);
+        }
+      });
+      return result;
+    }
+
+    function formatDisplayTime(value) {
+      if (!value) return '';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '';
+      const year = date.getFullYear();
+      const month = `${date.getMonth() + 1}`.padStart(2, '0');
+      const day = `${date.getDate()}`.padStart(2, '0');
+      const hour = `${date.getHours()}`.padStart(2, '0');
+      const minute = `${date.getMinutes()}`.padStart(2, '0');
+      return `${year}-${month}-${day} ${hour}:${minute}`;
+    }
+
+    function formatShortTime(value) {
+      if (!value) return '—';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '—';
+      const month = `${date.getMonth() + 1}`.padStart(2, '0');
+      const day = `${date.getDate()}`.padStart(2, '0');
+      const hour = `${date.getHours()}`.padStart(2, '0');
+      const minute = `${date.getMinutes()}`.padStart(2, '0');
+      return `${month}-${day} ${hour}:${minute}`;
+    }
+
+    function formatRelativeTime(value) {
+      if (!value) return '';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '';
+      const now = Date.now();
+      const diffMs = now - date.getTime();
+      if (diffMs < 0) return '即将到来';
+      const diffMinutes = Math.floor(diffMs / 60000);
+      if (diffMinutes < 1) return '刚刚';
+      if (diffMinutes < 60) return `${diffMinutes} 分钟前`;
+      const diffHours = Math.floor(diffMinutes / 60);
+      if (diffHours < 24) return `${diffHours} 小时前`;
+      const diffDays = Math.floor(diffHours / 24);
+      if (diffDays < 30) return `${diffDays} 天前`;
+      const diffMonths = Math.floor(diffDays / 30);
+      return `${diffMonths} 个月前`;
+    }
+
+    function formatShortDate(value) {
+      if (!value) return '';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '';
+      const month = `${date.getMonth() + 1}`.padStart(2, '0');
+      const day = `${date.getDate()}`.padStart(2, '0');
+      return `${month}-${day}`;
+    }
 
     function createLRU(max) {
       const map = new Map();

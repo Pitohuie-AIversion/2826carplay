@@ -711,4 +711,52 @@ describe('Web Admin Gateway Sentinel & Operations Center', () => {
     expect(releaseNotes).toEqual(sharedVer.RELEASE_NOTES);
     expect(vm.runInContext('CURRENT_VERSION', sandbox)).toBe(sharedVer.CURRENT_VERSION);
   });
+
+  test('最大余数法分段占比 (Hamilton-Hare)、Toast截断、时间格式化、企微客服配置与分片上传守卫与 shared 完全一致', () => {
+    const sharedUi = require('../shared/uiFeedback');
+    const sharedTime = require('../shared/formatTime');
+    const sharedKf = require('../shared/customerService');
+    const sharedUpload = require('../shared/adminImageUpload');
+
+    // 1. Hamilton-Hare calculateRatioSegments (1, 1, 1 -> sum of percents strictly 100)
+    const segments = [
+      { key: 's1', label: '待排期', value: 1 },
+      { key: 's2', label: '进行中', value: 1 },
+      { key: 's3', label: '已完成', value: 1 }
+    ];
+    const ratioRes = JSON.parse(
+      vm.runInContext(`JSON.stringify(calculateRatioSegments(${JSON.stringify(segments)}))`, sandbox)
+    );
+    expect(ratioRes).toEqual(sharedUi.calculateRatioSegments(segments));
+    expect(ratioRes.reduce((sum, item) => sum + item.percent, 0)).toBe(100);
+
+    // 2. formatToastTitle, buildSummaryRows, normalizeStringArray
+    expect(vm.runInContext('formatToastTitle("这是一个超过十个字符长度的错误提示文案", "保存失败")', sandbox)).toBe(
+      sharedUi.formatToastTitle('这是一个超过十个字符长度的错误提示文案', '保存失败')
+    );
+    const summaryText = '车型：保时捷 911\n门店：上海外滩中心\n备注说明';
+    expect(
+      JSON.parse(vm.runInContext(`JSON.stringify(buildSummaryRows(${JSON.stringify(summaryText)}))`, sandbox))
+    ).toEqual(sharedUi.buildSummaryRows(summaryText));
+    expect(
+      JSON.parse(vm.runInContext('JSON.stringify(normalizeStringArray([" 沪A ", "", "浙A", "沪A"]))', sandbox))
+    ).toEqual(sharedUi.normalizeStringArray([' 沪A ', '', '浙A', '沪A']));
+
+    // 3. formatTime parity
+    const ts = '2026-10-27T10:30:00+08:00';
+    expect(vm.runInContext(`formatDisplayTime("${ts}")`, sandbox)).toBe(sharedTime.formatDisplayTime(ts));
+    expect(vm.runInContext(`formatShortTime("${ts}")`, sandbox)).toBe(sharedTime.formatShortTime(ts));
+    expect(vm.runInContext(`formatShortDate("${ts}")`, sandbox)).toBe(sharedTime.formatShortDate(ts));
+
+    // 4. Customer service & chunked admin upload guardrails
+    const validKf = { wxKfCorpId: 'ww1234567890abcdef', wxKfExtInfo: 'https://work.weixin.qq.com/kfid/kfc01' };
+    const invalidKf = { wxKfCorpId: 'bad', wxKfExtInfo: 'http://insecure.example.com' };
+    expect(vm.runInContext(`hasWxKfConfig(${JSON.stringify(validKf)})`, sandbox)).toBe(sharedKf.hasWxKfConfig(validKf));
+    expect(vm.runInContext(`hasWxKfConfig(${JSON.stringify(invalidKf)})`, sandbox)).toBe(sharedKf.hasWxKfConfig(invalidKf));
+
+    const reqId = vm.runInContext('createImageUploadRequestId()', sandbox);
+    expect(reqId).toMatch(/^image_[a-z0-9]+_\d+_[a-z0-9]+$/);
+    expect(sharedUpload.createImageUploadRequestId()).toMatch(/^image_[a-z0-9]+_\d+_[a-z0-9]+$/);
+    expect(vm.runInContext('ALLOWED_EVENTS.length', sandbox)).toBe(21);
+  });
 });

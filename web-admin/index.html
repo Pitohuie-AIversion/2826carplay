@@ -1815,6 +1815,9 @@
             </div>
             <div class="panel-controls">
               <input type="text" class="search-input" id="vehicleSearch" placeholder="搜索车型 / 车牌号..." oninput="filterVehicles()">
+              <button class="btn-action primary" onclick="openVehicleOnboardModal()">
+                <span>➕</span> 新车入库与车牌校验
+              </button>
               <button class="btn-action" style="border-color: rgba(245, 158, 11, 0.4); color: #fbbf24;" onclick="openMaintenanceAlertModal()">
                 <span>🔧</span> 维保年检与运营预警
               </button>
@@ -3174,6 +3177,80 @@
         <span style="font-size:0.72rem; color:var(--text-dim);">支持 8 维协调状态自动计分排序与 30 网点 GPS 边界校验</span>
         <div style="display:flex; gap:0.65rem;">
           <button class="btn-action" onclick="closeWorkbenchServiceModal()">关闭</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 14: Vehicle Onboarding, Plate Validator & Schema Inspector -->
+  <div class="modal-overlay" id="vehicleOnboardModal">
+    <div class="modal-card" style="max-width: 820px;">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span>🏎️</span> 新车入库上牌、31省车牌校验与全维 Schema 审查中心
+        </div>
+        <button class="modal-close" onclick="closeVehicleOnboardModal()">×</button>
+      </div>
+      <div class="modal-subtitle">
+        对齐 <code style="color:#38bdf8;">shared/vehicle.js</code> (蓝牌/新能源大小车牌正则、性能参数正则与注册日期防未来守卫)、<code style="color:#fbbf24;">shared/vehicleFormProgress.js</code> (5项必填进度) 与 <code style="color:#34d399;">shared/vehicleLabels.js</code> (7大营销角标预设)。
+      </div>
+
+      <div id="vehicleOnboardProgressBanner" style="background: rgba(15, 23, 42, 0.85); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 0.65rem 0.85rem; margin-bottom: 0.75rem; font-size: 0.75rem;">
+        <!-- Populated dynamically -->
+      </div>
+
+      <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:0.65rem;">
+        <div class="modal-field">
+          <label>车牌号码 (plateNumber · 剔除 I/O)</label>
+          <input type="text" class="search-input" id="onboardPlateInput" value="浙AD88888" style="width:100%; font-family:'JetBrains Mono',monospace;" oninput="runVehicleOnboardPreview()">
+        </div>
+        <div class="modal-field">
+          <label>品牌型号 (brandModel · 1-50字)</label>
+          <input type="text" class="search-input" id="onboardBrandInput" value="Porsche Taycan Turbo GT" style="width:100%;" oninput="runVehicleOnboardPreview()">
+        </div>
+        <div class="modal-field">
+          <label>车辆类型 (vehicleType)</label>
+          <select class="search-input" id="onboardTypeSelect" style="width:100%; padding:0.45rem;" onchange="runVehicleOnboardPreview()">
+            <option value="sports">跑车 (sports)</option>
+            <option value="sedan">轿车 (sedan)</option>
+            <option value="suv">SUV (suv)</option>
+            <option value="mpv">MPV (mpv)</option>
+            <option value="truck">卡车 (truck)</option>
+            <option value="other">其他 (other)</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:0.65rem;">
+        <div class="modal-field">
+          <label>注册日期 (registerDate · 禁未来日期)</label>
+          <input type="text" class="search-input" id="onboardRegisterDateInput" value="2026-05-20" style="width:100%; font-family:'JetBrains Mono',monospace;" oninput="runVehicleOnboardPreview()">
+        </div>
+        <div class="modal-field">
+          <label>运营状态 (status)</label>
+          <select class="search-input" id="onboardStatusSelect" style="width:100%; padding:0.45rem;" onchange="runVehicleOnboardPreview()">
+            <option value="active">在用 (active)</option>
+            <option value="idle">闲置 (idle)</option>
+            <option value="maintenance">维修 (maintenance)</option>
+            <option value="retired">停用 (retired)</option>
+          </select>
+        </div>
+        <div class="modal-field">
+          <label>日租金 (priceDay · 0-99999)</label>
+          <input type="text" class="search-input" id="onboardPriceInput" value="5200" style="width:100%; font-family:'JetBrains Mono',monospace;" oninput="runVehicleOnboardPreview()">
+        </div>
+      </div>
+
+      <div class="modal-field">
+        <label>validateVehicle Schema 校验结果与 C 端车牌尾号脱敏标识 (buildVehicleDisplayIdentity)</label>
+        <textarea id="vehicleOnboardResultBox" readonly style="width: 100%; height: 135px; background: rgba(5, 8, 17, 0.85); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: #34d399; font-size: 0.74rem; font-family: 'JetBrains Mono', monospace; padding: 0.65rem; resize: none; line-height: 1.45;"></textarea>
+      </div>
+
+      <div class="modal-footer" style="display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-size:0.72rem; color:var(--text-dim);">支持蓝牌 7 位与新能源绿牌 8 位 (D/F) 正则校验及脱敏尾号生成</span>
+        <div style="display:flex; gap:0.65rem;">
+          <button class="btn-action" onclick="closeVehicleOnboardModal()">关闭</button>
+          <button class="btn-action primary" onclick="submitVehicleOnboardPreview()"><span>✅</span> 模拟入库校验并写审计</button>
         </div>
       </div>
     </div>
@@ -7590,6 +7667,392 @@
     function closeWorkbenchServiceModal() {
       const modal = document.getElementById('workbenchServiceModal');
       if (modal) modal.classList.remove('open');
+    }
+
+    // ==================== 15E. VEHICLE SCHEMA, FORM PROGRESS, LABELS, PRIVACY JOURNEY & ATTRIBUTION (对齐 shared/vehicle.js, vehicleFormProgress.js, vehicleLabels.js, privacy.js, contentAttribution.js) ====================
+    const VEHICLE_TYPES = ['sedan', 'suv', 'mpv', 'sports', 'truck', 'other'];
+    const VEHICLE_STATUSES = ['active', 'idle', 'maintenance', 'retired'];
+    const TRANSMISSION_TYPES = ['manual', 'automatic'];
+    const FUEL_TYPES = ['gasoline', 'electric', 'hybrid'];
+    const ARCHIVE_REVIEW_STATUSES = ['pending', 'reviewed'];
+    const PERFORMANCE_TEXT_FIELDS = ['acceleration', 'horsepower', 'drivetrain', 'torque'];
+    const PERFORMANCE_ACCELERATION_RE = /^\d+(?:\.\d+)?\s*(?:s|秒)?$/i;
+    const PERFORMANCE_HORSEPOWER_RE = /^\d+(?:\.\d+)?\s*(?:ps|hp|kw|千瓦|匹|马力)?$/i;
+    const PERFORMANCE_TORQUE_RE = /^\d+(?:\.\d+)?\s*(?:n·m|nm|牛·米|牛米)?$/i;
+
+    const PUBLIC_ARCHIVE_TEXT_FIELDS = [
+      'publicInspectionSummary',
+      'publicExteriorSummary',
+      'publicInsuranceSummary',
+      'publicAssistanceSummary'
+    ];
+    const INTERNAL_ARCHIVE_TEXT_FIELDS = [
+      'internalMaintenanceRecord',
+      'internalInspectionRecord',
+      'internalInsuranceRecord',
+      'internalArchiveNote'
+    ];
+
+    const VEHICLE_FORM_REQUIRED_FIELDS = [
+      { key: 'plateNumber', label: '车牌号' },
+      { key: 'vehicleType', label: '车辆类型' },
+      { key: 'brandModel', label: '品牌型号' },
+      { key: 'registerDate', label: '注册日期' },
+      { key: 'status', label: '使用状态' }
+    ];
+
+    const PROVINCES = '京津沪渝冀豫云辽黑湘皖鲁新苏浙赣鄂桂甘晋蒙陕吉闽贵粤青藏川宁琼';
+    const ALPHANUM = 'A-HJ-NP-Z0-9';
+    const SPECIAL_END = '挂学警港澳领';
+    const COMMON_PLATE_RE = new RegExp(`^[${PROVINCES}][A-Z][${ALPHANUM}]{4}[${ALPHANUM}${SPECIAL_END}]$`);
+    const NEV_SMALL_RE = new RegExp(`^[${PROVINCES}][A-Z][DF][${ALPHANUM}]{5}$`);
+    const NEV_LARGE_RE = new RegExp(`^[${PROVINCES}][A-Z][${ALPHANUM}]{5}[DF]$`);
+
+    function normalizePlateNumber(input) {
+      return String(input || '').trim().toUpperCase();
+    }
+
+    function isValidPlateNumber(plateNumber) {
+      const plate = normalizePlateNumber(plateNumber);
+      if (!plate || /\s/.test(plate)) return false;
+      return COMMON_PLATE_RE.test(plate) || NEV_SMALL_RE.test(plate) || NEV_LARGE_RE.test(plate);
+    }
+
+    function buildVehicleDisplayIdentity(value) {
+      const vehicleName = String(value || '').trim();
+      if (!isValidPlateNumber(vehicleName)) {
+        return {
+          vehicleName: vehicleName || '预约车辆',
+          vehicleReference: ''
+        };
+      }
+      const plateNumber = normalizePlateNumber(vehicleName);
+      return {
+        vehicleName: '预约车辆',
+        vehicleReference: `车牌尾号 ${plateNumber.slice(-2)}`
+      };
+    }
+
+    function isValidYmdDate(dateStr, options = {}) {
+      const str = String(dateStr || '');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+        return { ok: false, reason: 'FORMAT' };
+      }
+      const [yStr, mStr, dStr] = str.split('-');
+      const year = Number(yStr);
+      const month = Number(mStr);
+      const day = Number(dStr);
+      if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+        return { ok: false, reason: 'FORMAT' };
+      }
+      if (month < 1 || month > 12 || day < 1 || day > 31) {
+        return { ok: false, reason: 'RANGE' };
+      }
+      const date = new Date(year, month - 1, day);
+      if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+        return { ok: false, reason: 'INVALID_DATE' };
+      }
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      if (!options.allowFuture && date.getTime() > today.getTime()) {
+        return { ok: false, reason: 'FUTURE' };
+      }
+      return { ok: true };
+    }
+
+    function buildVehicleFormProgress(form) {
+      const source = form && typeof form === 'object' ? form : {};
+      const hasVal = v => String(v === undefined || v === null ? '' : v).trim().length > 0;
+      const missing = VEHICLE_FORM_REQUIRED_FIELDS.filter(field => !hasVal(source[field.key]));
+      const completed = VEHICLE_FORM_REQUIRED_FIELDS.length - missing.length;
+      const ready = missing.length === 0;
+      return {
+        completed,
+        total: VEHICLE_FORM_REQUIRED_FIELDS.length,
+        percent: Math.round((completed / VEHICLE_FORM_REQUIRED_FIELDS.length) * 100),
+        ready,
+        plateNumberComplete: hasVal(source.plateNumber),
+        vehicleTypeComplete: hasVal(source.vehicleType),
+        brandModelComplete: hasVal(source.brandModel),
+        registerDateComplete: hasVal(source.registerDate),
+        statusComplete: hasVal(source.status),
+        nextField: ready ? '' : missing[0].key,
+        hint: ready ? '必填信息已完整，可以提交' : `下一项：填写${missing[0].label}`
+      };
+    }
+
+    function cleanVehicleTextInput(field, rawValue) {
+      let value = rawValue;
+      if (field === 'brandModel') value = String(value || '').slice(0, 50);
+      if (field === 'location') value = String(value || '').slice(0, 20);
+      if (field === 'vin' || field === 'engineNumber') value = String(value || '').slice(0, 32);
+      if (field === 'publicDrivingTips') value = String(value || '').slice(0, 500);
+      if (field === 'publicDescription' || field === 'note') value = String(value || '').slice(0, 200);
+      if (PUBLIC_ARCHIVE_TEXT_FIELDS.includes(field)) value = String(value || '').slice(0, 200);
+      if (INTERNAL_ARCHIVE_TEXT_FIELDS.includes(field)) value = String(value || '').slice(0, 500);
+      if (field === 'seats') value = String(value || '').replace(/\D/g, '').slice(0, 1);
+      if (field === 'priceDay') value = String(value || '').replace(/\D/g, '').slice(0, 5);
+      return value;
+    }
+
+    function cleanPerformanceValue(field, rawValue) {
+      const value = String(rawValue || '');
+      if (field === 'acceleration') return value.replace(/[^\d.s秒]/g, '').slice(0, 12);
+      if (field === 'horsepower') return value.replace(/[^\d.kKwWpPsShH匹马力千瓦]/g, '').slice(0, 16);
+      if (field === 'torque') return value.replace(/[^\d.nN·mM牛米]/g, '').slice(0, 18);
+      return value.slice(0, 30);
+    }
+
+    function normalizePerformanceInput(raw) {
+      if (raw === undefined) return undefined;
+      const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+      const result = {};
+      PERFORMANCE_TEXT_FIELDS.forEach(field => {
+        const value = String(source[field] == null ? '' : source[field]).trim();
+        result[field] = value || '';
+      });
+      result.highlights = [];
+      if (Object.prototype.hasOwnProperty.call(source, 'highlights')) {
+        const rawHighlights = source.highlights;
+        if (Array.isArray(rawHighlights)) {
+          result.highlights = rawHighlights.map(item => String(item || '').trim()).filter(Boolean);
+        } else if (typeof rawHighlights === 'string' && rawHighlights) {
+          result.highlights = String(rawHighlights).split(/[,，、\n;；]/).map(item => item.trim()).filter(Boolean);
+        }
+      }
+      return result;
+    }
+
+    function normalizeVehicleInput(input) {
+      const payload = input && typeof input === 'object' ? input : {};
+      const optText = f => {
+        if (!Object.prototype.hasOwnProperty.call(payload, f) || payload[f] === undefined) return undefined;
+        return String(payload[f] || '').trim();
+      };
+      const optInt = f => {
+        if (!Object.prototype.hasOwnProperty.call(payload, f) || payload[f] === undefined) return undefined;
+        if (payload[f] === null || String(payload[f]).trim() === '') return null;
+        const s = String(payload[f]).trim();
+        return /^\d+$/.test(s) ? Number(s) : Number.NaN;
+      };
+      const normalized = {
+        plateNumber: normalizePlateNumber(payload.plateNumber),
+        vehicleType: payload.vehicleType,
+        brandModel: String(payload.brandModel || '').trim(),
+        registerDate: String(payload.registerDate || '').trim(),
+        status: payload.status
+      };
+      [
+        'vin', 'engineNumber', 'publicDescription', 'note',
+        'publicMaterialsUpdatedDate', 'publicInspectionDate', 'publicArchiveReviewStatus',
+        'publicDrivingTips', 'archiveDate', 'archiveReview',
+        'location', 'transmission', 'fuelType'
+      ].concat(PUBLIC_ARCHIVE_TEXT_FIELDS).concat(INTERNAL_ARCHIVE_TEXT_FIELDS).forEach(f => {
+        const v = optText(f);
+        if (v !== undefined) normalized[f] = v;
+      });
+      const seats = optInt('seats');
+      if (seats !== undefined) normalized.seats = seats;
+      const priceDay = optInt('priceDay');
+      if (priceDay !== undefined) normalized.priceDay = priceDay;
+      if (payload.rentalDiscountTiers !== undefined) normalized.rentalDiscountTiers = payload.rentalDiscountTiers;
+      const perf = normalizePerformanceInput(payload.performance);
+      if (perf !== undefined) normalized.performance = perf;
+      return normalized;
+    }
+
+    function validateVehicle(input) {
+      const value = normalizeVehicleInput(input);
+      const errors = [];
+      if (input && input.performance != null && (typeof input.performance !== 'object' || Array.isArray(input.performance))) {
+        errors.push({ field: 'performance', message: '性能参数格式不合法' });
+      }
+      if (value.rentalDiscountTiers !== undefined) {
+        const message = validateRentalDiscountTiers(value.rentalDiscountTiers);
+        if (message) errors.push({ field: 'rentalDiscountTiers', message });
+        else value.rentalDiscountTiers = normalizeRentalDiscountTiers(value.rentalDiscountTiers);
+      }
+      ['plateNumber', 'vehicleType', 'brandModel', 'registerDate', 'status'].forEach(field => {
+        const v = value[field];
+        if (v === undefined || v === null || (typeof v === 'string' && !v.trim())) {
+          errors.push({ field, message: '必填字段缺失' });
+        }
+      });
+      if (value.plateNumber && !isValidPlateNumber(value.plateNumber)) {
+        errors.push({ field: 'plateNumber', message: '车牌号格式不合法', value: value.plateNumber });
+      }
+      if (value.vehicleType && !VEHICLE_TYPES.includes(value.vehicleType)) {
+        errors.push({ field: 'vehicleType', message: '车辆类型不合法', value: value.vehicleType, allowed: VEHICLE_TYPES });
+      }
+      if (value.status && !VEHICLE_STATUSES.includes(value.status)) {
+        errors.push({ field: 'status', message: '车辆状态不合法', value: value.status, allowed: VEHICLE_STATUSES });
+      }
+      if (value.transmission && !TRANSMISSION_TYPES.includes(value.transmission)) {
+        errors.push({ field: 'transmission', message: '变速箱类型不合法', value: value.transmission, allowed: TRANSMISSION_TYPES });
+      }
+      if (value.fuelType && !FUEL_TYPES.includes(value.fuelType)) {
+        errors.push({ field: 'fuelType', message: '燃油类型不合法', value: value.fuelType, allowed: FUEL_TYPES });
+      }
+      if (value.brandModel && (value.brandModel.length < 1 || value.brandModel.length > 50)) {
+        errors.push({ field: 'brandModel', message: '品牌型号长度需为 1-50', value: value.brandModel });
+      }
+      if (value.registerDate) {
+        const dateCheck = isValidYmdDate(value.registerDate);
+        if (!dateCheck.ok) {
+          errors.push({
+            field: 'registerDate',
+            message: dateCheck.reason === 'FUTURE' ? '注册日期不得晚于今天' : '注册日期格式不合法（YYYY-MM-DD）',
+            value: value.registerDate,
+            reason: dateCheck.reason
+          });
+        }
+      }
+      if (value.seats !== undefined && value.seats !== null && (!Number.isInteger(value.seats) || value.seats < 1 || value.seats > 9)) {
+        errors.push({ field: 'seats', message: '座位数需为 1-9 的整数', value: value.seats });
+      }
+      if (value.priceDay !== undefined && value.priceDay !== null && (!Number.isInteger(value.priceDay) || value.priceDay < 0 || value.priceDay > 99999)) {
+        errors.push({ field: 'priceDay', message: '日租金需为 0-99999 的整数', value: value.priceDay });
+      }
+      if (value.performance !== undefined && value.performance !== null) {
+        const perf = value.performance;
+        if (perf.acceleration && (String(perf.acceleration).length > 20 || !PERFORMANCE_ACCELERATION_RE.test(String(perf.acceleration)))) {
+          errors.push({ field: 'performance.acceleration', message: '百公里加速格式不合法（如 3.4s 或 6.5）', value: perf.acceleration });
+        }
+        if (perf.horsepower && (String(perf.horsepower).length > 20 || !PERFORMANCE_HORSEPOWER_RE.test(String(perf.horsepower)))) {
+          errors.push({ field: 'performance.horsepower', message: '马力格式不合法（如 450Ps、300kW、280匹）', value: perf.horsepower });
+        }
+        if (perf.torque && (String(perf.torque).length > 20 || !PERFORMANCE_TORQUE_RE.test(String(perf.torque)))) {
+          errors.push({ field: 'performance.torque', message: '扭矩格式不合法（如 530N·m、380牛米）', value: perf.torque });
+        }
+      }
+      if (errors.length) {
+        return { ok: false, code: 'VALIDATION_ERROR', message: '参数校验失败', details: { errors } };
+      }
+      return { ok: true, value };
+    }
+
+    const MARKETING_BADGE_PRESETS = [
+      { key: 'new_arrival', label: '新车到店', color: 'badge-cyan' },
+      { key: 'zero_deposit', label: '免押金', color: 'badge-emerald' },
+      { key: 'featured_hot', label: '特惠爆款', color: 'badge-amber' },
+      { key: 'track_ready', label: '赛道级性能', color: 'badge-purple' },
+      { key: 'convertible', label: '敞篷体验', color: 'badge-rose' },
+      { key: 'carplay_ready', label: 'CarPlay', color: 'badge-blue' },
+      { key: 'long_term_deal', label: '长租特惠', color: 'badge-gold' }
+    ];
+
+    function resolveMarketingBadges(car) {
+      if (!car || typeof car !== 'object') return [];
+      const badges = [];
+      if (Array.isArray(car.badges)) {
+        car.badges.forEach(b => {
+          if (typeof b === 'string' && b.trim()) {
+            const found = MARKETING_BADGE_PRESETS.find(p => p.key === b || p.label === b);
+            badges.push(found ? { ...found } : { key: b, label: b, color: 'badge-default' });
+          } else if (b && typeof b === 'object' && b.label) {
+            badges.push({
+              key: b.key || b.label,
+              label: b.label,
+              color: b.color || 'badge-default'
+            });
+          }
+        });
+      }
+      return badges;
+    }
+
+    function buildRequestJourney(statusInput) {
+      const status = String(statusInput || 'pending');
+      if (status === 'processing') {
+        return { journeyStage: 2, journeyProgress: 67, journeyClass: 'request-journey-processing', journeyHint: '正在核实中' };
+      }
+      if (status === 'completed') {
+        return { journeyStage: 3, journeyProgress: 100, journeyClass: 'request-journey-completed', journeyHint: '已完成处理' };
+      }
+      if (status === 'rejected') {
+        return { journeyStage: 3, journeyProgress: 100, journeyClass: 'request-journey-rejected', journeyHint: '申请未通过' };
+      }
+      if (status === 'cancelled') {
+        return { journeyStage: 1, journeyProgress: 0, journeyClass: 'request-journey-cancelled', journeyHint: '用户已撤回' };
+      }
+      return { journeyStage: 1, journeyProgress: 33, journeyClass: 'request-journey-pending', journeyHint: '排队待处理' };
+    }
+
+    const ATTRIBUTION_CHANNELS = ['direct', 'wechat_share', 'moments', 'qr', 'official_account', 'campaign'];
+    const ATTRIBUTION_SCENES = ['weekend_trip', 'business_reception', 'group_travel', 'ev_experience'];
+    const ATTRIBUTION_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+
+    function sanitizeAttribution(input) {
+      const source = input && typeof input === 'object' ? input : {};
+      const normEnum = (val, allowed) => {
+        const text = String(val || '').trim().slice(0, 32);
+        return allowed.includes(text) ? text : '';
+      };
+      const normId = val => {
+        const text = String(val || '').trim();
+        return ATTRIBUTION_ID_PATTERN.test(text) ? text : '';
+      };
+      return {
+        channel: normEnum(source.channel, ATTRIBUTION_CHANNELS),
+        scene: normEnum(source.scene, ATTRIBUTION_SCENES),
+        contentId: normId(source.contentId),
+        vehicleId: normId(source.vehicleId || source.carId)
+      };
+    }
+
+    function runVehicleOnboardPreview(overrideForm) {
+      const form = overrideForm || {
+        plateNumber: (document.getElementById('onboardPlateInput') && document.getElementById('onboardPlateInput').value) || '浙AD88888',
+        brandModel: (document.getElementById('onboardBrandInput') && document.getElementById('onboardBrandInput').value) || 'Porsche Taycan Turbo GT',
+        vehicleType: (document.getElementById('onboardTypeSelect') && document.getElementById('onboardTypeSelect').value) || 'sports',
+        registerDate: (document.getElementById('onboardRegisterDateInput') && document.getElementById('onboardRegisterDateInput').value) || '2026-05-20',
+        status: (document.getElementById('onboardStatusSelect') && document.getElementById('onboardStatusSelect').value) || 'active',
+        priceDay: (document.getElementById('onboardPriceInput') && document.getElementById('onboardPriceInput').value) || '5200',
+        performance: { acceleration: '2.2s', horsepower: '1108Ps', torque: '1340N·m', drivetrain: '双电机四驱' }
+      };
+      const progress = buildVehicleFormProgress(form);
+      const validation = validateVehicle(form);
+      const identity = buildVehicleDisplayIdentity(form.plateNumber);
+      const badges = resolveMarketingBadges({ badges: ['new_arrival', 'track_ready', 'zero_deposit'] });
+
+      const bannerEl = document.getElementById('vehicleOnboardProgressBanner');
+      if (bannerEl) {
+        bannerEl.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span>📋 必填字段完成度：<strong>${progress.completed}/${progress.total} (${progress.percent}%)</strong> · ${progress.hint}</span>
+            <span class="status-pill ${validation.ok ? 'active' : 'maint'}">${validation.ok ? '✔ Schema 校验通过' : '✘ 存在校验错误'}</span>
+          </div>
+        `;
+      }
+      const boxEl = document.getElementById('vehicleOnboardResultBox');
+      if (boxEl) {
+        boxEl.value = JSON.stringify({ progress, validation, displayIdentity: identity, marketingBadges: badges }, null, 2);
+      }
+      return { progress, validation, displayIdentity: identity, marketingBadges: badges };
+    }
+
+    function openVehicleOnboardModal() {
+      const res = runVehicleOnboardPreview();
+      const modal = document.getElementById('vehicleOnboardModal');
+      if (modal) modal.classList.add('open');
+      return res;
+    }
+
+    function closeVehicleOnboardModal() {
+      const modal = document.getElementById('vehicleOnboardModal');
+      if (modal) modal.classList.remove('open');
+    }
+
+    function submitVehicleOnboardPreview() {
+      const res = runVehicleOnboardPreview();
+      if (!res.validation.ok) {
+        showToast(`新车入库参数校验未通过：${res.validation.details.errors[0].message}`, '⚠️');
+        return res;
+      }
+      recordProbeHistory('vehicleCreate', 200, 29, 'VEHICLE_VALIDATED');
+      appendLogStreamEntry('VEHICLE_ONBOARD', 'vehicleCreate', 200, `新车 ${res.validation.value.brandModel} (${res.validation.value.plateNumber}) 通过 Schema 校验`, 29);
+      showToast(`已通过【${res.validation.value.brandModel}】全维 Schema 入库校验！`, '🏎️');
+      return res;
     }
 
     // ==================== 16. TOAST & TIMING ====================

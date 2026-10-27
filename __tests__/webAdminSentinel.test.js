@@ -543,4 +543,50 @@ describe('Web Admin Gateway Sentinel & Operations Center', () => {
     );
     expect(httpErr).toEqual({ field: 'wxKfExtInfo', message: '微信客服链接须为 HTTPS 地址' });
   });
+
+  test('新车入库 31 省蓝牌/绿牌正则、5项必填进度、7类营销角标及隐私旅程与 shared/vehicle.js 等一致', () => {
+    const sharedVehicle = require('../shared/vehicle');
+    const sharedProgress = require('../shared/vehicleFormProgress');
+    const sharedLabels = require('../shared/vehicleLabels');
+    const sharedPrivacy = require('../shared/privacy');
+    const sharedAttr = require('../shared/contentAttribution');
+
+    const sampleForm = {
+      plateNumber: '浙AD88888',
+      brandModel: 'Porsche Taycan Turbo GT',
+      vehicleType: 'sports',
+      registerDate: '2026-05-20',
+      status: 'active',
+      priceDay: '5200',
+      performance: { acceleration: '2.2s', horsepower: '1108Ps', torque: '1340N·m', drivetrain: '双电机四驱' }
+    };
+
+    const onboardRes = JSON.parse(
+      vm.runInContext(`JSON.stringify(runVehicleOnboardPreview(${JSON.stringify(sampleForm)}))`, sandbox)
+    );
+    expect(onboardRes.progress).toEqual(sharedProgress.buildVehicleFormProgress(sampleForm));
+    expect(onboardRes.validation).toEqual(sharedVehicle.validateVehicle(sampleForm));
+    expect(onboardRes.displayIdentity).toEqual(sharedVehicle.buildVehicleDisplayIdentity('浙AD88888'));
+    expect(onboardRes.displayIdentity.vehicleReference).toBe('车牌尾号 88');
+
+    // Invalid plate containing 'I' or 'O' must fail
+    const badPlateValid = vm.runInContext('isValidPlateNumber("浙AI8888")', sandbox);
+    expect(badPlateValid).toBe(false);
+    expect(sharedVehicle.isValidPlateNumber('浙AI8888')).toBe(false);
+
+    // Marketing badges
+    expect(onboardRes.marketingBadges).toEqual(
+      sharedLabels.resolveMarketingBadges({ badges: ['new_arrival', 'track_ready', 'zero_deposit'] })
+    );
+
+    // Privacy journey & Content Attribution
+    const actualJourney = JSON.parse(vm.runInContext('JSON.stringify(buildRequestJourney("processing"))', sandbox));
+    expect(actualJourney).toEqual(sharedPrivacy.buildRequestJourney('processing'));
+
+    const rawAttr = { channel: 'wechat_share', scene: 'weekend_trip', contentId: 'guide_2026', vehicleId: 'v1' };
+    const actualAttr = JSON.parse(
+      vm.runInContext(`JSON.stringify(sanitizeAttribution(${JSON.stringify(rawAttr)}))`, sandbox)
+    );
+    expect(actualAttr).toEqual(sharedAttr.sanitizeAttribution(rawAttr));
+  });
 });

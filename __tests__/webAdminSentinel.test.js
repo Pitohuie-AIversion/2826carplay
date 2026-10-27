@@ -759,4 +759,43 @@ describe('Web Admin Gateway Sentinel & Operations Center', () => {
     expect(sharedUpload.createImageUploadRequestId()).toMatch(/^image_[a-z0-9]+_\d+_[a-z0-9]+$/);
     expect(vm.runInContext('ALLOWED_EVENTS.length', sandbox)).toBe(21);
   });
+
+  test('运营攻略草稿 Schema 校验、主包 1.75MiB 水位线预算与敏感凭据扫描守卫与 scripts 完全一致', () => {
+    const contentValidate = require('../scripts/contentDraftsValidate');
+    const pkgBudget = require('../scripts/checkMiniProgramPackage');
+    const secretScan = require('../scripts/checkRepositorySecrets');
+
+    // 1. All 5 canonical drafts normalize & validate identically
+    expect(JSON.parse(vm.runInContext('JSON.stringify(CANONICAL_GUIDE_SLUGS)', sandbox))).toEqual(
+      contentValidate.DRAFTS.map((d) => d.slug)
+    );
+    contentValidate.DRAFTS.forEach((draft) => {
+      const normWeb = JSON.parse(
+        vm.runInContext(`JSON.stringify(normalizeGuide(${JSON.stringify(draft)}))`, sandbox)
+      );
+      const normScript = contentValidate.normalizeGuide(draft);
+      expect(normWeb).toEqual(normScript);
+      expect(JSON.parse(vm.runInContext(`JSON.stringify(validateGuide(${JSON.stringify(normWeb)}))`, sandbox))).toEqual(
+        contentValidate.validateGuide(normScript)
+      );
+    });
+
+    // 2. Package budget thresholds (1.75 MiB warning, 2.00 MiB hard limit)
+    expect(vm.runInContext('PACKAGE_HARD_LIMIT_BYTES', sandbox)).toBe(pkgBudget.HARD_LIMIT_BYTES);
+    expect(vm.runInContext('PACKAGE_WARNING_LIMIT_BYTES', sandbox)).toBe(pkgBudget.WARNING_LIMIT_BYTES);
+    expect(vm.runInContext('formatMiB(1488977)', sandbox)).toBe(pkgBudget.formatMiB(1488977));
+    expect(vm.runInContext('evaluatePackageBudgetStatus(1488977)', sandbox)).toBe('pass');
+    expect(vm.runInContext(`evaluatePackageBudgetStatus(${pkgBudget.WARNING_LIMIT_BYTES})`, sandbox)).toBe('warning');
+    expect(vm.runInContext(`evaluatePackageBudgetStatus(${pkgBudget.HARD_LIMIT_BYTES})`, sandbox)).toBe('fail');
+
+    // 3. Repository secret scanner parity
+    const leakSample = 'const appsecret = "wx_live_secret_998877";\n-----BEGIN RSA PRIVATE KEY-----';
+    const placeholderSample = 'const appsecret = "your_placeholder_secret";';
+    expect(
+      JSON.parse(vm.runInContext(`JSON.stringify(findContentViolations(${JSON.stringify(leakSample)}, "cfg.js"))`, sandbox))
+    ).toEqual(secretScan.findContentViolations(leakSample, 'cfg.js'));
+    expect(
+      JSON.parse(vm.runInContext(`JSON.stringify(findContentViolations(${JSON.stringify(placeholderSample)}, "cfg.js"))`, sandbox))
+    ).toEqual(secretScan.findContentViolations(placeholderSample, 'cfg.js'));
+  });
 });

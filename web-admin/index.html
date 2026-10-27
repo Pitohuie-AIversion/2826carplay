@@ -8855,7 +8855,10 @@
           formattedToastTitleSample: formatToastTitle('由于当前网络超时导致车辆排期读取失败，请稍后重试', '加载失败'),
           hasWxKfValidSample: hasWxKfConfig({ wxKfCorpId: 'ww1234567890abcdef', wxKfExtInfo: 'https://work.weixin.qq.com/kfid/kfc01' }),
           analyticsAllowedEventCount: ALLOWED_EVENTS.length,
-          maxUploadChunkBytes: MAX_CHUNK_BYTES
+          maxUploadChunkBytes: MAX_CHUNK_BYTES,
+          packageBudgetStatusAt142MiB: evaluatePackageBudgetStatus(Math.floor(1.42 * 1024 * 1024)),
+          canonicalGuideCount: CANONICAL_GUIDE_SLUGS.length,
+          secretViolationBlockedSample: findContentViolations('const api_key = "prod_live_99887766";', 'config.js').length === 1
         }
       };
 
@@ -9171,6 +9174,86 @@
         return rawMsg;
       }
       return fallback;
+    }
+
+    // Aligned with scripts/contentDraftsValidate.js, scripts/checkMiniProgramPackage.js & scripts/checkRepositorySecrets.js
+    const CONTENT_TYPES = ['route', 'guide', 'vehicle_advice', 'handover_guide', 'vehicle_tip'];
+    const SCENARIOS = ['weekend_trip', 'business_reception', 'group_travel', 'ev_experience', 'handover_tips'];
+    const GUIDE_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+    const CANONICAL_GUIDE_SLUGS = [
+      'weekend-short-trip-prep-2026',
+      'business-reception-guide-2026',
+      'ev-first-rental-tips-2026',
+      'long-distance-road-trip-2026',
+      'handover-checklist-2026'
+    ];
+    const PACKAGE_HARD_LIMIT_BYTES = 2 * 1024 * 1024;
+    const PACKAGE_WARNING_LIMIT_BYTES = Math.floor(1.75 * 1024 * 1024);
+    const PRIVATE_KEY_PATTERN = /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/;
+    const SECRET_ASSIGNMENT_PATTERN =
+      /["']?(appsecret|app_secret|secretkey|secret_key|private_key|apikey|api_key|access_token|bootstrap_token)["']?\s*[:=]\s*["']([^"'\r\n]+)["']/gi;
+    const PLACEHOLDER_PATTERN =
+      /(?:example|sample|dummy|test|placeholder|replace|your[_-]|change[_-]?me|not[_-]?a[_-]?secret)/i;
+
+    function normalizeGuide(input) {
+      const text = (v, max) => String(v || '').trim().slice(0, max);
+      const strings = (v, maxItems, maxLength) =>
+        Array.from(new Set((Array.isArray(v) ? v : []).map((item) => text(item, maxLength)).filter(Boolean))).slice(0, maxItems);
+      return {
+        slug: text(input.slug, 64),
+        title: text(input.title, 100),
+        summary: text(input.summary, 300),
+        body: text(input.body, 20000),
+        contentType: text(input.contentType, 32),
+        scenario: text(input.scenario, 32),
+        vehicleIds: strings(input.vehicleIds, 20, 64).filter((id) => GUIDE_ID_PATTERN.test(id)),
+        tags: strings(input.tags, 20, 30),
+        shareTitle: text(input.shareTitle, 100)
+      };
+    }
+
+    function validateGuide(guide) {
+      const fields = [];
+      if (!GUIDE_ID_PATTERN.test(guide.slug)) fields.push(`slug(${guide.slug})`);
+      if (!guide.title) fields.push('title');
+      if (!guide.summary) fields.push('summary');
+      if (!guide.body) fields.push('body');
+      if (!CONTENT_TYPES.includes(guide.contentType)) fields.push(`contentType(${guide.contentType})`);
+      if (!SCENARIOS.includes(guide.scenario)) fields.push(`scenario(${guide.scenario})`);
+      return fields;
+    }
+
+    function formatMiB(bytes) {
+      return `${(Number(bytes || 0) / 1024 / 1024).toFixed(2)} MiB`;
+    }
+
+    function evaluatePackageBudgetStatus(mainPackageBytes) {
+      if (mainPackageBytes >= PACKAGE_HARD_LIMIT_BYTES) return 'fail';
+      if (mainPackageBytes >= PACKAGE_WARNING_LIMIT_BYTES) return 'warning';
+      return 'pass';
+    }
+
+    function findContentViolations(source, relativePath) {
+      const violations = [];
+      if (PRIVATE_KEY_PATTERN.test(source)) {
+        violations.push({
+          path: relativePath,
+          reason: '包含私钥正文'
+        });
+      }
+      SECRET_ASSIGNMENT_PATTERN.lastIndex = 0;
+      let match = SECRET_ASSIGNMENT_PATTERN.exec(source);
+      while (match) {
+        const value = String(match[2] || '').trim();
+        if (value && !PLACEHOLDER_PATTERN.test(value)) {
+          violations.push({
+            path: relativePath,
+            reason: `疑似硬编码敏感配置：${match[1]}`
+          });
+        }
+        match = SECRET_ASSIGNMENT_PATTERN.exec(source);
+      }
+      return violations;
     }
 
     function openArchitectureGuardModal(defaultStatus = 'quoted') {

@@ -798,4 +798,53 @@ describe('Web Admin Gateway Sentinel & Operations Center', () => {
       JSON.parse(vm.runInContext(`JSON.stringify(findContentViolations(${JSON.stringify(placeholderSample)}, "cfg.js"))`, sandbox))
     ).toEqual(secretScan.findContentViolations(placeholderSample, 'cfg.js'));
   });
+
+  test('云函数 Node.js 运行时生命周期守卫、37条推荐索引清单与全栈增量发布参数守卫与 scripts 完全一致', () => {
+    const runtimeCheck = require('../scripts/cloudRuntimeCheck');
+    const dbIndexCheck = require('../scripts/checkDatabaseIndexes');
+
+    // 1. Runtime lifecycle check (Nodejs24.11 active vs Nodejs16.13 EOL vs missing runtime)
+    expect(vm.runInContext('DEFAULT_RUNTIME', sandbox)).toBe(runtimeCheck.DEFAULT_RUNTIME);
+    const sampleRc = {
+      functions: [
+        { name: 'bookingCreate', runtime: 'Nodejs24.11' },
+        { name: 'legacyFn', runtime: 'Nodejs16.13' },
+        { name: 'missingRuntimeFn' }
+      ]
+    };
+    const webRuntimeRes = JSON.parse(
+      vm.runInContext(
+        `JSON.stringify(checkRuntimeConfiguration(${JSON.stringify(sampleRc)}, new Date("2026-10-27T00:00:00Z")))`,
+        sandbox
+      )
+    );
+    const scriptRuntimeRes = runtimeCheck.checkRuntimeConfiguration(sampleRc, new Date('2026-10-27T00:00:00Z'));
+    expect(webRuntimeRes).toEqual(scriptRuntimeRes);
+    expect(webRuntimeRes.exitCode).toBe(1);
+    expect(webRuntimeRes.issues.map((i) => i.code)).toEqual(['RUNTIME_EOL', 'RUNTIME_MISSING']);
+
+    // 2. 37 recommended database indexes parity
+    const webIndexes = JSON.parse(vm.runInContext('JSON.stringify(RECOMMENDED_INDEXES)', sandbox));
+    expect(webIndexes).toEqual(dbIndexCheck.RECOMMENDED_INDEXES);
+    expect(webIndexes.length).toBe(37);
+
+    // 3. Deployment option validation (--apply vs --dry-run, mutually exclusive scopes, unknown cloud function)
+    const conflictIssues = JSON.parse(
+      vm.runInContext(
+        'JSON.stringify(validateDeploymentOptions({ "--apply": true, "--dry-run": true, "--functions-only": true, "--admin-only": true }, [], "cloud1-d8gtmns36320e045e", ["unknownFn"]))',
+        sandbox
+      )
+    );
+    expect(conflictIssues).toContain('--apply 不能与演练模式同时使用');
+    expect(conflictIssues).toContain('函数、规则与静态托管的限定范围不能同时指定');
+    expect(conflictIssues).toContain('未知或无效云函数：unknownFn');
+
+    const validIssues = JSON.parse(
+      vm.runInContext(
+        'JSON.stringify(validateDeploymentOptions({ "--apply": true, "--functions-only": true }, [], "cloud1-d8gtmns36320e045e", ["bookingCreate", "vehicleList"]))',
+        sandbox
+      )
+    );
+    expect(validIssues).toEqual([]);
+  });
 });

@@ -8784,6 +8784,52 @@
       page._nativeActionExclusiveSerials = {};
     }
 
+    const RECOMMENDED_INDEXES = [
+      { collection: 'admin_upload_sessions', fields: ['expiresAt'], unique: false, category: 'cleanup', priority: 'blocking', requiredInDeclaration: true },
+      { collection: 'admin_upload_sessions', fields: ['openid', 'expiresAt'], unique: false, category: 'cleanup', priority: 'blocking', requiredInDeclaration: true },
+      { collection: 'analytics_events', fields: ['createdAt'], unique: false, category: 'performance', priority: 'medium' },
+      { collection: 'audit_logs', fields: ['createdAt'], unique: false, category: 'performance', priority: 'medium' },
+      { collection: 'audit_logs', fields: ['action'], unique: false, category: 'performance', priority: 'low' },
+      { collection: 'error_logs', fields: ['createdAt'], unique: false, category: 'performance', priority: 'medium' },
+      { collection: 'error_logs', fields: ['function'], unique: false, category: 'performance', priority: 'low' },
+      { collection: 'favorites', fields: ['openid', 'createdAt'], unique: false, category: 'performance', priority: 'medium' },
+      { collection: 'favorites', fields: ['openid', 'vehicleId'], unique: false, category: 'correctness', priority: 'high' },
+      { collection: 'bookings', fields: ['openid', 'createdAt'], unique: false, category: 'performance', priority: 'high' },
+      { collection: 'bookings', fields: ['createdAt'], unique: false, category: 'performance', priority: 'medium' },
+      { collection: 'bookings', fields: ['vehicleId'], unique: false, category: 'performance', priority: 'high' },
+      { collection: 'bookings', fields: ['status', 'createdAt'], unique: false, category: 'performance', priority: 'medium' },
+      { collection: 'bookings', fields: ['status', 'coordinationStatus'], unique: false, category: 'performance', priority: 'low' },
+      { collection: 'bookings', fields: ['startDate', 'endDate'], unique: false, category: 'performance', priority: 'high' },
+      { collection: 'booking_quotes', fields: ['bookingId', 'version'], unique: false, category: 'correctness', priority: 'high' },
+      { collection: 'booking_quotes', fields: ['bookingId', 'status'], unique: false, category: 'performance', priority: 'medium' },
+      { collection: 'booking_quotes', fields: ['sentAt'], unique: false, category: 'performance', priority: 'low' },
+      { collection: 'booking_handovers', fields: ['bookingId', 'stage', 'version'], unique: false, category: 'correctness', priority: 'high' },
+      { collection: 'booking_handovers', fields: ['bookingId', 'status'], unique: false, category: 'performance', priority: 'medium' },
+      { collection: 'content_guides', fields: ['slug'], unique: true, category: 'correctness', priority: 'blocking' },
+      { collection: 'content_guides', fields: ['status', 'publishedAt'], unique: false, category: 'performance', priority: 'high' },
+      { collection: 'content_guides', fields: ['scenario', 'status'], unique: false, category: 'performance', priority: 'medium' },
+      { collection: 'vehicle_availability_blocks', fields: ['status', 'startDate', 'endDate'], unique: false, category: 'performance', priority: 'high' },
+      { collection: 'vehicle_availability_blocks', fields: ['vehicleId', 'status'], unique: false, category: 'performance', priority: 'high' },
+      { collection: 'vehicle_calendar_days', fields: ['blockId'], unique: false, category: 'performance', priority: 'medium' },
+      { collection: 'vehicle_calendar_days', fields: ['bookingId'], unique: false, category: 'performance', priority: 'medium' },
+      { collection: 'vehicle_price_rules', fields: ['vehicleId', 'status'], unique: false, category: 'performance', priority: 'medium' },
+      { collection: 'privacy_requests', fields: ['openid', 'createdAt'], unique: false, category: 'performance', priority: 'medium' },
+      { collection: 'privacy_requests', fields: ['createdAt'], unique: false, category: 'performance', priority: 'low' },
+      { collection: 'roles', fields: ['openid'], unique: true, category: 'correctness', priority: 'blocking' },
+      { collection: 'vehicles', fields: ['plateNumber'], unique: true, category: 'correctness', priority: 'blocking' },
+      { collection: 'vehicles', fields: ['updatedAt'], unique: false, category: 'performance', priority: 'low' },
+      { collection: 'app_configs', fields: ['key'], unique: true, category: 'correctness', priority: 'blocking' },
+      { collection: 'app_configs', fields: ['updatedAt'], unique: false, category: 'performance', priority: 'low' },
+      { collection: 'pending_file_deletions', fields: ['status', 'createdAt'], unique: false, category: 'performance', priority: 'high' },
+      { collection: 'pending_file_deletions', fields: ['source', 'notBeforeAt'], unique: false, category: 'performance', priority: 'medium' }
+    ];
+
+    function indexKey(idx) {
+      const uniqTag = idx.unique ? ':unique' : '';
+      return `${idx.collection}:${idx.fields.join('+')}${uniqTag}`;
+    }
+
+
     function onArchBookingStatusChange(status = 'quoted') {
       const journey = buildJourneyProgress(status);
       const steps = buildProgressSteps(status);
@@ -8858,7 +8904,12 @@
           maxUploadChunkBytes: MAX_CHUNK_BYTES,
           packageBudgetStatusAt142MiB: evaluatePackageBudgetStatus(Math.floor(1.42 * 1024 * 1024)),
           canonicalGuideCount: CANONICAL_GUIDE_SLUGS.length,
-          secretViolationBlockedSample: findContentViolations('const api_key = "prod_live_99887766";', 'config.js').length === 1
+          secretViolationBlockedSample: findContentViolations('const api_key = "prod_live_99887766";', 'config.js').length === 1,
+          recommendedIndexCount: RECOMMENDED_INDEXES.length,
+          runtimeCheckHealthy: checkRuntimeConfiguration(
+            { functions: [{ name: 'bookingCreate', runtime: DEFAULT_RUNTIME }] },
+            new Date('2026-10-27T00:00:00Z')
+          ).exitCode === 0
         }
       };
 
@@ -9254,6 +9305,82 @@
         match = SECRET_ASSIGNMENT_PATTERN.exec(source);
       }
       return violations;
+    }
+
+    // Aligned with scripts/cloudRuntimeCheck.js, scripts/checkDatabaseIndexes.js & scripts/deployAll.js
+    const DEFAULT_RUNTIME = 'Nodejs24.11';
+    const RUNTIME_END_OF_LIFE = Object.freeze({
+      'Nodejs16.13': '2023-09-11',
+      'Nodejs18.15': '2025-04-30',
+      'Nodejs20.19': '2026-04-30',
+      'Nodejs22.21': '2027-04-30',
+      'Nodejs24.11': '2028-04-30'
+    });
+
+    function checkRuntimeConfiguration(rc, now = new Date()) {
+      const issues = [];
+      const functions = rc && Array.isArray(rc.functions) ? rc.functions : [];
+      const validClock = now instanceof Date && Number.isFinite(now.getTime());
+      const checkedOn = validClock ? now.toISOString().slice(0, 10) : '';
+      if (!validClock) {
+        issues.push({ code: 'CLOCK_INVALID', message: '检查时间无效，不能确认运行时维护状态' });
+      } else if (!functions.length) {
+        issues.push({ code: 'CONFIG_INVALID', message: 'cloudbaserc.json 必须包含非空 functions 数组' });
+      } else {
+        functions.forEach((fn, index) => {
+          const name = fn && typeof fn.name === 'string' ? fn.name : `functions[${index}]`;
+          const runtime = fn && fn.runtime;
+          if (runtime == null || (typeof runtime === 'string' && !runtime.trim())) {
+            issues.push({ name, runtime, code: 'RUNTIME_MISSING', message: '必须显式配置 runtime，不能依赖平台默认版本' });
+            return;
+          }
+          if (typeof runtime !== 'string' || !Object.prototype.hasOwnProperty.call(RUNTIME_END_OF_LIFE, runtime)) {
+            issues.push({ name, runtime, code: 'RUNTIME_UNKNOWN', message: '运行时尚未登记，请核对官方支持及维护期限后更新策略' });
+            return;
+          }
+          const endOfLife = RUNTIME_END_OF_LIFE[runtime];
+          if (checkedOn >= endOfLife) {
+            issues.push({ name, runtime, code: 'RUNTIME_EOL', endOfLife, message: `Node.js 已到维护截止日期 ${endOfLife}` });
+          }
+        });
+      }
+      return { exitCode: issues.length ? 1 : 0, total: functions.length, checkedOn, issues };
+    }
+
+    function validateDeploymentOptions(flags = {}, positionals = [], envId = 'cloud1-d8gtmns36320e045e', targetFunctions = null) {
+      const booleanFlags = ['--apply', '--force', '--clean-cache', '--functions-only', '--fns', '--rules-only', '--admin-only', '--dry', '--dry-run'];
+      const allowed = new Set(booleanFlags.concat('--env', '--fn'));
+      const issues = [];
+      for (const key of Object.keys(flags)) {
+        if (!allowed.has(key)) issues.push(`未知参数：${key}`);
+        else if (booleanFlags.includes(key) && flags[key] !== true) issues.push(`${key} 不接受参数值`);
+      }
+      if (positionals.length) issues.push('参数值请使用 --env=<环境> 或 --fn=<函数> 格式');
+      for (const key of ['--env', '--fn']) {
+        if (Object.prototype.hasOwnProperty.call(flags, key) && (typeof flags[key] !== 'string' || !flags[key].trim())) {
+          issues.push(`${key} 缺少有效参数值`);
+        }
+      }
+      if (typeof envId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(envId)) {
+        issues.push('云环境 ID 格式无效');
+      }
+      if (flags['--apply'] && (flags['--dry'] || flags['--dry-run'])) {
+        issues.push('--apply 不能与演练模式同时使用');
+      }
+      const functionScope = Boolean(flags['--functions-only'] || flags['--fns'] || Object.prototype.hasOwnProperty.call(flags, '--fn'));
+      if ([functionScope, Boolean(flags['--rules-only']), Boolean(flags['--admin-only'])].filter(Boolean).length > 1) {
+        issues.push('函数、规则与静态托管的限定范围不能同时指定');
+      }
+      if (targetFunctions != null) {
+        if (!Array.isArray(targetFunctions) || !targetFunctions.length) {
+          issues.push('必须明确指定至少一个云函数名称');
+        } else {
+          const available = new Set(CLOUD_MICROSERVICES.map((m) => m.name));
+          const invalid = targetFunctions.filter((name) => typeof name !== 'string' || !/^[A-Za-z0-9_-]+$/.test(name) || !available.has(name));
+          if (invalid.length) issues.push(`未知或无效云函数：${invalid.join(', ')}`);
+        }
+      }
+      return issues;
     }
 
     function openArchitectureGuardModal(defaultStatus = 'quoted') {

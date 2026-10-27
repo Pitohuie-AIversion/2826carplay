@@ -37,7 +37,7 @@
 
 ### 2.4 包体积与性能预算 (Package Footprint Budget)
 - **严守 1.75 MiB 安全预警水位线**：微信主包硬性上限为 2.0 MiB，本项目设定 1.75 MiB 安全警戒线。
-- **管理端独立分包**：所有管理端页面与资源统一收敛至 `pages-admin` 独立分包（当前约为 0.66 MiB），主包体积稳定保持在 **1.24 MiB**（留有 **0.76 MiB** 充裕余量）。
+- **管理端独立分包**：所有管理端页面与资源统一收敛至 `pages-admin` 独立分包（当前约为 0.68 MiB），主包体积稳定保持在 **1.42 MiB**（留有 **0.58 MiB** 充裕余量）。
 - 严禁向主包引入未经压缩的大于 100 KB 的位图资源或冗余外部依赖。
 
 ---
@@ -49,7 +49,7 @@
 - **规则**：若修改了此类共享文件，必须同步更新所有对应云函数包中的对应文件；对于纯小程序端展示的枚举和文案，建议收敛在 [shared/vehicleLabels.js](file:///g:/Autosave/2826carplay/shared/vehicleLabels.js) 与 [shared/bookingStatus.js](file:///g:/Autosave/2826carplay/shared/bookingStatus.js) 中，避免破坏云函数字节同步。
 
 ### 3.2 运行时与 SDK 锁文件
-- 56 个云函数本地目标运行时统一为 `Node.js 20.19`，固定依赖 `wx-server-sdk@4.0.2`，每个函数目录下均包含独立的 `package.json` 与 `package-lock.json`，严禁使用浮动版本（`^`、`~`）。
+- 57 个云函数本地目标运行时统一为 `Nodejs24.11`，固定依赖 `wx-server-sdk@4.0.2`，每个函数目录下均包含独立的 `package.json` 与 `package-lock.json`，严禁使用浮动版本（`^`、`~`）。
 
 ---
 
@@ -68,7 +68,7 @@ npm run quality:fast       # 或 node scripts/qualityGate.js --static
 
 ### 4.2 单元与集成测试 (Jest)
 ```bash
-# 执行全部 154 个测试套件 (1856 个测试用例 100% 通过)
+# 执行全部 195 个测试套件 (3130+ 个测试用例 100% 通过)
 npm test
 
 # 针对特定模块运行单测
@@ -79,7 +79,7 @@ npx jest __tests__/releaseHygiene.test.js
 
 ### 4.3 全页面无头点击仿真 (Headless Simulation)
 ```bash
-# 模拟执行全量 26 个页面与组件的 333 项真实交互点击断言
+# 模拟执行全量 26 个页面与组件的 374 项真实交互点击断言
 npm run simulate:clicks
 
 # 执行 30 项真实用户端到端核心业务旅程仿真
@@ -88,13 +88,13 @@ node scripts/verifyActualUsage.js
 
 ### 4.4 小程序体积与安全预算审计
 ```bash
-# 检查真实主包与分包体积（主包 1.23 MiB，余量 0.77 MiB）
+# 检查真实主包与分包体积（主包 1.42 MiB，余量 0.58 MiB）
 npm run check:package
 
 # 检查代码库是否误存敏感凭据或密钥
 npm run check:secrets
 
-# 检查 16 个云数据库集合的 52 项复合索引配置
+# 检查 17 个云数据库集合与 37 项复合索引配置
 npm run check:indexes
 ```
 

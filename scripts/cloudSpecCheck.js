@@ -22,7 +22,7 @@ function run(opts = {}) {
       hints.push(colorize("建议 timeout→20s", "yellow"));
       warn++;
     }
-    if (it.logs >= 5) {
+    if (it.logs > 5) {
       hints.push(colorize(`日志 ${it.logs} 条（建议精简）`, "yellow"));
       warn++;
     }

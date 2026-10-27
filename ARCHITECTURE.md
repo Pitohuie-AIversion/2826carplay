@@ -30,8 +30,8 @@ graph TD
     end
 
     subgraph CloudBase["腾讯云端 Serverless 层 (CloudBase Layer)"]
-        CloudFunctions["56 个独立轻量云函数 (CloudFunctions)<br/>Node.js 20.19 运行时，职责单一与入参白名单"]
-        CloudDB[("CloudBase NoSQL 数据库<br/>集合安全规则 + 52 项复合索引")]
+        CloudFunctions["57 个独立轻量云函数 (CloudFunctions)<br/>Nodejs24.11 运行时，职责单一与入参白名单"]
+        CloudDB[("CloudBase NoSQL 数据库<br/>17 集合安全规则 + 37 项索引检查")]
         CloudStorage["云存储 (车辆图库、留证照片、导出文件)"]
     end
 
@@ -85,10 +85,10 @@ graph TD
 │   │   ├── pageAuth.js       # 管理员角色与鉴权拦截
 │   │   └── privacy.js        # 用户数据权利申请与合规状态流转
 │   └── pageController.js     # 页面架构控制器 (definePage, createPageController)
-├── cloudfunctions/           # 56 个单职责 Serverless 云函数
-├── security-rules/           # 数据库与存储集合安全策略
+├── cloudfunctions/           # 57 个单职责 Serverless 云函数
+├── security-rules/           # 数据库与存储集合安全策略 (17 集合)
 ├── scripts/                  # 自动化检查与全量交互仿真脚本
-└── __tests__/                # Jest 单元与集成测试套件 (154 Suites)
+└── __tests__/                # Jest 单元与集成测试套件 (195 Suites)
 ```
 
 ---

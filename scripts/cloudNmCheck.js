@@ -20,7 +20,7 @@ function run(opts = {}) {
   const clean = items.length - dirty;
   console.log(colorize("【云端·node_modules 残留检查】", "bold"));
   if (dirty === 0) {
-    console.log(colorize("🎉 56/56 个云函数均无 node_modules 残留", "green"));
+    console.log(colorize(`🎉 ${clean}/${items.length} 个云函数均无 node_modules 残留`, "green"));
   } else {
     printTable(rows, [
       { key: "name", label: "残留 node_modules 的函数" },

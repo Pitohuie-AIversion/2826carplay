@@ -2330,6 +2330,9 @@
           </div>
           <div class="panel-controls">
             <input type="text" class="search-input" id="reconcileSearchInput" placeholder="搜索预约单号 / 车型 / 城市..." oninput="filterReconcileBookings()" style="width: 210px;">
+            <button class="btn-action" style="border-color: rgba(56, 189, 248, 0.4); color: #38bdf8;" onclick="openWorkbenchServiceModal()">
+              <span>🧭</span> 协调工作台与网点配置
+            </button>
             <button class="btn-action" onclick="exportHandoverEvidenceCsv()">
               <span>📸</span> 导出验车存证对账单
             </button>
@@ -2843,11 +2846,23 @@
       </div>
 
       <div class="modal-field">
+        <label>座驾提车整备核对卡与 400 应急专线 (对齐 shared/vehicleChecklist.js)</label>
+        <div id="handoverReadinessBox" style="background: rgba(15, 23, 42, 0.78); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 0.65rem; font-size: 0.74rem; color: var(--text-main); line-height: 1.55;">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <div class="modal-field">
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <label>电子交接留证归档摘要 (可一键复制发给客户或财务归档)</label>
-          <button type="button" class="btn-action" style="padding: 0.2rem 0.55rem; font-size: 0.72rem;" onclick="copyHandoverSummaryText()">
-            <span>📋</span> 复制存证核验报告
-          </button>
+          <div style="display:flex; gap:0.45rem;">
+            <button type="button" class="btn-action" style="padding: 0.2rem 0.55rem; font-size: 0.72rem; border-color: rgba(56, 189, 248, 0.4); color: #38bdf8;" onclick="exportSingleHandoverReportCsv()">
+              <span>📥</span> 导出 19 列防注入 CSV 凭证
+            </button>
+            <button type="button" class="btn-action" style="padding: 0.2rem 0.55rem; font-size: 0.72rem;" onclick="copyHandoverSummaryText()">
+              <span>📋</span> 复制存证核验报告
+            </button>
+          </div>
         </div>
         <textarea id="handoverSummaryText" readonly style="width: 100%; height: 90px; background: rgba(5, 8, 17, 0.85); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: #34d399; font-size: 0.75rem; font-family: 'JetBrains Mono', monospace; padding: 0.65rem; resize: none; line-height: 1.45;"></textarea>
       </div>
@@ -3107,6 +3122,58 @@
         <span style="font-size:0.72rem; color:var(--text-dim);">基准核算时钟：2026-10-26 · 预警阈值：24h / 48h / 30d / 48h</span>
         <div style="display:flex; gap:0.65rem;">
           <button class="btn-action" onclick="closeMaintenanceAlertModal()">关闭</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 13: Booking Coordination Workbench & Global Service Hub Configurator -->
+  <div class="modal-overlay" id="workbenchServiceModal">
+    <div class="modal-card" style="max-width: 840px;">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span>🧭</span> 预约协调工作台多因子评分队列与全局网点配置中心
+        </div>
+        <button class="modal-close" onclick="closeWorkbenchServiceModal()">×</button>
+      </div>
+      <div class="modal-subtitle">
+        对齐 <code style="color:#38bdf8;">shared/bookingWorkbench.js</code> (8 维筛选与紧急度 Score 排序) 与 <code style="color:#34d399;">shared/serviceConfig.js</code> (最大 30 网点 / 20 城市 / 企微 HTTPS 成对守卫)。
+      </div>
+
+      <div class="modal-field">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem;">
+          <label style="margin-bottom:0;">📋 预约协调智能队列模式切换 (buildBookingWorkbench)</label>
+          <select class="search-input" id="workbenchModeSelect" style="width: 240px; padding: 0.35rem 0.6rem; font-size: 0.75rem;" onchange="onWorkbenchModeChange(this.value)">
+            <option value="todo">待办总队列 (todo)</option>
+            <option value="overdue">超时未处理 (overdue ≥24h)</option>
+            <option value="pickupAttention">7天内紧急取车 (pickupAttention)</option>
+            <option value="priority">高优调度单 (priority)</option>
+            <option value="contactIssue">号码异常待核 (contactIssue)</option>
+            <option value="coordinating">协调跟进中 (coordinating)</option>
+            <option value="pending">待协调初审 (pending)</option>
+            <option value="standby">候补排期单 (standby)</option>
+          </select>
+        </div>
+        <div id="workbenchSummaryPills" style="display:flex; flex-wrap:wrap; gap:0.4rem; margin-bottom:0.55rem;">
+          <!-- Populated dynamically -->
+        </div>
+        <div id="workbenchQueueList" style="display:flex; flex-direction:column; gap:0.45rem; max-height: 175px; overflow-y: auto;">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+
+      <div class="modal-field">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.35rem;">
+          <label style="margin-bottom:0;">🌐 全局服务网点与企微客服配置校验 (validateServiceConfig &amp; normalizeServiceConfig)</label>
+          <span id="serviceConfigStatusBadge" class="status-pill active" style="font-size:0.68rem;">✔ 配置校验通过</span>
+        </div>
+        <textarea id="serviceConfigJsonBox" readonly style="width: 100%; height: 120px; background: rgba(5, 8, 17, 0.85); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: #38bdf8; font-size: 0.73rem; font-family: 'JetBrains Mono', monospace; padding: 0.6rem; resize: none; line-height: 1.4;"></textarea>
+      </div>
+
+      <div class="modal-footer" style="display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-size:0.72rem; color:var(--text-dim);">支持 8 维协调状态自动计分排序与 30 网点 GPS 边界校验</span>
+        <div style="display:flex; gap:0.65rem;">
+          <button class="btn-action" onclick="closeWorkbenchServiceModal()">关闭</button>
         </div>
       </div>
     </div>
@@ -4796,6 +4863,21 @@
           • 交接图集乐观锁版本: <code>handoverImageRevision = ${b.handoverImageRevision}</code><br>
           • 云存储引用计数校验: <strong style="color:#34d399;">4/4 张四角存证受 booking_handovers 强引用保护</strong><br>
           • 孤儿清理队列状态: <code>pending_file_deletions</code> 零误删风险
+        `;
+      }
+
+      const readinessEl = document.getElementById('handoverReadinessBox');
+      if (readinessEl && typeof getVehicleReadinessCard === 'function') {
+        const matchedVehicle = VEHICLES.find(v => v.id === b.vehicleId) || { name: b.vehicleName, category: 'supercar' };
+        const card = getVehicleReadinessCard(matchedVehicle);
+        readinessEl.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.25rem;">
+            <strong style="color:#38bdf8;">🏎️ ${card.vehicleName} · [${card.categoryName}] 提车整备核对卡</strong>
+            <span style="color:#fbbf24; font-family:'JetBrains Mono',monospace;">☎️ 24h 应急专线：${card.emergencyHotline}</span>
+          </div>
+          • 燃油加注：${card.fuelNotice}<br>
+          • 底盘悬架：${card.suspensionNotice}<br>
+          • 驾驶提示：${card.drivingNotice}
         `;
       }
 
@@ -6822,6 +6904,692 @@
       appendLogStreamEntry('FLEET_MAINT', 'vehicleUpdateStatus', 200, `车辆 ${target.name} (${target.plate}) 已完成维保登记，下次保养顺延至 ${target.archiveDate}`, 24);
       showToast(`已完成【${target.name}】保养整备登记，下次保养周期顺延至 ${target.archiveDate}！`, '🔧');
       return { vehicle: target, summary: updatedState.summary };
+    }
+
+    // ==================== 15D. HANDOVER REPORT CSV, VEHICLE CHECKLIST, BOOKING WORKBENCH & SERVICE CONFIG (对齐 shared/handoverReport.js, vehicleChecklist.js, bookingWorkbench.js, serviceConfig.js) ====================
+    const ANGLE_LABELS = {
+      front: '车头',
+      rear: '车尾',
+      left: '左侧',
+      right: '右侧'
+    };
+
+    const DAMAGE_TYPE_LABELS = {
+      scratch: '划痕/擦伤',
+      dent: '凹坑/变形',
+      wear: '正常磨损',
+      paint: '漆面损伤',
+      glass: '玻璃破损',
+      wheel: '轮毂损伤',
+      other: '其他损伤'
+    };
+
+    const PART_LABELS = {
+      front: '车头/前保险杠',
+      rear: '车尾/后保险杠',
+      left: '车身左侧/车门',
+      right: '车身右侧/车门',
+      roof: '车顶/天窗',
+      wheel_fl: '左前轮毂',
+      wheel_fr: '右前轮毂',
+      wheel_rl: '左后轮毂',
+      wheel_rr: '右后轮毂',
+      interior: '座舱内饰',
+      other: '其他部位'
+    };
+
+    function escapeCsvCell(value) {
+      const text = String(value === undefined || value === null ? '' : value).replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+      const formulaPrefix = /^[\t\n\u0000]|^[\s\u0000]*[=+\-@\uFF1D\uFF0B\uFF0D\uFF20]/;
+      const safeText = formulaPrefix.test(text) ? `'${text}` : text;
+      const escaped = safeText.replace(/"/g, '""');
+      return /[",\n]/.test(escaped) ? `"${escaped}"` : escaped;
+    }
+
+    function formatHandoverTime(timestamp) {
+      if (!timestamp) return '';
+      const d = new Date(timestamp);
+      if (typeof timestamp === 'boolean' || Number.isNaN(d.getTime())) return '';
+      const pad = n => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+
+    function recordedNumber(value, max) {
+      if ((typeof value !== 'number' && typeof value !== 'string') || (typeof value === 'string' && !value.trim())) return null;
+      const number = Number(value);
+      return Number.isInteger(number) && number >= 0 && number <= max ? number : null;
+    }
+
+    function buildHandoverReport(bookingInput, handoverInput) {
+      const booking = bookingInput && typeof bookingInput === 'object' ? bookingInput : {};
+      const handover = handoverInput && typeof handoverInput === 'object' ? handoverInput : {};
+      const stage = String(handover.stage || 'pickup') === 'return' ? 'return' : 'pickup';
+      const stageText = stage === 'return' ? '还车交验' : '取车交验';
+
+      const photos = (Array.isArray(handover.photos) ? handover.photos : []).filter(p => p && typeof p === 'object' && !Array.isArray(p)).map(p => ({
+        angle: p.angle || 'unknown',
+        label: ANGLE_LABELS[p.angle] || p.angle || '其他视角',
+        fileId: p.fileId || '',
+        url: p.url || ''
+      }));
+
+      const energyType = ['electric', 'fuel'].includes(handover.energyType) ? handover.energyType : '';
+      const energyTypeText = energyType === 'electric' ? '纯电' : energyType === 'fuel' ? '燃油' : '未记录';
+
+      const scratchItems = (Array.isArray(handover.scratchItems) ? handover.scratchItems : []).filter(item => item && typeof item === 'object' && !Array.isArray(item)).map(item => ({
+        part: item.part || 'other',
+        partLabel: PART_LABELS[item.part] || item.part || '其他部位',
+        type: item.type || 'scratch',
+        typeLabel: DAMAGE_TYPE_LABELS[item.type] || item.type || '损伤',
+        description: String(item.description || item.desc || '').trim()
+      }));
+
+      const scratchSummary = scratchItems.length > 0
+        ? scratchItems.map(s => `[${s.partLabel}] ${s.typeLabel}${s.description ? `(${s.description})` : ''}`).join('; ')
+        : '';
+
+      const inspectorName = String(handover.inspectorName || '').trim();
+      const customerConfirmed = Boolean(formatHandoverTime(handover.confirmedAt)) || handover.status === 'confirmed';
+
+      return {
+        bookingId: String(booking.id || booking.bookingId || '—'),
+        vehicleName: String(booking.vehicleName || '爱迦座驾'),
+        plateNumber: String(booking.plateNumber || '车牌保密'),
+        userName: String(booking.userName || '未记录'),
+        phone: String(booking.phone || '—'),
+        stage,
+        stageText,
+        submittedAt: handover.submittedAt || null,
+        submittedAtText: formatHandoverTime(handover.submittedAt) || '待提交',
+        confirmedAt: handover.confirmedAt || null,
+        confirmedAtText: formatHandoverTime(handover.confirmedAt) || '待确认',
+        mileageKm: recordedNumber(handover.mileageKm, 5000000),
+        energyType,
+        energyTypeText,
+        energyLevelPercent: recordedNumber(handover.energyLevelPercent, 100),
+        damageNote: String(handover.damageNote || '').trim() || scratchSummary || '车况未记录',
+        scratchItems,
+        scratchSummary,
+        inspectorName,
+        customerConfirmed,
+        additionalNote: String(handover.additionalNote || '').trim(),
+        photos,
+        disclaimer: '本验车留证单为车况及交接事实记录，确认仅表示内容核对，不是电子签章或合同签署。'
+      };
+    }
+
+    function formatHandoverCsvContent(bookingInput, handoverInput) {
+      const report = buildHandoverReport(bookingInput, handoverInput);
+      const header = [
+        '预约单号',
+        '车辆名称',
+        '车牌号码',
+        '交接阶段',
+        '客户姓名',
+        '联系电话',
+        '交接登记时间',
+        '客户确认时间',
+        '仪表里程(km)',
+        '能源形式',
+        '剩余油量电量(%)',
+        '车身损伤检查记录',
+        '补充交接约定',
+        '车头留证照片',
+        '车尾留证照片',
+        '左侧留证照片',
+        '右侧留证照片',
+        '验车服务专员',
+        '客户内容核对状态'
+      ];
+
+      const getPhotoLocation = angle => {
+        const item = report.photos.find(p => p.angle === angle);
+        return item ? (item.fileId || item.url || '已存证') : '未采集';
+      };
+
+      const row = [
+        report.bookingId,
+        report.vehicleName,
+        report.plateNumber,
+        report.stageText,
+        report.userName,
+        report.phone,
+        report.submittedAtText,
+        report.confirmedAtText,
+        report.mileageKm === null ? '未记录' : String(report.mileageKm),
+        report.energyTypeText,
+        report.energyLevelPercent === null ? '未记录' : `${report.energyLevelPercent}%`,
+        report.damageNote,
+        report.additionalNote || '未记录',
+        getPhotoLocation('front'),
+        getPhotoLocation('rear'),
+        getPhotoLocation('left'),
+        getPhotoLocation('right'),
+        report.inspectorName || '未记录',
+        report.customerConfirmed ? '已核对' : '待核对'
+      ];
+
+      const bom = '\uFEFF';
+      return bom + header.map(escapeCsvCell).join(',') + '\r\n' + row.map(escapeCsvCell).join(',') + '\r\n';
+    }
+
+    function exportSingleHandoverReportCsv() {
+      const b = currentHandoverBooking || RECONCILE_BOOKINGS[0];
+      const v = VEHICLES.find(item => item.id === b.vehicleId) || VEHICLES[0];
+      const bookingInput = {
+        id: b.bookingId,
+        vehicleName: b.vehicleName,
+        plateNumber: v ? v.plate : '浙A·88888',
+        userName: b.customerName,
+        phone: b.maskedPhone
+      };
+      const handoverInput = {
+        stage: b.status === 'COMPLETED' ? 'return' : 'pickup',
+        submittedAt: '2026-10-26T09:05:00+08:00',
+        confirmedAt: '2026-10-26T09:12:00+08:00',
+        mileageKm: b.odometerReturnKm || b.odometerPickupKm,
+        energyType: 'fuel',
+        energyLevelPercent: b.fuelReturnPercent,
+        damageNote: (b.cornerPhotos && b.cornerPhotos[1] && b.cornerPhotos[1].verified) || '0 划痕 · 原厂车漆完好',
+        inspectorName: '首席验车专员 林工',
+        status: 'confirmed',
+        photos: [
+          { angle: 'front', fileId: b.cornerPhotos[0].fileId },
+          { angle: 'rear', fileId: b.cornerPhotos[2].fileId },
+          { angle: 'left', fileId: b.cornerPhotos[0].fileId },
+          { angle: 'right', fileId: b.cornerPhotos[1].fileId }
+        ]
+      };
+      const csv = formatHandoverCsvContent(bookingInput, handoverInput);
+      if (typeof Blob !== 'undefined' && typeof URL !== 'undefined' && URL.createObjectURL) {
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', `验车留证单_${b.bookingId}.csv`);
+        if (document.body && document.body.appendChild) {
+          document.body.appendChild(link);
+          if (link.click) link.click();
+          if (document.body.removeChild) document.body.removeChild(link);
+        }
+      }
+      showToast(`已生成 19 列防公式注入标准验车留证单 CSV (${b.bookingId})！`, '📥');
+      return csv;
+    }
+
+    // Vehicle Readiness Checklist (对齐 shared/vehicleChecklist.js)
+    const EMERGENCY_HOTLINE = '400-888-2826';
+    const CATEGORY_NAMES = {
+      supercar: '超级跑车',
+      luxury_sedan: '豪华轿车',
+      suv: '全地形豪华 SUV',
+      sports: '运动轿跑',
+      default: '尊享座驾'
+    };
+    const CATEGORY_TIPS_MAP = {
+      supercar: {
+        fuelNotice: '请务必加注 98# 优质汽油；油箱盖位于车身侧方，熄火解锁后轻按弹开',
+        suspensionNotice: '通过地库坡道、减速带或坑洼路面时，请在中控台开启「前桥底盘升降」防剐蹭',
+        drivingNotice: '大马力后置/中置驱动，雨雪湿滑路面请切至 WET/雨雪模式，公开道路切勿关闭车身稳定系统 (ESC)',
+        parkingNotice: 'P 挡驻车后确认电子手刹亮起；激烈驾驶后建议平缓巡航 2 分钟以保护双涡轮散热'
+      },
+      luxury_sedan: {
+        fuelNotice: '建议加注 95# 或以上高标号清洁燃油',
+        suspensionNotice: '如车辆配备空气悬架，可在中控调节舒适/运动高度，地库及起伏路面请减速慢行',
+        drivingNotice: '轴距较长转弯半径较大，狭窄弯道与倒车时建议留意 360° 全景影像与盲区预警',
+        parkingNotice: '如车辆配备电吸门，车门虚掩即可自动闭锁；未配备电吸门请轻关车门确认锁止'
+      },
+      suv: {
+        fuelNotice: '建议加注 95# 或以上燃油，油箱容积较大请留足续航余量',
+        suspensionNotice: '如车辆配备底盘升降或全地形模式，非铺装路面可切换对应模式；限高地库注意顶部距离',
+        drivingNotice: '车身自重较大制动距离偏长，高速跟车请保持至少 3 秒安全车距',
+        parkingNotice: '停车后注意后备箱开启高度，避免在低矮地下车库碰触车顶管道'
+      }
+    };
+    const DEFAULT_TIPS = {
+      fuelNotice: '请按油箱盖内侧标示加注对应标号燃油',
+      suspensionNotice: '行经减速带及起伏路面请减速慢行',
+      drivingNotice: '雨雪湿滑路面请谨慎驾驶并保持足够车距',
+      parkingNotice: '离开车辆前请确认车窗全部关闭并锁好车门'
+    };
+
+    function getVehicleReadinessCard(vehicle) {
+      const v = vehicle && typeof vehicle === 'object' ? vehicle : {};
+      const rawCat = String(v.category || v.vehicleType || '').trim().toLowerCase();
+      const cat = CATEGORY_TIPS_MAP[rawCat] ? rawCat : (rawCat.includes('super') || rawCat.includes('sport') || rawCat.includes('跑车') ? 'supercar' : (rawCat.includes('suv') || rawCat.includes('越野') ? 'suv' : (rawCat.includes('sedan') || rawCat.includes('行政') ? 'luxury_sedan' : 'default')));
+      const tips = CATEGORY_TIPS_MAP[cat] || DEFAULT_TIPS;
+
+      return {
+        category: cat,
+        categoryName: CATEGORY_NAMES[cat] || CATEGORY_NAMES.default,
+        vehicleName: String(v.name || v.brandModel || '爱迦座驾').trim(),
+        fuelNotice: tips.fuelNotice,
+        suspensionNotice: tips.suspensionNotice,
+        drivingNotice: tips.drivingNotice,
+        parkingNotice: tips.parkingNotice,
+        emergencyHotline: EMERGENCY_HOTLINE
+      };
+    }
+
+    // Booking Coordination Workbench (对齐 shared/bookingWorkbench.js)
+    const OVERDUE_MS = 24 * 60 * 60 * 1000;
+    const WORKBENCH_PRIORITY_VALUES = ['priority', 'normal', 'standby'];
+    const WORKBENCH_COORDINATION_VALUES = ['pending', 'coordinating', 'resolved'];
+    const WORKBENCH_ACTIVE_STATUSES = ['pending', 'contacted'];
+    const WORKBENCH_MODE_VALUES = [
+      'todo',
+      'pending',
+      'priority',
+      'overdue',
+      'pickupAttention',
+      'contactIssue',
+      'standby',
+      'coordinating'
+    ];
+
+    function toTimestamp(value) {
+      if (!value) return 0;
+      if (value instanceof Date) return value.getTime() || 0;
+      if (typeof value === 'object' && typeof value.toDate === 'function') {
+        return value.toDate().getTime() || 0;
+      }
+      return new Date(value).getTime() || 0;
+    }
+
+    function normalizeUsablePhone(value) {
+      const phone = String(value || '').trim();
+      const digitCount = phone.replace(/\D/g, '').length;
+      if (!/^\+?[0-9-]{6,20}$/.test(phone) || digitCount < 6 || digitCount > 15) {
+        return '';
+      }
+      return phone;
+    }
+
+    function toDateDayNumber(value) {
+      const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (!match) return null;
+      const year = Number(match[1]);
+      const month = Number(match[2]);
+      const day = Number(match[3]);
+      const timestamp = Date.UTC(year, month - 1, day);
+      const date = new Date(timestamp);
+      if (
+        date.getUTCFullYear() !== year ||
+        date.getUTCMonth() !== month - 1 ||
+        date.getUTCDate() !== day
+      ) {
+        return null;
+      }
+      return Math.floor(timestamp / ONE_DAY_MS);
+    }
+
+    function toLocalDayNumber(timestamp) {
+      const date = new Date(timestamp);
+      return Math.floor(
+        Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / ONE_DAY_MS
+      );
+    }
+
+    function normalizeBooking(item, now) {
+      const source = item && typeof item === 'object' ? item : {};
+      const status = String(source.status || 'pending').trim() || 'pending';
+      const schedulePriority = WORKBENCH_PRIORITY_VALUES.includes(source.schedulePriority)
+        ? source.schedulePriority
+        : 'normal';
+      const coordinationStatus =
+        status === 'completed' || status === 'cancelled'
+          ? 'resolved'
+          : WORKBENCH_COORDINATION_VALUES.includes(source.coordinationStatus)
+            ? source.coordinationStatus
+            : 'pending';
+      const createdTimestamp = toTimestamp(source.createdAt);
+      const waitingMs = createdTimestamp ? Math.max(0, now - createdTimestamp) : 0;
+      const active = WORKBENCH_ACTIVE_STATUSES.includes(status);
+      const todo = active && coordinationStatus !== 'resolved';
+      const overdue =
+        todo &&
+        coordinationStatus === 'pending' &&
+        Boolean(createdTimestamp) &&
+        waitingMs >= OVERDUE_MS;
+      const pickupDay = toDateDayNumber(source.startDate);
+      const pickupDays =
+        pickupDay === null ? null : pickupDay - toLocalDayNumber(now);
+      const pickupAttention =
+        todo &&
+        pickupDays !== null &&
+        pickupDays <= 7;
+      const phoneAvailable = Boolean(normalizeUsablePhone(source.phone));
+      const contactIssue = todo && !phoneAvailable;
+      const waitingHours = Math.floor(waitingMs / (60 * 60 * 1000));
+      const waitingText = !createdTimestamp
+        ? '提交时间待确认'
+        : waitingHours < 1
+          ? '等待不足 1 小时'
+          : waitingHours < 24
+            ? `已等待 ${waitingHours} 小时`
+            : `已等待 ${Math.floor(waitingHours / 24)} 天`;
+      const badges = [];
+
+      if (overdue) {
+        badges.push({ key: 'overdue', text: '超时未处理', tone: 'danger' });
+      }
+      if (pickupAttention) {
+        const text =
+          pickupDays < 0
+            ? '用车日已过'
+            : pickupDays === 0
+              ? '今天用车'
+              : pickupDays === 1
+                ? '明天用车'
+                : `${pickupDays} 天后用车`;
+        badges.push({
+          key: 'pickupAttention',
+          text,
+          tone: pickupDays <= 0 ? 'danger' : 'warning'
+        });
+      }
+      if (schedulePriority === 'priority') {
+        badges.push({ key: 'priority', text: '优先', tone: 'warning' });
+      } else if (schedulePriority === 'standby') {
+        badges.push({ key: 'standby', text: '候补', tone: 'muted' });
+      }
+      if (coordinationStatus === 'coordinating') {
+        badges.push({ key: 'coordinating', text: '协调中', tone: 'primary' });
+      } else if (coordinationStatus === 'pending' && !overdue) {
+        badges.push({ key: 'pending', text: '待协调', tone: 'warning' });
+      }
+
+      let score = 0;
+      if (overdue) score += 100;
+      if (pickupAttention) {
+        if (pickupDays < 0) score += 90;
+        else if (pickupDays === 0) score += 80;
+        else if (pickupDays === 1) score += 65;
+        else score += 35;
+      }
+      if (contactIssue) score += 55;
+      if (schedulePriority === 'priority') score += 60;
+      else if (schedulePriority === 'standby') score += 20;
+      if (coordinationStatus === 'coordinating') score += 40;
+      else if (coordinationStatus === 'pending') score += 10;
+
+      return {
+        ...source,
+        id: String(source.id || source._id || '').trim(),
+        status,
+        schedulePriority,
+        coordinationStatus,
+        createdTimestamp,
+        waitingHours,
+        waitingText,
+        active,
+        todo,
+        overdue,
+        pickupDays,
+        pickupAttention,
+        phoneAvailable,
+        contactIssue,
+        badges,
+        score
+      };
+    }
+
+    function matchesWorkbenchMode(item, mode) {
+      if (mode === 'pending') return item.todo && item.coordinationStatus === 'pending';
+      if (mode === 'priority') return item.todo && item.schedulePriority === 'priority';
+      if (mode === 'overdue') return item.overdue;
+      if (mode === 'pickupAttention') return item.pickupAttention;
+      if (mode === 'contactIssue') return item.contactIssue;
+      if (mode === 'standby') return item.todo && item.schedulePriority === 'standby';
+      if (mode === 'coordinating') return item.todo && item.coordinationStatus === 'coordinating';
+      return item.todo;
+    }
+
+    function buildBookingWorkbench(bookings, selectedMode, nowValue) {
+      const now = Number.isFinite(Number(nowValue)) ? Number(nowValue) : Date.now();
+      const mode = WORKBENCH_MODE_VALUES.includes(selectedMode) ? selectedMode : 'todo';
+      const normalized = (Array.isArray(bookings) ? bookings : []).map(item =>
+        normalizeBooking(item, now)
+      );
+      const active = normalized.filter(item => item.active);
+      const todo = active.filter(item => item.todo);
+      const queue = active
+        .filter(item => matchesWorkbenchMode(item, mode))
+        .sort((left, right) => {
+          if (right.score !== left.score) return right.score - left.score;
+          const leftTime = left.createdTimestamp || Number.MAX_SAFE_INTEGER;
+          const rightTime = right.createdTimestamp || Number.MAX_SAFE_INTEGER;
+          return leftTime - rightTime || left.id.localeCompare(right.id);
+        });
+
+      return {
+        mode,
+        queue,
+        summary: {
+          todo: todo.length,
+          pending: todo.filter(item => item.coordinationStatus === 'pending').length,
+          priority: todo.filter(item => item.schedulePriority === 'priority').length,
+          overdue: todo.filter(item => item.overdue).length,
+          pickupAttention: todo.filter(item => item.pickupAttention).length,
+          contactIssue: todo.filter(item => item.contactIssue === true).length,
+          standby: todo.filter(item => item.schedulePriority === 'standby').length,
+          coordinating: todo.filter(item => item.coordinationStatus === 'coordinating').length
+        }
+      };
+    }
+
+    // Service Hub & WeChat KF Config Validator (对齐 shared/serviceConfig.js)
+    const SERVICE_TEXT_LIMITS = { serviceHoursText: 120, emergencyPhone: 20, wxKfCorpId: 64, wxKfExtInfo: 512 };
+    const HUB_TEXT_LIMITS = { id: 64, city: 20, name: 60, address: 200, feeText: 100 };
+    const HUB_TYPES = ['store', 'hub', 'delivery'];
+    const MAX_SERVICE_HUBS = 30;
+    const MAX_CITIES = 20;
+    const MAX_CITY_LENGTH = 20;
+
+    function validateCityOptions(value) {
+      if (value === undefined) return null;
+      if (!Array.isArray(value) || value.some(item => typeof item !== 'string' || item.trim().length > MAX_CITY_LENGTH)) {
+        return { field: 'cityOptions', message: '每个城市名称限20字' };
+      }
+      if (new Set(value.map(item => item.trim()).filter(Boolean)).size > MAX_CITIES) {
+        return { field: 'cityOptions', message: '服务城市最多20个' };
+      }
+      return null;
+    }
+
+    function isCustomerServiceCorpId(value) {
+      return typeof value === 'string' && /^[A-Za-z0-9_-]{6,64}$/.test(value.trim());
+    }
+
+    function isServicePhone(value) {
+      const digits = value.replace(/\D/g, '').length;
+      return /^\+?[0-9-]{6,20}$/.test(value) && digits >= 6 && digits <= 15;
+    }
+
+    function parseCoordinate(value) {
+      if (value === undefined || value === null || (typeof value === 'string' && !value.trim())) return null;
+      if (typeof value !== 'number' && typeof value !== 'string') return NaN;
+      return Number(value);
+    }
+
+    function isCustomerServiceUrl(value) {
+      if (typeof value !== 'string') return false;
+      const match = /^https:\/\/([a-z0-9](?:[a-z0-9.-]*[a-z0-9])?)(?::(\d{1,5}))?(?:[/?#][^\s]*)?$/i.exec(value.trim());
+      if (!match || (match[2] && (Number(match[2]) < 1 || Number(match[2]) > 65535))) return false;
+      return match[1].split('.').every(label => /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i.test(label));
+    }
+
+    function validateServiceConfig(input) {
+      const source = input || {};
+      for (const [key, max] of Object.entries(SERVICE_TEXT_LIMITS)) {
+        if (source[key] !== undefined && (typeof source[key] !== 'string' || source[key].trim().length > max)) {
+          return { field: key, message: `字段长度不能超过 ${max} 字` };
+        }
+      }
+      if (String(source.emergencyPhone || '').trim() && !isServicePhone(source.emergencyPhone.trim())) {
+        return { field: 'emergencyPhone', message: '救援电话格式不正确' };
+      }
+      const corp = String(source.wxKfCorpId || '').trim();
+      const ext = String(source.wxKfExtInfo || '').trim();
+      if (Boolean(corp) !== Boolean(ext) || (corp && !isCustomerServiceCorpId(corp))) {
+        return { field: 'wxKfCorpId', message: '客服企业ID与链接参数需成对填写' };
+      }
+      if (ext && !isCustomerServiceUrl(ext)) {
+        return { field: 'wxKfExtInfo', message: '微信客服链接须为 HTTPS 地址' };
+      }
+      if (source.serviceHubs === undefined) return null;
+      if (!Array.isArray(source.serviceHubs) || source.serviceHubs.length > MAX_SERVICE_HUBS) {
+        return { field: 'serviceHubs', message: '服务网点最多 30 个' };
+      }
+      const ids = new Set();
+      const names = new Set();
+      for (const hub of source.serviceHubs) {
+        const error = { field: 'serviceHubs', message: '网点需填写唯一编号、城市、名称及真实地址' };
+        if (!hub || typeof hub !== 'object') return error;
+        for (const [key, max] of Object.entries(HUB_TEXT_LIMITS)) {
+          if (typeof hub[key] !== 'string' || hub[key].trim().length > max || (key !== 'feeText' && !hub[key].trim())) return error;
+        }
+        const nameKey = `${hub.city.trim()}:${hub.name.trim()}`;
+        if (!/^[A-Za-z0-9_-]{1,64}$/.test(hub.id.trim()) || ids.has(hub.id.trim()) || names.has(nameKey)) return error;
+        ids.add(hub.id.trim());
+        names.add(nameKey);
+        if (!HUB_TYPES.includes(hub.type)) return { field: 'serviceHubs', message: '网点类型不合法' };
+        const lat = parseCoordinate(hub.latitude);
+        const lng = parseCoordinate(hub.longitude);
+        if ((lat === null) !== (lng === null) || (lat !== null && (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180))) {
+          return { field: 'serviceHubs', message: '经纬度需成对填写且在合法范围内' };
+        }
+      }
+      return null;
+    }
+
+    function normalizeServiceConfig(input) {
+      const source = input || {};
+      const result = {};
+      for (const [key, max] of Object.entries(SERVICE_TEXT_LIMITS)) {
+        result[key] = String(source[key] || '').trim().slice(0, max);
+      }
+      const hubs = Array.isArray(source.serviceHubs) ? source.serviceHubs : [];
+      result.serviceHubs = validateServiceConfig({ serviceHubs: hubs }) ? [] : hubs.map(hub => ({
+        ...Object.fromEntries(Object.keys(HUB_TEXT_LIMITS).map(key => [key, hub[key].trim()])),
+        type: hub.type,
+        latitude: parseCoordinate(hub.latitude),
+        longitude: parseCoordinate(hub.longitude)
+      }));
+      return result;
+    }
+
+    const WORKBENCH_SAMPLE_BOOKINGS = [
+      {
+        id: 'WB_20261026_01',
+        customerName: '赵先生 (紧急加急)',
+        phone: '13800138000',
+        vehicleName: 'Porsche 911 GT3 RS',
+        status: 'pending',
+        schedulePriority: 'priority',
+        coordinationStatus: 'pending',
+        startDate: '2026-10-26',
+        createdAt: '2026-10-24T08:00:00Z'
+      },
+      {
+        id: 'WB_20261026_02',
+        customerName: '钱女士 (号码待核)',
+        phone: 'invalid-phone',
+        vehicleName: 'Ferrari 488 Pista',
+        status: 'contacted',
+        schedulePriority: 'normal',
+        coordinationStatus: 'coordinating',
+        startDate: '2026-10-27',
+        createdAt: '2026-10-26T04:00:00Z'
+      },
+      {
+        id: 'WB_20261026_03',
+        customerName: '孙先生 (候补长租)',
+        phone: '13912345678',
+        vehicleName: 'Aston Martin DBS',
+        status: 'pending',
+        schedulePriority: 'standby',
+        coordinationStatus: 'pending',
+        startDate: '2026-11-01',
+        createdAt: '2026-10-26T09:00:00Z'
+      }
+    ];
+
+    const DEFAULT_SERVICE_CONFIG = {
+      serviceHoursText: '08:30 - 22:00 (全年无休 · 24h 道路救援)',
+      emergencyPhone: '400-888-2826',
+      wxKfCorpId: 'ww2826carplay_aijia',
+      wxKfExtInfo: 'https://work.weixin.qq.com/kfid/kfc2826carplay',
+      serviceHubs: [
+        {
+          id: 'hub_hz_westlake',
+          city: '杭州',
+          name: '杭州西湖旗舰交付中心',
+          address: '杭州市西湖区北山街88号爱迦超跑俱乐部',
+          feeText: '门店自提免服务费',
+          type: 'store',
+          latitude: 30.2592,
+          longitude: 120.1485
+        },
+        {
+          id: 'hub_sh_hongqiao',
+          city: '上海',
+          name: '上海虹桥枢纽VIP交接区',
+          address: '上海市闵行区申虹路333号P7贵宾厅',
+          feeText: '跨城专板送车上门',
+          type: 'delivery',
+          latitude: 31.1979,
+          longitude: 121.3219
+        }
+      ]
+    };
+
+    function onWorkbenchModeChange(mode = 'todo') {
+      const nowMs = new Date('2026-10-26T12:00:00Z').getTime();
+      const wb = buildBookingWorkbench(WORKBENCH_SAMPLE_BOOKINGS, mode, nowMs);
+      const pillsEl = document.getElementById('workbenchSummaryPills');
+      if (pillsEl) {
+        pillsEl.innerHTML = Object.entries(wb.summary).map(([k, v]) => `
+          <span class="tier-pill" style="cursor:pointer;" onclick="onWorkbenchModeChange('${k}')">${k}: <strong>${v}</strong></span>
+        `).join('');
+      }
+      const listEl = document.getElementById('workbenchQueueList');
+      if (listEl) {
+        listEl.innerHTML = wb.queue.map(item => `
+          <div style="background: rgba(15, 23, 42, 0.82); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 0.6rem; display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <strong style="color:#f8fafc; font-size:0.78rem;">${item.id} · ${item.customerName}</strong>
+              <span style="color:#38bdf8; font-size:0.74rem; margin-left:0.4rem;">${item.vehicleName}</span>
+              <div style="font-size:0.7rem; color:var(--text-dim); margin-top:0.15rem;">
+                取车日: <code>${item.startDate}</code> · ${item.waitingText} · 标签: ${item.badges.map(b => `[${b.text}]`).join(' ')}
+              </div>
+            </div>
+            <div style="text-align:right;">
+              <span class="status-pill maint" style="font-family:'JetBrains Mono',monospace;">Score: ${item.score}</span>
+            </div>
+          </div>
+        `).join('');
+      }
+      const normalizedConfig = normalizeServiceConfig(DEFAULT_SERVICE_CONFIG);
+      const cfgBox = document.getElementById('serviceConfigJsonBox');
+      if (cfgBox) {
+        cfgBox.value = JSON.stringify(normalizedConfig, null, 2);
+      }
+      return { workbench: wb, serviceConfig: normalizedConfig };
+    }
+
+    function openWorkbenchServiceModal(defaultMode = 'todo') {
+      const sel = document.getElementById('workbenchModeSelect');
+      if (sel) sel.value = defaultMode;
+      const res = onWorkbenchModeChange(defaultMode);
+      const modal = document.getElementById('workbenchServiceModal');
+      if (modal) modal.classList.add('open');
+      return res;
+    }
+
+    function closeWorkbenchServiceModal() {
+      const modal = document.getElementById('workbenchServiceModal');
+      if (modal) modal.classList.remove('open');
     }
 
     // ==================== 16. TOAST & TIMING ====================

@@ -460,4 +460,87 @@ describe('Web Admin Gateway Sentinel & Operations Center', () => {
     expect(maintDone.vehicle.status).toBe('active');
     expect(maintDone.summary.urgentCount).toBe(1);
   });
+
+  test('19列防公式注入验车留证单 CSV 生成器与座驾提车整备核对卡与 shared/handoverReport.js & vehicleChecklist.js 一致', () => {
+    const sharedHandover = require('../shared/handoverReport');
+    const sharedChecklist = require('../shared/vehicleChecklist');
+
+    const bookingInput = {
+      id: 'BK_2026102601',
+      vehicleName: 'Porsche 911 GT3 RS',
+      plateNumber: '浙A·88888',
+      userName: '=CMD("calc")',
+      phone: '157****0090'
+    };
+    const handoverInput = {
+      stage: 'pickup',
+      submittedAt: '2026-10-26T09:05:00+08:00',
+      confirmedAt: '2026-10-26T09:12:00+08:00',
+      mileageKm: 8420,
+      energyType: 'fuel',
+      energyLevelPercent: 100,
+      scratchItems: [{ part: 'wheel_fr', type: 'wheel', description: '轻微擦痕' }],
+      inspectorName: '林工',
+      status: 'confirmed',
+      photos: [
+        { angle: 'front', fileId: 'cloud://f1' },
+        { angle: 'rear', fileId: 'cloud://f2' },
+        { angle: 'left', fileId: 'cloud://f3' },
+        { angle: 'right', fileId: 'cloud://f4' }
+      ]
+    };
+
+    const expectedReport = sharedHandover.buildHandoverReport(bookingInput, handoverInput);
+    const actualReport = JSON.parse(
+      vm.runInContext(
+        `JSON.stringify(buildHandoverReport(${JSON.stringify(bookingInput)}, ${JSON.stringify(handoverInput)}))`,
+        sandbox
+      )
+    );
+    expect(actualReport).toEqual(expectedReport);
+
+    const expectedCsv = sharedHandover.formatHandoverCsvContent(bookingInput, handoverInput);
+    const actualCsv = vm.runInContext(
+      `formatHandoverCsvContent(${JSON.stringify(bookingInput)}, ${JSON.stringify(handoverInput)})`,
+      sandbox
+    );
+    expect(actualCsv).toBe(expectedCsv);
+    // Verify formula injection defense prepended single quote
+    expect(actualCsv).toContain("'=CMD");
+
+    const expectedCard = sharedChecklist.getVehicleReadinessCard({ name: 'Porsche 911 GT3 RS', category: 'supercar' });
+    const actualCard = JSON.parse(
+      vm.runInContext('JSON.stringify(getVehicleReadinessCard({ name: "Porsche 911 GT3 RS", category: "supercar" }))', sandbox)
+    );
+    expect(actualCard).toEqual(expectedCard);
+  });
+
+  test('预约协调工作台 8 维评分队列与服务网点/企微 HTTPS 配置校验与 shared/bookingWorkbench.js & serviceConfig.js 一致', () => {
+    const sharedWb = require('../shared/bookingWorkbench');
+    const sharedCfg = require('../shared/serviceConfig');
+
+    const nowMs = new Date('2026-10-26T12:00:00Z').getTime();
+    const sampleBookings = JSON.parse(vm.runInContext('JSON.stringify(WORKBENCH_SAMPLE_BOOKINGS)', sandbox));
+
+    const expectedWb = sharedWb.buildBookingWorkbench(sampleBookings, 'todo', nowMs);
+    const modalRes = JSON.parse(vm.runInContext('JSON.stringify(openWorkbenchServiceModal("todo"))', sandbox));
+
+    expect(modalRes.workbench).toEqual(expectedWb);
+    expect(modalRes.workbench.queue.length).toBe(3);
+    // Highest urgency score is WB_20261026_01 (overdue +100, today pickup +80, priority +60, pending +10 = 250)
+    expect(modalRes.workbench.queue[0].id).toBe('WB_20261026_01');
+    expect(modalRes.workbench.queue[0].score).toBe(250);
+
+    const defaultCfg = JSON.parse(vm.runInContext('JSON.stringify(DEFAULT_SERVICE_CONFIG)', sandbox));
+    expect(modalRes.serviceConfig).toEqual(sharedCfg.normalizeServiceConfig(defaultCfg));
+
+    // Verify HTTPS enforcement on wxKfExtInfo
+    const httpErr = JSON.parse(
+      vm.runInContext(
+        'JSON.stringify(validateServiceConfig({ wxKfCorpId: "ww2826carplay", wxKfExtInfo: "http://work.weixin.qq.com/kfid/123" }))',
+        sandbox
+      )
+    );
+    expect(httpErr).toEqual({ field: 'wxKfExtInfo', message: '微信客服链接须为 HTTPS 地址' });
+  });
 });

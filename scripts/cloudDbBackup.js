@@ -29,6 +29,7 @@ const ALL_COLLECTIONS = [
   "content_guides",
   "privacy_requests",
   "pending_file_deletions",
+  "admin_upload_sessions",
   "analytics_events"
 ];
 
@@ -43,14 +44,18 @@ function formatTimestamp(d = new Date()) {
   return `${year}${month}${day}_${hours}${mins}${secs}`;
 }
 
-async function runBackup() {
-  const { flags } = parseArgs(process.argv);
-  const isDryRun = !!flags["--dry"] || !!flags["--dry-run"];
+async function runBackup(opts = {}) {
+  const parsed = opts.flags ? { flags: opts.flags } : parseArgs(opts.argv || process.argv);
+  const { flags } = parsed;
+  const isApply = !!flags["--apply"];
+  const isDryRun = !isApply || !!flags["--dry"] || !!flags["--dry-run"];
   const isAll = !!flags["--all"];
-  const singleCol = flags["--collection"];
+  const singleCol = typeof flags["--collection"] === "string" ? flags["--collection"].trim() : "";
   
   const rc = readCloudbaserc();
-  const envId = rc && rc.envId ? rc.envId : "cloud1-d8gtmns36320e045e";
+  const envId = (typeof flags["--env"] === "string" && flags["--env"].trim())
+    ? flags["--env"].trim()
+    : (rc && rc.envId ? rc.envId : "cloud1-d8gtmns36320e045e");
   
   let targetCollections = isAll ? ALL_COLLECTIONS : CORE_COLLECTIONS;
   if (singleCol) {
@@ -64,7 +69,7 @@ async function runBackup() {
   console.log(colorize("【云端·数据库异地容灾冷备】", "bold"));
   console.log(`目标云环境: ${colorize(envId, "cyan")}`);
   console.log(`备份模式: ${isDryRun ? colorize("DRY-RUN（仅模拟，不执行导出）", "yellow") : colorize("LIVE（实时拉取归档）", "green")}`);
-  console.log(`备份集合范围: ${singleCol ? colorize(singleCol, "yellow") : (isAll ? colorize("全部 16 个集合", "magenta") : colorize("核心 7 个核心业务集合", "cyan"))}`);
+  console.log(`备份集合范围: ${singleCol ? colorize(singleCol, "yellow") : (isAll ? colorize(`全部 ${ALL_COLLECTIONS.length} 个集合`, "magenta") : colorize(`核心 ${CORE_COLLECTIONS.length} 个核心业务集合`, "cyan"))}`);
   console.log(`归档目标目录: ${colorize(path.relative(projectRoot, backupFolder) || backupFolder, "gray")}`);
   console.log("");
 
@@ -76,8 +81,13 @@ async function runBackup() {
     console.log("");
     console.log(colorize("ℹ️ dry-run 校验通过。若要真正启动云端数据库冷备，请运行：", "gray"));
     console.log(colorize("    npm run cloud:backup -- --apply", "cyan"));
-    console.log(colorize("    npm run cloud:backup -- --apply --all  (全量 16 个集合)", "cyan"));
-    return;
+    console.log(colorize(`    npm run cloud:backup -- --apply --all  (全量 ${ALL_COLLECTIONS.length} 个集合)`, "cyan"));
+    return {
+      mode: "dry-run",
+      envId,
+      targetCollections: [...targetCollections],
+      backupFolder
+    };
   }
 
   if (!fs.existsSync(backupFolder)) {
@@ -91,7 +101,7 @@ async function runBackup() {
     const start = Date.now();
     process.stdout.write(`  • 正在导出 ${colorize(col, "cyan")} ... `);
     try {
-      const cmd = `tcb db nosql dump "${col}" --file-type json --output-dir "${backupFolder}"`;
+      const cmd = `tcb db nosql dump "${col}" --file-type json --output-dir "${backupFolder}" -e "${envId}"`;
       execSync(cmd, { stdio: "pipe", cwd: projectRoot });
       const durationMs = Date.now() - start;
       console.log(colorize(`✔ 成功 (${durationMs}ms)`, "green"));

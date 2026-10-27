@@ -3,23 +3,28 @@ const path = require("path");
 const { execSync } = require("child_process");
 const { colorize, readCloudbaserc, parseArgs } = require("./_cloudUtil");
 
-function deployAdmin() {
-  const { flags } = parseArgs(process.argv);
-  const isDryRun = !!flags["--dry"] || !!flags["--dry-run"];
+function deployAdmin(opts = {}) {
+  const parsed = opts.flags ? { flags: opts.flags } : parseArgs(opts.argv || process.argv);
+  const { flags } = parsed;
+  const isApply = !!flags["--apply"];
+  const isDryRun = !isApply || !!flags["--dry"] || !!flags["--dry-run"];
   
   const projectRoot = path.resolve(__dirname, "..");
   const adminHtmlPath = path.join(projectRoot, "web-admin", "index.html");
   
   if (!fs.existsSync(adminHtmlPath)) {
     console.error(colorize("❌ 找不到 web-admin/index.html 文件", "red"));
-    process.exit(1);
+    if (opts.cli !== false) process.exit(1);
+    return { exitCode: 1, mode: isDryRun ? "dry-run" : "apply" };
   }
 
   const stat = fs.statSync(adminHtmlPath);
   const sizeKb = (stat.size / 1024).toFixed(2);
   
   const rc = readCloudbaserc();
-  const envId = rc && rc.envId ? rc.envId : "cloud1-d8gtmns36320e045e";
+  const envId = (typeof flags["--env"] === "string" && flags["--env"].trim())
+    ? flags["--env"].trim()
+    : (rc && rc.envId ? rc.envId : "cloud1-d8gtmns36320e045e");
 
   console.log(colorize("【云端·静态托管 Web 运营后台部署】", "bold"));
   console.log(`目标环境: ${colorize(envId, "cyan")}`);
@@ -30,7 +35,7 @@ function deployAdmin() {
   if (isDryRun) {
     console.log(colorize("ℹ️ dry-run 检查通过。若要真正发布到静态托管，请运行：", "gray"));
     console.log(colorize("    node scripts/cloudAdminDeploy.js --apply", "cyan"));
-    return;
+    return { exitCode: 0, mode: "dry-run", envId, adminHtmlPath, sizeKb: Number(sizeKb) };
   }
 
   try {

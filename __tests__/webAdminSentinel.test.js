@@ -352,4 +352,45 @@ describe('Web Admin Gateway Sentinel & Operations Center', () => {
     const approvedTicket = vm.runInContext('approveCurrentPrivacyTicket()', sandbox);
     expect(approvedTicket.status).toBe('APPROVED_ARCHIVED');
   });
+
+  test('57 微服务公开白名单 (5) 与鉴权私有 (52) 矩阵与 scripts/cloudAuthAudit.js 完全一致', () => {
+    const { EXPECTED_PUBLIC } = require('../scripts/cloudAuthAudit');
+    const publicFns = Array.from(vm.runInContext('CLOUD_MICROSERVICES.filter(f => f.auth === "public").map(f => f.name)', sandbox));
+    const authFns = Array.from(vm.runInContext('CLOUD_MICROSERVICES.filter(f => f.auth === "auth").map(f => f.name)', sandbox));
+
+    expect(publicFns.length).toBe(5);
+    expect(authFns.length).toBe(52);
+    expect(new Set(publicFns)).toEqual(EXPECTED_PUBLIC);
+  });
+
+  test('云端异地容灾冷备与增量发布编排中心 (triggerColdBackup & cloudDbBackup / cloudAdminDeploy 默认 dry-run 守卫)', async () => {
+    const fullManifest = vm.runInContext('triggerColdBackup("full_backup")', sandbox);
+    expect(fullManifest.totalCollectionsInScope).toBe(17);
+    expect(fullManifest.publicWhitelistFunctions).toBe(5);
+    expect(fullManifest.authenticatedFunctions).toBe(52);
+    expect(fullManifest.recommendedCommand).toBe('npm run cloud:backup -- --apply --all');
+
+    const coreManifest = vm.runInContext('buildColdBackupManifest("core_backup")', sandbox);
+    expect(coreManifest.totalCollectionsInScope).toBe(7);
+
+    // Verify scripts/cloudDbBackup.js 17 collections & default dry-run safety
+    const { ALL_COLLECTIONS, CORE_COLLECTIONS, runBackup } = require('../scripts/cloudDbBackup');
+    const secManifest = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'security-rules', 'manifest.json'), 'utf8'));
+    const secCollections = secManifest.database.collections;
+    const webAdminCollections = Array.from(vm.runInContext('COLLECTIONS_INFO.map(c => c.key)', sandbox));
+    expect(ALL_COLLECTIONS.length).toBe(17);
+    expect(CORE_COLLECTIONS.length).toBe(7);
+    expect(new Set(ALL_COLLECTIONS)).toEqual(new Set(secCollections));
+    expect(new Set(webAdminCollections)).toEqual(new Set(secCollections));
+
+    const dryBackupRes = await runBackup({ flags: { '--all': true } });
+    expect(dryBackupRes.mode).toBe('dry-run');
+    expect(dryBackupRes.targetCollections.length).toBe(17);
+
+    // Verify scripts/cloudAdminDeploy.js default dry-run safety
+    const { deployAdmin } = require('../scripts/cloudAdminDeploy');
+    const dryDeployRes = deployAdmin({ cli: false, flags: {} });
+    expect(dryDeployRes.exitCode).toBe(0);
+    expect(dryDeployRes.mode).toBe('dry-run');
+  });
 });

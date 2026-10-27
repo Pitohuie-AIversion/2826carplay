@@ -2993,6 +2993,55 @@
     </div>
   </div>
 
+  <!-- ==================== MODAL 11: CLOUD DISASTER RECOVERY & DEPLOYMENT ORCHESTRATOR (异地容灾冷备与增量发布编排工作台) ==================== -->
+  <div class="modal-overlay" id="cloudOpsModal">
+    <div class="modal-box" style="max-width: 780px;">
+      <div class="modal-header">
+        <h3><span>💾</span> 云端异地容灾冷备与 57 函数增量发布编排中心 (cloudDbBackup &amp; deployAll)</h3>
+        <button class="btn-close" onclick="closeCloudOpsModal()">×</button>
+      </div>
+
+      <div style="background: rgba(56, 189, 248, 0.08); border-left: 3px solid var(--primary); padding: 0.65rem 0.85rem; border-radius: var(--radius-sm); font-size: 0.75rem; color: var(--text-muted); line-height: 1.55;">
+        <strong style="color: #38bdf8;">安全发布与容灾守卫 (scripts/cloudDbBackup.js &amp; deployAll.js)：</strong>所有运维命令默认启用 <code>DRY-RUN</code> 演练保护，须显式携带 <code>--apply</code> 才执行线上拉取或部署；安全规则仅做本地校验并输出人工核验步骤，绝不静默覆盖线上权限。
+      </div>
+
+      <div class="modal-field">
+        <label>选择容灾冷备 / 增量发布编排模式</label>
+        <select class="search-input" id="cloudOpsModeSelect" style="width: 100%; padding: 0.6rem;" onchange="onCloudOpsModeChange(this.value)">
+          <option value="full_backup">💾 全量 17 集合异地容灾冷备 (npm run cloud:backup -- --apply --all)</option>
+          <option value="core_backup">📦 核心 7 业务集合快速冷备 (npm run cloud:backup -- --apply)</option>
+          <option value="deploy_dry">🔍 57 云函数 SHA-256 指纹增量比对演练 (npm run cloud:deploy)</option>
+          <option value="deploy_apply">🚀 57 云函数增量部署 + Web 运营中心静态托管发布 (npm run cloud:deploy:apply)</option>
+        </select>
+      </div>
+
+      <div class="modal-field">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <label>标准终端执行命令 (Terminal CLI Command)</label>
+          <button type="button" class="btn-action" style="padding:0.2rem 0.55rem; font-size:0.72rem;" onclick="copyCloudOpsCliCommand()">
+            <span>📋</span> 复制 CLI 命令
+          </button>
+        </div>
+        <input type="text" class="search-input" id="cloudOpsCliInput" readonly style="width: 100%; font-family: 'JetBrains Mono', monospace; color: #fbbf24; background: rgba(5, 8, 17, 0.9);" value="npm run cloud:backup -- --apply --all">
+      </div>
+
+      <div class="modal-field">
+        <label>冷备归档清单 / 增量发布指纹回执预览 (backup_manifest.json)</label>
+        <textarea id="cloudOpsManifestBox" readonly style="width: 100%; height: 155px; background: rgba(5, 8, 17, 0.85); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: #38bdf8; font-size: 0.74rem; font-family: 'JetBrains Mono', monospace; padding: 0.65rem; resize: none; line-height: 1.45;"></textarea>
+      </div>
+
+      <div class="modal-footer" style="display:flex; justify-content:space-between; align-items:center;">
+        <button class="btn-action" style="border-color: rgba(16, 185, 129, 0.4); color: #34d399;" onclick="downloadColdBackupManifest()">
+          <span>📥</span> 导出冷备凭据清单 (backup_manifest.json)
+        </button>
+        <div style="display:flex; gap:0.65rem;">
+          <button class="btn-action" onclick="closeCloudOpsModal()">关闭</button>
+          <button class="btn-action primary" onclick="copyCloudOpsCliCommand()"><span>💻</span> 复制命令并就绪</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Element -->
   <div id="toast">
     <span id="toastIcon">ℹ️</span>
@@ -3023,7 +3072,7 @@
 
       // Cluster 2: Fleet & Availability Matrix (12)
       { name: 'garageVehicleList', cluster: 'fleet', qps: 18.2, p95: 16, auth: 'public', desc: '公开车库大厅列表 (保活预热)' },
-      { name: 'vehicleAvailabilityCheck', cluster: 'fleet', qps: 8.4, p95: 24, auth: 'public', desc: '多区间档期占用排查与估价' },
+      { name: 'vehicleAvailabilityCheck', cluster: 'fleet', qps: 8.4, p95: 24, auth: 'auth', desc: '多区间档期占用排查与估价' },
       { name: 'vehicleCalendarManage', cluster: 'fleet', qps: 3.6, p95: 36, auth: 'auth', desc: '按日占用锁与47天边界安全调度' },
       { name: 'vehicleCreate', cluster: 'fleet', qps: 0.3, p95: 48, auth: 'auth', desc: '新车入库上牌与基础配置录入' },
       { name: 'vehicleDelete', cluster: 'fleet', qps: 0.1, p95: 42, auth: 'auth', desc: '退役车辆级联归档清除' },
@@ -4779,8 +4828,106 @@
       showToast(`已成功导出 ${fileName}，已遵循 17 列脱敏规范`, '📑');
     }
 
-    function triggerColdBackup() {
-      showToast('可通过 CLI 执行 npm run cloud:backup 一键生成异地多副本冷备快照', '💾');
+    const CORE_BACKUP_KEYS = [
+      'vehicles',
+      'bookings',
+      'vehicle_calendar_days',
+      'vehicle_availability_blocks',
+      'roles',
+      'app_configs',
+      'audit_logs'
+    ];
+
+    function buildColdBackupManifest(mode = 'full_backup') {
+      const cliMap = {
+        full_backup: 'npm run cloud:backup -- --apply --all',
+        core_backup: 'npm run cloud:backup -- --apply',
+        deploy_dry: 'npm run cloud:deploy',
+        deploy_apply: 'npm run cloud:deploy:apply'
+      };
+      const selectedMode = cliMap[mode] ? mode : 'full_backup';
+      const isCore = selectedMode === 'core_backup';
+      const targetCollections = isCore
+        ? COLLECTIONS_INFO.filter(c => CORE_BACKUP_KEYS.includes(c.key))
+        : COLLECTIONS_INFO;
+
+      return {
+        schemaVersion: 'CLOUDBASE-BACKUP-MANIFEST-2026.10',
+        envId: 'cloud1-d8gtmns36320e045e',
+        orchestrationMode: selectedMode,
+        recommendedCommand: cliMap[selectedMode],
+        defaultSafetyMode: 'DRY-RUN (unless --apply is explicitly passed)',
+        totalCloudFunctions: CLOUD_MICROSERVICES.length,
+        publicWhitelistFunctions: CLOUD_MICROSERVICES.filter(f => f.auth === 'public').length,
+        authenticatedFunctions: CLOUD_MICROSERVICES.filter(f => f.auth === 'auth').length,
+        totalCollectionsInScope: targetCollections.length,
+        collections: targetCollections.map(c => ({
+          collection: c.key,
+          label: c.label,
+          docCount: c.count,
+          estimatedSize: c.size,
+          indexCount: c.indexes,
+          zeroTrustClientRule: { read: false, write: false }
+        }))
+      };
+    }
+
+    function onCloudOpsModeChange(mode = 'full_backup') {
+      const manifest = buildColdBackupManifest(mode);
+      const cliInput = document.getElementById('cloudOpsCliInput');
+      if (cliInput) cliInput.value = manifest.recommendedCommand;
+      const box = document.getElementById('cloudOpsManifestBox');
+      if (box) box.value = JSON.stringify(manifest, null, 2);
+      return manifest;
+    }
+
+    function openCloudOpsModal(defaultMode = 'full_backup') {
+      const sel = document.getElementById('cloudOpsModeSelect');
+      if (sel) sel.value = defaultMode;
+      const manifest = onCloudOpsModeChange(defaultMode);
+      const modal = document.getElementById('cloudOpsModal');
+      if (modal) modal.classList.add('open');
+      return manifest;
+    }
+
+    function closeCloudOpsModal() {
+      const modal = document.getElementById('cloudOpsModal');
+      if (modal) modal.classList.remove('open');
+    }
+
+    function copyCloudOpsCliCommand() {
+      const cliInput = document.getElementById('cloudOpsCliInput');
+      const cmd = cliInput ? cliInput.value : 'npm run cloud:backup -- --apply --all';
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(cmd).catch(() => {});
+      }
+      showToast(`已复制运维命令：${cmd}`, '💻');
+      return cmd;
+    }
+
+    function downloadColdBackupManifest() {
+      const sel = document.getElementById('cloudOpsModeSelect');
+      const mode = sel && sel.value ? sel.value : 'full_backup';
+      const manifest = buildColdBackupManifest(mode);
+      if (typeof Blob !== 'undefined' && typeof URL !== 'undefined' && URL.createObjectURL) {
+        const blob = new Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', `backup_manifest_${mode}.json`);
+        if (document.body && document.body.appendChild) {
+          document.body.appendChild(link);
+          if (link.click) link.click();
+          if (document.body.removeChild) document.body.removeChild(link);
+        }
+      }
+      appendLogStreamEntry('COLD_BACKUP', 'cloudDbBackup', 200, `已生成 ${manifest.totalCollectionsInScope} 集合异地容灾冷备凭据清单 (${mode})`, 22);
+      showToast(`已生成并导出 ${manifest.totalCollectionsInScope} 集合异地冷备凭据清单！`, '💾');
+      return manifest;
+    }
+
+    function triggerColdBackup(mode = 'full_backup') {
+      return openCloudOpsModal(mode);
     }
 
     // ==================== 12. PRICING SIMULATOR ====================
@@ -5982,11 +6129,11 @@
         status: 'PENDING_REVIEW',
         submittedAt: '2026-10-26 14:20',
         scopedCollections: [
-          { collection: 'bookings', count: 6, whitelistFields: 'orderNo, vehicleName, pickupTime, returnTime, finalAmount, status', excludedFields: '_openid, managerId, internalRemark' },
-          { collection: 'favorite_entries', count: 4, whitelistFields: 'vehicleId, vehicleName, createdAt', excludedFields: '_openid' },
-          { collection: 'privacy_requests', count: 1, whitelistFields: 'ticketId, requestType, status, createdAt', excludedFields: '_openid, handlerOpenId, auditNote' },
-          { collection: 'customer_Access_list', count: 1, whitelistFields: 'memberTier, maskedPhone, depositExemptionStatus', excludedFields: 'openId, idCardHash' },
-          { collection: 'analytics_events', count: 18, whitelistFields: 'eventType, pagePath, timestamp (已定周期自动脱敏清理)', excludedFields: '_openid, deviceIp' },
+          { collection: 'bookings', count: 6, whitelistFields: 'bookingNo, vehicleName, startDate, endDate, totalAmount, status', excludedFields: 'openid, adminRemark, coordinationNote' },
+          { collection: 'favorites', count: 4, whitelistFields: 'vehicleId, vehicleName, createdAt', excludedFields: 'openid' },
+          { collection: 'privacy_requests', count: 1, whitelistFields: 'ticketId, type, status, createdAt', excludedFields: 'openid, handledByOpenid, reviewNote' },
+          { collection: 'booking_quotes', count: 5, whitelistFields: 'bookingId, quoteRevision, finalAmount, status', excludedFields: 'openid, adminOpenid' },
+          { collection: 'analytics_events', count: 18, whitelistFields: 'eventType, pagePath, createdAt (90天周期自动脱敏清理)', excludedFields: 'openid, clientIp' },
           { collection: '其余 12 个系统与车源集合', count: 0, whitelistFields: '无个人身份关联字段 (零触碰隔离)', excludedFields: '全量隔离' }
         ]
       },
@@ -5997,11 +6144,11 @@
         status: 'APPROVED_ARCHIVED',
         submittedAt: '2026-10-25 18:05',
         scopedCollections: [
-          { collection: 'bookings', count: 3, whitelistFields: 'orderNo, vehicleName, pickupTime, returnTime, finalAmount, status', excludedFields: '_openid, managerId, internalRemark' },
-          { collection: 'favorite_entries', count: 2, whitelistFields: 'vehicleId, vehicleName, createdAt', excludedFields: '_openid' },
-          { collection: 'privacy_requests', count: 1, whitelistFields: 'ticketId, requestType, status, createdAt', excludedFields: '_openid, handlerOpenId, auditNote' },
-          { collection: 'customer_Access_list', count: 1, whitelistFields: 'memberTier, maskedPhone, depositExemptionStatus', excludedFields: 'openId, idCardHash' },
-          { collection: 'analytics_events', count: 7, whitelistFields: 'eventType, pagePath, timestamp', excludedFields: '_openid, deviceIp' },
+          { collection: 'bookings', count: 3, whitelistFields: 'bookingNo, vehicleName, startDate, endDate, totalAmount, status', excludedFields: 'openid, adminRemark, coordinationNote' },
+          { collection: 'favorites', count: 2, whitelistFields: 'vehicleId, vehicleName, createdAt', excludedFields: 'openid' },
+          { collection: 'privacy_requests', count: 1, whitelistFields: 'ticketId, type, status, createdAt', excludedFields: 'openid, handledByOpenid, reviewNote' },
+          { collection: 'booking_quotes', count: 2, whitelistFields: 'bookingId, quoteRevision, finalAmount, status', excludedFields: 'openid, adminOpenid' },
+          { collection: 'analytics_events', count: 7, whitelistFields: 'eventType, pagePath, createdAt', excludedFields: 'openid, clientIp' },
           { collection: '其余 12 个系统与车源集合', count: 0, whitelistFields: '无个人身份关联字段 (零触碰隔离)', excludedFields: '全量隔离' }
         ]
       }

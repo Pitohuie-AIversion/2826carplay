@@ -18,10 +18,26 @@
  */
 
 const { spawnSync } = require("child_process")
+const fs = require("fs")
+const os = require("os")
 const path = require("path")
 
 const PROJECT_ROOT = path.resolve(__dirname, "..")
 const isStaticOnly = process.argv.includes("--static") || process.argv.includes("--fast")
+
+function resolveStageEnv() {
+  const env = { ...process.env, CI: "true" }
+  try {
+    fs.realpathSync.native(os.tmpdir())
+  } catch (err) {
+    const fallbackTmp = path.join(PROJECT_ROOT, "node_modules", ".cache", "jest-tmp")
+    fs.mkdirSync(fallbackTmp, { recursive: true })
+    env.TEMP = fallbackTmp
+    env.TMP = fallbackTmp
+    env.TMPDIR = fallbackTmp
+  }
+  return env
+}
 
 const STAGES = [
   {
@@ -95,7 +111,7 @@ function runStage(stage) {
   const proc = spawnSync(process.execPath, [targetScript, ...stage.args], {
     cwd: PROJECT_ROOT,
     stdio: isJest ? "inherit" : "inherit",
-    env: { ...process.env, CI: "true" }
+    env: resolveStageEnv()
   })
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(2)

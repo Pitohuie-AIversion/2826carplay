@@ -272,4 +272,84 @@ describe('Web Admin Gateway Sentinel & Operations Center', () => {
     vm.runInContext('resetFleetSchedules()', sandbox);
     expect(vm.runInContext('VEHICLES[0].status', sandbox)).toBe('rented');
   });
+
+  test('57函数智能拨测模板与 RBAC 三态权限白名单矩阵断言 (runAuthMatrixAssertion)', () => {
+    const publicPayload = vm.runInContext('getPresetPayloadForFunction("garageVehicleList")', sandbox);
+    expect(publicPayload.city).toBe('杭州');
+
+    const handoverPayload = vm.runInContext('getPresetPayloadForFunction("bookingHandover")', sandbox);
+    expect(Array.isArray(handoverPayload.cornerPhotos)).toBe(true);
+    expect(handoverPayload.cornerPhotos.length).toBe(4);
+
+    // Public whitelist function (garageVehicleList): anonymous should be 200 OK
+    const pubMatrix = vm.runInContext('runAuthMatrixAssertion("garageVehicleList")', sandbox);
+    expect(pubMatrix.isPublic).toBe(true);
+    expect(pubMatrix.matrix[0].role).toBe('anonymous');
+    expect(pubMatrix.matrix[0].status).toBe(200);
+
+    // Authenticated function (bookingCreate): anonymous should be 403 AUTH_REQUIRED
+    const authMatrix = vm.runInContext('runAuthMatrixAssertion("bookingCreate")', sandbox);
+    expect(authMatrix.isPublic).toBe(false);
+    expect(authMatrix.matrix[0].role).toBe('anonymous');
+    expect(authMatrix.matrix[0].status).toBe(403);
+    expect(authMatrix.matrix[1].status).toBe(200);
+    expect(authMatrix.matrix[2].status).toBe(200);
+  });
+
+  test('云端自动化维护哨兵演练与 47 天档期跨度边界及按日占用锁冲突判定器', () => {
+    const cronRes = vm.runInContext('triggerCronSentinel("analyticsCleanup")', sandbox);
+    expect(cronRes.ok).toBe(true);
+    expect(cronRes.fnName).toBe('analyticsCleanup');
+
+    // 1. Overlap conflict test (v6 has lockedDays ['2026-10-25', '2026-10-26', '2026-10-27'])
+    const conflictRes = vm.runInContext(`
+      validateCalendarSpanAndConflict({
+        vehicleId: 'v6',
+        startDate: '2026-10-25',
+        endDate: '2026-10-27'
+      })
+    `, sandbox);
+    expect(conflictRes.ok).toBe(false);
+    expect(conflictRes.code).toBe('CALENDAR_DAY_LOCK_CONFLICT');
+    expect(conflictRes.conflictDays.length).toBe(3);
+
+    // 2. Exceeding 47-day span limit test
+    const overSpanRes = vm.runInContext(`
+      validateCalendarSpanAndConflict({
+        vehicleId: 'v1',
+        startDate: '2026-11-01',
+        endDate: '2026-12-30'
+      })
+    `, sandbox);
+    expect(overSpanRes.ok).toBe(false);
+    expect(overSpanRes.code).toBe('MAX_SPAN_EXCEEDED');
+    expect(overSpanRes.spanDays).toBe(60);
+    expect(overSpanRes.maxAllowedDays).toBe(47);
+
+    // 3. Valid non-overlapping date range within 47 days
+    const safeRes = vm.runInContext(`
+      validateCalendarSpanAndConflict({
+        vehicleId: 'v1',
+        startDate: '2026-11-05',
+        endDate: '2026-11-08'
+      })
+    `, sandbox);
+    expect(safeRes.ok).toBe(true);
+    expect(safeRes.code).toBe('CALENDAR_SPAN_SAFE');
+    expect(safeRes.spanDays).toBe(4);
+  });
+
+  test('全链路网关 Trace 零 OpenID 泄露审计与 17 集合隐私合规工单盘点审批', () => {
+    const tracePayload = vm.runInContext('openLatestTraceInspector()', sandbox);
+    expect(tracePayload.openIdExposed).toBe(false);
+    expect(tracePayload.callerMask).toBe('usr_mask_9f2a***');
+
+    const inventory = vm.runInContext('buildPersonalDataInventory("PRV-20261026-01")', sandbox);
+    expect(inventory.zeroOpenIdLeakageVerified).toBe(true);
+    expect(inventory.totalCollectionsAudited).toBe(17);
+    expect(inventory.scopedCollections.length).toBe(6);
+
+    const approvedTicket = vm.runInContext('approveCurrentPrivacyTicket()', sandbox);
+    expect(approvedTicket.status).toBe('APPROVED_ARCHIVED');
+  });
 });

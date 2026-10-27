@@ -589,4 +589,42 @@ describe('Web Admin Gateway Sentinel & Operations Center', () => {
     );
     expect(actualAttr).toEqual(sharedAttr.sanitizeAttribution(rawAttr));
   });
+
+  test('月度预约日历冲突矩阵、网点消歧定位、有界CSV解析器与跨时区日期工具与 shared 完全一致', () => {
+    const sharedCal = require('../shared/bookingCalendar');
+    const sharedLoc = require('../shared/locations');
+    const sharedCsv = require('../shared/csvFile');
+    const sharedDate = require('../shared/dateUtils');
+
+    const sampleBookings = JSON.parse(vm.runInContext('JSON.stringify(CALENDAR_SAMPLE_BOOKINGS)', sandbox));
+    const expectedView = sharedCal.buildMonthView('2026-10', sampleBookings, '2026-10-26');
+    const modalRes = JSON.parse(vm.runInContext('JSON.stringify(openMonthCalendarModal())', sandbox));
+
+    expect(modalRes.view).toEqual(expectedView);
+    expect(modalRes.view.summary.bookingCount).toBe(3); // cancelled CB_04 filtered out
+    expect(modalRes.view.summary.conflictDayCount).toBe(2); // 2026-10-26 & 2026-10-27 on v1
+    expect(modalRes.view.selectedConflictCount).toBe(1);
+
+    // Location disambiguation: '杭州市' resolves unambiguously to the single store hub in Hangzhou
+    const hubs = JSON.parse(vm.runInContext('JSON.stringify(DEFAULT_SERVICE_CONFIG.serviceHubs)', sandbox));
+    expect(modalRes.resolvedHub).toEqual(sharedLoc.resolveServiceHub('杭州市', '杭州', hubs));
+    expect(modalRes.resolvedHub.id).toBe('hub_hz_westlake');
+    expect(vm.runInContext('formatLocationDisplay("西湖门店", "杭州")', sandbox)).toBe(
+      sharedLoc.formatLocationDisplay('西湖门店', '杭州')
+    );
+
+    // Bounded CSV preview parser
+    const csvSample = '\uFEFF预约单号,车型,租期\r\n"BK_01","Porsche 911","3 天 2 晚"\r\n';
+    expect(modalRes.sampleCsvPreview).toEqual(sharedCsv.parseCsvPreview(csvSample));
+    expect(() => vm.runInContext('parseCsvPreview(\'"unclosed quote\')', sandbox)).toThrow('CSV 内容不完整');
+
+    // Date utils
+    expect(vm.runInContext('formatDateSpan("2026-10-26", "2026-10-28", { withNights: true })', sandbox)).toBe(
+      sharedDate.formatDateSpan('2026-10-26', '2026-10-28', { withNights: true })
+    );
+    expect(vm.runInContext('isDateOverlap("2026-10-25", "2026-10-27", "2026-10-27", "2026-10-29")', sandbox)).toBe(true);
+    expect(vm.runInContext('getChinaToday("2026-10-26T20:00:00Z")', sandbox)).toBe(
+      sharedDate.getChinaToday('2026-10-26T20:00:00Z')
+    );
+  });
 });

@@ -1824,6 +1824,9 @@
               <button class="btn-action" style="border-color: rgba(56, 189, 248, 0.4); color: #38bdf8;" onclick="openCalendarConflictModal()">
                 <span>🛡️</span> 47天跨度与冲突校验
               </button>
+              <button class="btn-action" style="border-color: rgba(168, 85, 247, 0.4); color: #c084fc;" onclick="openMonthCalendarModal()">
+                <span>📆</span> 月度日历冲突矩阵
+              </button>
               <button class="btn-action" onclick="syncAllLocks()">
                 <span>🔒</span> 日锁全量校验
               </button>
@@ -3251,6 +3254,48 @@
         <div style="display:flex; gap:0.65rem;">
           <button class="btn-action" onclick="closeVehicleOnboardModal()">关闭</button>
           <button class="btn-action primary" onclick="submitVehicleOnboardPreview()"><span>✅</span> 模拟入库校验并写审计</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 15: Monthly Booking Calendar Conflict Matrix, Location Resolver & CSV Previewer -->
+  <div class="modal-overlay" id="monthCalendarModal">
+    <div class="modal-card" style="max-width: 840px;">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span>📆</span> 月度预约日历同车重叠冲突矩阵、网点消歧与有界 CSV 解析台
+        </div>
+        <button class="modal-close" onclick="closeMonthCalendarModal()">×</button>
+      </div>
+      <div class="modal-subtitle">
+        对齐 <code style="color:#c084fc;">shared/bookingCalendar.js</code> (月度网格、同车重叠冲突与 ARIA 无障碍播报标签)、<code style="color:#38bdf8;">shared/locations.js</code> (城市单门店智能消歧) 与 <code style="color:#34d399;">shared/csvFile.js</code> (128KB/100行/30列有界 CSV 解析)。
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.65rem;">
+        <div style="display:flex; align-items:center; gap:0.5rem;">
+          <button type="button" class="btn-action" style="padding:0.2rem 0.55rem; font-size:0.74rem;" onclick="switchCalendarMonth(-1)">◀ 上月</button>
+          <strong id="monthCalendarTitle" style="color:#f8fafc; font-size:0.9rem;">2026 年 10 月</strong>
+          <button type="button" class="btn-action" style="padding:0.2rem 0.55rem; font-size:0.74rem;" onclick="switchCalendarMonth(1)">下月 ▶</button>
+        </div>
+        <div id="monthCalendarSummaryBadges" style="display:flex; gap:0.45rem; flex-wrap:wrap;">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+
+      <div id="monthCalendarCellsGrid" style="display:grid; grid-template-columns:repeat(7, 1fr); gap:0.35rem; margin-bottom:0.75rem;">
+        <!-- Populated dynamically -->
+      </div>
+
+      <div class="modal-field">
+        <label>有界 CSV 预览解析 (parseCsvPreview) 与网点消歧定位结果 (resolveServiceHub)</label>
+        <textarea id="monthCalendarInspectorBox" readonly style="width: 100%; height: 120px; background: rgba(5, 8, 17, 0.85); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: #38bdf8; font-size: 0.73rem; font-family: 'JetBrains Mono', monospace; padding: 0.6rem; resize: none; line-height: 1.4;"></textarea>
+      </div>
+
+      <div class="modal-footer" style="display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-size:0.72rem; color:var(--text-dim);">自动过滤已取消订单，精准识别同车跨天重叠冲突与无障碍 ARIA 描述</span>
+        <div style="display:flex; gap:0.65rem;">
+          <button class="btn-action" onclick="closeMonthCalendarModal()">关闭</button>
         </div>
       </div>
     </div>
@@ -8053,6 +8098,421 @@
       appendLogStreamEntry('VEHICLE_ONBOARD', 'vehicleCreate', 200, `新车 ${res.validation.value.brandModel} (${res.validation.value.plateNumber}) 通过 Schema 校验`, 29);
       showToast(`已通过【${res.validation.value.brandModel}】全维 Schema 入库校验！`, '🏎️');
       return res;
+    }
+
+    // ==================== 15F. MONTHLY BOOKING CALENDAR, LOCATION RESOLVER, BOUNDED CSV PARSER & DATE UTILS (对齐 shared/bookingCalendar.js, locations.js, csvFile.js, dateUtils.js) ====================
+    function padTwo(value) {
+      return String(value).padStart(2, '0');
+    }
+
+    function normalizeMonthKey(value) {
+      const text = String(value || '');
+      const match = text.match(/^(\d{4})-(\d{2})$/);
+      if (match) {
+        const month = Number(match[2]);
+        if (month >= 1 && month <= 12) {
+          return `${match[1]}-${match[2]}`;
+        }
+      }
+      const now = new Date();
+      return `${now.getFullYear()}-${padTwo(now.getMonth() + 1)}`;
+    }
+
+    function shiftMonth(monthKey, offset) {
+      const normalized = normalizeMonthKey(monthKey);
+      const [year, month] = normalized.split('-').map(Number);
+      const date = new Date(year, month - 1 + Number(offset || 0), 1);
+      return `${date.getFullYear()}-${padTwo(date.getMonth() + 1)}`;
+    }
+
+    function formatMonthTitle(monthKey) {
+      const [year, month] = normalizeMonthKey(monthKey).split('-');
+      return `${year} 年 ${Number(month)} 月`;
+    }
+
+    function getConflictVehicleCount(bookings) {
+      const vehicleCounts = new Map();
+      const list = Array.isArray(bookings) ? bookings : [];
+      list.forEach(item => {
+        const vehicleId = String((item && item.vehicleId) || '').trim();
+        if (vehicleId) {
+          vehicleCounts.set(vehicleId, (vehicleCounts.get(vehicleId) || 0) + 1);
+        }
+      });
+      return Array.from(vehicleCounts.values()).filter(count => count > 1).length;
+    }
+
+    function getConflictVehicleIds(bookings) {
+      const vehicleCounts = new Map();
+      const list = Array.isArray(bookings) ? bookings : [];
+      list.forEach(item => {
+        const vehicleId = String((item && item.vehicleId) || '').trim();
+        if (vehicleId) {
+          vehicleCounts.set(vehicleId, (vehicleCounts.get(vehicleId) || 0) + 1);
+        }
+      });
+      return new Set(
+        Array.from(vehicleCounts.entries())
+          .filter(entry => entry[1] > 1)
+          .map(entry => entry[0])
+      );
+    }
+
+    function buildDateAriaLabel(input) {
+      const source = input && typeof input === 'object' ? input : {};
+      const parts = [String(source.date || '')];
+      if (source.isToday) parts.push('今天');
+      if (source.isSelected) parts.push('已选中');
+      parts.push(`${Number(source.bookingCount) || 0} 条预约`);
+      if (source.pendingCount) parts.push(`${Number(source.pendingCount)} 条待联系`);
+      if (source.hasConflict) parts.push('存在同车预约重叠');
+      return parts.join('，');
+    }
+
+    function buildMonthView(monthKey, bookings, selectedDate) {
+      const normalized = normalizeMonthKey(monthKey);
+      const [year, month] = normalized.split('-').map(Number);
+      const firstDate = new Date(year, month - 1, 1);
+      const dayCount = new Date(year, month, 0).getDate();
+      const monthStart = `${normalized}-01`;
+      const monthEnd = `${normalized}-${padTwo(dayCount)}`;
+      const todayDate = new Date();
+      const today = `${todayDate.getFullYear()}-${padTwo(todayDate.getMonth() + 1)}-${padTwo(todayDate.getDate())}`;
+      const activeBookings = (Array.isArray(bookings) ? bookings : []).filter(item => {
+        if (String(item.status || 'pending') === 'cancelled') return false;
+        const startDate = String(item.startDate || '');
+        const endDate = String(item.endDate || startDate);
+        return (
+          /^\d{4}-\d{2}-\d{2}$/.test(startDate) &&
+          /^\d{4}-\d{2}-\d{2}$/.test(endDate) &&
+          startDate <= endDate &&
+          startDate <= monthEnd &&
+          endDate >= monthStart
+        );
+      });
+      const safeSelectedDate =
+        String(selectedDate || '').startsWith(`${normalized}-`)
+          ? String(selectedDate)
+          : today.startsWith(`${normalized}-`)
+            ? today
+            : monthStart;
+      const cells = [];
+
+      for (let index = 0; index < firstDate.getDay(); index += 1) {
+        cells.push({ key: `empty-start-${index}`, empty: true });
+      }
+
+      for (let day = 1; day <= dayCount; day += 1) {
+        const date = `${normalized}-${padTwo(day)}`;
+        const dayBookings = activeBookings.filter(item => {
+          const startDate = String(item.startDate || '');
+          const endDate = String(item.endDate || startDate);
+          return startDate <= date && endDate >= date;
+        });
+        const conflictVehicleCount = getConflictVehicleCount(dayBookings);
+        const bookingCount = dayBookings.length;
+        const pendingCount = dayBookings.filter(item => item.status === 'pending').length;
+        const isToday = date === today;
+        const isSelected = date === safeSelectedDate;
+        const hasConflict = conflictVehicleCount > 0;
+        cells.push({
+          key: date,
+          date,
+          day,
+          empty: false,
+          isToday,
+          isSelected,
+          bookingCount,
+          pendingCount,
+          hasBookings: bookingCount > 0,
+          hasConflict,
+          conflictVehicleCount,
+          ariaLabel: buildDateAriaLabel({
+            date,
+            isToday,
+            isSelected,
+            bookingCount,
+            pendingCount,
+            hasConflict
+          })
+        });
+      }
+
+      while (cells.length % 7 !== 0) {
+        cells.push({ key: `empty-end-${cells.length}`, empty: true });
+      }
+
+      const selectedBookingsRaw = activeBookings
+        .filter(item => {
+          const startDate = String(item.startDate || '');
+          const endDate = String(item.endDate || startDate);
+          return startDate <= safeSelectedDate && endDate >= safeSelectedDate;
+        })
+        .slice()
+        .sort((prev, next) => String(prev.startDate || '').localeCompare(String(next.startDate || '')));
+      const conflictVehicleIds = getConflictVehicleIds(selectedBookingsRaw);
+      const selectedBookings = selectedBookingsRaw.map(item => ({
+        ...item,
+        hasConflict: conflictVehicleIds.has(String(item.vehicleId || '').trim())
+      }));
+
+      return {
+        monthKey: normalized,
+        monthTitle: formatMonthTitle(normalized),
+        selectedDate: safeSelectedDate,
+        cells,
+        selectedBookings,
+        selectedConflictCount: conflictVehicleIds.size,
+        summary: {
+          bookingCount: activeBookings.length,
+          pendingCount: activeBookings.filter(item => item.status === 'pending').length,
+          vehicleCount: new Set(activeBookings.map(item => item.vehicleId).filter(Boolean)).size,
+          conflictDayCount: cells.filter(item => !item.empty && item.hasConflict).length
+        }
+      };
+    }
+
+    // Location & Hub Disambiguation (对齐 shared/locations.js)
+    function normalizeCity(value) {
+      return String(value || '').trim().replace(/市$/, '');
+    }
+
+    function getCityHubs(city, serviceHubs = []) {
+      const normalizedCity = normalizeCity(city);
+      if (!normalizedCity || !Array.isArray(serviceHubs)) return [];
+      return serviceHubs.filter(hub => hub && normalizeCity(hub.city) === normalizedCity).map(hub => ({ ...hub }));
+    }
+
+    function getDefaultHub(city, serviceHubs = []) {
+      return getCityHubs(city, serviceHubs)[0] || null;
+    }
+
+    function resolveServiceHub(location, city, serviceHubs = []) {
+      const value = String(location || '').trim();
+      if (!value || !Array.isArray(serviceHubs)) return null;
+      const hubs = normalizeCity(city) ? getCityHubs(city, serviceHubs) : serviceHubs.filter(Boolean);
+      const matches = hubs.filter(hub => [hub.id, hub.name, hub.address].some(field => String(field || '').trim() === value));
+      if (matches.length) return matches.length === 1 ? { ...matches[0] } : null;
+      const cityHubs = getCityHubs(value, hubs);
+      const stores = cityHubs.filter(hub => hub.type === 'store');
+      return stores.length === 1 ? { ...stores[0] } : null;
+    }
+
+    function hasHubCoordinates(hub) {
+      if (!hub) return false;
+      const coordinates = [hub.latitude, hub.longitude];
+      if (coordinates.some(value => (typeof value !== 'number' && typeof value !== 'string') || String(value).trim() === '')) return false;
+      const [latitude, longitude] = coordinates.map(Number);
+      return Number.isFinite(latitude) && Number.isFinite(longitude) && Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180;
+    }
+
+    function formatLocationDisplay(location, city = '') {
+      const loc = String(location || '').trim();
+      const cityText = String(city || '').trim();
+      if (!loc) return cityText ? `${cityText} · 取车地点待确认` : '取车地点待确认';
+      if (cityText && !loc.startsWith(cityText)) return `${cityText} · ${loc}`;
+      return loc;
+    }
+
+    function normalizeBookingLocation(value) {
+      return String(value || '').trim().slice(0, 60);
+    }
+
+    // Bounded CSV Preview Parser (对齐 shared/csvFile.js)
+    const CSV_PREVIEW_MAX_BYTES = 128 * 1024;
+    const CSV_PREVIEW_MAX_ROWS = 100;
+    const CSV_PREVIEW_MAX_COLUMNS = 30;
+    const CSV_PREVIEW_MAX_CELL_CHARS = 2000;
+
+    function ensureCsvFileName(name, fallback) {
+      const raw = String(name || '').trim();
+      const safeFallback = String(fallback || 'export.csv').trim() || 'export.csv';
+      const resolved = raw || safeFallback;
+      return /\.csv$/i.test(resolved) ? resolved : `${resolved}.csv`;
+    }
+
+    function parseCsvPreview(text, options) {
+      const source = String(text || '').replace(/^\ufeff/, '');
+      const partial = Boolean(options && options.partial);
+      const rows = [];
+      let row = [], field = '', quoted = false, touched = false, clipped = false;
+      let truncated = partial;
+      const append = value => {
+        touched = true;
+        if (field.length < CSV_PREVIEW_MAX_CELL_CHARS) field += value;
+        else clipped = truncated = true;
+      };
+      const finishField = () => {
+        if (row.length < CSV_PREVIEW_MAX_COLUMNS) row.push(field + (clipped ? '…' : ''));
+        else truncated = true;
+        field = '';
+        clipped = false;
+      };
+      const finishRow = () => {
+        finishField();
+        if (rows.length >= CSV_PREVIEW_MAX_ROWS) {
+          truncated = true;
+          return false;
+        }
+        rows.push(row);
+        row = [];
+        touched = false;
+        return true;
+      };
+      for (let i = 0; i < source.length; i += 1) {
+        const character = source[i];
+        if (character === '"') {
+          touched = true;
+          if (quoted && source[i + 1] === '"') {
+            append('"');
+            i += 1;
+          } else if (quoted || !field) {
+            quoted = !quoted;
+          } else {
+            append(character);
+          }
+        } else if (character === ',' && !quoted) {
+          touched = true;
+          finishField();
+        } else if ((character === '\r' || character === '\n') && !quoted) {
+          if (!finishRow()) break;
+          if (character === '\r' && source[i + 1] === '\n') i += 1;
+        } else {
+          append(character);
+        }
+      }
+      if (!partial && quoted) throw new Error('CSV 内容不完整');
+      if (!partial && (touched || row.length || field)) finishRow();
+      return { rows, truncated };
+    }
+
+    // Date & Span Utilities (对齐 shared/dateUtils.js)
+    function isValidDateFormat(value) {
+      if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+      const [year, month, day] = value.split('-').map(Number);
+      if (month < 1 || month > 12 || day < 1 || day > 31) return false;
+      const date = new Date(Date.UTC(year, month - 1, day));
+      return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+    }
+
+    function isDateRangeValid(startDate, endDate) {
+      if (!isValidDateFormat(startDate) || !isValidDateFormat(endDate)) return false;
+      return String(startDate) <= String(endDate);
+    }
+
+    function calculateRentalDays(startDate, endDate) {
+      const startStr = String(startDate || '').trim();
+      const endStr = String(endDate || '').trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(startStr) || !/^\d{4}-\d{2}-\d{2}$/.test(endStr)) return 0;
+      const start = Date.parse(`${startStr}T00:00:00Z`);
+      const end = Date.parse(`${endStr}T00:00:00Z`);
+      if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return 0;
+      return Math.max(1, Math.round((end - start) / ONE_DAY_MS) + 1);
+    }
+
+    function formatDateSpan(startDate, endDate, options = {}) {
+      const fallback = options.fallback || '—';
+      const days = calculateRentalDays(startDate, endDate);
+      if (days <= 0) return fallback;
+      if (options.withNights) {
+        const nights = Math.max(0, days - 1);
+        return `${days} 天 ${nights} 晚`;
+      }
+      return `${days} 天`;
+    }
+
+    function isDateOverlap(startA, endA, startB, endB) {
+      if (!isDateRangeValid(startA, endA) || !isDateRangeValid(startB, endB)) return false;
+      return !(String(endA) < String(startB) || String(startA) > String(endB));
+    }
+
+    function getChinaToday(date) {
+      const time = date instanceof Date
+        ? date.getTime()
+        : (date !== undefined && date !== null ? new Date(date).getTime() : Date.now());
+      if (Number.isNaN(time)) return '';
+      return new Date(time + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    }
+
+    let currentCalendarMonthKey = '2026-10';
+    let currentCalendarSelectedDate = '2026-10-26';
+
+    const CALENDAR_SAMPLE_BOOKINGS = [
+      { id: 'CB_01', vehicleId: 'v1', vehicleName: 'Porsche 911 GT3 RS', status: 'pending', startDate: '2026-10-25', endDate: '2026-10-27' },
+      { id: 'CB_02', vehicleId: 'v1', vehicleName: 'Porsche 911 GT3 RS', status: 'confirmed', startDate: '2026-10-26', endDate: '2026-10-28' },
+      { id: 'CB_03', vehicleId: 'v3', vehicleName: 'Lamborghini Huracán EVO', status: 'confirmed', startDate: '2026-10-26', endDate: '2026-10-30' },
+      { id: 'CB_04', vehicleId: 'v2', vehicleName: 'Ferrari 488 Pista', status: 'cancelled', startDate: '2026-10-26', endDate: '2026-10-27' }
+    ];
+
+    function renderMonthCalendarModal(monthKey = currentCalendarMonthKey, selectedDate = currentCalendarSelectedDate) {
+      currentCalendarMonthKey = normalizeMonthKey(monthKey);
+      const view = buildMonthView(currentCalendarMonthKey, CALENDAR_SAMPLE_BOOKINGS, selectedDate);
+      currentCalendarSelectedDate = view.selectedDate;
+
+      const titleEl = document.getElementById('monthCalendarTitle');
+      if (titleEl) titleEl.innerText = view.monthTitle;
+
+      const badgesEl = document.getElementById('monthCalendarSummaryBadges');
+      if (badgesEl) {
+        badgesEl.innerHTML = `
+          <span class="tier-pill">有效预约: <strong>${view.summary.bookingCount}</strong></span>
+          <span class="tier-pill">待联系: <strong>${view.summary.pendingCount}</strong></span>
+          <span class="tier-pill">涉及车辆: <strong>${view.summary.vehicleCount}</strong></span>
+          <span class="status-pill ${view.summary.conflictDayCount > 0 ? 'maint' : 'active'}">同车冲突天数: ${view.summary.conflictDayCount}</span>
+        `;
+      }
+
+      const gridEl = document.getElementById('monthCalendarCellsGrid');
+      if (gridEl) {
+        gridEl.innerHTML = view.cells.slice(0, 35).map(cell => {
+          if (cell.empty) {
+            return `<div style="background: rgba(15, 23, 42, 0.25); border-radius: 4px; padding: 0.35rem; min-height: 42px;"></div>`;
+          }
+          const borderCol = cell.hasConflict ? 'rgba(239, 68, 68, 0.65)' : (cell.isSelected ? 'rgba(56, 189, 248, 0.7)' : 'var(--border-subtle)');
+          return `
+            <div title="${cell.ariaLabel}" style="background: rgba(15, 23, 42, 0.82); border: 1px solid ${borderCol}; border-radius: 4px; padding: 0.35rem; min-height: 42px;">
+              <div style="display:flex; justify-content:space-between; font-size:0.7rem;">
+                <strong style="color:${cell.isSelected ? '#38bdf8' : '#f8fafc'};">${cell.day}</strong>
+                ${cell.bookingCount > 0 ? `<span style="color:${cell.hasConflict ? '#f87171' : '#34d399'}; font-family:monospace;">${cell.bookingCount}单</span>` : ''}
+              </div>
+              ${cell.hasConflict ? `<div style="font-size:0.62rem; color:#f87171;">⚠️冲突(${cell.conflictVehicleCount})</div>` : ''}
+            </div>
+          `;
+        }).join('');
+      }
+
+      const resolvedHub = resolveServiceHub('杭州市', '杭州', DEFAULT_SERVICE_CONFIG.serviceHubs);
+      const sampleCsvPreview = parseCsvPreview('\uFEFF预约单号,车型,租期\r\n"BK_01","Porsche 911","3 天 2 晚"\r\n');
+      const boxEl = document.getElementById('monthCalendarInspectorBox');
+      if (boxEl) {
+        boxEl.value = JSON.stringify({
+          selectedDate: view.selectedDate,
+          selectedConflictCount: view.selectedConflictCount,
+          resolvedHub,
+          hasCoordinates: hasHubCoordinates(resolvedHub),
+          formattedSpan: formatDateSpan('2026-10-26', '2026-10-28', { withNights: true }),
+          sampleCsvPreview
+        }, null, 2);
+      }
+
+      return { view, resolvedHub, sampleCsvPreview };
+    }
+
+    function switchCalendarMonth(offset) {
+      const nextKey = shiftMonth(currentCalendarMonthKey, offset);
+      return renderMonthCalendarModal(nextKey, `${nextKey}-01`);
+    }
+
+    function openMonthCalendarModal() {
+      const res = renderMonthCalendarModal('2026-10', '2026-10-26');
+      const modal = document.getElementById('monthCalendarModal');
+      if (modal) modal.classList.add('open');
+      return res;
+    }
+
+    function closeMonthCalendarModal() {
+      const modal = document.getElementById('monthCalendarModal');
+      if (modal) modal.classList.remove('open');
     }
 
     // ==================== 16. TOAST & TIMING ====================

@@ -9383,6 +9383,90 @@
       return issues;
     }
 
+    // Aligned with app.json, components/core-nav/core-nav.js, cloudbaserc.json, scripts/cloudSdkCheck.js & scripts/syncRentalPricing.js
+    const MAIN_PACKAGE_PAGES = [
+      'pages/garage/garage',
+      'pages/car-detail/car-detail',
+      'pages/booking/booking',
+      'pages/mine/mine',
+      'pages/bookings/bookings',
+      'pages/favorites/favorites',
+      'pages/booking-detail/booking-detail',
+      'pages/content-page/content-page',
+      'pages/privacy-request/privacy-request',
+      'pages/booking-calendar/booking-calendar',
+      'pages/booking-workbench/booking-workbench',
+      'pages/booking-manage/booking-manage',
+      'pages/booking-manage-detail/booking-manage-detail'
+    ];
+    const ADMIN_SUBPACKAGE_PAGES = [
+      'analytics-manage/analytics-manage',
+      'role-manage/role-manage',
+      'config-manage/config-manage',
+      'audit-log-manage/audit-log-manage',
+      'error-log-manage/error-log-manage',
+      'system-health/system-health',
+      'vehicle-manage/vehicle-manage',
+      'vehicle-create/vehicle-create',
+      'vehicle-edit/vehicle-edit',
+      'vehicle-detail-manage/vehicle-detail-manage',
+      'operations-overview/operations-overview',
+      'privacy-request-manage/privacy-request-manage',
+      'privacy-data-inventory/privacy-data-inventory'
+    ];
+    const MINIPROGRAM_PRELOAD_RULE = {
+      'pages/mine/mine': {
+        network: 'all',
+        packages: ['pages-admin']
+      }
+    };
+    const CORE_NAV_ROUTES = {
+      garage: '/pages/garage/garage',
+      favorites: '/pages/favorites/favorites',
+      bookings: '/pages/bookings/bookings',
+      mine: '/pages/mine/mine'
+    };
+
+    function resolveCoreNavAction(activeKey, targetKey, pageStackRoutes = []) {
+      const key = String(targetKey || '');
+      const url = CORE_NAV_ROUTES[key];
+      if (!url || key === activeKey) {
+        return { action: 'noop', url: null, delta: 0 };
+      }
+      const targetRoute = url.replace(/^\//, '');
+      const stack = Array.isArray(pageStackRoutes) ? pageStackRoutes : [];
+      let existingIndex = -1;
+      for (let index = stack.length - 2; index >= 0; index -= 1) {
+        const route = String(stack[index] || '').replace(/^\//, '');
+        if (route === targetRoute) {
+          existingIndex = index;
+          break;
+        }
+      }
+      if (existingIndex >= 0) {
+        return {
+          action: 'navigateBack',
+          url,
+          delta: stack.length - 1 - existingIndex
+        };
+      }
+      return {
+        action: 'navigateTo',
+        url,
+        delta: 0
+      };
+    }
+
+    const SCHEDULED_CLOUD_TRIGGERS = [
+      { functionName: 'analyticsCleanup', name: 'dailyCleanupTrigger', type: 'timer', config: '0 0 2 * * * *' },
+      { functionName: 'garageVehicleList', name: 'warmupKeepAlive', type: 'timer', config: '0 */10 8-23 * * * *' },
+      { functionName: 'pendingFileDeletionProcess', name: 'dailyFilePurgeTrigger', type: 'timer', config: '0 0 3 * * * *' },
+      { functionName: 'systemHealthCheck', name: 'periodicHealthCheckTrigger', type: 'timer', config: '0 0 */6 * * * *' }
+    ];
+    const WX_SERVER_SDK_TARGET = '4.0.2';
+    const SYNC_MODEL_TARGETS = ['vehicleCreate', 'vehicleUpdate', 'vehicleList'];
+    const SYNC_PRICING_TARGETS = ['vehicleCreate', 'vehicleUpdate', 'vehicleList', 'vehicleAvailabilityCheck', 'vehiclePublicDetail', 'bookingDetail'];
+
     function openArchitectureGuardModal(defaultStatus = 'quoted') {
       const sel = document.getElementById('archBookingStatusSelect');
       if (sel) sel.value = defaultStatus;

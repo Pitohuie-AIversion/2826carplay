@@ -847,4 +847,70 @@ describe('Web Admin Gateway Sentinel & Operations Center', () => {
     );
     expect(validIssues).toEqual([]);
   });
+
+  test('26页面主分包拓扑、个人中心预加载规则、CoreNav栈回退计算与云端定时触发器及定价同步矩阵与 app.json/cloudbaserc.json 完全一致', () => {
+    const appJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'app.json'), 'utf8'));
+    const cloudbaseRc = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'cloudbaserc.json'), 'utf8'));
+
+    // 1. 13 Main package pages + 13 pages-admin subpackage pages = 26 pages
+    const mainPages = JSON.parse(vm.runInContext('JSON.stringify(MAIN_PACKAGE_PAGES)', sandbox));
+    const adminPages = JSON.parse(vm.runInContext('JSON.stringify(ADMIN_SUBPACKAGE_PAGES)', sandbox));
+    const preloadRule = JSON.parse(vm.runInContext('JSON.stringify(MINIPROGRAM_PRELOAD_RULE)', sandbox));
+
+    expect(mainPages).toEqual(appJson.pages);
+    expect(adminPages).toEqual(appJson.subPackages[0].pages);
+    expect(mainPages.length + adminPages.length).toBe(26);
+    expect(preloadRule).toEqual(appJson.preloadRule);
+
+    // 2. CoreNav smart navigateBack delta vs navigateTo vs noop
+    const backAction = JSON.parse(
+      vm.runInContext(
+        'JSON.stringify(resolveCoreNavAction("mine", "garage", ["pages/garage/garage", "pages/favorites/favorites", "pages/mine/mine"]))',
+        sandbox
+      )
+    );
+    expect(backAction).toEqual({ action: 'navigateBack', url: '/pages/garage/garage', delta: 2 });
+
+    const forwardAction = JSON.parse(
+      vm.runInContext(
+        'JSON.stringify(resolveCoreNavAction("garage", "bookings", ["pages/garage/garage"]))',
+        sandbox
+      )
+    );
+    expect(forwardAction).toEqual({ action: 'navigateTo', url: '/pages/bookings/bookings', delta: 0 });
+
+    const noopAction = JSON.parse(
+      vm.runInContext('JSON.stringify(resolveCoreNavAction("garage", "garage", ["pages/garage/garage"]))', sandbox)
+    );
+    expect(noopAction).toEqual({ action: 'noop', url: null, delta: 0 });
+
+    // 3. Scheduled timer triggers in cloudbaserc.json
+    const expectedTriggers = [];
+    (cloudbaseRc.functions || []).forEach((fn) => {
+      if (Array.isArray(fn.triggers)) {
+        fn.triggers.forEach((tr) => {
+          expectedTriggers.push({
+            functionName: fn.name,
+            name: tr.name,
+            type: tr.type,
+            config: tr.config
+          });
+        });
+      }
+    });
+    const webTriggers = JSON.parse(vm.runInContext('JSON.stringify(SCHEDULED_CLOUD_TRIGGERS)', sandbox));
+    expect(webTriggers).toEqual(expectedTriggers);
+    expect(webTriggers.length).toBe(4);
+
+    // 4. wx-server-sdk version & syncRentalPricing targets
+    expect(vm.runInContext('WX_SERVER_SDK_TARGET', sandbox)).toBe('4.0.2');
+    expect(JSON.parse(vm.runInContext('JSON.stringify(SYNC_PRICING_TARGETS)', sandbox))).toEqual([
+      'vehicleCreate',
+      'vehicleUpdate',
+      'vehicleList',
+      'vehicleAvailabilityCheck',
+      'vehiclePublicDetail',
+      'bookingDetail'
+    ]);
+  });
 });

@@ -74,6 +74,8 @@ async function audit(openid, action, contentId) {
   } catch (ignored) {}
 }
 
+module.exports._test = { normalizeGuide, text, strings, validateGuide }
+
 exports.main = async (event) => {
   const openid = String((cloud.getWXContext() || {}).OPENID || "")
   const input = event && typeof event === "object" ? event : {}
@@ -111,4 +113,11 @@ exports.main = async (event) => {
     console.error({ function: "contentGuideManage", action, id, authenticated: Boolean(openid), errorMessage: String(err && (err.message || err.errMsg) || err) })
     return error("INTERNAL_ERROR", "内容维护失败")
   }
+}
+
+// For testing purposes
+if (process.env.NODE_ENV === 'test') {
+  exports.text = text;
+  exports.strings = strings;
+  exports.isAdmin = isAdmin;
 }

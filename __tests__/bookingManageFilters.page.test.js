@@ -33,6 +33,30 @@ describe("pages/booking-manage workflow filters", () => {
     delete global.getApp
   })
 
+  test("fetchList handles synchronous exceptions thrown during callFunction", () => {
+    global.wx = {
+      showToast: jest.fn(),
+      cloud: {
+        callFunction: jest.fn(() => {
+          throw new Error("cloud disconnected")
+        })
+      }
+    }
+    const page = createPage(loadPageDefinition(), {
+      loading: true,
+      pageAuthorized: true,
+      pageSize: 20
+    })
+
+    page.fetchList()
+
+    expect(page.data.loading).toBe(false)
+    expect(global.wx.showToast).toHaveBeenCalledWith({
+      title: "加载失败",
+      icon: "none"
+    })
+  })
+
   test("ignores share callbacks after the booking management page unloads", () => {
     let shareOptions
     global.wx = {
@@ -263,6 +287,43 @@ describe("pages/booking-manage workflow filters", () => {
       },
       success: expect.any(Function),
       fail: expect.any(Function)
+    })
+  })
+
+  test("导出记录出错时抛出异常被捕获处理", () => {
+    let exportRequest
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn((options) => {
+          if (options.name === "bookingExportCsv") {
+            exportRequest = options
+          }
+        })
+      },
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition())
+    page.saveExportedCsv = jest.fn(() => {
+      throw new Error("sync save error")
+    })
+
+    page.handleExport()
+
+    exportRequest.success({
+      result: {
+        ok: true,
+        fileName: "bookings.csv",
+        csvText: "id,status\nb1,pending",
+        total: 1,
+        matchedTotal: 1
+      }
+    })
+
+    expect(page.saveExportedCsv).toHaveBeenCalled()
+    expect(page.data.loading).toBe(false)
+    expect(global.wx.showToast).toHaveBeenCalledWith({
+      title: "保存失败",
+      icon: "none"
     })
   })
 

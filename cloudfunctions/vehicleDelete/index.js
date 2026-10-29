@@ -232,9 +232,18 @@ exports.main = async (event) => {
       const removed = Number(removeRes && removeRes.stats && removeRes.stats.removed) || 0
       if (removed < 1) return { error: createError("DELETE_CONFLICT", "车辆未能删除，可能已被其他管理员处理，请刷新后重试") }
       const fileList = normalizeStringArray(latest.imageList).concat(String(latest.coverImage || "").trim() ? [String(latest.coverImage).trim()] : [])
+
+      const uniqueFiles = normalizeStringArray(fileList)
+      const claimResults = await Promise.all(
+        uniqueFiles.map(async (fileId) => {
+          const claimed = await imageLifecycle.writeClaim(transaction, id, fileId, "vehicleDelete", "deleteVehicle")
+          return { fileId, claimed }
+        })
+      )
+
       const claimedFiles = []
-      for (const fileId of normalizeStringArray(fileList)) {
-        if (await imageLifecycle.writeClaim(transaction, id, fileId, "vehicleDelete", "deleteVehicle")) claimedFiles.push(fileId)
+      for (const res of claimResults) {
+        if (res.claimed) claimedFiles.push(res.fileId)
       }
       return { latest, claimedFiles }
     })

@@ -895,6 +895,44 @@ describe("pages/car-detail 客户侧车辆状态", () => {
     expect(wxss).toContain(".perf-tag-dot")
   })
 
+
+  test("wx.cloud.init error in onLoad is caught and handled gracefully", () => {
+    const originalGetApp = global.getApp;
+    const originalWx = global.wx;
+
+    global.getApp = jest.fn(() => ({
+      globalData: {
+        cloudEnvId: "test-env-id"
+      }
+    }))
+    global.wx = {
+      ...originalWx,
+      cloud: {
+        init: jest.fn(() => {
+          throw new Error("Init error")
+        }),
+        callFunction: jest.fn()
+      },
+      setNavigationBarTitle: jest.fn()
+    }
+
+    const page = createPage(loadPageDefinition())
+    // Should not throw an error
+    expect(() => {
+      page.onLoad({ carId: "test-car-id" })
+    }).not.toThrow()
+
+    expect(global.wx.cloud.init).toHaveBeenCalledWith({
+      env: "test-env-id",
+      traceUser: true
+    })
+
+    page.onUnload()
+
+    global.getApp = originalGetApp;
+    global.wx = originalWx;
+  })
+
   test("loadCarDetail 支持从 storage 缓存秒开 (SWR 策略)", () => {
     const cachedCar = {
       id: "car-swr-1",

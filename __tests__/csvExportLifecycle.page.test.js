@@ -178,6 +178,15 @@ describe.each(EXPORT_PAGES)("%s CSV export lifecycle", (label, modulePath, busyF
     expect(jest.getTimerCount()).toBe(0)
   })
 
+  test("synchronous callFunction error resets state and shows toast", () => {
+    wx.cloud.callFunction.mockImplementationOnce(() => {
+      throw new Error("immediate cloud error")
+    })
+    page.handleExport()
+    expect(page.data[busyField]).toBe(false)
+    expect(wx.showToast).toHaveBeenCalledWith({ title: expect.stringMatching(/immediate cloud error|导出失败/), icon: "none" })
+  })
+
   test("background export failure stays silent and unlocks retry on return", () => {
     page.handleExport()
     currentPages = [page, {}]

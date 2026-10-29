@@ -328,9 +328,10 @@ function buildRecentCreatedList(list) {
 
 async function readBookingsByMode(maxRecords, ordered) {
   const list = []
+  const safeMaxRecords = Math.min(Number(maxRecords) || 200, MAX_BOOKING_RECORDS)
 
-  for (let offset = 0; offset <= maxRecords; offset += BOOKING_BATCH_SIZE) {
-    const remaining = maxRecords + 1 - list.length
+  for (let offset = 0; offset <= safeMaxRecords; offset += BOOKING_BATCH_SIZE) {
+    const remaining = safeMaxRecords + 1 - list.length
     const batchSize = Math.min(BOOKING_BATCH_SIZE, remaining)
     let query = db.collection("bookings").field(BOOKING_MANAGE_LIST_FIELDS)
     if (ordered) {
@@ -340,14 +341,14 @@ async function readBookingsByMode(maxRecords, ordered) {
     const batch = res && Array.isArray(res.data) ? res.data : []
 
     list.push(...batch)
-    if (batch.length < batchSize || list.length > maxRecords) {
+    if (batch.length < batchSize || list.length > safeMaxRecords) {
       break
     }
   }
 
   return {
-    list: list.slice(0, maxRecords),
-    truncated: list.length > maxRecords
+    list: list.slice(0, safeMaxRecords),
+    truncated: list.length > safeMaxRecords
   }
 }
 

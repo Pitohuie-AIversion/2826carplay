@@ -219,7 +219,9 @@ Page({
           env,
           traceUser: true
         })
-      } catch (error) {}
+      } catch (error) {
+        console.error("wx.cloud.init failed in booking-manage:", error)
+      }
     }
     this.cancelOperationConfigRequest()
     this._cancelOperationConfigRequest = requestOperationConfig({

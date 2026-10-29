@@ -290,4 +290,28 @@ describe("Phase 16 content guide cloud functions", () => {
     expect(docs["content_99"].status).toBe("draft")
     expect(audit.add).not.toHaveBeenCalled()
   })
+
+  test("trigger INTERNAL_ERROR catch block by mocking database failure", async () => {
+    const roles = {
+      where: jest.fn().mockReturnThis(),
+      field: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      get: jest.fn().mockRejectedValue(new Error("Simulated database failure"))
+    };
+    const mod = loadFunction("../cloudfunctions/contentGuideManage/index", {
+      openid: "admin",
+      collections: { roles }
+    })
+
+    const originalConsoleError = console.error;
+    console.error = jest.fn();
+
+    const res = await mod.main({ action: "create", guide: {} })
+
+    expect(res).toMatchObject({ ok: false, code: "INTERNAL_ERROR" })
+    expect(console.error).toHaveBeenCalled()
+
+    console.error = originalConsoleError;
+  })
+
 })

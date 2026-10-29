@@ -62,6 +62,31 @@ describe('normalizeGuide suite', () => {
             });
         });
 
+
+        it('should safely normalize with undefined input', () => {
+            const result = normalizeGuide({});
+            expect(result.slug).toBe('');
+        });
+
+        it('should handle missing vehicleIds or tags properties correctly', () => {
+             const input = {
+                slug: 'my-cool-guide',
+                title: 'A very cool guide title that could be long',
+                summary: 'Some summary',
+                body: 'The body content',
+                contentType: 'guide',
+                scenario: 'weekend_trip'
+            };
+            const result = normalizeGuide(input);
+            expect(result.vehicleIds).toEqual([]);
+            expect(result.tags).toEqual([]);
+        });
+
+        it('should throw error if input is not an object (null/undefined)', () => {
+           expect(() => normalizeGuide(undefined)).toThrow();
+           expect(() => normalizeGuide(null)).toThrow();
+        });
+
         it('should safely normalize with valid inputs and respect length limits', () => {
             const input = {
                 slug: 'my-cool-guide',

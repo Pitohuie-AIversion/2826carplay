@@ -319,18 +319,8 @@ function normalizeVehicleInput(input) {
   return normalized
 }
 
-function validateVehicle(input) {
-  const value = normalizeVehicleInput(input)
+function validateRequiredFields(value) {
   const errors = []
-  if (input && input.performance != null && (typeof input.performance !== "object" || Array.isArray(input.performance))) {
-    errors.push({ field: "performance", message: "性能参数格式不合法" })
-  }
-  if (value.rentalDiscountTiers !== undefined) {
-    const message = validateRentalDiscountTiers(value.rentalDiscountTiers)
-    if (message) errors.push({ field: "rentalDiscountTiers", message })
-    else value.rentalDiscountTiers = normalizeRentalDiscountTiers(value.rentalDiscountTiers)
-  }
-
   REQUIRED_FIELDS.forEach((field) => {
     const v = value[field]
     if (v === undefined || v === null || (typeof v === "string" && !v.trim())) {
@@ -341,135 +331,57 @@ function validateVehicle(input) {
   if (value.plateNumber && !isValidPlateNumber(value.plateNumber)) {
     errors.push({ field: "plateNumber", message: "车牌号格式不合法", value: value.plateNumber })
   }
+  return errors
+}
 
+function validateEnums(value) {
+  const errors = []
   if (value.vehicleType && !VEHICLE_TYPES.includes(value.vehicleType)) {
-    errors.push({
-      field: "vehicleType",
-      message: "车辆类型不合法",
-      value: value.vehicleType,
-      allowed: VEHICLE_TYPES
-    })
+    errors.push({ field: "vehicleType", message: "车辆类型不合法", value: value.vehicleType, allowed: VEHICLE_TYPES })
   }
 
   if (value.status && !VEHICLE_STATUSES.includes(value.status)) {
-    errors.push({
-      field: "status",
-      message: "车辆状态不合法",
-      value: value.status,
-      allowed: VEHICLE_STATUSES
-    })
+    errors.push({ field: "status", message: "车辆状态不合法", value: value.status, allowed: VEHICLE_STATUSES })
   }
 
   if (value.transmission && !TRANSMISSION_TYPES.includes(value.transmission)) {
-    errors.push({
-      field: "transmission",
-      message: "变速箱类型不合法",
-      value: value.transmission,
-      allowed: TRANSMISSION_TYPES
-    })
+    errors.push({ field: "transmission", message: "变速箱类型不合法", value: value.transmission, allowed: TRANSMISSION_TYPES })
   }
 
   if (value.fuelType && !FUEL_TYPES.includes(value.fuelType)) {
-    errors.push({
-      field: "fuelType",
-      message: "燃油类型不合法",
-      value: value.fuelType,
-      allowed: FUEL_TYPES
-    })
+    errors.push({ field: "fuelType", message: "燃油类型不合法", value: value.fuelType, allowed: FUEL_TYPES })
   }
 
-  if (value.brandModel) {
-    if (value.brandModel.length < 1 || value.brandModel.length > 50) {
-      errors.push({
-        field: "brandModel",
-        message: "品牌型号长度需为 1-50",
-        value: value.brandModel
-      })
-    }
+  if (value.publicArchiveReviewStatus && !ARCHIVE_REVIEW_STATUSES.includes(value.publicArchiveReviewStatus)) {
+    errors.push({ field: "publicArchiveReviewStatus", message: "公开档案复核状态不合法", value: value.publicArchiveReviewStatus, allowed: ARCHIVE_REVIEW_STATUSES })
+  }
+  return errors
+}
+
+function validateStringLengths(value) {
+  const errors = []
+  if (value.brandModel && (value.brandModel.length < 1 || value.brandModel.length > 50)) {
+    errors.push({ field: "brandModel", message: "品牌型号长度需为 1-50", value: value.brandModel })
   }
 
-  if (value.registerDate) {
-    const dateCheck = isValidYmdDate(value.registerDate)
-    if (!dateCheck.ok) {
-      errors.push({
-        field: "registerDate",
-        message:
-          dateCheck.reason === "FUTURE"
-            ? "注册日期不得晚于今天"
-            : "注册日期格式不合法（YYYY-MM-DD）",
-        value: value.registerDate,
-        reason: dateCheck.reason
-      })
-    }
+  if (value.vin !== undefined && value.vin.length > 32) {
+    errors.push({ field: "vin", message: "VIN 长度不能超过 32", value: value.vin })
   }
 
-  if (value.vin !== undefined) {
-    if (value.vin.length > 32) {
-      errors.push({ field: "vin", message: "VIN 长度不能超过 32", value: value.vin })
-    }
+  if (value.engineNumber !== undefined && value.engineNumber.length > 32) {
+    errors.push({ field: "engineNumber", message: "发动机号长度不能超过 32", value: value.engineNumber })
   }
 
-  if (value.engineNumber !== undefined) {
-    if (value.engineNumber.length > 32) {
-      errors.push({
-        field: "engineNumber",
-        message: "发动机号长度不能超过 32",
-        value: value.engineNumber
-      })
-    }
-  }
-
-  if (value.note !== undefined) {
-    if (value.note.length > 200) {
-      errors.push({ field: "note", message: "备注长度不能超过 200", value: value.note })
-    }
+  if (value.note !== undefined && value.note.length > 200) {
+    errors.push({ field: "note", message: "备注长度不能超过 200", value: value.note })
   }
 
   if (value.publicDescription !== undefined && value.publicDescription.length > 200) {
-    errors.push({
-      field: "publicDescription",
-      message: "公开说明长度不能超过 200",
-      value: value.publicDescription
-    })
+    errors.push({ field: "publicDescription", message: "公开说明长度不能超过 200", value: value.publicDescription })
   }
 
   if (value.publicDrivingTips !== undefined && value.publicDrivingTips.length > 500) {
     errors.push({ field: "publicDrivingTips", message: "用车提示长度不能超过 500", value: value.publicDrivingTips })
-  }
-
-  ;["archiveDate", "archiveReview"].forEach((field) => {
-    if (!value[field]) return
-    const dateCheck = isValidYmdDate(value[field], { allowFuture: true })
-    if (!dateCheck.ok) {
-      errors.push({ field, message: "到期日期格式不合法（YYYY-MM-DD）", value: value[field], reason: dateCheck.reason })
-    }
-  })
-
-  ;["publicMaterialsUpdatedDate", "publicInspectionDate"].forEach((field) => {
-    if (!value[field]) {
-      return
-    }
-    const dateCheck = isValidYmdDate(value[field])
-    if (!dateCheck.ok) {
-      errors.push({
-        field,
-        message: dateCheck.reason === "FUTURE" ? "日期不得晚于今天" : "日期格式不合法（YYYY-MM-DD）",
-        value: value[field],
-        reason: dateCheck.reason
-      })
-    }
-  })
-
-  if (
-    value.publicArchiveReviewStatus &&
-    !ARCHIVE_REVIEW_STATUSES.includes(value.publicArchiveReviewStatus)
-  ) {
-    errors.push({
-      field: "publicArchiveReviewStatus",
-      message: "公开档案复核状态不合法",
-      value: value.publicArchiveReviewStatus,
-      allowed: ARCHIVE_REVIEW_STATUSES
-    })
   }
 
   PUBLIC_ARCHIVE_TEXT_FIELDS.forEach((field) => {
@@ -484,12 +396,51 @@ function validateVehicle(input) {
     }
   })
 
-  if (value.location !== undefined) {
-    if (value.location.length > 20) {
-      errors.push({ field: "location", message: "城市长度不能超过 20", value: value.location })
+  if (value.location !== undefined && value.location.length > 20) {
+    errors.push({ field: "location", message: "城市长度不能超过 20", value: value.location })
+  }
+  return errors
+}
+
+function validateDates(value) {
+  const errors = []
+  if (value.registerDate) {
+    const dateCheck = isValidYmdDate(value.registerDate)
+    if (!dateCheck.ok) {
+      errors.push({
+        field: "registerDate",
+        message: dateCheck.reason === "FUTURE" ? "注册日期不得晚于今天" : "注册日期格式不合法（YYYY-MM-DD）",
+        value: value.registerDate,
+        reason: dateCheck.reason
+      })
     }
   }
 
+  ;["archiveDate", "archiveReview"].forEach((field) => {
+    if (!value[field]) return
+    const dateCheck = isValidYmdDate(value[field], { allowFuture: true })
+    if (!dateCheck.ok) {
+      errors.push({ field, message: "到期日期格式不合法（YYYY-MM-DD）", value: value[field], reason: dateCheck.reason })
+    }
+  })
+
+  ;["publicMaterialsUpdatedDate", "publicInspectionDate"].forEach((field) => {
+    if (!value[field]) return
+    const dateCheck = isValidYmdDate(value[field])
+    if (!dateCheck.ok) {
+      errors.push({
+        field,
+        message: dateCheck.reason === "FUTURE" ? "日期不得晚于今天" : "日期格式不合法（YYYY-MM-DD）",
+        value: value[field],
+        reason: dateCheck.reason
+      })
+    }
+  })
+  return errors
+}
+
+function validateNumericFields(value) {
+  const errors = []
   if (value.seats !== undefined && value.seats !== null) {
     if (!Number.isInteger(value.seats) || value.seats < 1 || value.seats > 9) {
       errors.push({ field: "seats", message: "座位数需为 1-9 的整数", value: value.seats })
@@ -501,7 +452,11 @@ function validateVehicle(input) {
       errors.push({ field: "priceDay", message: "日租金需为 0-99999 的整数", value: value.priceDay })
     }
   }
+  return errors
+}
 
+function validatePerformanceField(value) {
+  const errors = []
   if (value.performance !== undefined && value.performance !== null) {
     const perf = value.performance
     if (perf.acceleration !== undefined && perf.acceleration !== "") {
@@ -536,6 +491,29 @@ function validateVehicle(input) {
       })
     }
   }
+  return errors
+}
+
+function validateVehicle(input) {
+  const value = normalizeVehicleInput(input)
+  const errors = []
+  if (input && input.performance != null && (typeof input.performance !== "object" || Array.isArray(input.performance))) {
+    errors.push({ field: "performance", message: "性能参数格式不合法" })
+  }
+  if (value.rentalDiscountTiers !== undefined) {
+    const message = validateRentalDiscountTiers(value.rentalDiscountTiers)
+    if (message) errors.push({ field: "rentalDiscountTiers", message })
+    else value.rentalDiscountTiers = normalizeRentalDiscountTiers(value.rentalDiscountTiers)
+  }
+
+  errors.push(
+    ...validateRequiredFields(value),
+    ...validateEnums(value),
+    ...validateStringLengths(value),
+    ...validateDates(value),
+    ...validateNumericFields(value),
+    ...validatePerformanceField(value)
+  )
 
   if (errors.length) {
     return createError("VALIDATION_ERROR", "参数校验失败", { errors })

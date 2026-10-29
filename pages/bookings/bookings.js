@@ -68,7 +68,7 @@ Page({
           env,
           traceUser: true
         })
-      } catch (error) {}
+      } catch (error) { console.error('Failed to init wx.cloud', error); }
     }
 
     try {
@@ -85,7 +85,7 @@ Page({
           this._lastBookingsLoadedAt = 0
         }
       }
-    } catch (e) {}
+    } catch (e) { console.error('Failed to read bookings_last_snapshot from storage', e); }
 
     this._unsubscribeNetwork = onNetworkReconnect(() => {
       if (this.data.loadFailed) {
@@ -140,7 +140,7 @@ Page({
     this._bookingCancelSerial = Number(this._bookingCancelSerial || 0) + 1
     this.finishBookingsLoadEffects()
     this.clearBookingCancelTimer()
-    if (this._perf && typeof this._perf.dispose === 'function') try { this._perf.dispose(); } catch(e) {}
+    if (this._perf && typeof this._perf.dispose === 'function') try { this._perf.dispose(); } catch (e) { console.error('Failed to dispose perf', e); }
   },
 
   finishBookingsLoadEffects() {
@@ -150,7 +150,7 @@ Page({
       this._bookingsLoadDone = null
       try {
         done()
-      } catch (error) {}
+      } catch (error) { console.error('Failed to execute _bookingsLoadDone callback', error); }
     }
   },
 
@@ -176,7 +176,7 @@ Page({
       if (input && typeof input.done === "function") {
         try {
           input.done()
-        } catch (error) {}
+        } catch (error) { console.error('Failed to execute input.done callback', error); }
       }
       return
     }
@@ -267,7 +267,7 @@ Page({
         })
         const nextList = append ? this.data.list.concat(list) : list
         if (!append && typeof wx !== "undefined" && typeof wx.setStorageSync === "function") {
-          try { wx.setStorageSync("bookings_last_snapshot", nextList) } catch (e) {}
+          try { wx.setStorageSync("bookings_last_snapshot", nextList) } catch (e) { console.error('Failed to write bookings_last_snapshot to storage', e); }
         }
         this.applyBookingList(nextList, {
           page: Number.isInteger(result.page) ? result.page : nextPage,

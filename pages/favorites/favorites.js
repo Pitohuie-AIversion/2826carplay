@@ -255,7 +255,9 @@ Page({
           this.setData({ initialLoading: false, loadedOnce: true })
         }
       }
-    } catch (e) {}
+    } catch (e) {
+      console.error("Failed to read favorites_last_snapshot:", e)
+    }
     this.fetchList()
   },
 
@@ -387,14 +389,18 @@ Page({
       if (preloadUrls.length) {
         try {
           preloadImages(preloadUrls.slice(0, 4), { priority: 90 })
-        } catch (e) {}
+        } catch (e) {
+          console.error("Failed to preload images for car tap:", e)
+        }
       }
       try {
         const app = typeof getApp === "function" ? getApp() : null
         if (app && app.globalData) {
           app.globalData._tempCarDetailPreview = targetCar
         }
-      } catch (e) {}
+      } catch (e) {
+        console.error("Failed to set _tempCarDetailPreview on globalData:", e)
+      }
     }
     const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.navigateTo({
@@ -527,7 +533,9 @@ Page({
       if (res && res.localPath) {
         return res.localPath
       }
-    } catch (e) {}
+    } catch (e) {
+      console.error("Failed to resolve image via resolveImage:", e)
+    }
 
     if (typeof wx !== "undefined" && typeof wx.getImageInfo === "function") {
       try {
@@ -537,7 +545,9 @@ Page({
         if (info && info.path) {
           return info.path
         }
-      } catch (e) {}
+      } catch (e) {
+        console.error("Failed to get image info via wx.getImageInfo:", e)
+      }
     }
     return src
   },
@@ -1308,7 +1318,9 @@ Page({
         const nextList = Array.from(new Map((append ? this.data.list.concat(list) : list).map((car) => [car.id, car])).values())
         this._favoritesPaginationDirty = false
         if (!append && typeof wx !== "undefined" && typeof wx.setStorageSync === "function") {
-          try { wx.setStorageSync("favorites_last_snapshot", nextList) } catch (e) {}
+          try { wx.setStorageSync("favorites_last_snapshot", nextList) } catch (e) {
+            console.error("Failed to set favorites_last_snapshot:", e)
+          }
         }
         this.applyFavoriteList(nextList, {
           availableOnly: this.data.availableOnly,

@@ -140,7 +140,7 @@ Page({
     this._bookingCancelSerial = Number(this._bookingCancelSerial || 0) + 1
     this.finishBookingsLoadEffects()
     this.clearBookingCancelTimer()
-    if (this._perf && typeof this._perf.dispose === 'function') try { this._perf.dispose(); } catch(e) {}
+    if (this._perf && typeof this._perf.dispose === 'function') try { this._perf.dispose(); } catch(e) { console.error('Failed to dispose perf helpers:', e); }
   },
 
   finishBookingsLoadEffects() {

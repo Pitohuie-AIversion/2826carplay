@@ -537,18 +537,26 @@ function validatePerformance(value, errors) {
   }
 }
 
-function validateVehicle(input) {
-  const value = normalizeVehicleInput(input)
-  const errors = []
-
+function validatePerformanceInput(input, errors) {
   if (input && input.performance != null && (typeof input.performance !== "object" || Array.isArray(input.performance))) {
     errors.push({ field: "performance", message: "性能参数格式不合法" })
   }
+}
+
+function processRentalDiscountTiers(value, errors) {
   if (value.rentalDiscountTiers !== undefined) {
     const message = validateRentalDiscountTiers(value.rentalDiscountTiers)
     if (message) errors.push({ field: "rentalDiscountTiers", message })
     else value.rentalDiscountTiers = normalizeRentalDiscountTiers(value.rentalDiscountTiers)
   }
+}
+
+function validateVehicle(input) {
+  const value = normalizeVehicleInput(input)
+  const errors = []
+
+  validatePerformanceInput(input, errors)
+  processRentalDiscountTiers(value, errors)
 
   validateRequiredFields(value, errors)
   validateBasicInfo(value, errors)

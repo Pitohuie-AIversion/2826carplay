@@ -74,6 +74,8 @@ async function audit(openid, action, contentId) {
   } catch (ignored) {}
 }
 
+module.exports._test = { normalizeGuide, text, strings, validateGuide }
+
 exports.main = async (event) => {
   const openid = String((cloud.getWXContext() || {}).OPENID || "")
   const input = event && typeof event === "object" ? event : {}

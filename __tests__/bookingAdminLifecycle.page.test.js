@@ -277,6 +277,22 @@ describe("管理员预约原生动作与写入恢复", () => {
     page.onUnload()
   })
 
+  test("后台 CSV 分享异常时走到 fail 回调并按普通分享失败处理", () => {
+    const shareFileMessage = jest.fn(() => {
+      throw new Error("sync crash")
+    })
+    const openDocument = jest.fn()
+    const page = loadPage("booking-manage", { shareFileMessage, openDocument })
+    Object.assign(page.data, { exportFilePath: "/tmp/report.csv", exportFileName: "report.csv" })
+    page.handleShareExportedFile()
+
+    expect(openDocument).not.toHaveBeenCalled()
+    expect(wx.showToast).toHaveBeenCalledWith({
+      title: "分享失败",
+      icon: "none"
+    })
+  })
+
   test("后台 CSV 分享失败不提示也不自动打开文件", () => {
     const shareFileMessage = jest.fn()
     const openDocument = jest.fn()

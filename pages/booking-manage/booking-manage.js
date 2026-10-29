@@ -159,11 +159,11 @@ function isTapGestureShareError(error) {
 }
 function isDevtoolsEnv() {
   try {
-    if (!wx || typeof wx.getSystemInfoSync !== "function") {
+    if (typeof wx === "undefined" || !wx || typeof wx.getSystemInfoSync !== "function") {
       return false
     }
     const info = wx.getSystemInfoSync()
-    return info && info.platform === "devtools"
+    return Boolean(info && info.platform === "devtools")
   } catch (error) {
     return false
   }

@@ -319,29 +319,16 @@ function normalizeVehicleInput(input) {
   return normalized
 }
 
-function validateVehicle(input) {
-  const value = normalizeVehicleInput(input)
-  const errors = []
-  if (input && input.performance != null && (typeof input.performance !== "object" || Array.isArray(input.performance))) {
-    errors.push({ field: "performance", message: "性能参数格式不合法" })
-  }
-  if (value.rentalDiscountTiers !== undefined) {
-    const message = validateRentalDiscountTiers(value.rentalDiscountTiers)
-    if (message) errors.push({ field: "rentalDiscountTiers", message })
-    else value.rentalDiscountTiers = normalizeRentalDiscountTiers(value.rentalDiscountTiers)
-  }
-
+function validateRequiredFields(value, errors) {
   REQUIRED_FIELDS.forEach((field) => {
     const v = value[field]
     if (v === undefined || v === null || (typeof v === "string" && !v.trim())) {
       errors.push({ field, message: "必填字段缺失" })
     }
   })
+}
 
-  if (value.plateNumber && !isValidPlateNumber(value.plateNumber)) {
-    errors.push({ field: "plateNumber", message: "车牌号格式不合法", value: value.plateNumber })
-  }
-
+function validateEnumFields(value, errors) {
   if (value.vehicleType && !VEHICLE_TYPES.includes(value.vehicleType)) {
     errors.push({
       field: "vehicleType",
@@ -378,27 +365,30 @@ function validateVehicle(input) {
     })
   }
 
+  if (
+    value.publicArchiveReviewStatus &&
+    !ARCHIVE_REVIEW_STATUSES.includes(value.publicArchiveReviewStatus)
+  ) {
+    errors.push({
+      field: "publicArchiveReviewStatus",
+      message: "公开档案复核状态不合法",
+      value: value.publicArchiveReviewStatus,
+      allowed: ARCHIVE_REVIEW_STATUSES
+    })
+  }
+}
+
+function validateStringFields(value, errors) {
+  if (value.plateNumber && !isValidPlateNumber(value.plateNumber)) {
+    errors.push({ field: "plateNumber", message: "车牌号格式不合法", value: value.plateNumber })
+  }
+
   if (value.brandModel) {
     if (value.brandModel.length < 1 || value.brandModel.length > 50) {
       errors.push({
         field: "brandModel",
         message: "品牌型号长度需为 1-50",
         value: value.brandModel
-      })
-    }
-  }
-
-  if (value.registerDate) {
-    const dateCheck = isValidYmdDate(value.registerDate)
-    if (!dateCheck.ok) {
-      errors.push({
-        field: "registerDate",
-        message:
-          dateCheck.reason === "FUTURE"
-            ? "注册日期不得晚于今天"
-            : "注册日期格式不合法（YYYY-MM-DD）",
-        value: value.registerDate,
-        reason: dateCheck.reason
       })
     }
   }
@@ -437,6 +427,41 @@ function validateVehicle(input) {
     errors.push({ field: "publicDrivingTips", message: "用车提示长度不能超过 500", value: value.publicDrivingTips })
   }
 
+  PUBLIC_ARCHIVE_TEXT_FIELDS.forEach((field) => {
+    if (value[field] !== undefined && value[field].length > 200) {
+      errors.push({ field, message: "公开摘要长度不能超过 200", value: value[field] })
+    }
+  })
+
+  INTERNAL_ARCHIVE_TEXT_FIELDS.forEach((field) => {
+    if (value[field] !== undefined && value[field].length > 500) {
+      errors.push({ field, message: "内部记录长度不能超过 500", value: value[field] })
+    }
+  })
+
+  if (value.location !== undefined) {
+    if (value.location.length > 20) {
+      errors.push({ field: "location", message: "城市长度不能超过 20", value: value.location })
+    }
+  }
+}
+
+function validateDateFields(value, errors) {
+  if (value.registerDate) {
+    const dateCheck = isValidYmdDate(value.registerDate)
+    if (!dateCheck.ok) {
+      errors.push({
+        field: "registerDate",
+        message:
+          dateCheck.reason === "FUTURE"
+            ? "注册日期不得晚于今天"
+            : "注册日期格式不合法（YYYY-MM-DD）",
+        value: value.registerDate,
+        reason: dateCheck.reason
+      })
+    }
+  }
+
   ;["archiveDate", "archiveReview"].forEach((field) => {
     if (!value[field]) return
     const dateCheck = isValidYmdDate(value[field], { allowFuture: true })
@@ -459,37 +484,9 @@ function validateVehicle(input) {
       })
     }
   })
+}
 
-  if (
-    value.publicArchiveReviewStatus &&
-    !ARCHIVE_REVIEW_STATUSES.includes(value.publicArchiveReviewStatus)
-  ) {
-    errors.push({
-      field: "publicArchiveReviewStatus",
-      message: "公开档案复核状态不合法",
-      value: value.publicArchiveReviewStatus,
-      allowed: ARCHIVE_REVIEW_STATUSES
-    })
-  }
-
-  PUBLIC_ARCHIVE_TEXT_FIELDS.forEach((field) => {
-    if (value[field] !== undefined && value[field].length > 200) {
-      errors.push({ field, message: "公开摘要长度不能超过 200", value: value[field] })
-    }
-  })
-
-  INTERNAL_ARCHIVE_TEXT_FIELDS.forEach((field) => {
-    if (value[field] !== undefined && value[field].length > 500) {
-      errors.push({ field, message: "内部记录长度不能超过 500", value: value[field] })
-    }
-  })
-
-  if (value.location !== undefined) {
-    if (value.location.length > 20) {
-      errors.push({ field: "location", message: "城市长度不能超过 20", value: value.location })
-    }
-  }
-
+function validateNumericFields(value, errors) {
   if (value.seats !== undefined && value.seats !== null) {
     if (!Number.isInteger(value.seats) || value.seats < 1 || value.seats > 9) {
       errors.push({ field: "seats", message: "座位数需为 1-9 的整数", value: value.seats })
@@ -501,40 +498,63 @@ function validateVehicle(input) {
       errors.push({ field: "priceDay", message: "日租金需为 0-99999 的整数", value: value.priceDay })
     }
   }
+}
+
+function validatePerformanceField(perf, errors) {
+  if (perf.acceleration !== undefined && perf.acceleration !== "") {
+    if (String(perf.acceleration).length > 20 || !PERFORMANCE_ACCELERATION_RE.test(String(perf.acceleration))) {
+      errors.push({ field: "performance.acceleration", message: "百公里加速格式不合法（如 3.4s 或 6.5）", value: perf.acceleration })
+    }
+  }
+  if (perf.horsepower !== undefined && perf.horsepower !== "") {
+    if (String(perf.horsepower).length > 20 || !PERFORMANCE_HORSEPOWER_RE.test(String(perf.horsepower))) {
+      errors.push({ field: "performance.horsepower", message: "马力格式不合法（如 450Ps、300kW、280匹）", value: perf.horsepower })
+    }
+  }
+  if (perf.torque !== undefined && perf.torque !== "") {
+    if (String(perf.torque).length > 20 || !PERFORMANCE_TORQUE_RE.test(String(perf.torque))) {
+      errors.push({ field: "performance.torque", message: "扭矩格式不合法（如 530N·m、380牛米）", value: perf.torque })
+    }
+  }
+  if (perf.drivetrain !== undefined && perf.drivetrain !== "") {
+    const driveStr = String(perf.drivetrain)
+    if (driveStr.length > 30) {
+      errors.push({ field: "performance.drivetrain", message: "驱动方式长度不能超过 30", value: driveStr })
+    }
+  }
+  if (Array.isArray(perf.highlights)) {
+    if (perf.highlights.length > 8) {
+      errors.push({ field: "performance.highlights", message: "配置标签不能超过 8 项", value: perf.highlights.length })
+    }
+    perf.highlights.forEach((tag, idx) => {
+      if (typeof tag !== "string" || tag.length === 0 || tag.length > 20) {
+        errors.push({ field: `performance.highlights[${idx}]`, message: "每项配置标签需为 1-20 字", value: tag })
+      }
+    })
+  }
+}
+
+function validateVehicle(input) {
+  const value = normalizeVehicleInput(input)
+  const errors = []
+
+  if (input && input.performance != null && (typeof input.performance !== "object" || Array.isArray(input.performance))) {
+    errors.push({ field: "performance", message: "性能参数格式不合法" })
+  }
+  if (value.rentalDiscountTiers !== undefined) {
+    const message = validateRentalDiscountTiers(value.rentalDiscountTiers)
+    if (message) errors.push({ field: "rentalDiscountTiers", message })
+    else value.rentalDiscountTiers = normalizeRentalDiscountTiers(value.rentalDiscountTiers)
+  }
+
+  validateRequiredFields(value, errors)
+  validateEnumFields(value, errors)
+  validateStringFields(value, errors)
+  validateDateFields(value, errors)
+  validateNumericFields(value, errors)
 
   if (value.performance !== undefined && value.performance !== null) {
-    const perf = value.performance
-    if (perf.acceleration !== undefined && perf.acceleration !== "") {
-      if (String(perf.acceleration).length > 20 || !PERFORMANCE_ACCELERATION_RE.test(String(perf.acceleration))) {
-        errors.push({ field: "performance.acceleration", message: "百公里加速格式不合法（如 3.4s 或 6.5）", value: perf.acceleration })
-      }
-    }
-    if (perf.horsepower !== undefined && perf.horsepower !== "") {
-      if (String(perf.horsepower).length > 20 || !PERFORMANCE_HORSEPOWER_RE.test(String(perf.horsepower))) {
-        errors.push({ field: "performance.horsepower", message: "马力格式不合法（如 450Ps、300kW、280匹）", value: perf.horsepower })
-      }
-    }
-    if (perf.torque !== undefined && perf.torque !== "") {
-      if (String(perf.torque).length > 20 || !PERFORMANCE_TORQUE_RE.test(String(perf.torque))) {
-        errors.push({ field: "performance.torque", message: "扭矩格式不合法（如 530N·m、380牛米）", value: perf.torque })
-      }
-    }
-    if (perf.drivetrain !== undefined && perf.drivetrain !== "") {
-      const driveStr = String(perf.drivetrain)
-      if (driveStr.length > 30) {
-        errors.push({ field: "performance.drivetrain", message: "驱动方式长度不能超过 30", value: driveStr })
-      }
-    }
-    if (Array.isArray(perf.highlights)) {
-      if (perf.highlights.length > 8) {
-        errors.push({ field: "performance.highlights", message: "配置标签不能超过 8 项", value: perf.highlights.length })
-      }
-      perf.highlights.forEach((tag, idx) => {
-        if (typeof tag !== "string" || tag.length === 0 || tag.length > 20) {
-          errors.push({ field: `performance.highlights[${idx}]`, message: "每项配置标签需为 1-20 字", value: tag })
-        }
-      })
-    }
+    validatePerformanceField(value.performance, errors)
   }
 
   if (errors.length) {

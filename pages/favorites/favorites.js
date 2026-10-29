@@ -58,7 +58,9 @@ function saveFavoriteFilterPreference(availableOnly) {
   }
   try {
     wx.setStorageSync(FAVORITE_FILTER_STORAGE_KEY, Boolean(availableOnly))
-  } catch (error) {}
+  } catch (error) {
+    console.error("Error saving favorite filter preference:", error)
+  }
 }
 
 function buildCompareState(car1, car2, diffOnly) {
@@ -1220,7 +1222,9 @@ Page({
     this._favoritesPaginationDirty = true
     try {
       if (typeof wx.setStorageSync === "function") wx.setStorageSync("favorites_last_snapshot", this.data.list.slice(0, this.data.pageSize))
-    } catch (error) {}
+    } catch (error) {
+      console.error("Error saving favorites snapshot:", error)
+    }
   },
 
   fetchList(options) {

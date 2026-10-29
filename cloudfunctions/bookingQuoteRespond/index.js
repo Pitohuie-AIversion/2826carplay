@@ -166,10 +166,12 @@ exports.main = async (event) => {
         if (!["idle", "active"].includes(vehicleStatus)) {
           return { error: createError("VEHICLE_NOT_OCCUPIABLE", "车辆状态待核对，请联系顾问后再确认档期") }
         }
-        for (const date of dates) {
-          const occupied = await getDocOrNull(transaction.collection("vehicle_calendar_days"), dayDocumentId(vehicleId, date), { blockId: true, bookingId: true, kind: true })
+        const readPromises = dates.map(date => getDocOrNull(transaction.collection("vehicle_calendar_days"), dayDocumentId(vehicleId, date), { blockId: true, bookingId: true, kind: true }))
+        const readResults = await Promise.all(readPromises)
+        for (let i = 0; i < dates.length; i++) {
+          const occupied = readResults[i]
           if (occupied && String(occupied.bookingId || "") !== input.bookingId) {
-            return { error: createError("AVAILABILITY_CONFLICT", `${date} 已被占用，请联系顾问调整日期`, { date }) }
+            return { error: createError("AVAILABILITY_CONFLICT", `${dates[i]} 已被占用，请联系顾问调整日期`, { date: dates[i] }) }
           }
         }
         occupancy = {
@@ -204,8 +206,8 @@ exports.main = async (event) => {
           createdAt: db.serverDate(),
           updatedAt: db.serverDate()
         } })
-        for (const date of occupancy.dates) {
-          await transaction.collection("vehicle_calendar_days").doc(dayDocumentId(occupancy.vehicleId, date)).set({ data: {
+        const writePromises = occupancy.dates.map(date =>
+          transaction.collection("vehicle_calendar_days").doc(dayDocumentId(occupancy.vehicleId, date)).set({ data: {
             vehicleId: occupancy.vehicleId,
             date,
             blockId: occupancy.id,
@@ -214,7 +216,8 @@ exports.main = async (event) => {
             createdAt: db.serverDate(),
             updatedAt: db.serverDate()
           } })
-        }
+        )
+        await Promise.all(writePromises)
       }
       return { duplicate: false, targetStatus, quote, adjustmentNote: input.adjustmentNote, attribution: booking.attribution, vehicleId: booking.vehicleId }
     })

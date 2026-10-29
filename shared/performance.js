@@ -87,10 +87,65 @@ function mergePatchIntoPending(pendingPatch, patch) {
   return result
 }
 
+function setUnrefTimeout(fn, ms) {
+  const timer = setTimeout(fn, ms)
+  if (timer && typeof timer.unref === "function") {
+    timer.unref()
+  }
+  return timer
+}
+
+function clearUnrefTimer(timer) {
+  if (timer !== null) {
+    clearTimeout(timer)
+  }
+  return null
+}
+
+function createDebounceFactory(state, debounceHandles) {
+  return function debounce(fn, delayMs, immediate) {
+    if (typeof fn !== "function") {
+      return fn
+    }
+    const ms = Math.max(0, Number(delayMs) || 0)
+    let timer = null
+    let lastResult
+    const wrapped = function () {
+      if (state.destroyed) return lastResult
+      const self = this
+      const args = new Array(arguments.length)
+      for (let i = 0; i < args.length; i++) args[i] = arguments[i]
+      const shouldCallNow = immediate && timer === null
+      timer = clearUnrefTimer(timer)
+
+      if (immediate) {
+        timer = setUnrefTimeout(() => {
+          timer = null
+        }, ms)
+        if (shouldCallNow) {
+          lastResult = fn.apply(self, args)
+        }
+        return lastResult
+      }
+
+      timer = setUnrefTimeout(() => {
+        timer = null
+        lastResult = fn.apply(self, args)
+      }, ms)
+      return lastResult
+    }
+    wrapped.cancel = () => {
+      timer = clearUnrefTimer(timer)
+    }
+    debounceHandles.push(wrapped)
+    return wrapped
+  }
+}
+
 function createPerformanceHelpers(context) {
+  const state = { destroyed: false }
   let pendingPatch = null
   let flushTimer = null
-  let destroyed = false
   let flushScheduled = false
   let flushSerial = 0
   const debounceHandles = []
@@ -98,14 +153,11 @@ function createPerformanceHelpers(context) {
   const cancelScheduledFlush = () => {
     flushScheduled = false
     flushSerial += 1
-    if (flushTimer !== null) {
-      clearTimeout(flushTimer)
-      flushTimer = null
-    }
+    flushTimer = clearUnrefTimer(flushTimer)
   }
 
   const flushPending = () => {
-    if (destroyed || pendingPatch === null) {
+    if (state.destroyed || pendingPatch === null) {
       cancelScheduledFlush()
       return
     }
@@ -126,7 +178,7 @@ function createPerformanceHelpers(context) {
   }
 
   const scheduleFlush = () => {
-    if (destroyed) return
+    if (state.destroyed) return
     if (typeof wx !== "object" || !wx || typeof wx.nextTick !== "function") {
       flushPending()
       return
@@ -137,7 +189,7 @@ function createPerformanceHelpers(context) {
     flushScheduled = true
     const serial = ++flushSerial
     const flushIfCurrent = () => {
-      if (serial === flushSerial && !destroyed) flushPending()
+      if (serial === flushSerial && !state.destroyed) flushPending()
     }
     try {
       wx.nextTick(flushIfCurrent)
@@ -145,15 +197,12 @@ function createPerformanceHelpers(context) {
       // Fall through to setTimeout
     }
     if (flushScheduled && flushTimer === null) {
-      flushTimer = setTimeout(flushIfCurrent, APPLY_STATE_FLUSH_MS)
-      if (flushTimer && typeof flushTimer.unref === "function") {
-        flushTimer.unref()
-      }
+      flushTimer = setUnrefTimeout(flushIfCurrent, APPLY_STATE_FLUSH_MS)
     }
   }
 
   const applyState = (patch) => {
-    if (destroyed || !isPlainObject(patch)) {
+    if (state.destroyed || !isPlainObject(patch)) {
       return
     }
     if (context && typeof context.data === "object" && context.data !== null) {
@@ -167,57 +216,11 @@ function createPerformanceHelpers(context) {
     flushPending()
   }
 
-  const debounce = (fn, delayMs, immediate) => {
-    if (typeof fn !== "function") {
-      return fn
-    }
-    const ms = Math.max(0, Number(delayMs) || 0)
-    let timer = null
-    let lastResult
-    const wrapped = function () {
-      if (destroyed) return lastResult
-      const self = this
-      const args = new Array(arguments.length)
-      for (let i = 0; i < args.length; i++) args[i] = arguments[i]
-      const shouldCallNow = immediate && timer === null
-      if (timer !== null) {
-        clearTimeout(timer)
-        timer = null
-      }
-      if (immediate) {
-        timer = setTimeout(() => {
-          timer = null
-        }, ms)
-        if (timer && typeof timer.unref === "function") {
-          timer.unref()
-        }
-        if (shouldCallNow) {
-          lastResult = fn.apply(self, args)
-        }
-        return lastResult
-      }
-      timer = setTimeout(() => {
-        timer = null
-        lastResult = fn.apply(self, args)
-      }, ms)
-      if (timer && typeof timer.unref === "function") {
-        timer.unref()
-      }
-      return lastResult
-    }
-    wrapped.cancel = () => {
-      if (timer !== null) {
-        clearTimeout(timer)
-        timer = null
-      }
-    }
-    debounceHandles.push(wrapped)
-    return wrapped
-  }
+  const debounce = createDebounceFactory(state, debounceHandles)
 
   const dispose = () => {
-    if (destroyed) return
-    destroyed = true
+    if (state.destroyed) return
+    state.destroyed = true
     for (let i = 0; i < debounceHandles.length; i++) {
       const h = debounceHandles[i]
       if (h && typeof h.cancel === "function") {

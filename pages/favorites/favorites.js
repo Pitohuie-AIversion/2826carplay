@@ -1220,7 +1220,9 @@ Page({
     this._favoritesPaginationDirty = true
     try {
       if (typeof wx.setStorageSync === "function") wx.setStorageSync("favorites_last_snapshot", this.data.list.slice(0, this.data.pageSize))
-    } catch (error) {}
+    } catch (error) {
+      console.error("Failed to update favorites snapshot", error)
+    }
   },
 
   fetchList(options) {
@@ -1304,7 +1306,9 @@ Page({
         const nextList = Array.from(new Map((append ? this.data.list.concat(list) : list).map((car) => [car.id, car])).values())
         this._favoritesPaginationDirty = false
         if (!append && typeof wx !== "undefined" && typeof wx.setStorageSync === "function") {
-          try { wx.setStorageSync("favorites_last_snapshot", nextList) } catch (e) {}
+          try { wx.setStorageSync("favorites_last_snapshot", nextList) } catch (e) {
+            console.error("Failed to save favorites snapshot", e)
+          }
         }
         this.applyFavoriteList(nextList, {
           availableOnly: this.data.availableOnly,

@@ -1020,5 +1020,24 @@ describe("pages/car-detail 客户侧车辆状态", () => {
     expect(wxml).toContain("handleRetryHeroImage")
     expect(wxml).toContain("点击重试")
   })
+
+  test("finishCarDetailLoadEffects safely catches errors from done callback", () => {
+    const page = createPage(loadPageDefinition())
+    const done = jest.fn(() => {
+      throw new Error("Simulated callback error")
+    })
+    page._carDetailLoadDone = done
+    page.clearCarDetailLoadTimer = jest.fn()
+
+    expect(() => {
+      page.finishCarDetailLoadEffects()
+    }).not.toThrow()
+
+    expect(page.clearCarDetailLoadTimer).toHaveBeenCalled()
+    expect(page._carDetailLoadDone).toBeNull()
+    expect(done).toHaveBeenCalledTimes(1)
+    page.finishCarDetailLoadEffects()
+    expect(done).toHaveBeenCalledTimes(1)
+  })
 })
 

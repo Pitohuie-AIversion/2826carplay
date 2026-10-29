@@ -11,11 +11,17 @@ const GUIDE_FIELDS = {
 const VEHICLE_FIELDS = { brandModel: true, name: true, coverImage: true, imageList: true, status: true }
 
 function toTimestamp(value) {
-  if (!value) return 0
-  if (value instanceof Date) return value.getTime()
-  if (typeof value.toDate === "function") return value.toDate().getTime()
-  const parsed = new Date(value).getTime()
-  return Number.isFinite(parsed) ? parsed : 0
+  try {
+    let parsed
+    if (value instanceof Date) parsed = value.getTime()
+    else if (value && typeof value.toDate === "function") {
+      const date = value.toDate()
+      parsed = date instanceof Date ? date.getTime() : NaN
+    } else if (typeof value === "string" || typeof value === "number") parsed = new Date(value).getTime()
+    return Number.isFinite(parsed) ? parsed : 0
+  } catch (ignored) {
+    return 0
+  }
 }
 
 async function readVehicle(id) {
@@ -37,20 +43,29 @@ async function readVehicle(id) {
 
 exports._test = { toTimestamp, readVehicle }
 exports.main = async (event) => {
-  const contentId = String(event && (event.contentId || event.slug) || "").trim()
+  const input = event && typeof event === "object" ? event : {}
+  const rawId = input.contentId === undefined ? input.slug : input.contentId
+  const contentId = typeof rawId === "string" ? rawId.trim() : ""
   if (!ID_PATTERN.test(contentId)) return { ok: false, code: "VALIDATION_ERROR", message: "内容标识格式不正确" }
   try {
     const res = await db.collection("content_guides").where({ slug: contentId }).field(GUIDE_FIELDS).limit(2).get()
-    const guide = res && Array.isArray(res.data) ? res.data[0] : null
-    if (!guide || guide.status !== "published" || toTimestamp(guide.publishedAt) <= 0 || toTimestamp(guide.publishedAt) > Date.now()) {
+    if (!res || !Array.isArray(res.data) || res.data.length > 1) throw new Error("Unexpected content detail result")
+    const guide = res.data[0]
+    if (res.data.length && (!guide || typeof guide !== "object" || Array.isArray(guide))) {
+      throw new Error("Unexpected content detail result")
+    }
+    const publishedAt = guide ? toTimestamp(guide.publishedAt) : 0
+    if (!guide || guide.status !== "published" || publishedAt <= 0 || publishedAt > Date.now()) {
       return { ok: false, code: "NOT_FOUND", message: "内容不存在或尚未发布" }
     }
-    const vehicleIds = (Array.isArray(guide.vehicleIds) ? guide.vehicleIds : []).filter((id) => ID_PATTERN.test(String(id))).slice(0, 20)
+    if (guide.slug !== contentId) throw new Error("Unexpected content detail identity")
+    const vehicleIds = Array.from(new Set((Array.isArray(guide.vehicleIds) ? guide.vehicleIds : [])
+      .map((id) => typeof id === "string" ? id.trim() : "").filter((id) => ID_PATTERN.test(id)))).slice(0, 20)
     const vehicles = (await Promise.all(vehicleIds.map(readVehicle))).filter(Boolean)
     const { status, ...publicGuide } = guide
     return {
       ok: true,
-      guide: { ...publicGuide, id: guide.slug || guide._id },
+      guide: { ...publicGuide, id: guide.slug, vehicleIds },
       vehicles
     }
   } catch (error) {

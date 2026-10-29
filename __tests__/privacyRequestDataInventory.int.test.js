@@ -17,8 +17,6 @@ function createPagedWhere(records, error) {
 }
 
 
-
-
 function createMockDb({
   roles,
   request,
@@ -44,52 +42,28 @@ function createMockDb({
     favorites,
     unavailable.includes("favorites") ? new Error("collection not found") : null
   )
-  const quotesWhere = jest.fn((filter) => {
-    let ids = [];
-    if (filter.bookingId && Array.isArray(filter.bookingId.$in)) {
-      ids = filter.bookingId.$in;
-    } else if (filter.bookingId && typeof filter.bookingId === 'object' && filter.bookingId.in) {
-      ids = filter.bookingId.in;
-    } else if (filter.bookingId) {
-      ids = [filter.bookingId];
-    }
-
-    const skip = jest.fn((offset) => ({
-      limit: jest.fn((limit) => ({
-        get: unavailable.includes("booking_quotes")
-          ? jest.fn().mockRejectedValue(new Error("collection not found"))
-          : jest.fn().mockResolvedValue({
-              data: quotes.filter((item) => ids.includes(item.bookingId)).slice(offset, offset + limit)
-            })
-      }))
-    }))
-    return {
-      field: jest.fn(() => ({ skip, limit: skip(0).limit }))
-    }
-  })
-  const handoversWhere = jest.fn((filter) => {
-    let ids = [];
-    if (filter.bookingId && Array.isArray(filter.bookingId.$in)) {
-      ids = filter.bookingId.$in;
-    } else if (filter.bookingId && typeof filter.bookingId === 'object' && filter.bookingId.in) {
-      ids = filter.bookingId.in;
-    } else if (filter.bookingId) {
-      ids = [filter.bookingId];
-    }
-
-    const skip = jest.fn((offset) => ({
-      limit: jest.fn((limit) => ({
-        get: unavailable.includes("booking_handovers")
-          ? jest.fn().mockRejectedValue(new Error("collection not found"))
-          : jest.fn().mockResolvedValue({
-              data: handovers.filter((item) => ids.includes(item.bookingId)).slice(offset, offset + limit)
-            })
-      }))
-    }))
-    return {
-      field: jest.fn(() => ({ skip, limit: skip(0).limit }))
-    }
-  })
+  const relatedGets = []
+  function relatedWhere(category, records) {
+    return jest.fn((filter) => {
+      const ids = filter.bookingId.$in
+      if (!Array.isArray(ids) || ids.length > 20) throw new Error("Expected bounded booking ID batch")
+      return {
+        field: jest.fn(() => ({
+          skip: jest.fn((offset) => ({
+            limit: jest.fn((limit) => ({
+              get: jest.fn(async () => {
+                relatedGets.push({ category, ids, offset, limit })
+                if (unavailable.includes(category)) throw new Error("collection not found")
+                return { data: records.filter((item) => ids.includes(item.bookingId)).slice(offset, offset + Math.min(limit, 100)) }
+              })
+            }))
+          }))
+        }))
+      }
+    })
+  }
+  const quotesWhere = relatedWhere("booking_quotes", quotes)
+  const handoversWhere = relatedWhere("booking_handovers", handovers)
   const requestsWhere = createPagedWhere(
     privacyRequests,
     unavailable.includes("privacy_requests") ? new Error("collection not found") : null
@@ -118,11 +92,6 @@ function createMockDb({
   }))
   const auditAdd = jest.fn().mockResolvedValue({ _id: "audit_1" })
   const serverDateValue = { serverDate: true }
-  const command = {
-    in: (val) => ({ $in: val }),
-    neq: (val) => ({ operation: "neq", value: val })
-  }
-
   const collection = jest.fn((name) => {
     if (name === "roles") {
       return { where: rolesWhere }
@@ -160,6 +129,9 @@ function createMockDb({
       },
       serverDate: jest.fn(() => serverDateValue)
     },
+    relatedGets,
+    quotesWhere,
+    handoversWhere,
     bookingsWhere,
     favoritesWhere,
     requestsWhere,
@@ -186,6 +158,77 @@ async function loadModule(openid, mockDb) {
 }
 
 describe("cloudfunctions/privacyRequestDataInventory integration", () => {
+  test.each([0, 100, 200, 201])("关联分类分页读取 %i 条且保留截断检测", async (count) => {
+    const mocks = createMockDb({
+      roles: [{ openid: "admin", role: "admin" }],
+      request: { _id: "request_1", openid: "user", type: "access", status: "processing" },
+      bookings: [{ _id: "booking_1", openid: "user" }],
+      quotes: Array.from({ length: count }, (_, i) => ({ _id: `q_${i}`, bookingId: "booking_1" })),
+      handovers: Array.from({ length: count }, (_, i) => ({ _id: `h_${i}`, bookingId: "booking_1" }))
+    })
+    const mod = await loadModule("admin", mocks.db)
+    const res = await mod.main({ requestId: "request_1" })
+    expect(res.ok).toBe(true)
+    for (const category of ["quotes", "handovers"]) {
+      expect(res.categories[category].count).toBe(Math.min(count, 200))
+      expect(res.categories[category].truncated).toBe(count > 200)
+    }
+    expect(res.partial).toBe(count > 200)
+    for (const category of ["booking_quotes", "booking_handovers"]) {
+      const reads = mocks.relatedGets.filter((read) => read.category === category)
+      expect(reads.map((read) => read.offset)).toEqual(count < 100 ? [0] : count < 200 ? [0, 100] : [0, 100, 200])
+      expect(reads.every((read) => read.limit <= 100)).toBe(true)
+      expect(reads.reduce((total, read) => total + read.limit, 0)).toBeLessThanOrEqual(201)
+    }
+  })
+
+  test("多个预约按有界 ID 批次查询且不包含其他用户的关联数据", async () => {
+    const bookings = Array.from({ length: 45 }, (_, i) => ({ _id: `booking_${i}`, openid: "user" }))
+    const related = bookings.map((booking, i) => ({ _id: `related_${i}`, bookingId: booking._id }))
+    const mocks = createMockDb({
+      roles: [{ openid: "admin", role: "admin" }],
+      request: { _id: "request_1", openid: "user", type: "access", status: "processing" },
+      bookings,
+      quotes: related.concat({ _id: "other_quote", bookingId: "other_user_booking" }),
+      handovers: related.concat({ _id: "other_handover", bookingId: "other_user_booking" })
+    })
+    const mod = await loadModule("admin", mocks.db)
+    const res = await mod.main({ requestId: "request_1" })
+    expect(res.ok).toBe(true)
+    expect(res.partial).toBe(false)
+    expect(res.categories.quotes.count).toBe(45)
+    expect(res.categories.handovers.count).toBe(45)
+    expect(mocks.quotesWhere).toHaveBeenCalledTimes(3)
+    expect(mocks.handoversWhere).toHaveBeenCalledTimes(3)
+    expect(mocks.quotesWhere.mock.calls.map(([filter]) => filter.bookingId.$in.length)).toEqual([20, 20, 5])
+  })
+
+  test("没有预约时不查询关联分类", async () => {
+    const mocks = createMockDb({
+      roles: [{ openid: "admin", role: "admin" }],
+      request: { _id: "request_1", openid: "user", type: "access", status: "processing" }
+    })
+    const mod = await loadModule("admin", mocks.db)
+    const res = await mod.main({ requestId: "request_1" })
+    expect(res.ok).toBe(true)
+    expect(mocks.quotesWhere).not.toHaveBeenCalled()
+    expect(mocks.handoversWhere).not.toHaveBeenCalled()
+  })
+
+  test.each(["booking_quotes", "booking_handovers"])("关联集合 %s 不可用时禁止导出", async (category) => {
+    const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {})
+    const mocks = createMockDb({
+      roles: [{ openid: "admin", role: "admin" }],
+      request: { _id: "request_1", openid: "user", type: "access", status: "processing" },
+      bookings: [{ _id: "booking_1", openid: "user" }],
+      unavailable: [category]
+    })
+    const mod = await loadModule("admin", mocks.db)
+    await expect(mod.main({ requestId: "request_1", mode: "export" })).resolves.toMatchObject({ ok: false, code: "INVENTORY_INCOMPLETE" })
+    expect(mocks.auditAdd).not.toHaveBeenCalled()
+    warnSpy.mockRestore()
+  })
+
   test.each([
     ["数组申请 ID", { requestId: ["request_1"] }],
     ["数字申请 ID", { requestId: 123 }],

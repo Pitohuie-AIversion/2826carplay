@@ -12,6 +12,7 @@ const AUTH_ROLE_FIELDS = {
   admin: true
 }
 const BATCH_SIZE = 100
+const BOOKING_ID_BATCH_SIZE = 20
 const MAX_RECORDS = 200
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/
 const MODES = new Set(["inventory", "export", "confirmExport"])
@@ -358,7 +359,7 @@ async function readByOpenid(collectionName, openid) {
   }
 }
 
-async function readQuotesByBookingIds(bookingIds) {
+async function readRelatedByBookingIds(category, bookingIds) {
   const records = []
   try {
     const ids = Array.from(
@@ -368,16 +369,17 @@ async function readQuotesByBookingIds(bookingIds) {
           .filter(Boolean)
       )
     )
-    for (let index = 0; index < ids.length && records.length <= MAX_RECORDS; index += 1) {
-      const remaining = MAX_RECORDS + 1 - records.length
-      const res = await db
-        .collection("booking_quotes")
-        .where({ bookingId: ids[index] })
-        .field(INVENTORY_FIELDS.booking_quotes)
-        .limit(remaining)
-        .get()
-      const list = res && Array.isArray(res.data) ? res.data : []
-      records.push(...list)
+    for (let index = 0; index < ids.length && records.length <= MAX_RECORDS; index += BOOKING_ID_BATCH_SIZE) {
+      const bookingIdBatch = ids.slice(index, index + BOOKING_ID_BATCH_SIZE)
+      for (let offset = 0; records.length <= MAX_RECORDS; offset += BATCH_SIZE) {
+        const limit = Math.min(BATCH_SIZE, MAX_RECORDS + 1 - records.length)
+        const res = await db.collection(category)
+          .where({ bookingId: db.command.in(bookingIdBatch) })
+          .field(INVENTORY_FIELDS[category]).skip(offset).limit(limit).get()
+        const batch = res && Array.isArray(res.data) ? res.data : []
+        records.push(...batch)
+        if (batch.length < limit) break
+      }
     }
     return {
       available: true,
@@ -388,7 +390,7 @@ async function readQuotesByBookingIds(bookingIds) {
     console.warn({
       function: "privacyRequestDataInventory",
       stage: "readCategory",
-      category: "booking_quotes",
+      category,
       errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error),
       createdAt: new Date().toISOString()
     })
@@ -396,27 +398,12 @@ async function readQuotesByBookingIds(bookingIds) {
   }
 }
 
-async function readHandoversByBookingIds(bookingIds) {
-  const records = []
-  try {
-    const ids = [...new Set((bookingIds || []).map((item) => String(item || "").trim()).filter(Boolean))]
-    if (ids.length > 0) {
-      for (let offset = 0; offset <= MAX_RECORDS; offset += BATCH_SIZE) {
-        const remaining = MAX_RECORDS + 1 - records.length
-        const limit = Math.min(BATCH_SIZE, remaining)
-        const res = await db.collection("booking_handovers").where({ bookingId: db.command.in(ids) }).field(INVENTORY_FIELDS.booking_handovers).skip(offset).limit(limit).get()
-        const batch = res && Array.isArray(res.data) ? res.data : []
-        records.push(...batch)
-        if (batch.length < limit || records.length > MAX_RECORDS) {
-          break
-        }
-      }
-    }
-    return { available: true, list: sortByCreatedAtDesc(records.slice(0, MAX_RECORDS)), truncated: records.length > MAX_RECORDS }
-  } catch (error) {
-    console.warn({ function: "privacyRequestDataInventory", stage: "readCategory", category: "booking_handovers", errorMessage: error && (error.message || error.errMsg) ? error.message || error.errMsg : String(error) })
-    return { available: false, list: [], truncated: false }
-  }
+function readQuotesByBookingIds(bookingIds) {
+  return readRelatedByBookingIds("booking_quotes", bookingIds)
+}
+
+function readHandoversByBookingIds(bookingIds) {
+  return readRelatedByBookingIds("booking_handovers", bookingIds)
 }
 
 function normalizeBooking(item) {

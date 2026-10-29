@@ -232,7 +232,10 @@ exports.main = async (event) => {
       const removed = Number(removeRes && removeRes.stats && removeRes.stats.removed) || 0
       if (removed < 1) return { error: createError("DELETE_CONFLICT", "车辆未能删除，可能已被其他管理员处理，请刷新后重试") }
       const fileList = normalizeStringArray(latest.imageList).concat(String(latest.coverImage || "").trim() ? [String(latest.coverImage).trim()] : [])
+
       const claimedFiles = []
+      // Finish each claim before starting another so rollback cannot leave a
+      // pending claim that resumes writing through the closed transaction.
       for (const fileId of normalizeStringArray(fileList)) {
         if (await imageLifecycle.writeClaim(transaction, id, fileId, "vehicleDelete", "deleteVehicle")) claimedFiles.push(fileId)
       }

@@ -35,7 +35,7 @@ async function readVehicle(id) {
   }
 }
 
-exports._test = { toTimestamp }
+exports._test = { toTimestamp, readVehicle }
 exports.main = async (event) => {
   const contentId = String(event && (event.contentId || event.slug) || "").trim()
   if (!ID_PATTERN.test(contentId)) return { ok: false, code: "VALIDATION_ERROR", message: "内容标识格式不正确" }

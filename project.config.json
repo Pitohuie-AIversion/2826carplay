@@ -14,6 +14,10 @@
       },
       {
         "type": "folder",
+        "value": "coverage"
+      },
+      {
+        "type": "folder",
         "value": "__mocks__"
       },
       {

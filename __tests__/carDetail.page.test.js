@@ -32,6 +32,40 @@ function createPage(definition) {
 }
 
 describe("pages/car-detail 客户侧车辆状态", () => {
+  test("若预填数据处理发生异常应安全降级不影响正常加载", () => {
+    global.getApp = jest.fn(() => ({
+      globalData: {
+        _tempCarDetailPreview: {
+          id: "vehicle-preview-error",
+          name: "保时捷 911"
+        }
+      }
+    }))
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn()
+      },
+      setNavigationBarTitle: jest.fn()
+    }
+    const page = createPage(loadPageDefinition())
+
+    page.applyCar = jest.fn(() => {
+      throw new Error("Mock error during applyCar")
+    })
+    page.loadOperationConfig = jest.fn()
+    page.loadCarDetail = jest.fn()
+    page.loadFavoriteStatus = jest.fn()
+
+    expect(() => {
+      page.onLoad({ carId: "vehicle-preview-error" })
+    }).not.toThrow()
+
+    expect(page.loadCarDetail).toHaveBeenCalledWith("vehicle-preview-error")
+    expect(page.loadOperationConfig).toHaveBeenCalled()
+    expect(page.loadFavoriteStatus).toHaveBeenCalledWith("vehicle-preview-error")
+    page.onUnload()
+  })
+
   test("租赁条款只显示已保存内容，清空、缺字段与读取失败均撤销旧文案", () => {
     let request
     global.wx = { setNavigationBarTitle: jest.fn(), cloud: { callFunction: jest.fn((options) => { request = options }) } }
@@ -181,6 +215,7 @@ describe("pages/car-detail 客户侧车辆状态", () => {
     jest.useRealTimers()
     delete global.Page
     delete global.wx
+    delete global.getApp
   })
 
   test("详情页状态和主要操作与首页客户口径一致", () => {
@@ -540,6 +575,23 @@ describe("pages/car-detail 客户侧车辆状态", () => {
     expect(page._favoriteStatusTimer).toBeNull()
   })
 
+  test("初始收藏状态接口失败时保持默认值并清理计时器", () => {
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn((options) => {
+          if (options && typeof options.fail === "function") {
+            options.fail(new Error("network failed"))
+          }
+        })
+      }
+    }
+    const page = createPage(loadPageDefinition())
+
+    expect(() => page.loadFavoriteStatus("vehicle-status-fail")).not.toThrow()
+    expect(page.data.favorited).toBe(false)
+    expect(page._favoriteStatusTimer).toBeNull()
+  })
+
   test("初始收藏状态同步异常时保持默认值并清理计时器", () => {
     global.wx = {
       cloud: {
@@ -878,6 +930,44 @@ describe("pages/car-detail 客户侧车辆状态", () => {
     expect(wxss).toContain(".perf-tag-dot")
   })
 
+
+  test("wx.cloud.init error in onLoad is caught and handled gracefully", () => {
+    const originalGetApp = global.getApp;
+    const originalWx = global.wx;
+
+    global.getApp = jest.fn(() => ({
+      globalData: {
+        cloudEnvId: "test-env-id"
+      }
+    }))
+    global.wx = {
+      ...originalWx,
+      cloud: {
+        init: jest.fn(() => {
+          throw new Error("Init error")
+        }),
+        callFunction: jest.fn()
+      },
+      setNavigationBarTitle: jest.fn()
+    }
+
+    const page = createPage(loadPageDefinition())
+    // Should not throw an error
+    expect(() => {
+      page.onLoad({ carId: "test-car-id" })
+    }).not.toThrow()
+
+    expect(global.wx.cloud.init).toHaveBeenCalledWith({
+      env: "test-env-id",
+      traceUser: true
+    })
+
+    page.onUnload()
+
+    global.getApp = originalGetApp;
+    global.wx = originalWx;
+  })
+
   test("loadCarDetail 支持从 storage 缓存秒开 (SWR 策略)", () => {
     const cachedCar = {
       id: "car-swr-1",
@@ -906,6 +996,57 @@ describe("pages/car-detail 客户侧车辆状态", () => {
     page.onUnload()
   })
 
+  test("loadCarDetail 缺少 carId 时清理数据并安全触发 done", () => {
+    const page = createPage(loadPageDefinition())
+    const doneMock = jest.fn(() => {
+      throw new Error("done error")
+    })
+
+    // 设置初始数据
+    page.setData({ car: { id: "old-car" } })
+
+    // 拦截 setLoadError 确保不触发
+    page.setLoadError = jest.fn()
+
+    // 执行无 carId 调用
+    page.loadCarDetail(null, { done: doneMock })
+
+    // 验证 car 数据被清空
+    expect(page.data.car).toBeNull()
+    // 验证 done 被触发且错误被吞掉
+    expect(doneMock).toHaveBeenCalled()
+    expect(page.setLoadError).not.toHaveBeenCalled()
+  })
+
+  test("loadCarDetail 在云能力未初始化时提示错误并安全触发 done", () => {
+    const page = createPage(loadPageDefinition())
+    const doneMock = jest.fn(() => {
+      throw new Error("done error")
+    })
+
+    // 模拟微信云能力未初始化
+    const originalWx = global.wx
+    global.wx = {
+      ...originalWx,
+      cloud: undefined // 模拟 cloud 未初始化
+    }
+
+    // 拦截 setLoadError
+    page.setLoadError = jest.fn()
+
+    // 执行调用
+    page.loadCarDetail("valid-car-id", { done: doneMock })
+
+    // 验证错误提示
+    expect(page.setLoadError).toHaveBeenCalledWith("云能力未初始化，请稍后重试")
+
+    // 验证 done 被触发且错误被吞掉
+    expect(doneMock).toHaveBeenCalled()
+
+    // 恢复全局 mock
+    global.wx = originalWx
+  })
+
   test("handleRetryHeroImage 允许重试失败的主图并恢复加载状态", () => {
     const page = createPage(loadPageDefinition())
     page.data.car = {
@@ -929,6 +1070,25 @@ describe("pages/car-detail 客户侧车辆状态", () => {
     const wxml = fs.readFileSync(path.join(pageDir, "car-detail.wxml"), "utf8")
     expect(wxml).toContain("handleRetryHeroImage")
     expect(wxml).toContain("点击重试")
+  })
+
+  test("finishCarDetailLoadEffects safely catches errors from done callback", () => {
+    const page = createPage(loadPageDefinition())
+    const done = jest.fn(() => {
+      throw new Error("Simulated callback error")
+    })
+    page._carDetailLoadDone = done
+    page.clearCarDetailLoadTimer = jest.fn()
+
+    expect(() => {
+      page.finishCarDetailLoadEffects()
+    }).not.toThrow()
+
+    expect(page.clearCarDetailLoadTimer).toHaveBeenCalled()
+    expect(page._carDetailLoadDone).toBeNull()
+    expect(done).toHaveBeenCalledTimes(1)
+    page.finishCarDetailLoadEffects()
+    expect(done).toHaveBeenCalledTimes(1)
   })
 })
 

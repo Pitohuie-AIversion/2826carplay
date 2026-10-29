@@ -189,7 +189,7 @@ Page({
         try {
           input.done()
         } catch (error) {
-          console.error("[bookings] input.done callback failed:", error)
+          console.error("Error executing input done callback:", error)
         }
       }
       return

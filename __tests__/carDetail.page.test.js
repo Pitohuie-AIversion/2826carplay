@@ -930,5 +930,95 @@ describe("pages/car-detail 客户侧车辆状态", () => {
     expect(wxml).toContain("handleRetryHeroImage")
     expect(wxml).toContain("点击重试")
   })
+
+  test("海报生成中 drawPosterTextEllipsis 的错误处理与截断逻辑", async () => {
+    jest.useFakeTimers()
+    let execCallback = null
+    const mockCtx = {
+      measureText: jest.fn(),
+      fillText: jest.fn(),
+      fillRect: jest.fn(),
+      createLinearGradient: jest.fn(() => ({ addColorStop: jest.fn() })),
+      beginPath: jest.fn(),
+      moveTo: jest.fn(),
+      lineTo: jest.fn(),
+      arcTo: jest.fn(),
+      arc: jest.fn(),
+      closePath: jest.fn(),
+      stroke: jest.fn(),
+      fill: jest.fn(),
+      save: jest.fn(),
+      clip: jest.fn(),
+      restore: jest.fn(),
+      drawImage: jest.fn(),
+      scale: jest.fn(),
+    }
+    const mockCanvas = {
+      getContext: jest.fn(() => mockCtx),
+      createImage: jest.fn(() => ({
+        onload: null,
+        onerror: null,
+        src: ""
+      }))
+    }
+    global.wx = {
+      createSelectorQuery: jest.fn(() => ({
+        in: jest.fn(() => ({
+          select: jest.fn(() => ({
+            fields: jest.fn(() => ({
+              exec: jest.fn((cb) => { execCallback = cb })
+            }))
+          }))
+        }))
+      })),
+      getSystemInfoSync: jest.fn(() => ({ pixelRatio: 2 })),
+      setNavigationBarTitle: jest.fn(),
+      canvasToTempFilePath: jest.fn()
+    }
+
+    const page = createPage(loadPageDefinition())
+    page.data.car = {
+      id: "car_1",
+      name: "Test Car",
+      brand: "Test Brand",
+      performance: { acceleration: "3s" },
+      imageItems: [{ displaySrc: "cloud://test.jpg" }]
+    }
+    page.data.carId = "car_1"
+
+    // 1. Test error in initial try block
+    mockCtx.measureText.mockImplementation(() => {
+      throw new Error("measureText error initial")
+    })
+
+    page.handleOpenPosterModal()
+    jest.advanceTimersByTime(100)
+
+    expect(execCallback).not.toBeNull()
+    await execCallback([{ node: mockCanvas }])
+
+    expect(mockCtx.fillText).toHaveBeenCalledWith("Test Brand Test Car", 36, 136)
+
+    // Clear mocks for next scenario
+    mockCtx.fillText.mockClear()
+    mockCtx.measureText.mockClear()
+    execCallback = null
+
+    // 2. Test error inside the while loop
+    mockCtx.measureText.mockImplementation((str) => {
+      if (str.endsWith("…")) {
+        throw new Error("measureText error loop")
+      }
+      return { width: 1000 }
+    })
+
+    page.handleOpenPosterModal()
+    jest.advanceTimersByTime(100)
+
+    expect(execCallback).not.toBeNull()
+    await execCallback([{ node: mockCanvas }])
+
+    expect(mockCtx.fillText).toHaveBeenCalledWith("Test Brand Test Car…", 36, 136)
+  })
 })
 

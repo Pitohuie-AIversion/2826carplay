@@ -32,6 +32,40 @@ function createPage(definition) {
 }
 
 describe("pages/car-detail 客户侧车辆状态", () => {
+  test("若预填数据处理发生异常应安全降级不影响正常加载", () => {
+    global.getApp = jest.fn(() => ({
+      globalData: {
+        _tempCarDetailPreview: {
+          id: "vehicle-preview-error",
+          name: "保时捷 911"
+        }
+      }
+    }))
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn()
+      },
+      setNavigationBarTitle: jest.fn()
+    }
+    const page = createPage(loadPageDefinition())
+
+    page.applyCar = jest.fn(() => {
+      throw new Error("Mock error during applyCar")
+    })
+    page.loadOperationConfig = jest.fn()
+    page.loadCarDetail = jest.fn()
+    page.loadFavoriteStatus = jest.fn()
+
+    expect(() => {
+      page.onLoad({ carId: "vehicle-preview-error" })
+    }).not.toThrow()
+
+    expect(page.loadCarDetail).toHaveBeenCalledWith("vehicle-preview-error")
+    expect(page.loadOperationConfig).toHaveBeenCalled()
+    expect(page.loadFavoriteStatus).toHaveBeenCalledWith("vehicle-preview-error")
+    page.onUnload()
+  })
+
   test("租赁条款只显示已保存内容，清空、缺字段与读取失败均撤销旧文案", () => {
     let request
     global.wx = { setNavigationBarTitle: jest.fn(), cloud: { callFunction: jest.fn((options) => { request = options }) } }
@@ -181,6 +215,7 @@ describe("pages/car-detail 客户侧车辆状态", () => {
     jest.useRealTimers()
     delete global.Page
     delete global.wx
+    delete global.getApp
   })
 
   test("详情页状态和主要操作与首页客户口径一致", () => {

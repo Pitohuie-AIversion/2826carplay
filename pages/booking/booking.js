@@ -499,7 +499,13 @@ Page({
     }
     this.clearAvailabilityCheckTimer()
     this.clearBookingSubmitTimer()
-    if (this._perf && typeof this._perf.dispose === 'function') try { this._perf.dispose(); } catch(e) {}
+    if (this._perf && typeof this._perf.dispose === 'function') {
+      try {
+        this._perf.dispose();
+      } catch (e) {
+        console.error("[booking] perf dispose failed:", e);
+      }
+    }
   },
 
   cancelOperationConfigRequest() {

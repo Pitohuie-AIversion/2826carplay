@@ -357,7 +357,13 @@ Page({
       clearTimeout(this._handoverExportTimer)
       this._handoverExportTimer = null
     }
-    if (this._perf && typeof this._perf.dispose === 'function') try { this._perf.dispose(); } catch(e) {}
+    if (this._perf && typeof this._perf.dispose === 'function') {
+      try {
+        this._perf.dispose();
+      } catch (e) {
+        console.error("[booking-detail] perf dispose failed:", e);
+      }
+    }
   },
   finishDetailLoadEffects() {
     this.clearDetailLoadTimer()

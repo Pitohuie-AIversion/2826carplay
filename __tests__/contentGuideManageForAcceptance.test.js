@@ -29,15 +29,33 @@ function createMockDb({
 }) {
   const serverDateValue = { __type: "serverDate" }
   const serverDate = jest.fn(() => serverDateValue)
-  const guideGet = jest.fn().mockResolvedValue({ data: existingDocument })
-  const guideDoc = jest.fn(() => ({ get: guideGet, update: jest.fn().mockResolvedValue({ stats: { updated: 1 } }) }))
+  const documents = existingDocument ? { [existingDocument._id]: { ...existingDocument } } : {}
+  const guideGet = jest.fn(async (source, id) => ({ data: source[id] || null }))
+  const guideUpdate = jest.fn(async (source, id, { data }) => {
+    if (!source[id]) return { stats: { updated: 0 } }
+    source[id] = { ...source[id], ...data }
+    return { stats: { updated: 1 } }
+  })
+  const document = (source, id) => {
+    const ref = {
+      get: () => guideGet(source, id),
+      update: (payload) => guideUpdate(source, id, payload)
+    }
+    ref.field = jest.fn(() => ref)
+    return ref
+  }
+  const guideDoc = jest.fn((id) => document(documents, id))
   const slugWhere = jest.fn((filter) => {
-    const matched = existingSlugs.includes(filter.slug) ? [{ _id: createdGuideId + "_dup" }] : []
+    const matched = Object.values(documents).filter((item) => item.slug === filter.slug)
+    if (existingSlugs.includes(filter.slug)) matched.push({ _id: createdGuideId + "_dup" })
     const slugGet = jest.fn().mockResolvedValue({ data: matched })
     const slugField = jest.fn(() => ({ limit: jest.fn(() => ({ get: slugGet })) }))
     return { field: slugField }
   })
-  const guideAdd = jest.fn().mockResolvedValue({ _id: createdGuideId })
+  const guideAdd = jest.fn(async ({ data }) => {
+    documents[createdGuideId] = { _id: createdGuideId, ...data }
+    return { _id: createdGuideId }
+  })
   const auditAdd = jest.fn().mockImplementation((payload) => {
     actionAuditCaptures.push(payload && payload.data ? payload.data : payload)
     return Promise.resolve({ _id: "audit_" + Math.random().toString(36).slice(2, 10) })
@@ -58,15 +76,23 @@ function createMockDb({
         return {
           where: slugWhere,
           doc: guideDoc,
-          add: guideAdd,
-          update: jest.fn().mockResolvedValue({ stats: { updated: 1 } })
+          add: guideAdd
         }
       }
       if (name === "roles") return { where: roleWhere }
       if (name === "audit_logs") return { add: auditAdd }
       throw new Error(`Unexpected collection: ${name}`)
     }),
-    serverDate
+    serverDate,
+    runTransaction: jest.fn(async (callback) => {
+      const staged = { ...documents }
+      const result = await callback({ collection: (name) => {
+        if (name !== "content_guides") throw new Error(`Unexpected transaction collection: ${name}`)
+        return { doc: (id) => document(staged, id) }
+      } })
+      Object.assign(documents, staged)
+      return result
+    })
   }
   return {
     db,
@@ -76,6 +102,8 @@ function createMockDb({
     slugWhere,
     guideDoc,
     guideGet,
+    guideUpdate,
+    documents,
     auditAdd,
     actionAuditCaptures,
     roleWhere
@@ -93,6 +121,7 @@ async function loadContentGuideManageWith({ openid, mockDb }) {
   jest.isolateModules(() => {
     mod = require("../cloudfunctions/contentGuideManage/index")
   })
+  expect(freshCloud.database).toHaveBeenCalledWith({ throwOnNotFound: false })
   return mod
 }
 
@@ -128,7 +157,7 @@ describe("contentGuideManage acceptance suite (admin / normal user / parameter p
   })
 
   test("A2: 管理员 update 现有内容 → VALIDATION_ERROR 拒绝 slug 路径字符，合法枚举 update 通过并写 update audit", async () => {
-    const mocks = createMockDb({})
+    const mocks = createMockDb({ existingDocument: { _id: "content_acceptance_a0_001", ...buildValidGuide(), status: "draft" } })
     const mod = await loadContentGuideManageWith({ openid: "admin_openid_real_account", mockDb: mocks.db })
     const badUpdate = await mod.main({ action: "update", id: "../../etc/passwd", guide: buildValidGuide() })
     expect(badUpdate.ok).toBe(false)
@@ -138,25 +167,29 @@ describe("contentGuideManage acceptance suite (admin / normal user / parameter p
     const goodUpdate = await mod.main({ action: "update", id: "content_acceptance_a0_001", guide: buildValidGuide({ title: "A2 更新后合法标题", scenario: "business_reception" }) })
     expect(goodUpdate.ok).toBe(true)
     expect(goodUpdate.id).toBe("content_acceptance_a0_001")
+    expect(mocks.documents.content_acceptance_a0_001.title).toBe("A2 更新后合法标题")
     const auditRecord = mocks.actionAuditCaptures[0]
     expect(auditRecord.action).toBe("contentGuide.update")
   })
 
   test("A3: 管理员 publish 合法 id → status=published + publishedAt=serverDate", async () => {
-    const mocks = createMockDb({})
+    const mocks = createMockDb({ existingDocument: { _id: "content_acceptance_a0_001", ...buildValidGuide(), status: "draft" } })
     const mod = await loadContentGuideManageWith({ openid: "admin_openid_real_account", mockDb: mocks.db })
     const res = await mod.main({ action: "publish", id: "content_acceptance_a0_001" })
     expect(res).toEqual({ ok: true, id: "content_acceptance_a0_001", status: "published" })
+    expect(mocks.documents.content_acceptance_a0_001).toMatchObject({ status: "published", publishedAt: mocks.serverDateValue })
     const auditRecord = mocks.actionAuditCaptures[0]
     expect(auditRecord.action).toBe("contentGuide.publish")
     expect(auditRecord.contentId).toBe("content_acceptance_a0_001")
   })
 
   test("A4: 管理员 archive 合法 id → status=archived", async () => {
-    const mocks = createMockDb({})
+    const publishedAt = new Date("2026-10-01T00:00:00Z")
+    const mocks = createMockDb({ existingDocument: { _id: "content_acceptance_a0_001", ...buildValidGuide(), status: "published", publishedAt } })
     const mod = await loadContentGuideManageWith({ openid: "admin_openid_real_account", mockDb: mocks.db })
     const res = await mod.main({ action: "archive", id: "content_acceptance_a0_001" })
     expect(res).toEqual({ ok: true, id: "content_acceptance_a0_001", status: "archived" })
+    expect(mocks.documents.content_acceptance_a0_001).toMatchObject({ status: "archived", publishedAt })
     expect(mocks.actionAuditCaptures[0].action).toBe("contentGuide.archive")
   })
 

@@ -10,10 +10,22 @@ function loadFunction(relativePath, { openid = "user", collections = {} } = {}) 
       if (!collections[name]) throw new Error(`Unexpected collection: ${name}`)
       return collections[name]
     }),
-    serverDate: jest.fn(() => ({ __type: "serverDate" }))
+    serverDate: jest.fn(() => ({ __type: "serverDate" })),
+    runTransaction: jest.fn(async (callback) => {
+      const staged = collections.content_guides.beginTransaction()
+      const result = await callback({ collection: (name) => {
+        if (name !== "content_guides") throw new Error(`Unexpected transaction collection: ${name}`)
+        return staged.collection
+      } })
+      staged.commit()
+      return result
+    })
   })
   let mod
   jest.isolateModules(() => { mod = require(relativePath) })
+  if (relativePath.includes("contentGuideManage")) {
+    expect(cloud.database).toHaveBeenCalledWith({ throwOnNotFound: false })
+  }
   return mod
 }
 
@@ -29,16 +41,25 @@ function queryCollection(options = {}) {
   chain.skip = jest.fn(() => chain)
   chain.get = get
   chain.add = add
-  chain.doc = jest.fn((id) => ({
+  const document = (source, id) => ({
     update: jest.fn().mockImplementation((payload) => {
-      docsMap[id] = { ...(docsMap[id] || {}), _id: id, ...(payload && payload.data ? payload.data : payload) }
+      if (!source[id]) return Promise.resolve({ stats: { updated: 0 } })
+      source[id] = { ...source[id], _id: id, ...(payload && payload.data ? payload.data : payload) }
       return Promise.resolve({ stats: { updated: 1 } })
     }),
-    get: jest.fn().mockResolvedValue({ data: docsMap[id] || null }),
+    get: jest.fn(async () => ({ data: source[id] || null })),
     field: jest.fn(() => ({
-      get: jest.fn().mockResolvedValue({ data: docsMap[id] || null })
+      get: jest.fn(async () => ({ data: source[id] || null }))
     }))
-  }))
+  })
+  chain.doc = jest.fn((id) => document(docsMap, id))
+  chain.beginTransaction = () => {
+    const staged = { ...docsMap }
+    return {
+      collection: { doc: jest.fn((id) => document(staged, id)) },
+      commit: () => Object.assign(docsMap, staged)
+    }
+  }
   return chain
 }
 
@@ -233,7 +254,8 @@ describe("Phase 16 content guide cloud functions", () => {
 
   test("archive 把已发布内容归档，审计写 contentGuide.archive", async () => {
     const roles = queryCollection({ data: [{ role: "admin" }] })
-    const docs = { content_30: { _id: "content_30", slug: "c30", status: "published" } }
+    const publishedAt = new Date("2026-10-01T00:00:00Z")
+    const docs = { content_30: { _id: "content_30", slug: "c30", status: "published", publishedAt } }
     const guides = queryCollection({ docs })
     const audit = { add: jest.fn().mockResolvedValue({ _id: "audit_30" }) }
     const mod = loadFunction("../cloudfunctions/contentGuideManage/index", {
@@ -244,7 +266,7 @@ describe("Phase 16 content guide cloud functions", () => {
     expect(res).toMatchObject({ ok: true, id: "content_30", status: "archived" })
     const updated = docs["content_30"]
     expect(updated.status).toBe("archived")
-    expect(updated).not.toHaveProperty("publishedAt")
+    expect(updated.publishedAt).toEqual(publishedAt)
     expect(updated).toHaveProperty("updatedAt")
     expect(audit.add).toHaveBeenCalledTimes(1)
     expect(audit.add.mock.calls[0][0].data.action).toBe("contentGuide.archive")

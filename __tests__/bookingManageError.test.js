@@ -1,48 +1,29 @@
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
+const { createRequire } = require('module');
 
 describe("Booking Manage Error Utils", () => {
   let env;
+  let sandbox;
 
   beforeAll(() => {
-    const code = fs.readFileSync(path.join(__dirname, '../pages/booking-manage/booking-manage.js'), 'utf8');
-
-    const getErrorMessageMatch = code.match(/function getErrorMessage\(error\) {[\s\S]*?\n}/);
-    const getErrorMessageStr = getErrorMessageMatch ? getErrorMessageMatch[0] : '';
-
-    const isTapGestureShareErrorMatch = code.match(/function isTapGestureShareError\(error\) {[\s\S]*?\n}/);
-    const isTapGestureShareErrorStr = isTapGestureShareErrorMatch ? isTapGestureShareErrorMatch[0] : '';
-
-    const isDevtoolsEnvMatch = code.match(/function isDevtoolsEnv\(\) {[\s\S]*?\n}/);
-    const isDevtoolsEnvStr = isDevtoolsEnvMatch ? isDevtoolsEnvMatch[0] : '';
-
-    const isDevtoolsNotSupportedShareErrorMatch = code.match(/function isDevtoolsNotSupportedShareError\(error\) {[\s\S]*?\n}/);
-    const isDevtoolsNotSupportedShareErrorStr = isDevtoolsNotSupportedShareErrorMatch ? isDevtoolsNotSupportedShareErrorMatch[0] : '';
-
-    const testCode = `
-      ${getErrorMessageStr}
-      ${isTapGestureShareErrorStr}
-      ${isDevtoolsEnvStr}
-      ${isDevtoolsNotSupportedShareErrorStr}
-
+    const modulePath = path.join(__dirname, '../pages/booking-manage/booking-manage.js');
+    const code = fs.readFileSync(modulePath, 'utf8');
+    sandbox = {
+      require: createRequire(modulePath),
+      module: { exports: {} },
+      Page: jest.fn()
+    };
+    vm.runInNewContext(`${code}\n
       module.exports = {
         getErrorMessage,
         isTapGestureShareError,
         isDevtoolsEnv,
         isDevtoolsNotSupportedShareError
       };
-    `;
-
-    const tempFilePath = path.join(__dirname, 'bookingManageError.temp.js');
-    fs.writeFileSync(tempFilePath, testCode);
-
-    env = require('./bookingManageError.temp.js');
-  });
-
-  afterAll(() => {
-    try {
-      fs.unlinkSync(path.join(__dirname, 'bookingManageError.temp.js'));
-    } catch (e) {}
+    `, sandbox, { filename: modulePath });
+    env = sandbox.module.exports;
   });
 
   describe("getErrorMessage", () => {
@@ -83,46 +64,43 @@ describe("Booking Manage Error Utils", () => {
   });
 
   describe("isDevtoolsEnv", () => {
-    let originalWx;
-
     beforeEach(() => {
-      originalWx = global.wx;
-      global.wx = {
+      sandbox.wx = {
         getSystemInfoSync: jest.fn()
       };
     });
 
     afterEach(() => {
-      global.wx = originalWx;
+      delete sandbox.wx;
     });
 
     it("should return true when platform is 'devtools'", () => {
-      global.wx.getSystemInfoSync.mockReturnValue({ platform: "devtools" });
+      sandbox.wx.getSystemInfoSync.mockReturnValue({ platform: "devtools" });
       expect(env.isDevtoolsEnv()).toBe(true);
     });
 
     it("should return false when platform is not 'devtools'", () => {
-      global.wx.getSystemInfoSync.mockReturnValue({ platform: "ios" });
+      sandbox.wx.getSystemInfoSync.mockReturnValue({ platform: "ios" });
       expect(env.isDevtoolsEnv()).toBe(false);
     });
 
     it("should return false when getSystemInfoSync returns null/undefined", () => {
-      global.wx.getSystemInfoSync.mockReturnValue(null);
+      sandbox.wx.getSystemInfoSync.mockReturnValue(null);
       expect(env.isDevtoolsEnv()).toBe(false);
     });
 
     it("should return false when wx is undefined", () => {
-      global.wx = undefined;
+      delete sandbox.wx;
       expect(env.isDevtoolsEnv()).toBe(false);
     });
 
     it("should return false when wx.getSystemInfoSync is not a function", () => {
-      global.wx = { getSystemInfoSync: "not a function" };
+      sandbox.wx = { getSystemInfoSync: "not a function" };
       expect(env.isDevtoolsEnv()).toBe(false);
     });
 
     it("should return false when getSystemInfoSync throws an error", () => {
-      global.wx.getSystemInfoSync.mockImplementation(() => {
+      sandbox.wx.getSystemInfoSync.mockImplementation(() => {
         throw new Error("API not available");
       });
       expect(env.isDevtoolsEnv()).toBe(false);

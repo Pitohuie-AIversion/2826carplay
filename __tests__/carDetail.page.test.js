@@ -63,6 +63,7 @@ describe("pages/car-detail 客户侧车辆状态", () => {
     expect(page.loadCarDetail).toHaveBeenCalledWith("vehicle-preview-error")
     expect(page.loadOperationConfig).toHaveBeenCalled()
     expect(page.loadFavoriteStatus).toHaveBeenCalledWith("vehicle-preview-error")
+    page.onUnload()
   })
 
   test("租赁条款只显示已保存内容，清空、缺字段与读取失败均撤销旧文案", () => {
@@ -214,6 +215,7 @@ describe("pages/car-detail 客户侧车辆状态", () => {
     jest.useRealTimers()
     delete global.Page
     delete global.wx
+    delete global.getApp
   })
 
   test("详情页状态和主要操作与首页客户口径一致", () => {

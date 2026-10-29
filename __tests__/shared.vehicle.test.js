@@ -111,6 +111,35 @@ describe("shared/vehicle.js validateVehicle", () => {
     expect(res.details.errors.some((e) => e.field === "vehicleType")).toBe(true)
   })
 
+  test("validation keeps the first form error ahead of optional performance errors", () => {
+    const res = validateVehicle({
+      plateNumber: "",
+      vehicleType: "sedan",
+      brandModel: "Toyota",
+      registerDate: "2020-01-01",
+      status: "idle",
+      performance: { acceleration: "bad" }
+    })
+    expect(res.details.errors.map((error) => error.field)).toEqual([
+      "plateNumber", "performance.acceleration"
+    ])
+  })
+
+  test("validation preserves malformed payload errors before form field errors", () => {
+    const res = validateVehicle({
+      plateNumber: "",
+      vehicleType: "sedan",
+      brandModel: "Toyota",
+      registerDate: "2020-01-01",
+      status: "idle",
+      performance: "bad",
+      rentalDiscountTiers: null
+    })
+    expect(res.details.errors.map((error) => error.field)).toEqual([
+      "performance", "rentalDiscountTiers", "plateNumber"
+    ])
+  })
+
   test("validateVehicle rejects invalid enums", () => {
     const res = validateVehicle({
       plateNumber: "京A12345",

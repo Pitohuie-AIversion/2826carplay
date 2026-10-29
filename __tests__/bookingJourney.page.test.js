@@ -825,5 +825,69 @@ describe("我的预约旅程状态", () => {
     expect(page.applyBooking).toHaveBeenCalledWith(cachedDetail.booking, cachedDetail.latestQuote, cachedDetail.handovers)
     page.onUnload()
   })
+
+  test("booking-detail onLoad 吞掉 wx.cloud.init 抛出的错误，不影响主流程继续执行", () => {
+    global.getApp = jest.fn(() => ({ globalData: { cloudEnvId: "test-env" } }))
+    const initMock = jest.fn(() => {
+      throw new Error("cloud init error")
+    })
+    global.wx = {
+      cloud: {
+        init: initMock
+      },
+      getStorageSync: jest.fn(() => null)
+    }
+
+    const definition = loadPageDefinition("../pages/booking-detail/booking-detail")
+    const page = createPage(definition)
+
+    // 执行不会抛出错误
+    expect(() => {
+      page.onLoad({ id: "booking_error_test_1" })
+    }).not.toThrow()
+
+    // 验证 init 确实被调用了
+    expect(initMock).toHaveBeenCalledWith({
+      env: "test-env",
+      traceUser: true
+    })
+
+    // 验证后续逻辑继续执行
+    expect(page.data.id).toBe("booking_error_test_1")
+    expect(page.data.initialLoading).toBe(true)
+    page.onUnload()
+  })
+
+  test("booking-detail onLoad 吞掉 wx.getStorageSync 抛出的错误，不影响主流程继续执行", () => {
+    global.getApp = jest.fn(() => ({ globalData: { cloudEnvId: "test-env" } }))
+    const getStorageSyncMock = jest.fn(() => {
+      throw new Error("storage error")
+    })
+    global.wx = {
+      cloud: {
+        init: jest.fn()
+      },
+      getStorageSync: getStorageSyncMock
+    }
+
+    const definition = loadPageDefinition("../pages/booking-detail/booking-detail")
+    const page = createPage(definition)
+
+    page.applyBooking = jest.fn()
+
+    // 执行不会抛出错误
+    expect(() => {
+      page.onLoad({ id: "booking_error_test_2" })
+    }).not.toThrow()
+
+    // 验证 getStorageSync 确实被调用了
+    expect(getStorageSyncMock).toHaveBeenCalledWith("booking_detail_booking_error_test_2")
+
+    // 验证不影响其他逻辑执行
+    expect(page.applyBooking).not.toHaveBeenCalled()
+    expect(page.data.id).toBe("booking_error_test_2")
+    expect(page.data.initialLoading).toBe(true)
+    page.onUnload()
+  })
 })
 

@@ -319,25 +319,16 @@ function normalizeVehicleInput(input) {
   return normalized
 }
 
-function validateVehicle(input) {
-  const value = normalizeVehicleInput(input)
-  const errors = []
-  if (input && input.performance != null && (typeof input.performance !== "object" || Array.isArray(input.performance))) {
-    errors.push({ field: "performance", message: "性能参数格式不合法" })
-  }
-  if (value.rentalDiscountTiers !== undefined) {
-    const message = validateRentalDiscountTiers(value.rentalDiscountTiers)
-    if (message) errors.push({ field: "rentalDiscountTiers", message })
-    else value.rentalDiscountTiers = normalizeRentalDiscountTiers(value.rentalDiscountTiers)
-  }
-
+function validateRequiredFields(value, errors) {
   REQUIRED_FIELDS.forEach((field) => {
     const v = value[field]
     if (v === undefined || v === null || (typeof v === "string" && !v.trim())) {
       errors.push({ field, message: "必填字段缺失" })
     }
   })
+}
 
+function validateBasicInfo(value, errors) {
   if (value.plateNumber && !isValidPlateNumber(value.plateNumber)) {
     errors.push({ field: "plateNumber", message: "车牌号格式不合法", value: value.plateNumber })
   }
@@ -402,7 +393,9 @@ function validateVehicle(input) {
       })
     }
   }
+}
 
+function validateExtendedInfo(value, errors) {
   if (value.vin !== undefined) {
     if (value.vin.length > 32) {
       errors.push({ field: "vin", message: "VIN 长度不能超过 32", value: value.vin })
@@ -436,7 +429,9 @@ function validateVehicle(input) {
   if (value.publicDrivingTips !== undefined && value.publicDrivingTips.length > 500) {
     errors.push({ field: "publicDrivingTips", message: "用车提示长度不能超过 500", value: value.publicDrivingTips })
   }
+}
 
+function validateArchiveInfo(value, errors) {
   ;["archiveDate", "archiveReview"].forEach((field) => {
     if (!value[field]) return
     const dateCheck = isValidYmdDate(value[field], { allowFuture: true })
@@ -483,7 +478,9 @@ function validateVehicle(input) {
       errors.push({ field, message: "内部记录长度不能超过 500", value: value[field] })
     }
   })
+}
 
+function validateLocationAndPrice(value, errors) {
   if (value.location !== undefined) {
     if (value.location.length > 20) {
       errors.push({ field: "location", message: "城市长度不能超过 20", value: value.location })
@@ -501,7 +498,9 @@ function validateVehicle(input) {
       errors.push({ field: "priceDay", message: "日租金需为 0-99999 的整数", value: value.priceDay })
     }
   }
+}
 
+function validatePerformance(value, errors) {
   if (value.performance !== undefined && value.performance !== null) {
     const perf = value.performance
     if (perf.acceleration !== undefined && perf.acceleration !== "") {
@@ -536,6 +535,27 @@ function validateVehicle(input) {
       })
     }
   }
+}
+
+function validateVehicle(input) {
+  const value = normalizeVehicleInput(input)
+  const errors = []
+
+  if (input && input.performance != null && (typeof input.performance !== "object" || Array.isArray(input.performance))) {
+    errors.push({ field: "performance", message: "性能参数格式不合法" })
+  }
+  if (value.rentalDiscountTiers !== undefined) {
+    const message = validateRentalDiscountTiers(value.rentalDiscountTiers)
+    if (message) errors.push({ field: "rentalDiscountTiers", message })
+    else value.rentalDiscountTiers = normalizeRentalDiscountTiers(value.rentalDiscountTiers)
+  }
+
+  validateRequiredFields(value, errors)
+  validateBasicInfo(value, errors)
+  validateExtendedInfo(value, errors)
+  validateArchiveInfo(value, errors)
+  validateLocationAndPrice(value, errors)
+  validatePerformance(value, errors)
 
   if (errors.length) {
     return createError("VALIDATION_ERROR", "参数校验失败", { errors })

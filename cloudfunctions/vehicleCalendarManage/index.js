@@ -404,7 +404,8 @@ async function savePriceRule(input, openid, isUpdate) {
     const expectedVehicles = new Map()
     // Read revisions before the query. Every price-rule writer advances these revisions
     // in the same transaction as its rule, so a changed query snapshot cannot be committed.
-    for (const vehicleId of vehicleIds) expectedVehicles.set(vehicleId, await getDocOrNull(db.collection("vehicles"), vehicleId, VEHICLE_FIELDS))
+    const fetchedVehicles = await Promise.all(vehicleIds.map(id => getDocOrNull(db.collection("vehicles"), id, VEHICLE_FIELDS)))
+    vehicleIds.forEach((id, index) => expectedVehicles.set(id, fetchedVehicles[index]))
     const activeRules = await readActivePriceRules(input.vehicleId)
     if (activeRules.error) return activeRules
     const overlapping = activeRules.list.find((item) => String(item._id || "") !== ruleId && String(item.startDate || "") <= input.endDate && String(item.endDate || item.startDate || "") >= input.startDate)

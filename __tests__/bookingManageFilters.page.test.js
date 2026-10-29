@@ -266,6 +266,43 @@ describe("pages/booking-manage workflow filters", () => {
     })
   })
 
+  test("导出记录出错时抛出异常被捕获处理", () => {
+    let exportRequest
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn((options) => {
+          if (options.name === "bookingExportCsv") {
+            exportRequest = options
+          }
+        })
+      },
+      showToast: jest.fn()
+    }
+    const page = createPage(loadPageDefinition())
+    page.saveExportedCsv = jest.fn(() => {
+      throw new Error("sync save error")
+    })
+
+    page.handleExport()
+
+    exportRequest.success({
+      result: {
+        ok: true,
+        fileName: "bookings.csv",
+        csvText: "id,status\nb1,pending",
+        total: 1,
+        matchedTotal: 1
+      }
+    })
+
+    expect(page.saveExportedCsv).toHaveBeenCalled()
+    expect(page.data.loading).toBe(false)
+    expect(global.wx.showToast).toHaveBeenCalledWith({
+      title: "保存失败",
+      icon: "none"
+    })
+  })
+
   test("导出沿用筛选，重置会清空三个筛选组", () => {
     global.wx = {
       cloud: {

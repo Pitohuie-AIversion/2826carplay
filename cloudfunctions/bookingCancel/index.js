@@ -158,11 +158,12 @@ exports.main = async (event) => {
       if (Number(booking.calendarSyncVersion || 0) !== Number(current.calendarSyncVersion || 0)) {
         return createError("STATUS_CONFLICT", "预约档期已发生变化，请刷新后重试")
       }
-      const days = await Promise.all(dayIds.map(id => readDocument(transaction.collection("vehicle_calendar_days"), id, { bookingId: true })))
-      const ownedDayIds = dayIds.filter((id, index) => {
-        const day = days[index]
-        return day && String(day.bookingId || "") === input.id
-      })
+      // Await each transaction operation so a failure cannot leave work running after rollback.
+      const ownedDayIds = []
+      for (const id of dayIds) {
+        const day = await readDocument(transaction.collection("vehicle_calendar_days"), id, { bookingId: true })
+        if (day && String(day.bookingId || "") === input.id) ownedDayIds.push(id)
+      }
       const blockId = bookingBlockId(input.id)
       const block = releaseOccupancy
         ? await readDocument(transaction.collection("vehicle_availability_blocks"), blockId, { bookingId: true, status: true })
@@ -177,7 +178,7 @@ exports.main = async (event) => {
       if (status !== "cancelled") {
         await transaction.collection("bookings").doc(input.id).update({ data: { status: "cancelled", updatedAt: db.serverDate() } })
       }
-      await Promise.all(ownedDayIds.map(id => transaction.collection("vehicle_calendar_days").doc(id).remove()))
+      for (const id of ownedDayIds) await transaction.collection("vehicle_calendar_days").doc(id).remove()
       if (needsBlockRelease) {
         await transaction.collection("vehicle_availability_blocks").doc(blockId).update({ data: {
           status: "released",

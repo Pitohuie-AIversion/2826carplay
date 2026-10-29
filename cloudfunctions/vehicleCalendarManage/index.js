@@ -179,29 +179,30 @@ function blockDateIds(block) {
 
 async function readBlockDays(transaction, blockId, ids, dayCache) {
   const days = []
-  await Promise.all(ids.map(async (id) => {
+  // Finish each request before issuing another on the same transaction so a
+  // rejected operation cannot leave requests running after rollback starts.
+  for (const id of ids) {
     const day = await getDocOrNull(transaction.collection("vehicle_calendar_days"), id, { blockId: true, kind: true, date: true })
     dayCache.set(id, day)
     if (day && String(day.blockId || "") === blockId) days.push({ ...day, _id: id })
-  }))
+  }
   return days
 }
 
 async function ensureDatesFree(transaction, vehicleId, dates, ignoredBlockId, dayCache = new Map()) {
-  const results = await Promise.all(dates.map(async (date) => {
+  for (const date of dates) {
     const id = dayDocumentId(vehicleId, date)
     const occupied = dayCache.has(id) ? dayCache.get(id) : await getDocOrNull(transaction.collection("vehicle_calendar_days"), id, { blockId: true, kind: true, date: true })
     if (occupied && String(occupied.blockId || "") !== ignoredBlockId) {
       return createError("AVAILABILITY_CONFLICT", `${date} 已被占用，请调整区间`, { date, kind: occupied.kind || "unavailable" })
     }
-    return null
-  }))
-  return results.find((err) => err) || null
+  }
+  return null
 }
 
 async function saveDays(transaction, block, dates) {
-  await Promise.all(dates.map((date) =>
-    transaction.collection("vehicle_calendar_days").doc(dayDocumentId(block.vehicleId, date)).set({
+  for (const date of dates) {
+    await transaction.collection("vehicle_calendar_days").doc(dayDocumentId(block.vehicleId, date)).set({
       data: {
         vehicleId: block.vehicleId,
         date,
@@ -212,13 +213,13 @@ async function saveDays(transaction, block, dates) {
         updatedAt: db.serverDate()
       }
     })
-  ))
+  }
 }
 
 async function removeDays(transaction, days) {
-  await Promise.all(days.map(async (day) => {
+  for (const day of days) {
     if (day && day._id) await transaction.collection("vehicle_calendar_days").doc(day._id).remove()
-  }))
+  }
 }
 
 async function createBlock(input, openid) {

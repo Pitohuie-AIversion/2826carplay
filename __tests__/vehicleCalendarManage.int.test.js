@@ -111,7 +111,118 @@ function failCalendarDayReads(db, error) {
   })))
 }
 
+function controlCalendarMutationFailure(db, { method, firstId, failureId, delayedId }) {
+  const runTransaction = db.runTransaction.getMockImplementation()
+  const deferred = () => {
+    let resolve
+    const promise = new Promise((done) => { resolve = done })
+    return { promise, resolve }
+  }
+  const firstCompleted = deferred()
+  const failureStarted = deferred()
+  const fail = deferred()
+  const delayed = deferred()
+  const pending = []
+  const completed = []
+  const ended = []
+  db.runTransaction.mockImplementation((callback) => {
+    const active = new Set()
+    let closed = false
+    return runTransaction((transaction) => callback({ collection: (name) => {
+      const collection = transaction.collection(name)
+      if (name !== "vehicle_calendar_days") return collection
+      return { doc: (id) => {
+        const doc = collection.doc(id)
+        const observe = (operation, invoke) => {
+          const request = { id, operation }
+          const promise = (async () => {
+            active.add(request)
+            try {
+              if (operation === method && id === failureId) {
+                failureStarted.resolve()
+                await fail.promise
+                throw new Error("injected calendar mutation failure")
+              }
+              if (operation === method && id === delayedId) await delayed.promise
+              const result = await invoke()
+              completed.push({ ...request, afterTransactionEnd: closed })
+              if (operation === method && id === firstId) firstCompleted.resolve()
+              return result
+            } finally {
+              active.delete(request)
+            }
+          })()
+          pending.push(promise)
+          return promise
+        }
+        return {
+          ...doc,
+          set: (input) => observe("set", () => doc.set(input)),
+          remove: () => observe("remove", () => doc.remove())
+        }
+      } }
+    } })).finally(() => {
+      closed = true
+      ended.push({ pending: [...active] })
+    })
+  })
+  return {
+    completed,
+    ended,
+    ready: Promise.all([firstCompleted.promise, failureStarted.promise]),
+    fail: fail.resolve,
+    drain: async () => {
+      delayed.resolve()
+      await Promise.allSettled(pending)
+      db.runTransaction.mockImplementation(runTransaction)
+    }
+  }
+}
+
 describe("cloudfunctions/vehicleCalendarManage integration", () => {
+  test.each(["updateBlock", "releaseBlock"])("%s 部分日期写入失败完整回滚，事务结束后无遗留请求且重试成功", async (action) => {
+    const mocks = createMockDb()
+    const mod = await loadModule(mocks.db)
+    jest.spyOn(console, "error").mockImplementation(() => {})
+    const base = { vehicleId: "vehicle_1", kind: "hold", startDate: "2099-08-01", endDate: "2099-08-03", reason: "原档期" }
+    const created = await mod.main({ action: "createBlock", ...base })
+    expect(created.ok).toBe(true)
+    const originalBlock = { ...mocks.blocks.get(created.blockId) }
+    const originalDays = [...mocks.days.entries()]
+    mocks.auditAdd.mockClear()
+    const isUpdate = action === "updateBlock"
+    const dates = isUpdate ? ["2099-08-04", "2099-08-05", "2099-08-06"] : ["2099-08-01", "2099-08-02", "2099-08-03"]
+    const ids = dates.map((date) => mod._test.dayDocumentId(base.vehicleId, date))
+    const control = controlCalendarMutationFailure(mocks.db, {
+      method: isUpdate ? "set" : "remove", firstId: ids[0], failureId: ids[1], delayedId: ids[2]
+    })
+    const input = {
+      ...base, action, id: created.blockId, expectedVersion: 1,
+      startDate: dates[0], endDate: dates[2], reason: "调整档期"
+    }
+    const request = mod.main(input)
+    await control.ready
+    if (isUpdate) {
+      // The update has already staged deletion of every old day and one new day.
+      expect(control.completed.filter((entry) => entry.operation === "remove")).toHaveLength(3)
+    }
+    control.fail()
+    const failed = await request
+    await control.drain()
+
+    expect(failed).toMatchObject({ ok: false, code: "INTERNAL_ERROR" })
+    expect(mocks.blocks.get(created.blockId)).toEqual(originalBlock)
+    expect([...mocks.days.entries()]).toEqual(originalDays)
+    expect(mocks.auditAdd).not.toHaveBeenCalled()
+    expect(control.ended).toEqual([{ pending: [] }])
+    expect(control.completed.some((entry) => entry.afterTransactionEnd)).toBe(false)
+
+    expect(await mod.main(input)).toMatchObject({ ok: true, blockId: created.blockId })
+    expect(mocks.blocks.get(created.blockId)).toMatchObject({ version: 2, status: isUpdate ? "active" : "released" })
+    expect([...mocks.days.keys()].sort()).toEqual(isUpdate ? ids.slice().sort() : [])
+    expect(mocks.auditAdd).toHaveBeenCalledTimes(1)
+  })
+
   test.each([
     { code: "DATABASE_COLLECTION_NOT_EXIST", message: "collection not exist" },
     { errCode: -502005, errMsg: "database collection not exists | Db or Table not exist" },

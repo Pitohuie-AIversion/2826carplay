@@ -213,7 +213,7 @@ Page({
           env,
           traceUser: true
         })
-      } catch (error) { console.error(error) }
+      } catch (error) {}
     }
     try {
       if (id && typeof wx !== "undefined" && typeof wx.getStorageSync === "function") {
@@ -222,7 +222,7 @@ Page({
           this.applyBooking(cached.booking, cached.latestQuote, cached.handovers)
         }
       }
-    } catch (e) { console.error(e) }
+    } catch (e) {}
     const eventChannel = this.getOpenerEventChannel && this.getOpenerEventChannel()
     if (eventChannel && typeof eventChannel.on === "function") {
       const handleBookingDetail = (payload) => {
@@ -357,7 +357,7 @@ Page({
       clearTimeout(this._handoverExportTimer)
       this._handoverExportTimer = null
     }
-    if (this._perf && typeof this._perf.dispose === 'function') try { this._perf.dispose(); } catch (e) { console.error(e) }
+    if (this._perf && typeof this._perf.dispose === 'function') try { this._perf.dispose(); } catch(e) {}
   },
   finishDetailLoadEffects() {
     this.clearDetailLoadTimer()
@@ -366,7 +366,7 @@ Page({
       this._detailLoadDone = null
       try {
         done()
-      } catch (error) { console.error(error) }
+      } catch (error) {}
     }
   },
   applyBooking(booking, latestQuote, handovers) {
@@ -385,7 +385,7 @@ Page({
     if (booking && booking.id && typeof wx !== "undefined" && typeof wx.getStorageSync === "function") {
       try {
         savedReview = wx.getStorageSync(`booking_review_${booking.id}`)
-      } catch (e) { console.error(e) }
+      } catch (e) {}
     }
     const hasSavedReview = Boolean(savedReview && savedReview.rating)
     const preserveReviewDraft = Boolean(booking.id) && !hasSavedReview && !this.data.reviewSubmitted &&
@@ -446,7 +446,7 @@ Page({
           latestQuote: quote,
           handovers: { pickup: pickupHandover, return: returnHandover }
         })
-      } catch (e) { console.error(e) }
+      } catch (e) {}
     }
   },
   loadNotificationConfig(options) {
@@ -595,7 +595,7 @@ Page({
       this.data.cancelling
     ) {
       if (options && typeof options.done === "function") {
-        try { options.done() } catch (e) { console.error(e) }
+        try { options.done() } catch (e) {}
       }
       return
     }
@@ -609,7 +609,7 @@ Page({
         cancelling: false
       })
       if (options && typeof options.done === "function") {
-        try { options.done() } catch (e) { console.error(e) }
+        try { options.done() } catch (e) {}
       }
       return
     }
@@ -622,7 +622,7 @@ Page({
         loadErrorText: "云能力未初始化，请稍后重试"
       })
       if (options && typeof options.done === "function") {
-        try { options.done() } catch (e) { console.error(e) }
+        try { options.done() } catch (e) {}
       }
       return
     }
@@ -671,7 +671,7 @@ Page({
         const current = result && result.ok ? result.detail : null
         if (!current) {
           if (typeof wx !== "undefined" && typeof wx.removeStorageSync === "function") {
-            try { wx.removeStorageSync(`booking_detail_${bookingId}`) } catch (e) { console.error(e) }
+            try { wx.removeStorageSync(`booking_detail_${bookingId}`) } catch (e) {}
           }
           if (isPageCurrent(this)) wx.showToast({
           title: formatToastTitle(result && result.message, "预约不存在"),
@@ -1306,7 +1306,7 @@ Page({
     const csvContent = formatHandoverCsvContent(this.data.booking, target)
     const fileName = getHandoverFileName(this.data.booking, target)
     let fs
-    try { fs = wx.getFileSystemManager && wx.getFileSystemManager() } catch (error) { console.error(error) }
+    try { fs = wx.getFileSystemManager && wx.getFileSystemManager() } catch (error) {}
     if (!fs || !wx.env || !wx.env.USER_DATA_PATH) {
       this.setData({ exportingHandover: false })
       if (typeof wx !== "undefined" && wx.showToast) wx.showToast({ title: "系统暂不支持文件导出", icon: "none" })
@@ -1353,7 +1353,7 @@ Page({
           exportedHandoverFileName: fileName
         })
         if (previousPath && previousPath !== filePath && typeof fs.unlink === "function") {
-          try { fs.unlink({ filePath: previousPath, fail: () => {} }) } catch (error) { console.error(error) }
+          try { fs.unlink({ filePath: previousPath, fail: () => {} }) } catch (error) {}
         }
         if (typeof wx !== "undefined" && wx.showToast) wx.showToast({ title: "留证单已导出", icon: "success" })
       },

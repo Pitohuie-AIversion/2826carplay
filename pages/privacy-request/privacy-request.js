@@ -119,7 +119,7 @@ Page({
           this.setData({ initialLoading: false, loading: false })
         }
       }
-    } catch (e) { console.error(e) }
+    } catch (e) {}
     this.fetchList()
   },
 
@@ -588,7 +588,7 @@ Page({
           : []
         const nextList = append ? this.data.list.concat(list) : list
         if (!append && typeof wx !== "undefined" && typeof wx.setStorageSync === "function") {
-          try { wx.setStorageSync("privacy_requests_snapshot", nextList) } catch (e) { console.error(e) }
+          try { wx.setStorageSync("privacy_requests_snapshot", nextList) } catch (e) {}
         }
         this.applyRequestList(nextList, {
           filter: this.data.currentFilter,

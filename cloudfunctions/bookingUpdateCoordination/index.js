@@ -120,7 +120,7 @@ async function writeErrorLogBestEffort(payload) {
         createdAt: db.serverDate()
       }
     })
-  } catch (error) { console.error(error) }
+  } catch (error) {}
 }
 
 exports.main = async (event) => {

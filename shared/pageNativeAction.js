@@ -17,7 +17,7 @@ function isPageCurrent(page) {
       if (app && app.globalData && app.globalData.nativeActionAppVisible === false) {
         return false
       }
-    } catch (error) { console.error(error) }
+    } catch (error) {}
   }
   const pages = getCurrentPages()
   if (!Array.isArray(pages) || !pages.length) {

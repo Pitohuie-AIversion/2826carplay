@@ -189,7 +189,7 @@ function deleteCloudFilesDirectBestEffort(fileList) {
       fileList: list,
       fail: () => {}
     })
-  } catch (error) { console.error(error) }
+  } catch (error) {}
 }
 function requestUploadedFileCleanup(vehicleId, fileList) {
   const id = String(vehicleId || "").trim()
@@ -210,8 +210,10 @@ function requestUploadedFileCleanup(vehicleId, fileList) {
       },
       fail: () => {}
     })
-  } catch (error) { console.error(error) }
+  } catch (error) {}
 }
+const { reportDiagnostic } = require("../../shared/diagnostics")
+
 Page({
   data: {
     id: "",
@@ -241,7 +243,9 @@ Page({
           env,
           traceUser: true
         })
-      } catch (error) { console.error(error) }
+      } catch (error) {
+        reportDiagnostic("[vehicle-detail-manage] wx.cloud.init failed")
+      }
     }
     const id = String((options && options.id) || "").trim()
     if (!id) {
@@ -298,7 +302,7 @@ Page({
     if (activeUploadTask && typeof activeUploadTask.abort === "function") {
       try {
         activeUploadTask.abort()
-      } catch (error) { console.error(error) }
+      } catch (error) {}
     }
     if (typeof cancelActiveUpload === "function") {
       cancelActiveUpload()
@@ -939,7 +943,7 @@ Page({
         if (abortTask && uploadTask && typeof uploadTask.abort === "function") {
           try {
             uploadTask.abort()
-          } catch (error) { console.error(error) }
+          } catch (error) {}
         }
         this.deliverVehicleImageResult(
           action,
@@ -1030,7 +1034,7 @@ Page({
     if (activeUploadTask && typeof activeUploadTask.abort === "function") {
       try {
         activeUploadTask.abort()
-      } catch (error) { console.error(error) }
+      } catch (error) {}
     }
     if (typeof cancelActiveUpload === "function") {
       cancelActiveUpload()
@@ -1318,7 +1322,7 @@ Page({
     if (typeof done === "function") {
       try {
         done()
-      } catch (error) { console.error(error) }
+      } catch (error) {}
     }
   },
   clearVehicleDetailLoadTimer() {

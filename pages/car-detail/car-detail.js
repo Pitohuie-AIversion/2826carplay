@@ -353,7 +353,7 @@ Page({
           env,
           traceUser: true
         })
-      } catch (error) { console.error(error) }
+      } catch (error) {}
     }
 
     const attribution = sanitizeAttribution(options)
@@ -369,7 +369,7 @@ Page({
         app.globalData._tempCarDetailPreview = null
         this.applyCar(previewCar)
       }
-    } catch (e) { console.error(e) }
+    } catch (e) {}
 
     this.loadOperationConfig()
     this.loadCarDetail(carId)
@@ -540,7 +540,7 @@ Page({
       this._carDetailLoadDone = null
       try {
         done()
-      } catch (error) { console.error(error) }
+      } catch (error) {}
     }
   },
 
@@ -565,7 +565,7 @@ Page({
     if (!carId) {
       this.applyCar(null)
       if (typeof input.done === "function") {
-        try { input.done() } catch (e) { console.error(e) }
+        try { input.done() } catch (e) {}
       }
       return
     }
@@ -578,7 +578,7 @@ Page({
           cachedCar = stored
           carDetailMemoryCache.set(carId, stored)
         }
-      } catch (e) { console.error(e) }
+      } catch (e) {}
     }
     if (cachedCar && !this.data.car) {
       this.applyCar(cachedCar)
@@ -587,7 +587,7 @@ Page({
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       this.setLoadError("云能力未初始化，请稍后重试")
       if (typeof input.done === "function") {
-        try { input.done() } catch (e) { console.error(e) }
+        try { input.done() } catch (e) {}
       }
       return
     }
@@ -636,7 +636,7 @@ Page({
             carDetailMemoryCache.delete(oldestKey)
           }
           if (typeof wx !== "undefined" && typeof wx.setStorageSync === "function") {
-            try { wx.setStorageSync(`car_detail_${carId}`, car) } catch (e) { console.error(e) }
+            try { wx.setStorageSync(`car_detail_${carId}`, car) } catch (e) {}
           }
           this.applyCar(car, { verified: true })
           return
@@ -645,7 +645,7 @@ Page({
         if (result && ["NOT_FOUND", "NOT_AVAILABLE"].includes(result.code)) {
           carDetailMemoryCache.delete(carId)
           if (typeof wx !== "undefined" && typeof wx.removeStorageSync === "function") {
-            try { wx.removeStorageSync(`car_detail_${carId}`) } catch (e) { console.error(e) }
+            try { wx.removeStorageSync(`car_detail_${carId}`) } catch (e) {}
           }
           this.applyCar(null)
           return
@@ -1378,7 +1378,7 @@ Page({
       if (res && res.localPath) {
         return res.localPath
       }
-    } catch (e) { console.error(e) }
+    } catch (e) {}
 
     if (typeof wx !== "undefined" && typeof wx.getImageInfo === "function") {
       try {
@@ -1388,7 +1388,7 @@ Page({
         if (info && info.path) {
           return info.path
         }
-      } catch (e) { console.error(e) }
+      } catch (e) {}
     }
 
     return src
@@ -1728,7 +1728,8 @@ Page({
           wx.showLoading({ title: "保存中…", mask: true })
         }
         filePath = await this.resolvePosterCover(filePath)
-      } catch (e) { console.error(e) } finally {
+      } catch (e) {
+      } finally {
         if (this._posterSaveLoadingAction === action) {
           this._posterSaveLoadingAction = null
           if (typeof wx.hideLoading === "function") wx.hideLoading()

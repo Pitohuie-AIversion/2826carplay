@@ -409,7 +409,7 @@ Page({
               vehicles: result.vehicles || [],
               truncated: Boolean(result.truncated)
             })
-          } catch (e) { console.error(e) }
+          } catch (e) {}
         }
         this.setData({
           loading: false,

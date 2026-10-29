@@ -35,7 +35,7 @@ function setStoredVersion(version) {
     wx.setStorageSync(STORAGE_KEY_VERSION, version)
     wx.setStorageSync(STORAGE_KEY_MIGRATED_AT, Date.now())
     wx.setStorageSync(STORAGE_KEY_RELEASE_NOTES, RELEASE_NOTES)
-  } catch (error) { console.error(error) }
+  } catch (error) {}
 }
 
 function runVersionMigration() {
@@ -88,7 +88,7 @@ function setupUpdateManager(options) {
         if (options && typeof options.onFailed === "function") {
           try {
             options.onFailed()
-          } catch (error) { console.error(error) }
+          } catch (error) {}
         }
       })
     }
@@ -117,11 +117,11 @@ function showReleaseNotesModal(options) {
         if (options && typeof options.onConfirm === "function") {
           try {
             options.onConfirm(res)
-          } catch (e) { console.error(e) }
+          } catch (e) {}
         }
       }
     })
-  } catch (error) { console.error(error) }
+  } catch (error) {}
 }
 
 module.exports = {

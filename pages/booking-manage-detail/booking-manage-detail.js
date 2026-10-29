@@ -253,7 +253,7 @@ Page({
           env,
           traceUser: true
         })
-      } catch (error) { console.error(error) }
+      } catch (error) {}
     }
     const eventChannel = this.getOpenerEventChannel && this.getOpenerEventChannel()
     if (eventChannel && typeof eventChannel.on === "function") {
@@ -388,7 +388,7 @@ Page({
     if (this._handoverExportTimer) clearTimeout(this._handoverExportTimer)
     this._handoverExportTimer = null
     this.cleanupPendingHandoverUploads()
-    if (this._perf && typeof this._perf.dispose === 'function') try { this._perf.dispose(); } catch (e) { console.error(e) }
+    if (this._perf && typeof this._perf.dispose === 'function') try { this._perf.dispose(); } catch(e) {}
   },
   applyBooking(booking, conflictResult, quoteResult, handoverResult, handoverHistoryUnavailable = false) {
     const conflictData = conflictResult && typeof conflictResult === "object"
@@ -418,7 +418,7 @@ Page({
       try {
         const stored = wx.getStorageSync(`booking_review_${booking.id}`)
         if (stored && stored.rating) customerReview = stored
-      } catch (e) { console.error(e) }
+      } catch (e) {}
     }
     const intelligentTags = deriveBookingIntelligentTags(booking)
     const currentTagMap = booking.tagMap || {}
@@ -468,7 +468,7 @@ Page({
       this._bookingDetailLoadDone = null
       try {
         done()
-      } catch (error) { console.error(error) }
+      } catch (error) {}
     }
   },
   loadDetail(options) {
@@ -480,7 +480,7 @@ Page({
         loading: false
       })
       if (typeof input.done === "function") {
-        try { input.done() } catch (e) { console.error(e) }
+        try { input.done() } catch (e) {}
       }
       return
     }
@@ -493,7 +493,7 @@ Page({
       this._bookingDetailStatusFeedbackPending
     ) {
       if (typeof input.done === "function") {
-        try { input.done() } catch (e) { console.error(e) }
+        try { input.done() } catch (e) {}
       }
       return
     }
@@ -508,7 +508,7 @@ Page({
         loadErrorText: "云能力未初始化，请稍后重试"
       })
       if (typeof input.done === "function") {
-        try { input.done() } catch (e) { console.error(e) }
+        try { input.done() } catch (e) {}
       }
       return
     }
@@ -1169,7 +1169,7 @@ Page({
       name: "bookingHandover",
       data: { action: "cleanupUpload", bookingId: bookingId || this.data.id, stage: stage || this.data.handoverStage, fileList: files },
       fail: () => {}
-    }) } catch (error) { console.error(error) }
+    }) } catch (error) {}
   },
   cleanupPendingHandoverUploads() {
     const form = this.data && this.data.handoverForm
@@ -1293,7 +1293,7 @@ Page({
     const csvContent = formatHandoverCsvContent(this.data.booking, target)
     const fileName = getHandoverFileName(this.data.booking, target)
     let fs
-    try { fs = wx.getFileSystemManager && wx.getFileSystemManager() } catch (error) { console.error(error) }
+    try { fs = wx.getFileSystemManager && wx.getFileSystemManager() } catch (error) {}
     if (!fs || !wx.env || !wx.env.USER_DATA_PATH) {
       this.setData({ exportingHandover: false })
       if (typeof wx !== "undefined" && wx.showToast) wx.showToast({ title: "系统暂不支持文件导出", icon: "none" })
@@ -1334,7 +1334,7 @@ Page({
         closePageCsvPreview(this)
         this.setData({ exportedHandoverPath: filePath, exportingHandover: false })
         if (previousPath && previousPath !== filePath && typeof fs.unlink === "function") {
-          try { fs.unlink({ filePath: previousPath, fail: () => {} }) } catch (error) { console.error(error) }
+          try { fs.unlink({ filePath: previousPath, fail: () => {} }) } catch (error) {}
         }
         if (typeof wx !== "undefined" && wx.showToast) wx.showToast({ title: "留证单已导出", icon: "success" })
       },

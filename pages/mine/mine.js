@@ -349,14 +349,14 @@ Page({
         info && info.miniProgram && info.miniProgram.envVersion
           ? info.miniProgram.envVersion
           : envVersion
-    } catch (error) { console.error(error) }
+    } catch (error) {}
 
     let cachedPermissions = null
     try {
       if (typeof wx !== "undefined" && typeof wx.getStorageSync === "function") {
         cachedPermissions = wx.getStorageSync("mine_permissions_snapshot")
       }
-    } catch (e) { console.error(e) }
+    } catch (e) {}
 
     if (cachedPermissions && typeof cachedPermissions === "object") {
       this.setData({
@@ -472,7 +472,7 @@ Page({
       this._permissionLoadDone = null
       try {
         done()
-      } catch (error) { console.error(error) }
+      } catch (error) {}
     }
   },
 
@@ -489,7 +489,7 @@ Page({
         ...buildPermissionFailureRole()
       })
       if (typeof input.done === "function") {
-        try { input.done() } catch (e) { console.error(e) }
+        try { input.done() } catch (e) {}
       }
       return
     }
@@ -542,7 +542,7 @@ Page({
             return
           }
           if (typeof wx !== "undefined" && typeof wx.setStorageSync === "function") {
-            try { wx.setStorageSync("mine_permissions_snapshot", result) } catch (e) { console.error(e) }
+            try { wx.setStorageSync("mine_permissions_snapshot", result) } catch (e) {}
           }
           this.setData({
             permissionsLoading: false,

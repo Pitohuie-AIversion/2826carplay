@@ -88,7 +88,7 @@ class AdminImageUploadSession {
     try {
       const pending = this.cloud.callFunction({ name: "adminImageUpload", data: { action: "abort", uploadId: id }, fail: () => {} })
       if (pending && typeof pending.catch === "function") pending.catch(() => {})
-    } catch (error) { console.error(error) }
+    } catch (error) {}
   }
 
   cleanupLateFile(response) {
@@ -103,7 +103,7 @@ class AdminImageUploadSession {
       payload.fail = () => {}
       const pending = this.cloud.callFunction(payload)
       if (pending && typeof pending.catch === "function") pending.catch(() => {})
-    } catch (error) { console.error(error) }
+    } catch (error) {}
   }
 
   finish(error, result) {

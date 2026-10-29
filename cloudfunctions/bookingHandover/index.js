@@ -177,7 +177,7 @@ async function getDocOrNull(collection, id, fields) {
 async function writeAudit(payload) {
   try {
     await db.collection("audit_logs").add({ data: { ...payload, createdAt: db.serverDate() } })
-  } catch (err) { console.error(err) }
+  } catch (err) {}
 }
 
 async function readHandoverTemplateId() {
@@ -188,7 +188,7 @@ async function readHandoverTemplateId() {
     const list = res && Array.isArray(res.data) ? res.data : []
     const val = list[0] && list[0].value
     if (val) return String(val.bookingHandoverTemplateId || val.bookingStatusTemplateId || "").trim()
-  } catch (err) { console.error(err) }
+  } catch (err) {}
   return ""
 }
 
@@ -237,7 +237,7 @@ async function sendHandoverNotificationBestEffort(info) {
           createdAt: db.serverDate()
         }
       })
-    } catch (logErr) { console.error(logErr) }
+    } catch (logErr) {}
     return { status: "failed", reason: "send_failed" }
   }
 }
@@ -431,7 +431,7 @@ exports.main = async (event) => {
     return error("VALIDATION_ERROR", "交接操作不合法")
   } catch (err) {
     const errorMessage = text(err && (err.message || err.errMsg) || err, 300)
-    try { await db.collection("error_logs").add({ data: { function: "bookingHandover", stage: input.action || "main", bookingId: input.bookingId, authenticated: Boolean(openid), errorMessage, createdAt: db.serverDate() } }) } catch (logError) { console.error(logError) }
+    try { await db.collection("error_logs").add({ data: { function: "bookingHandover", stage: input.action || "main", bookingId: input.bookingId, authenticated: Boolean(openid), errorMessage, createdAt: db.serverDate() } }) } catch (logError) {}
     console.error({ function: "bookingHandover", stage: input.action || "main", bookingId: input.bookingId, authenticated: Boolean(openid), errorMessage })
     return error("INTERNAL_ERROR", "交接记录处理失败，请稍后重试")
   }

@@ -478,11 +478,11 @@ async function releasePriceRule(input, openid) {
 }
 
 async function writeAuditLogBestEffort(payload) {
-  try { await db.collection("audit_logs").add({ data: { ...payload, createdAt: db.serverDate() } }) } catch (error) { console.error(error) }
+  try { await db.collection("audit_logs").add({ data: { ...payload, createdAt: db.serverDate() } }) } catch (error) {}
 }
 
 async function writeErrorLogBestEffort(payload) {
-  try { await db.collection("error_logs").add({ data: { ...payload, createdAt: db.serverDate() } }) } catch (error) { console.error(error) }
+  try { await db.collection("error_logs").add({ data: { ...payload, createdAt: db.serverDate() } }) } catch (error) {}
 }
 
 exports.main = async (event) => {

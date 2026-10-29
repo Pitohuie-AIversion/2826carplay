@@ -253,7 +253,7 @@ function main() {
       if (fs.existsSync(target)) {
         try {
           existingRecord = JSON.parse(fs.readFileSync(target, "utf8"))
-        } catch (e) { console.error(e) }
+        } catch (e) {}
       }
       const isUnchanged = existingRecord && [
         "slug", "title", "summary", "body", "contentType", "scenario", "shareTitle"
@@ -284,7 +284,7 @@ function main() {
   if (fs.existsSync(summaryPath)) {
     try {
       existingSummary = JSON.parse(fs.readFileSync(summaryPath, "utf8"))
-    } catch (e) { console.error(e) }
+    } catch (e) {}
   }
   const isSummaryUnchanged = existingSummary &&
     existingSummary.total === results.length &&

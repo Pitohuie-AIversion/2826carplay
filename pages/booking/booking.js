@@ -237,7 +237,7 @@ Page({
           env,
           traceUser: true
         })
-      } catch (error) { console.error(error) }
+      } catch (error) {}
     }
 
     const attribution = sanitizeAttribution(options)
@@ -311,7 +311,7 @@ Page({
           /^1\d{10}$/.test(String(this._savedContact.phone || "").trim())
         )
       })
-    } catch (error) { console.error(error) }
+    } catch (error) {}
   },
 
   handleUseSavedContact() {
@@ -499,7 +499,7 @@ Page({
     }
     this.clearAvailabilityCheckTimer()
     this.clearBookingSubmitTimer()
-    if (this._perf && typeof this._perf.dispose === 'function') try { this._perf.dispose(); } catch (e) { console.error(e) }
+    if (this._perf && typeof this._perf.dispose === 'function') try { this._perf.dispose(); } catch(e) {}
   },
 
   cancelOperationConfigRequest() {
@@ -1147,7 +1147,7 @@ Page({
                 userName: String(submittedForm.userName || "").trim(),
                 phone: String(submittedForm.phone || "").trim()
               })
-            } catch (error) { console.error(error) }
+            } catch (error) {}
           }
           this.applyState({
             isSubmitting: false,

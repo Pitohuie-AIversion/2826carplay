@@ -52,7 +52,7 @@ describe("数据库索引与集合安全巡检契约", () => {
     })
   })
 
-  test("37 条索引检查项中 6 条阻断级均已在本地声明", () => {
+  test("38 条索引检查项中 6 条阻断级均已在本地声明", () => {
     const blockingInDetail = result.indexes.detail.filter(
       (row) => row.priority === "blocking"
     )
@@ -63,9 +63,12 @@ describe("数据库索引与集合安全巡检契约", () => {
     })
   })
 
-  test("37 条索引检查项包含原有 35 条文档建议和 2 条上传清理必需声明", () => {
-    expect(result.indexes.recommended).toBe(37)
+  test("38 条索引检查项包含内容分页建议和 2 条上传清理必需声明", () => {
+    expect(result.indexes.recommended).toBe(38)
     expect(result.indexes.documentedInChecklist).toBeGreaterThanOrEqual(35)
+    expect(result.indexes.detail).toEqual(expect.arrayContaining([
+      expect.objectContaining({ collection: "content_guides", fields: "status + _id", declared: "是" })
+    ]))
     expect(RECOMMENDED_INDEXES.filter((index) => index.requiredInDeclaration)).toEqual([
       expect.objectContaining({ collection: "admin_upload_sessions", fields: ["expiresAt"], unique: false }),
       expect.objectContaining({ collection: "admin_upload_sessions", fields: ["openid", "expiresAt"], unique: false })
@@ -111,7 +114,7 @@ describe("数据库索引与集合安全巡检契约", () => {
     const output = log.mock.calls.map((args) => args.join(" ")).join("\n")
     expect(output).toContain("仅检查仓库中的集合与索引声明，未查询云端")
     expect(output).toContain("17 个集合")
-    expect(output).toContain("37 条索引检查项")
+    expect(output).toContain("38 条索引检查项")
   })
 })
 

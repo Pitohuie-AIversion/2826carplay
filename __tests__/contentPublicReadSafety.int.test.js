@@ -10,15 +10,51 @@ function guide(slug = "guide_1", overrides = {}) {
   }
 }
 
+const command = {
+  eq: (value) => ({ operator: "eq", value }),
+  elemMatch: (condition) => ({ operator: "elemMatch", condition })
+}
+
+function matchesQuery(row, filter) {
+  // Keep malformed rows available to the handler's defensive validation.
+  if (!row || typeof row !== "object" || Array.isArray(row)) return true
+  return Object.entries(filter).every(([key, value]) => {
+    if (value && value.operator === "elemMatch") {
+      return Array.isArray(row[key]) && row[key].some((item) => item === value.condition.value)
+    }
+    return row[key] === value
+  })
+}
+
+function compareIds(left, right) {
+  if (left === right) return 0
+  if (left === undefined || left === null) return -1
+  if (right === undefined || right === null) return 1
+  if (typeof left !== typeof right) return typeof left === "number" ? -1 : 1
+  return left < right ? -1 : 1
+}
+
 function setup(functionName, options = {}) {
   jest.resetModules()
   const cloud = require("wx-server-sdk")
   cloud.__reset()
-  const query = { get: jest.fn().mockResolvedValue("queryResponse" in options ? options.queryResponse : { data: options.rows || [] }) }
-  for (const method of ["where", "field", "limit"]) query[method] = jest.fn(() => query)
+  let filter = {}, ordering = null, offset = 0, count = Infinity
+  const query = {
+    get: jest.fn(async () => {
+      if ("queryResponse" in options) return options.queryResponse
+      const rows = (options.rows || []).filter((row) => matchesQuery(row, filter))
+      if (ordering) rows.sort((left, right) => compareIds(left && left[ordering.field], right && right[ordering.field]) * (ordering.direction === "desc" ? -1 : 1))
+      return { data: rows.slice(offset, offset + count) }
+    })
+  }
+  query.where = jest.fn((value) => { filter = value; return query })
+  query.field = jest.fn(() => query)
+  query.orderBy = jest.fn((field, direction) => { ordering = { field, direction }; return query })
+  query.skip = jest.fn((value) => { offset = value; return query })
+  query.limit = jest.fn((value) => { count = value; return query })
   const vehicleGet = jest.fn(async (id) => ({ data: { name: `车辆 ${id}`, status: "idle" } }))
   const vehicles = { doc: jest.fn((id) => ({ field: () => ({ get: () => vehicleGet(id) }) })) }
-  const db = { collection: jest.fn((name) => {
+  const db = { command, collection: jest.fn((name) => {
     if (name === "content_guides") return query
     if (name === "vehicles") return vehicles
     throw new Error(`Unexpected collection: ${name}`)
@@ -113,13 +149,13 @@ describe("public content read validation", () => {
   })
 
   test("detail cannot return a published record for a different slug", async () => {
-    const mocks = setup("detail", { rows: [guide("other_guide", { vehicleIds: ["car_1"] })] })
+    const mocks = setup("detail", { queryResponse: { data: [guide("other_guide", { vehicleIds: ["car_1"] })] } })
     expect(await mocks.main({ contentId: "guide_1" })).toMatchObject({ ok: false, code: "INTERNAL_ERROR" })
     expect(mocks.vehicles.doc).not.toHaveBeenCalled()
   })
 
   test("list ignores malformed rows and unknown statuses without discarding valid content", async () => {
-    const mocks = setup("list", { rows: [null, [], 123, guide("unknown", { status: "unknown" }), guide("valid")] })
+    const mocks = setup("list", { queryResponse: { data: [null, [], 123, guide("unknown", { status: "unknown" }), guide("valid")] } })
     const result = await mocks.main({})
     expect(result.ok).toBe(true)
     expect(result.list.map(({ id }) => id)).toEqual(["valid"])

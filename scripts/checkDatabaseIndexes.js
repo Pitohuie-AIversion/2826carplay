@@ -47,6 +47,7 @@ const RECOMMENDED_INDEXES = [
   { collection: "booking_handovers", fields: ["bookingId", "status"], unique: false, category: "performance", priority: "medium" },
   { collection: "content_guides", fields: ["slug"], unique: true, category: "correctness", priority: "blocking" },
   { collection: "content_guides", fields: ["status", "publishedAt"], unique: false, category: "performance", priority: "high" },
+  { collection: "content_guides", fields: ["status", "_id"], unique: false, category: "performance", priority: "high" },
   { collection: "content_guides", fields: ["scenario", "status"], unique: false, category: "performance", priority: "medium" },
   { collection: "vehicle_availability_blocks", fields: ["status", "startDate", "endDate"], unique: false, category: "performance", priority: "high" },
   { collection: "vehicle_availability_blocks", fields: ["vehicleId", "status"], unique: false, category: "performance", priority: "high" },

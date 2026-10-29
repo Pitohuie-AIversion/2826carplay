@@ -1,11 +1,35 @@
 jest.mock("wx-server-sdk")
 
+const command = {
+  eq: (value) => ({ operator: "eq", value }),
+  elemMatch: (condition) => ({ operator: "elemMatch", condition })
+}
+
+function matchesContentQuery(row, filter) {
+  if (!row || typeof row !== "object" || Array.isArray(row)) return true
+  return Object.entries(filter).every(([key, value]) => {
+    if (value && value.operator === "elemMatch") {
+      return Array.isArray(row[key]) && row[key].some((item) => item === value.condition.value)
+    }
+    return row[key] === value
+  })
+}
+
+function compareIds(left, right) {
+  if (left === right) return 0
+  if (left === undefined || left === null) return -1
+  if (right === undefined || right === null) return 1
+  if (typeof left !== typeof right) return typeof left === "number" ? -1 : 1
+  return left < right ? -1 : 1
+}
+
 function loadFunction(relativePath, { openid = "user", collections = {} } = {}) {
   jest.resetModules()
   const cloud = require("wx-server-sdk")
   cloud.__reset()
   cloud.__setMockContext({ OPENID: openid })
   cloud.__setMockDb({
+    command,
     collection: jest.fn((name) => {
       if (!collections[name]) throw new Error(`Unexpected collection: ${name}`)
       return collections[name]
@@ -31,14 +55,22 @@ function loadFunction(relativePath, { openid = "user", collections = {} } = {}) 
 
 function queryCollection(options = {}) {
   const docsMap = options.docs || {}
-  const get = jest.fn().mockResolvedValue({ data: options.data || [] })
+  let filter = {}, ordering = null, offset = 0, count = Infinity
+  const get = jest.fn(async () => {
+    if ("queryResponse" in options) return options.queryResponse
+    // Role fixtures supply permission results directly; content queries model database selection.
+    const contentQuery = Object.keys(filter).some((key) => ["status", "scenario", "contentType", "vehicleIds", "slug"].includes(key))
+    const rows = (options.data || []).filter((row) => !contentQuery || matchesContentQuery(row, filter))
+    if (ordering) rows.sort((left, right) => compareIds(left && left[ordering.field], right && right[ordering.field]) * (ordering.direction === "desc" ? -1 : 1))
+    return { data: rows.slice(offset, offset + count) }
+  })
   const add = jest.fn().mockResolvedValue({ _id: options.addId || ("gen_" + Math.random().toString(36).slice(2, 10)) })
   const chain = {}
-  chain.where = jest.fn(() => chain)
+  chain.where = jest.fn((value) => { filter = value; return chain })
   chain.field = jest.fn(() => chain)
-  chain.limit = jest.fn(() => chain)
-  chain.orderBy = jest.fn(() => chain)
-  chain.skip = jest.fn(() => chain)
+  chain.limit = jest.fn((value) => { count = value; return chain })
+  chain.orderBy = jest.fn((field, direction) => { ordering = { field, direction }; return chain })
+  chain.skip = jest.fn((value) => { offset = value; return chain })
   chain.get = get
   chain.add = add
   const document = (source, id) => ({
@@ -83,7 +115,7 @@ describe("Phase 16 content guide cloud functions", () => {
     const res = await mod.main({ vehicleId: "car_1", limit: 10 })
     expect(res.ok).toBe(true)
     expect(res.list.map((item) => item.id)).toEqual(["published"])
-    expect(collection.where).toHaveBeenCalledWith({ status: "published" })
+    expect(collection.where).toHaveBeenCalledWith({ status: "published", vehicleIds: command.elemMatch(command.eq("car_1")) })
   })
 
   test("草稿与归档内容不能通过公开详情读取", async () => {

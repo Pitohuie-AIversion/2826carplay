@@ -33,6 +33,30 @@ describe("pages/booking-manage workflow filters", () => {
     delete global.getApp
   })
 
+  test("fetchList handles synchronous exceptions thrown during callFunction", () => {
+    global.wx = {
+      showToast: jest.fn(),
+      cloud: {
+        callFunction: jest.fn(() => {
+          throw new Error("cloud disconnected")
+        })
+      }
+    }
+    const page = createPage(loadPageDefinition(), {
+      loading: true,
+      pageAuthorized: true,
+      pageSize: 20
+    })
+
+    page.fetchList()
+
+    expect(page.data.loading).toBe(false)
+    expect(global.wx.showToast).toHaveBeenCalledWith({
+      title: "加载失败",
+      icon: "none"
+    })
+  })
+
   test("ignores share callbacks after the booking management page unloads", () => {
     let shareOptions
     global.wx = {

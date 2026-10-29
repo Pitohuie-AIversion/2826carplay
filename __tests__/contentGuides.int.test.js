@@ -291,27 +291,30 @@ describe("Phase 16 content guide cloud functions", () => {
     expect(audit.add).not.toHaveBeenCalled()
   })
 
-  test("trigger INTERNAL_ERROR catch block by mocking database failure", async () => {
-    const roles = {
-      where: jest.fn().mockReturnThis(),
-      field: jest.fn().mockReturnThis(),
-      limit: jest.fn().mockReturnThis(),
-      get: jest.fn().mockRejectedValue(new Error("Simulated database failure"))
-    };
+  test("管理员权限查询失败时返回内部错误且不写入内容或成功审计", async () => {
+    const roles = queryCollection()
+    roles.get.mockRejectedValue(new Error("Simulated database failure"))
+    const guides = queryCollection()
+    const audit = { add: jest.fn() }
     const mod = loadFunction("../cloudfunctions/contentGuideManage/index", {
       openid: "admin",
-      collections: { roles }
+      collections: { roles, content_guides: guides, audit_logs: audit }
     })
-
-    const originalConsoleError = console.error;
-    console.error = jest.fn();
-
-    const res = await mod.main({ action: "create", guide: {} })
-
-    expect(res).toMatchObject({ ok: false, code: "INTERNAL_ERROR" })
-    expect(console.error).toHaveBeenCalled()
-
-    console.error = originalConsoleError;
+    const errorLog = jest.spyOn(console, "error").mockImplementation(() => {})
+    try {
+      const res = await mod.main({ action: "create", guide: {
+        slug: "valid-guide", title: "标题", summary: "摘要", body: "正文",
+        contentType: "guide", scenario: "weekend_trip"
+      } })
+      expect(roles.get).toHaveBeenCalledTimes(1)
+      expect(res).toMatchObject({ ok: false, code: "INTERNAL_ERROR" })
+      expect(errorLog).toHaveBeenCalledWith(expect.objectContaining({ function: "contentGuideManage", action: "create" }))
+      expect(guides.add).not.toHaveBeenCalled()
+      expect(guides.doc).not.toHaveBeenCalled()
+      expect(audit.add).not.toHaveBeenCalled()
+    } finally {
+      errorLog.mockRestore()
+    }
   })
 
 })

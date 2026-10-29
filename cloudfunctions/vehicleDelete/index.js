@@ -233,17 +233,11 @@ exports.main = async (event) => {
       if (removed < 1) return { error: createError("DELETE_CONFLICT", "车辆未能删除，可能已被其他管理员处理，请刷新后重试") }
       const fileList = normalizeStringArray(latest.imageList).concat(String(latest.coverImage || "").trim() ? [String(latest.coverImage).trim()] : [])
 
-      const uniqueFiles = normalizeStringArray(fileList)
-      const claimResults = await Promise.all(
-        uniqueFiles.map(async (fileId) => {
-          const claimed = await imageLifecycle.writeClaim(transaction, id, fileId, "vehicleDelete", "deleteVehicle")
-          return { fileId, claimed }
-        })
-      )
-
       const claimedFiles = []
-      for (const res of claimResults) {
-        if (res.claimed) claimedFiles.push(res.fileId)
+      // Finish each claim before starting another so rollback cannot leave a
+      // pending claim that resumes writing through the closed transaction.
+      for (const fileId of normalizeStringArray(fileList)) {
+        if (await imageLifecycle.writeClaim(transaction, id, fileId, "vehicleDelete", "deleteVehicle")) claimedFiles.push(fileId)
       }
       return { latest, claimedFiles }
     })

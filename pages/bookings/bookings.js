@@ -68,7 +68,9 @@ Page({
           env,
           traceUser: true
         })
-      } catch (error) {}
+      } catch (error) {
+        console.error("Cloud init error:", error)
+      }
     }
 
     try {
@@ -85,7 +87,9 @@ Page({
           this._lastBookingsLoadedAt = 0
         }
       }
-    } catch (e) {}
+    } catch (e) {
+      console.error("Storage read error (bookings_last_snapshot):", e)
+    }
 
     this._unsubscribeNetwork = onNetworkReconnect(() => {
       if (this.data.loadFailed) {
@@ -140,7 +144,7 @@ Page({
     this._bookingCancelSerial = Number(this._bookingCancelSerial || 0) + 1
     this.finishBookingsLoadEffects()
     this.clearBookingCancelTimer()
-    if (this._perf && typeof this._perf.dispose === 'function') try { this._perf.dispose(); } catch(e) {}
+    if (this._perf && typeof this._perf.dispose === 'function') try { this._perf.dispose(); } catch(e) { console.error("Performance dispose error:", e); }
   },
 
   finishBookingsLoadEffects() {
@@ -150,7 +154,9 @@ Page({
       this._bookingsLoadDone = null
       try {
         done()
-      } catch (error) {}
+      } catch (error) {
+        console.error("Error executing bookings load done callback:", error)
+      }
     }
   },
 
@@ -176,7 +182,9 @@ Page({
       if (input && typeof input.done === "function") {
         try {
           input.done()
-        } catch (error) {}
+        } catch (error) {
+          console.error("Error executing input.done callback on failure:", error)
+        }
       }
       return
     }
@@ -267,7 +275,7 @@ Page({
         })
         const nextList = append ? this.data.list.concat(list) : list
         if (!append && typeof wx !== "undefined" && typeof wx.setStorageSync === "function") {
-          try { wx.setStorageSync("bookings_last_snapshot", nextList) } catch (e) {}
+          try { wx.setStorageSync("bookings_last_snapshot", nextList) } catch (e) { console.error("Storage write error (bookings_last_snapshot):", e) }
         }
         this.applyBookingList(nextList, {
           page: Number.isInteger(result.page) ? result.page : nextPage,

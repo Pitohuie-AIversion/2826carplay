@@ -212,6 +212,8 @@ function requestUploadedFileCleanup(vehicleId, fileList) {
     })
   } catch (error) {}
 }
+const { reportDiagnostic } = require("../../shared/diagnostics")
+
 Page({
   data: {
     id: "",
@@ -241,7 +243,9 @@ Page({
           env,
           traceUser: true
         })
-      } catch (error) {}
+      } catch (error) {
+        reportDiagnostic("[vehicle-detail-manage] wx.cloud.init failed")
+      }
     }
     const id = String((options && options.id) || "").trim()
     if (!id) {

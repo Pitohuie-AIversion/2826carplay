@@ -21,6 +21,8 @@ const {
 } = require("../../shared/vehicleLabels")
 const { formatDate } = require("../../shared/dateUtils")
 const DRIVETRAIN_OPTIONS = vehicleUtils.DRIVETRAIN_OPTIONS
+const { reportDiagnostic } = require("../../shared/diagnostics")
+
 Page({
   ...discountFormMethods,
   data: {
@@ -175,7 +177,9 @@ Page({
           env,
           traceUser: true
         })
-      } catch (error) {}
+      } catch (error) {
+        reportDiagnostic("[vehicle-create] wx.cloud.init failed")
+      }
     }
     requirePagePermission(this, {
       required: "canManageVehicles",

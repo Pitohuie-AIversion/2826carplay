@@ -906,6 +906,57 @@ describe("pages/car-detail 客户侧车辆状态", () => {
     page.onUnload()
   })
 
+  test("loadCarDetail 缺少 carId 时清理数据并安全触发 done", () => {
+    const page = createPage(loadPageDefinition())
+    const doneMock = jest.fn(() => {
+      throw new Error("done error")
+    })
+
+    // 设置初始数据
+    page.setData({ car: { id: "old-car" } })
+
+    // 拦截 setLoadError 确保不触发
+    page.setLoadError = jest.fn()
+
+    // 执行无 carId 调用
+    page.loadCarDetail(null, { done: doneMock })
+
+    // 验证 car 数据被清空
+    expect(page.data.car).toBeNull()
+    // 验证 done 被触发且错误被吞掉
+    expect(doneMock).toHaveBeenCalled()
+    expect(page.setLoadError).not.toHaveBeenCalled()
+  })
+
+  test("loadCarDetail 在云能力未初始化时提示错误并安全触发 done", () => {
+    const page = createPage(loadPageDefinition())
+    const doneMock = jest.fn(() => {
+      throw new Error("done error")
+    })
+
+    // 模拟微信云能力未初始化
+    const originalWx = global.wx
+    global.wx = {
+      ...originalWx,
+      cloud: undefined // 模拟 cloud 未初始化
+    }
+
+    // 拦截 setLoadError
+    page.setLoadError = jest.fn()
+
+    // 执行调用
+    page.loadCarDetail("valid-car-id", { done: doneMock })
+
+    // 验证错误提示
+    expect(page.setLoadError).toHaveBeenCalledWith("云能力未初始化，请稍后重试")
+
+    // 验证 done 被触发且错误被吞掉
+    expect(doneMock).toHaveBeenCalled()
+
+    // 恢复全局 mock
+    global.wx = originalWx
+  })
+
   test("handleRetryHeroImage 允许重试失败的主图并恢复加载状态", () => {
     const page = createPage(loadPageDefinition())
     page.data.car = {

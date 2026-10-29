@@ -215,9 +215,12 @@ async function saveDays(transaction, block, dates) {
 }
 
 async function removeDays(transaction, days) {
-  for (const day of days) {
-    if (day && day._id) await transaction.collection("vehicle_calendar_days").doc(day._id).remove()
-  }
+  await Promise.all(
+    days.map((day) => {
+      if (day && day._id) return transaction.collection("vehicle_calendar_days").doc(day._id).remove()
+      return Promise.resolve()
+    })
+  )
 }
 
 async function createBlock(input, openid) {

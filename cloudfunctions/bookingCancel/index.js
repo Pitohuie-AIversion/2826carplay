@@ -158,6 +158,7 @@ exports.main = async (event) => {
       if (Number(booking.calendarSyncVersion || 0) !== Number(current.calendarSyncVersion || 0)) {
         return createError("STATUS_CONFLICT", "预约档期已发生变化，请刷新后重试")
       }
+      // Await each transaction operation so a failure cannot leave work running after rollback.
       const ownedDayIds = []
       for (const id of dayIds) {
         const day = await readDocument(transaction.collection("vehicle_calendar_days"), id, { bookingId: true })

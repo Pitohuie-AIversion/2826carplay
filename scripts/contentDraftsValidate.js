@@ -9,20 +9,26 @@ function text(value, max) {
   return String(value || "").trim().slice(0, max)
 }
 
+function trimmedString(value) {
+  return typeof value === "string" ? value.trim() : ""
+}
+
 function strings(value, maxItems, maxLength) {
   return Array.from(new Set((Array.isArray(value) ? value : [])
     .map((item) => text(item, maxLength)).filter(Boolean))).slice(0, maxItems)
 }
 
 function normalizeGuide(input) {
+  input = input && typeof input === "object" && !Array.isArray(input) ? input : {}
   return {
-    slug: text(input.slug, 64),
+    slug: trimmedString(input.slug),
     title: text(input.title, 100),
     summary: text(input.summary, 300),
     body: text(input.body, 20000),
     contentType: text(input.contentType, 32),
     scenario: text(input.scenario, 32),
-    vehicleIds: strings(input.vehicleIds, 20, 64).filter((id) => ID_PATTERN.test(id)),
+    vehicleIds: Array.from(new Set((Array.isArray(input.vehicleIds) ? input.vehicleIds : [])
+      .map(trimmedString).filter((id) => ID_PATTERN.test(id)))).slice(0, 20),
     tags: strings(input.tags, 20, 30),
     shareTitle: text(input.shareTitle, 100)
   }

@@ -22,6 +22,19 @@ describe("bootstrapContentDrafts scripts (PRE-4 bootstrap toolchain)", () => {
     })
   })
 
+  test("草稿校验拒绝超长 slug，车辆标识不截断或转换成其他引用", () => {
+    const { normalizeGuide, validateGuide } = require("../scripts/contentDraftsValidate")
+    const input = {
+      slug: "s".repeat(65), title: "指南", summary: "摘要", body: "正文",
+      contentType: "guide", scenario: "weekend_trip",
+      vehicleIds: ["v".repeat(65), ["car_array"], 123, " car_1 ", "car_1", "v".repeat(64)]
+    }
+    const guide = normalizeGuide(input)
+    expect(validateGuide(guide)).toEqual([`slug(${input.slug})`])
+    expect(guide.vehicleIds).toEqual(["car_1", "v".repeat(64)])
+    expect(validateGuide(normalizeGuide({ ...input, slug: "s".repeat(64) }))).toEqual([])
+  })
+
   test("loadAndValidateSeeds 5/5 通过，invalidFields 全空，无 duplicates", () => {
     const seedResults = loadAndValidateSeeds()
     expect(seedResults.results).toHaveLength(5)

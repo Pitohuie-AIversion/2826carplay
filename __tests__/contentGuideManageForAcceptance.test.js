@@ -172,7 +172,7 @@ describe("contentGuideManage acceptance suite (admin / normal user / parameter p
     }
   })
 
-  test("A6: 管理员 create 时车辆 ID 非法路径字符（../）自动被 strings filter 截断 + ID_PATTERN 丢弃，绝不跳转到任意 URL；≥65 字符被 strings(value,20,64).slice(0,64) 截断后仍过 ID_PATTERN 但语义上不允许超长，校验以 text(slice(0,64)) 一致", async () => {
+  test("A6: 管理员 create 丢弃非法路径与超长车辆 ID，不截断成其他车辆引用", async () => {
     const mocks = createMockDb({})
     const mod = await loadContentGuideManageWith({ openid: "admin_openid_real_account", mockDb: mocks.db })
     const badPathId = "../../../etc/passwd"
@@ -183,12 +183,7 @@ describe("contentGuideManage acceptance suite (admin / normal user / parameter p
     })
     expect(res.ok).toBe(true)
     const addPayload = mocks.guideAdd.mock.calls[0][0].data
-    expect(addPayload.vehicleIds.includes("valid_id_01")).toBe(true)
-    expect(addPayload.vehicleIds.some((id) => id.includes("/") || id.includes(".."))).toBe(false)
-    addPayload.vehicleIds.forEach((id) => {
-      expect(id.length <= 64).toBe(true)
-      expect(/^[A-Za-z0-9_-]{1,64}$/.test(id)).toBe(true)
-    })
+    expect(addPayload.vehicleIds).toEqual(["valid_id_01"])
   })
 
   test("A7: 管理员 ACTIONS 4 项枚举外全部 VALIDATION_ERROR 拒绝", async () => {

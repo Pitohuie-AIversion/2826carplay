@@ -47,8 +47,8 @@ describe('normalizeGuide suite', () => {
     });
 
     describe('normalizeGuide function', () => {
-        it('should safely normalize a completely missing or empty object', () => {
-            const result = normalizeGuide({});
+        it.each([undefined, null, {}, []])('should safely normalize missing or empty input %p', (input) => {
+            const result = normalizeGuide(input);
             expect(result).toEqual({
                 slug: '',
                 title: '',
@@ -103,15 +103,15 @@ describe('normalizeGuide suite', () => {
             };
 
             const result = normalizeGuide(input);
-            expect(result.slug).toBe('a'.repeat(64));
+            expect(validateGuide(result)).toContain(`slug(${'a'.repeat(100)})`);
             expect(result.title).toBe('b'.repeat(100));
             expect(result.summary).toBe('c'.repeat(300));
             expect(result.body).toBe('d'.repeat(20000));
             expect(result.contentType).toBe('e'.repeat(32));
             expect(result.scenario).toBe('f'.repeat(32));
 
-            // 'v'.repeat(70) is sliced to 64 length, which matches ID_PATTERN
-            expect(result.vehicleIds).toEqual(['v'.repeat(64)]);
+            // Invalid identifiers must never become valid references by truncation.
+            expect(result.vehicleIds).toEqual([]);
 
             expect(result.tags.length).toBe(20);
             expect(result.tags[0]).toBe('t0' + 'x'.repeat(28)); // length 30

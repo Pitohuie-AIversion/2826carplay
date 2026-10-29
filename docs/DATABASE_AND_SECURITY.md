@@ -30,13 +30,14 @@
 
 索引文件位于 **`security-rules/database-indexes.json`**，由 manifest 的 `database.indexFile` 相对于 `security-rules/` 目录引用。`cloudbaserc.json` 中的云函数部署配置不是该索引清单。
 
-当前索引文件共声明 **11 条索引**，包含单字段索引和复合索引；以下字段按声明顺序列出，`asc` 为升序，`desc` 为降序。
+当前索引文件共声明 **12 条索引**，包含单字段索引和复合索引；以下字段按声明顺序列出，`asc` 为升序，`desc` 为降序。
 
 | 集合 | 索引名称 | 字段及顺序 | 唯一 |
 | :--- | :--- | :--- | :--- |
 | `admin_upload_sessions` | `admin_upload_sessions_expiresAt` | `expiresAt asc` | 否 |
 | `admin_upload_sessions` | `admin_upload_sessions_openid_expiresAt` | `openid asc`、`expiresAt asc` | 否 |
 | `content_guides` | `content_guides_slug_unique` | `slug asc` | 是 |
+| `content_guides` | `content_guides_status_id` | `status asc`、`_id asc` | 否 |
 | `content_guides` | `content_guides_status_publishedAt` | `status asc`、`publishedAt desc` | 否 |
 | `content_guides` | `content_guides_scenario_status` | `scenario asc`、`status asc` | 否 |
 | `roles` | `roles_openid_unique` | `openid asc` | 是 |
@@ -47,6 +48,8 @@
 | `pending_file_deletions` | `pending_file_deletions_source_notBeforeAt` | `source asc`、`notBeforeAt asc` | 否 |
 
 部署清单还列有查询所需的推荐索引，应分别核对“文件已声明”和“文档建议创建”的项目，不能将建议数量当作已部署数量。`npm run check:indexes` 执行 [本地索引检查脚本](../scripts/checkDatabaseIndexes.js)，检查仓库声明与部署文档并提示缺项；它不会连接云环境、创建索引或确认线上索引可用，也不构成查询性能保证。
+
+`content_guides_status_id` 支持公开推荐按发布状态及 `_id` 顺序分批读取。场景、类型和车辆筛选先在数据库执行，发布时间沿用函数中的兼容解析；一次最多处理 2000 条匹配候选并额外探测 1 条，超限或中途失败不返回部分成功。多次查询不是一致性快照，部署前仍需检查可选筛选组合的实际查询计划与耗时，详见部署清单。
 
 ## 三、管理员上传会话的过期与清理
 

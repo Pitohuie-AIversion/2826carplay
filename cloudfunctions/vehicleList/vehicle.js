@@ -500,11 +500,7 @@ function validateLocationAndPrice(value, errors) {
   }
 }
 
-function validatePerformance(input, value, errors) {
-  if (input && input.performance != null && (typeof input.performance !== "object" || Array.isArray(input.performance))) {
-    errors.push({ field: "performance", message: "性能参数格式不合法" })
-  }
-
+function validatePerformance(value, errors) {
   if (value.performance !== undefined && value.performance !== null) {
     const perf = value.performance
     if (perf.acceleration !== undefined && perf.acceleration !== "") {
@@ -545,18 +541,21 @@ function validateVehicle(input) {
   const value = normalizeVehicleInput(input)
   const errors = []
 
+  if (input && input.performance != null && (typeof input.performance !== "object" || Array.isArray(input.performance))) {
+    errors.push({ field: "performance", message: "性能参数格式不合法" })
+  }
   if (value.rentalDiscountTiers !== undefined) {
     const message = validateRentalDiscountTiers(value.rentalDiscountTiers)
     if (message) errors.push({ field: "rentalDiscountTiers", message })
     else value.rentalDiscountTiers = normalizeRentalDiscountTiers(value.rentalDiscountTiers)
   }
 
-  validatePerformance(input, value, errors)
   validateRequiredFields(value, errors)
   validateBasicInfo(value, errors)
   validateExtendedInfo(value, errors)
   validateArchiveInfo(value, errors)
   validateLocationAndPrice(value, errors)
+  validatePerformance(value, errors)
 
   if (errors.length) {
     return createError("VALIDATION_ERROR", "参数校验失败", { errors })

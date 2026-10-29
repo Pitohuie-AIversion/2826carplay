@@ -194,6 +194,8 @@ function normalizeConflictBooking(item) {
     coordinationClass: `coordination-${coordinationStatus}`
   }
 }
+const { reportDiagnostic } = require("../../shared/diagnostics")
+
 Page({
   data: {
     id: "",
@@ -388,7 +390,13 @@ Page({
     if (this._handoverExportTimer) clearTimeout(this._handoverExportTimer)
     this._handoverExportTimer = null
     this.cleanupPendingHandoverUploads()
-    if (this._perf && typeof this._perf.dispose === 'function') try { this._perf.dispose(); } catch(e) {}
+    if (this._perf && typeof this._perf.dispose === 'function') {
+      try {
+        this._perf.dispose();
+      } catch (e) {
+        reportDiagnostic("[booking-manage-detail] perf dispose failed")
+      }
+    }
   },
   applyBooking(booking, conflictResult, quoteResult, handoverResult, handoverHistoryUnavailable = false) {
     const conflictData = conflictResult && typeof conflictResult === "object"

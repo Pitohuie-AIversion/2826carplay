@@ -162,6 +162,8 @@ function calculateRentalEstimate(startDate, endDate, priceDay, options) {
   return { rentalDays, estimateTotal, estimateText, hasDiscount: false, savingsAmount: 0 }
 }
 
+const { reportDiagnostic } = require("../../shared/diagnostics")
+
 Page({
   data: {
     carId: "",
@@ -499,7 +501,13 @@ Page({
     }
     this.clearAvailabilityCheckTimer()
     this.clearBookingSubmitTimer()
-    if (this._perf && typeof this._perf.dispose === 'function') try { this._perf.dispose(); } catch(e) {}
+    if (this._perf && typeof this._perf.dispose === 'function') {
+      try {
+        this._perf.dispose();
+      } catch (e) {
+        reportDiagnostic("[booking] perf dispose failed")
+      }
+    }
   },
 
   cancelOperationConfigRequest() {

@@ -135,6 +135,8 @@ function normalizeBooking(item) {
     updatedAt: booking.updatedAt || ""
   }
 }
+const { reportDiagnostic } = require("../../shared/diagnostics")
+
 Page({
   data: {
     id: "",
@@ -357,7 +359,13 @@ Page({
       clearTimeout(this._handoverExportTimer)
       this._handoverExportTimer = null
     }
-    if (this._perf && typeof this._perf.dispose === 'function') try { this._perf.dispose(); } catch(e) {}
+    if (this._perf && typeof this._perf.dispose === 'function') {
+      try {
+        this._perf.dispose();
+      } catch (e) {
+        reportDiagnostic("[booking-detail] perf dispose failed")
+      }
+    }
   },
   finishDetailLoadEffects() {
     this.clearDetailLoadTimer()

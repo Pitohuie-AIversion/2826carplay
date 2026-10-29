@@ -1822,9 +1822,3 @@ Page({
     this.handleOpenCustomerService()
   }
 })
-
-if (typeof module !== 'undefined') {
-  module.exports = {
-    drawPosterTextEllipsis
-  }
-}

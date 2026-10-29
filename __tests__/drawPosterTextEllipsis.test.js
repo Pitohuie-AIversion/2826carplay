@@ -1,7 +1,16 @@
-global.Page = jest.fn();
-global.wx = jest.fn();
+const fs = require("fs");
+const path = require("path");
+const vm = require("vm");
+const { createRequire } = require("module");
 
-const { drawPosterTextEllipsis } = require("../pages/car-detail/car-detail.js");
+const modulePath = path.join(__dirname, "../pages/car-detail/car-detail.js");
+const sandbox = {
+  require: createRequire(modulePath),
+  module: { exports: {} },
+  Page: jest.fn()
+};
+vm.runInNewContext(`${fs.readFileSync(modulePath, "utf8")}\nmodule.exports = { drawPosterTextEllipsis };`, sandbox, { filename: modulePath });
+const { drawPosterTextEllipsis } = sandbox.module.exports;
 
 describe("drawPosterTextEllipsis", () => {
   let ctx;

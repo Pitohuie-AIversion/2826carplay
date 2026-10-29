@@ -60,6 +60,33 @@ function isAncestorPath(parent, child) {
   return parent.length <= child.length && parent.every((part, index) => part === child[index])
 }
 
+function resolvePendingPatch(pendingPatch, contextData) {
+  if (!pendingPatch) return {}
+  const patch = {}
+  Object.keys(pendingPatch).forEach((key) => {
+    const value = contextData
+      ? statePath(key).reduce((current, part) => current == null ? undefined : current[part], contextData)
+      : pendingPatch[key]
+    if (value !== undefined) patch[key] = value
+  })
+  return patch
+}
+
+function mergePatchIntoPending(pendingPatch, patch) {
+  const result = pendingPatch ? Object.assign({}, pendingPatch) : {}
+  Object.keys(patch).forEach((key) => {
+    const parts = statePath(key)
+    if (!parts.length || patch[key] === undefined) return
+    const pendingKeys = Object.keys(result)
+    if (pendingKeys.some((existing) => isAncestorPath(statePath(existing), parts))) return
+    pendingKeys.forEach((existing) => {
+      if (isAncestorPath(parts, statePath(existing))) delete result[existing]
+    })
+    result[key] = patch[key]
+  })
+  return result
+}
+
 function createPerformanceHelpers(context) {
   let pendingPatch = null
   let flushTimer = null
@@ -82,15 +109,10 @@ function createPerformanceHelpers(context) {
       cancelScheduledFlush()
       return
     }
-    const patch = {}
-    Object.keys(pendingPatch).forEach((key) => {
-      // Read the latest logical state so a direct setData between batching and
-      // rendering cannot be overwritten by an older queued value.
-      const value = context && context.data
-        ? statePath(key).reduce((current, part) => current == null ? undefined : current[part], context.data)
-        : pendingPatch[key]
-      if (value !== undefined) patch[key] = value
-    })
+
+    // Read the latest logical state so a direct setData between batching and
+    // rendering cannot be overwritten by an older queued value.
+    const patch = resolvePendingPatch(pendingPatch, context && context.data)
     pendingPatch = null
     cancelScheduledFlush()
     if (!context || typeof context.setData !== "function" || !Object.keys(patch).length) {
@@ -137,17 +159,7 @@ function createPerformanceHelpers(context) {
     if (context && typeof context.data === "object" && context.data !== null) {
       applyPatchToTarget(context.data, patch)
     }
-    if (pendingPatch === null) pendingPatch = {}
-    Object.keys(patch).forEach((key) => {
-      const parts = statePath(key)
-      if (!parts.length || patch[key] === undefined) return
-      const pendingKeys = Object.keys(pendingPatch)
-      if (pendingKeys.some((existing) => isAncestorPath(statePath(existing), parts))) return
-      pendingKeys.forEach((existing) => {
-        if (isAncestorPath(parts, statePath(existing))) delete pendingPatch[existing]
-      })
-      pendingPatch[key] = patch[key]
-    })
+    pendingPatch = mergePatchIntoPending(pendingPatch, patch)
     scheduleFlush()
   }
 

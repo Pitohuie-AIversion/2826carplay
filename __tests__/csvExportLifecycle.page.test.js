@@ -254,3 +254,61 @@ describe.each(EXPORT_PAGES)("%s CSV export lifecycle", (label, modulePath, busyF
     expect(wx.openDocument).not.toHaveBeenCalled()
   })
 })
+
+
+describe("booking-manage CSV export error path", () => {
+  let page, pages, files, writes, fileSystem, requests
+  beforeEach(() => {
+    jest.resetModules()
+    jest.useFakeTimers()
+    files = new Map()
+    writes = []
+    requests = []
+    fileSystem = {
+      writeFile: jest.fn((options) => writes.push(options)),
+      unlink: jest.fn(({ filePath, success }) => { files.delete(filePath); if (success) success() })
+    }
+    global.wx = {
+      env: { USER_DATA_PATH: "/data" },
+      getFileSystemManager: () => fileSystem,
+      cloud: { callFunction: jest.fn((options) => requests.push(options)) },
+      showToast: jest.fn(),
+      showModal: jest.fn(({ success }) => { if (success) success({ confirm: true }) }),
+    }
+    global.getApp = () => ({})
+    global.Page = (definition) => {
+      page = { ...definition, data: JSON.parse(JSON.stringify(definition.data)) }
+      page.setData = jest.fn((patch) => Object.assign(page.data, patch))
+    }
+    require(`../pages/booking-manage/booking-manage`)
+    pages = [page]
+    global.getCurrentPages = () => pages
+    page.onLoad()
+  })
+  afterEach(() => {
+    page.onUnload()
+    jest.useRealTimers()
+    delete global.Page
+    delete global.wx
+    delete global.getApp
+    delete global.getCurrentPages
+  })
+
+  const flush = async () => { for (let index = 0; index < 8; index += 1) await Promise.resolve() }
+
+  test("synchronous saveExportedCsv failure is caught and reported", async () => {
+    page.handleExport()
+    page.saveExportedCsv = jest.fn(() => { throw new Error("synchronous mock error") })
+
+    const request = requests.find(req => req.name === "bookingExportCsv")
+    request.success({
+      result: { ok: true, csvText: "1,2,3", fileName: "test.csv" }
+    })
+
+    await flush()
+
+    expect(page.saveExportedCsv).toHaveBeenCalled()
+    expect(wx.showToast).toHaveBeenCalledWith({ title: "保存失败", icon: "none" })
+    expect(page.data.loading).toBe(false)
+  })
+})

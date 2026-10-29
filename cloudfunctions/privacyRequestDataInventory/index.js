@@ -400,9 +400,17 @@ async function readHandoversByBookingIds(bookingIds) {
   const records = []
   try {
     const ids = [...new Set((bookingIds || []).map((item) => String(item || "").trim()).filter(Boolean))]
-    for (let index = 0; index < ids.length && records.length <= MAX_RECORDS; index += 1) {
-      const res = await db.collection("booking_handovers").where({ bookingId: ids[index] }).field(INVENTORY_FIELDS.booking_handovers).limit(MAX_RECORDS + 1 - records.length).get()
-      records.push(...(res && Array.isArray(res.data) ? res.data : []))
+    if (ids.length > 0) {
+      for (let offset = 0; offset <= MAX_RECORDS; offset += BATCH_SIZE) {
+        const remaining = MAX_RECORDS + 1 - records.length
+        const limit = Math.min(BATCH_SIZE, remaining)
+        const res = await db.collection("booking_handovers").where({ bookingId: db.command.in(ids) }).field(INVENTORY_FIELDS.booking_handovers).skip(offset).limit(limit).get()
+        const batch = res && Array.isArray(res.data) ? res.data : []
+        records.push(...batch)
+        if (batch.length < limit || records.length > MAX_RECORDS) {
+          break
+        }
+      }
     }
     return { available: true, list: sortByCreatedAtDesc(records.slice(0, MAX_RECORDS)), truncated: records.length > MAX_RECORDS }
   } catch (error) {

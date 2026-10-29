@@ -16,6 +16,9 @@ function createPagedWhere(records, error) {
   return where
 }
 
+
+
+
 function createMockDb({
   roles,
   request,
@@ -41,28 +44,52 @@ function createMockDb({
     favorites,
     unavailable.includes("favorites") ? new Error("collection not found") : null
   )
-  const quotesWhere = jest.fn((filter) => ({
-    field: jest.fn(() => ({
+  const quotesWhere = jest.fn((filter) => {
+    let ids = [];
+    if (filter.bookingId && Array.isArray(filter.bookingId.$in)) {
+      ids = filter.bookingId.$in;
+    } else if (filter.bookingId && typeof filter.bookingId === 'object' && filter.bookingId.in) {
+      ids = filter.bookingId.in;
+    } else if (filter.bookingId) {
+      ids = [filter.bookingId];
+    }
+
+    const skip = jest.fn((offset) => ({
       limit: jest.fn((limit) => ({
         get: unavailable.includes("booking_quotes")
           ? jest.fn().mockRejectedValue(new Error("collection not found"))
           : jest.fn().mockResolvedValue({
-              data: quotes.filter((item) => item.bookingId === filter.bookingId).slice(0, limit)
+              data: quotes.filter((item) => ids.includes(item.bookingId)).slice(offset, offset + limit)
             })
       }))
     }))
-  }))
-  const handoversWhere = jest.fn((filter) => ({
-    field: jest.fn(() => ({
+    return {
+      field: jest.fn(() => ({ skip, limit: skip(0).limit }))
+    }
+  })
+  const handoversWhere = jest.fn((filter) => {
+    let ids = [];
+    if (filter.bookingId && Array.isArray(filter.bookingId.$in)) {
+      ids = filter.bookingId.$in;
+    } else if (filter.bookingId && typeof filter.bookingId === 'object' && filter.bookingId.in) {
+      ids = filter.bookingId.in;
+    } else if (filter.bookingId) {
+      ids = [filter.bookingId];
+    }
+
+    const skip = jest.fn((offset) => ({
       limit: jest.fn((limit) => ({
         get: unavailable.includes("booking_handovers")
           ? jest.fn().mockRejectedValue(new Error("collection not found"))
           : jest.fn().mockResolvedValue({
-              data: handovers.filter((item) => item.bookingId === filter.bookingId).slice(0, limit)
+              data: handovers.filter((item) => ids.includes(item.bookingId)).slice(offset, offset + limit)
             })
       }))
     }))
-  }))
+    return {
+      field: jest.fn(() => ({ skip, limit: skip(0).limit }))
+    }
+  })
   const requestsWhere = createPagedWhere(
     privacyRequests,
     unavailable.includes("privacy_requests") ? new Error("collection not found") : null
@@ -91,6 +118,10 @@ function createMockDb({
   }))
   const auditAdd = jest.fn().mockResolvedValue({ _id: "audit_1" })
   const serverDateValue = { serverDate: true }
+  const command = {
+    in: (val) => ({ $in: val }),
+    neq: (val) => ({ operation: "neq", value: val })
+  }
 
   const collection = jest.fn((name) => {
     if (name === "roles") {
@@ -123,7 +154,10 @@ function createMockDb({
   return {
     db: {
       collection,
-      command: { neq: jest.fn((value) => ({ operation: "neq", value })) },
+      command: {
+        neq: jest.fn((value) => ({ operation: "neq", value })),
+        in: jest.fn((val) => ({ $in: val }))
+      },
       serverDate: jest.fn(() => serverDateValue)
     },
     bookingsWhere,

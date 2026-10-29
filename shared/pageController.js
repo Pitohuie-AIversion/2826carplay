@@ -122,7 +122,7 @@ function createPageController(pageInstance, config = {}) {
       const task = cleanupTasks.pop()
       try {
         if (typeof task === "function") task()
-      } catch (e) {}
+      } catch (e) { console.error(e) }
     }
   }
 

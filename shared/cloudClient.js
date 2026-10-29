@@ -88,21 +88,21 @@ function callCloud(name, data = {}, options = {}) {
               icon: "none"
             })
           }
-        } catch (e) {}
+        } catch (e) { console.error(e) }
       }
 
       if (result.ok) {
         if (typeof options.onSuccess === "function") {
-          try { options.onSuccess(result.data, result) } catch (e) {}
+          try { options.onSuccess(result.data, result) } catch (e) { console.error(e) }
         }
       } else {
         if (typeof options.onFail === "function") {
-          try { options.onFail(result) } catch (e) {}
+          try { options.onFail(result) } catch (e) { console.error(e) }
         }
       }
 
       if (typeof options.onComplete === "function") {
-        try { options.onComplete(result) } catch (e) {}
+        try { options.onComplete(result) } catch (e) { console.error(e) }
       }
 
       resolve(result)

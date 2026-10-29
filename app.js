@@ -10,13 +10,13 @@ App({
   onError(err) {
     try {
       console.error("[App Error]", err)
-    } catch (e) {}
+    } catch (e) { console.error(e) }
   },
 
   onUnhandledRejection(res) {
     try {
       console.warn("[App UnhandledRejection]", res)
-    } catch (e) {}
+    } catch (e) { console.error(e) }
   },
 
   onLaunch() {
@@ -68,7 +68,7 @@ App({
                     this.onPrefetchGarageReady(parsed)
                   }
                 }
-              } catch (e) {}
+              } catch (e) { console.error(e) }
             }
           },
           fail: () => {}
@@ -85,11 +85,11 @@ App({
                   this.onPrefetchGarageReady(parsed)
                 }
               }
-            } catch (e) {}
+            } catch (e) { console.error(e) }
           }
         })
       }
-    } catch (error) {}
+    } catch (error) { console.error(error) }
   },
 
   globalData: {

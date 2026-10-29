@@ -180,7 +180,7 @@ Page({
       if (stored && stored.day === day && Array.isArray(stored.completedKeys)) {
         completedKeys = stored.completedKeys
       }
-    } catch (error) {}
+    } catch (error) { console.error(error) }
     this._manualReviewDay = day
     const manualChecks = buildManualChecks(completedKeys)
     const manualCompletedCount = manualChecks.filter((item) => item.checked).length
@@ -214,7 +214,7 @@ Page({
           completedKeys
         })
       }
-    } catch (error) {}
+    } catch (error) { console.error(error) }
     this.setData({
       manualChecks,
       manualCompletedCount,

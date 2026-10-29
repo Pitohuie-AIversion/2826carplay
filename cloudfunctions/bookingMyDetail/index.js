@@ -170,7 +170,7 @@ async function mapHandover(item) {
         const fileId = String(entry && (entry.fileID || entry.fileId) || "")
         if (fileId && entry.tempFileURL && Number(entry.status || 0) === 0) urlMap.set(fileId, entry.tempFileURL)
       })
-    } catch (error) {}
+    } catch (error) { console.error(error) }
   }
   return {
     id: String(item._id || item.id || ""),

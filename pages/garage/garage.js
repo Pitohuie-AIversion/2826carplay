@@ -338,7 +338,7 @@ Page({
           env,
           traceUser: true
         })
-      } catch (error) {}
+      } catch (error) { console.error(error) }
     }
 
     try {
@@ -346,7 +346,7 @@ Page({
       if (net && net.isConnected === false) {
         this.setData({ isOffline: true })
       }
-    } catch (e) {}
+    } catch (e) { console.error(e) }
 
     this._unsubscribeNetworkStatus = onNetworkStatusChange((res) => {
       this.setData({ isOffline: !res.isConnected })
@@ -407,7 +407,7 @@ Page({
           this.applyCars(snapshot.cars, snapshot.pagination, filters, { persist: false, savedAt: snapshot.savedAt })
         }
       }
-    } catch (e) {}
+    } catch (e) { console.error(e) }
   },
 
   onShow() {
@@ -429,7 +429,7 @@ Page({
     if (!guidesFresh) {
       this.loadContentGuides()
     }
-    try { clearExpiredCache() } catch (e) {}
+    try { clearExpiredCache() } catch (e) { console.error(e) }
   },
 
   onPullDownRefresh() {
@@ -526,7 +526,7 @@ Page({
       this._carsLoadDone = null
       try {
         done()
-      } catch (error) {}
+      } catch (error) { console.error(error) }
     }
   },
 
@@ -541,7 +541,7 @@ Page({
     const nextPage = append ? this.data.page + 1 : 0
     if (this.data.loadingCars && !force) {
       if (input && typeof input.done === "function") {
-        try { input.done() } catch (e) {}
+        try { input.done() } catch (e) { console.error(e) }
       }
       return
     }
@@ -553,7 +553,7 @@ Page({
     if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
       this.setCarsLoadError("云能力未初始化，请稍后重试")
       if (input && typeof input.done === "function") {
-        try { input.done() } catch (e) {}
+        try { input.done() } catch (e) { console.error(e) }
       }
       return
     }
@@ -693,7 +693,7 @@ Page({
       this._unsubscribeNetwork = null
     }
     if (this._perf && typeof this._perf.dispose === "function") {
-      try { this._perf.dispose() } catch (e) {}
+      try { this._perf.dispose() } catch (e) { console.error(e) }
       this._perf = null
     }
   },
@@ -707,7 +707,7 @@ Page({
 
   clearSearchDebounce() {
     if (this._debouncedFilterSearch && typeof this._debouncedFilterSearch.cancel === "function") {
-      try { this._debouncedFilterSearch.cancel() } catch (e) {}
+      try { this._debouncedFilterSearch.cancel() } catch (e) { console.error(e) }
     }
     if (!this._searchDebounceTimer) {
       return
@@ -822,7 +822,7 @@ Page({
     if (topCovers.length) {
       try {
         preloadImages(topCovers, { priority: 30 })
-      } catch (e) {}
+      } catch (e) { console.error(e) }
     }
     if ((!options || options.persist !== false) && typeof wx !== "undefined" && typeof wx.setStorageSync === "function") {
       try {
@@ -832,7 +832,7 @@ Page({
           filters: { category: currentCategory, city: selectedCity, keyword: searchKeyword, availableOnly, sortBy, quickFilter },
           savedAt: this._carsSnapshotSavedAt
         })
-      } catch (e) {}
+      } catch (e) { console.error(e) }
     }
   },
 
@@ -1080,14 +1080,14 @@ Page({
       if (preloadUrls.length) {
         try {
           preloadImages(preloadUrls.slice(0, 4), { priority: 90 })
-        } catch (e) {}
+        } catch (e) { console.error(e) }
       }
       try {
         const app = typeof getApp === "function" ? getApp() : null
         if (app && app.globalData) {
           app.globalData._tempCarDetailPreview = targetCar
         }
-      } catch (e) {}
+      } catch (e) { console.error(e) }
     }
 
     const action = beginPageNativeAction(this, { requireCurrent: true })

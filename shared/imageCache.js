@@ -67,7 +67,7 @@ function loadUrlMap() {
 function saveUrlMap() {
   try {
     wx.setStorageSync(STORAGE_KEY_MAP, urlMap || {})
-  } catch (e) {}
+  } catch (e) { console.error(e) }
 }
 
 function loadCacheMeta() {
@@ -84,7 +84,7 @@ function loadCacheMeta() {
 function saveCacheMeta() {
   try {
     wx.setStorageSync(STORAGE_KEY_META, cacheMeta || {})
-  } catch (e) {}
+  } catch (e) { console.error(e) }
 }
 
 function loadConfirmedUrls() {
@@ -107,7 +107,7 @@ function saveConfirmedUrls() {
     const list = Array.from(confirmedUrls)
     const trimmed = list.length > MAX_CONFIRMED_URLS ? list.slice(list.length - MAX_CONFIRMED_URLS) : list
     wx.setStorageSync(STORAGE_KEY_CONFIRMED, trimmed)
-  } catch (e) {}
+  } catch (e) { console.error(e) }
 }
 
 function touchMeta(url) {
@@ -156,7 +156,7 @@ function removeUnreferencedFile(localPath) {
           }
         }
       }
-    } catch (e) {}
+    } catch (e) { console.error(e) }
   }
 }
 

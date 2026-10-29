@@ -285,7 +285,7 @@ async function addHandoverPhotoUrls(records) {
         const url = String(item && item.tempFileURL || "").trim()
         if (fileId && url && Number(item.status || 0) === 0) urlMap.set(fileId, url)
       })
-    } catch (error) {}
+    } catch (error) { console.error(error) }
   }
   return list.map((item) => ({
     id: String(item._id || item.id || ""),

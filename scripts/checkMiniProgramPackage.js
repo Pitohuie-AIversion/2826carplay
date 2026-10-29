@@ -117,7 +117,7 @@ function calculatePackageFootprint(projectRoot) {
         if (root) subPackageRoots.push(root)
       })
     }
-  } catch (e) {}
+  } catch (e) { console.error(e) }
 
   const subPackages = subPackageRoots.map((subRoot) => {
     const subFiles = files.filter((f) => f.path.startsWith(`${subRoot}/`))

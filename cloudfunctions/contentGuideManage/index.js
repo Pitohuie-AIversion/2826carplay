@@ -71,7 +71,7 @@ async function slugExists(slug, excludedId) {
 async function audit(openid, action, contentId) {
   try {
     await db.collection("audit_logs").add({ data: { openid, action: `contentGuide.${action}`, contentId, createdAt: db.serverDate() } })
-  } catch (ignored) {}
+  } catch (ignored) { console.error(ignored) }
 }
 
 module.exports._test = { normalizeGuide, text, strings, validateGuide }

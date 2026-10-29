@@ -23,7 +23,7 @@ function handleNetworkStatusChange(res) {
       if (typeof callback === "function") {
         callback({ isConnected, networkType, previousConnected })
       }
-    } catch (error) {}
+    } catch (error) { console.error(error) }
   })
 
   // 从无网恢复为有网时，触发所有重连监听
@@ -33,7 +33,7 @@ function handleNetworkStatusChange(res) {
         if (typeof callback === "function") {
           callback({ isConnected, networkType })
         }
-      } catch (error) {}
+      } catch (error) { console.error(error) }
     })
   }
 }
@@ -46,7 +46,7 @@ function initNetworkStatusListener() {
     try {
       wx.onNetworkStatusChange(handleNetworkStatusChange)
       isListening = true
-    } catch (e) {}
+    } catch (e) { console.error(e) }
   }
 
   if (typeof wx.getNetworkType === "function") {
@@ -59,7 +59,7 @@ function initNetworkStatusListener() {
           handleNetworkStatusChange({ isConnected: initialType !== "none", networkType: initialType })
         }
       })
-    } catch (e) {}
+    } catch (e) { console.error(e) }
   }
 }
 
@@ -115,7 +115,7 @@ function notifyNetworkReconnectForTest(payload = { isConnected: true, networkTyp
       if (typeof callback === "function") {
         callback(payload)
       }
-    } catch (error) {}
+    } catch (error) { console.error(error) }
   })
 }
 

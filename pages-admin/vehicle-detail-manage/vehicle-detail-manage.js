@@ -189,7 +189,7 @@ function deleteCloudFilesDirectBestEffort(fileList) {
       fileList: list,
       fail: () => {}
     })
-  } catch (error) {}
+  } catch (error) { console.error(error) }
 }
 function requestUploadedFileCleanup(vehicleId, fileList) {
   const id = String(vehicleId || "").trim()
@@ -210,7 +210,7 @@ function requestUploadedFileCleanup(vehicleId, fileList) {
       },
       fail: () => {}
     })
-  } catch (error) {}
+  } catch (error) { console.error(error) }
 }
 Page({
   data: {
@@ -241,7 +241,7 @@ Page({
           env,
           traceUser: true
         })
-      } catch (error) {}
+      } catch (error) { console.error(error) }
     }
     const id = String((options && options.id) || "").trim()
     if (!id) {
@@ -298,7 +298,7 @@ Page({
     if (activeUploadTask && typeof activeUploadTask.abort === "function") {
       try {
         activeUploadTask.abort()
-      } catch (error) {}
+      } catch (error) { console.error(error) }
     }
     if (typeof cancelActiveUpload === "function") {
       cancelActiveUpload()
@@ -939,7 +939,7 @@ Page({
         if (abortTask && uploadTask && typeof uploadTask.abort === "function") {
           try {
             uploadTask.abort()
-          } catch (error) {}
+          } catch (error) { console.error(error) }
         }
         this.deliverVehicleImageResult(
           action,
@@ -1030,7 +1030,7 @@ Page({
     if (activeUploadTask && typeof activeUploadTask.abort === "function") {
       try {
         activeUploadTask.abort()
-      } catch (error) {}
+      } catch (error) { console.error(error) }
     }
     if (typeof cancelActiveUpload === "function") {
       cancelActiveUpload()
@@ -1318,7 +1318,7 @@ Page({
     if (typeof done === "function") {
       try {
         done()
-      } catch (error) {}
+      } catch (error) { console.error(error) }
     }
   },
   clearVehicleDetailLoadTimer() {

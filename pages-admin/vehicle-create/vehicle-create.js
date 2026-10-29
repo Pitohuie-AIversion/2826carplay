@@ -175,7 +175,7 @@ Page({
           env,
           traceUser: true
         })
-      } catch (error) {}
+      } catch (error) { console.error(error) }
     }
     requirePagePermission(this, {
       required: "canManageVehicles",

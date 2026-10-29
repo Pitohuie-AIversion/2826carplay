@@ -150,7 +150,7 @@ function saveSortPreference(sort) {
   }
   try {
     wx.setStorageSync(WORKBENCH_SORT_STORAGE_KEY, sort)
-  } catch (error) {}
+  } catch (error) { console.error(error) }
 }
 Page({
   data: {
@@ -263,7 +263,7 @@ Page({
     )
   },
   onUnload() {
-    if (this._perf && this._perf.dispose) try { this._perf.dispose() } catch(e) {}
+    if (this._perf && this._perf.dispose) try { this._perf.dispose() } catch (e) { console.error(e) }
     cancelPagePermissionCheck(this)
     cancelPageNativeActions(this)
     this._workbenchLoadRequestId =

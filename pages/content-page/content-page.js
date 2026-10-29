@@ -205,7 +205,7 @@ Page({
           }
         }
       }
-    } catch (e) {}
+    } catch (e) { console.error(e) }
 
     this._cancelGuideRequest = requestCloudRead({
       name: "contentGuideDetail",
@@ -217,7 +217,7 @@ Page({
         }
         const guide = result.guide
         if (contentId && typeof wx !== "undefined" && typeof wx.setStorageSync === "function") {
-          try { wx.setStorageSync(`guide_${contentId}`, { guide, vehicles: result.vehicles }) } catch (e) {}
+          try { wx.setStorageSync(`guide_${contentId}`, { guide, vehicles: result.vehicles }) } catch (e) { console.error(e) }
         }
         const attribution = sanitizeAttribution({
           ...this.data.attribution,
@@ -258,7 +258,7 @@ Page({
     if (error && ["NOT_FOUND", "VALIDATION_ERROR"].includes(error.code)) {
       try {
         if (typeof wx.removeStorageSync === "function") wx.removeStorageSync(`guide_${this._guideContentId}`)
-      } catch (e) {}
+      } catch (e) { console.error(e) }
       this.setData({
         guide: null, relatedVehicles: [], guideLoading: false,
         guideError: "内容已下线或尚未发布", guideNotice: "",
@@ -294,7 +294,7 @@ Page({
         if (app && app.globalData) {
           app.globalData._tempCarDetailPreview = targetVehicle
         }
-      } catch (e) {}
+      } catch (e) { console.error(e) }
     }
     const attribution = sanitizeAttribution({ ...this.data.attribution, vehicleId })
     trackEvent("content_vehicle_click", vehicleId, attribution)

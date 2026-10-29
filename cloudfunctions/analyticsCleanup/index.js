@@ -72,7 +72,7 @@ async function writeAuditLogBestEffort(payload) {
         createdAt: db.serverDate()
       }
     })
-  } catch (error) {}
+  } catch (error) { console.error(error) }
 }
 
 async function writeErrorLogBestEffort(payload) {
@@ -83,7 +83,7 @@ async function writeErrorLogBestEffort(payload) {
         createdAt: db.serverDate()
       }
     })
-  } catch (error) {}
+  } catch (error) { console.error(error) }
 }
 
 async function removeRecords(records) {

@@ -221,7 +221,7 @@ function createPerformanceHelpers(context) {
     for (let i = 0; i < debounceHandles.length; i++) {
       const h = debounceHandles[i]
       if (h && typeof h.cancel === "function") {
-        try { h.cancel() } catch (e) {}
+        try { h.cancel() } catch (e) { console.error(e) }
       }
     }
     debounceHandles.length = 0

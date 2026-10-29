@@ -114,7 +114,7 @@ Page({
           env,
           traceUser: true
         })
-      } catch (error) {}
+      } catch (error) { console.error(error) }
     }
     const id = String((options && options.id) || "").trim()
     if (!id) {

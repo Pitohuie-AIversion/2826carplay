@@ -166,6 +166,7 @@ exports.main = async (event) => {
         if (!["idle", "active"].includes(vehicleStatus)) {
           return { error: createError("VEHICLE_NOT_OCCUPIABLE", "车辆状态待核对，请联系顾问后再确认档期") }
         }
+        // Await each transaction request so failed work cannot outlive rollback.
         for (const date of dates) {
           const occupied = await getDocOrNull(transaction.collection("vehicle_calendar_days"), dayDocumentId(vehicleId, date), { blockId: true, bookingId: true, kind: true })
           if (occupied && String(occupied.bookingId || "") !== input.bookingId) {
@@ -204,6 +205,7 @@ exports.main = async (event) => {
           createdAt: db.serverDate(),
           updatedAt: db.serverDate()
         } })
+        // Keep writes sequential for the same transaction failure boundary.
         for (const date of occupancy.dates) {
           await transaction.collection("vehicle_calendar_days").doc(dayDocumentId(occupancy.vehicleId, date)).set({ data: {
             vehicleId: occupancy.vehicleId,

@@ -112,3 +112,10 @@ exports.main = async (event) => {
     return error("INTERNAL_ERROR", "内容维护失败")
   }
 }
+
+// For testing purposes
+if (process.env.NODE_ENV === 'test') {
+  exports.text = text;
+  exports.strings = strings;
+  exports.isAdmin = isAdmin;
+}

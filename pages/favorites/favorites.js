@@ -58,7 +58,9 @@ function saveFavoriteFilterPreference(availableOnly) {
   }
   try {
     wx.setStorageSync(FAVORITE_FILTER_STORAGE_KEY, Boolean(availableOnly))
-  } catch (error) {}
+  } catch (error) {
+    console.error("Failed to save filter preference:", error)
+  }
 }
 
 function buildCompareState(car1, car2, diffOnly) {
@@ -253,7 +255,9 @@ Page({
           this.setData({ initialLoading: false, loadedOnce: true })
         }
       }
-    } catch (e) {}
+    } catch (e) {
+      console.error("Failed to restore favorites snapshot:", e)
+    }
     this.fetchList()
   },
 
@@ -385,14 +389,18 @@ Page({
       if (preloadUrls.length) {
         try {
           preloadImages(preloadUrls.slice(0, 4), { priority: 90 })
-        } catch (e) {}
+        } catch (e) {
+          console.error("Failed to preload images:", e)
+        }
       }
       try {
         const app = typeof getApp === "function" ? getApp() : null
         if (app && app.globalData) {
           app.globalData._tempCarDetailPreview = targetCar
         }
-      } catch (e) {}
+      } catch (e) {
+        console.error("Failed to set preview globalData:", e)
+      }
     }
     const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.navigateTo({
@@ -525,7 +533,9 @@ Page({
       if (res && res.localPath) {
         return res.localPath
       }
-    } catch (e) {}
+    } catch (e) {
+      console.error("Failed to resolve image:", e)
+    }
 
     if (typeof wx !== "undefined" && typeof wx.getImageInfo === "function") {
       try {
@@ -535,7 +545,9 @@ Page({
         if (info && info.path) {
           return info.path
         }
-      } catch (e) {}
+      } catch (e) {
+        console.error("Failed to get image info:", e)
+      }
     }
     return src
   },
@@ -1220,7 +1232,9 @@ Page({
     this._favoritesPaginationDirty = true
     try {
       if (typeof wx.setStorageSync === "function") wx.setStorageSync("favorites_last_snapshot", this.data.list.slice(0, this.data.pageSize))
-    } catch (error) {}
+    } catch (error) {
+      console.error("Failed to set favorites snapshot:", error)
+    }
   },
 
   fetchList(options) {
@@ -1304,7 +1318,11 @@ Page({
         const nextList = Array.from(new Map((append ? this.data.list.concat(list) : list).map((car) => [car.id, car])).values())
         this._favoritesPaginationDirty = false
         if (!append && typeof wx !== "undefined" && typeof wx.setStorageSync === "function") {
-          try { wx.setStorageSync("favorites_last_snapshot", nextList) } catch (e) {}
+          try {
+            wx.setStorageSync("favorites_last_snapshot", nextList)
+          } catch (e) {
+            console.error("Failed to update favorites snapshot:", e)
+          }
         }
         this.applyFavoriteList(nextList, {
           availableOnly: this.data.availableOnly,

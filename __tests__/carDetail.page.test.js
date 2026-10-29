@@ -540,6 +540,23 @@ describe("pages/car-detail 客户侧车辆状态", () => {
     expect(page._favoriteStatusTimer).toBeNull()
   })
 
+  test("初始收藏状态接口失败时保持默认值并清理计时器", () => {
+    global.wx = {
+      cloud: {
+        callFunction: jest.fn((options) => {
+          if (options && typeof options.fail === "function") {
+            options.fail(new Error("network failed"))
+          }
+        })
+      }
+    }
+    const page = createPage(loadPageDefinition())
+
+    expect(() => page.loadFavoriteStatus("vehicle-status-fail")).not.toThrow()
+    expect(page.data.favorited).toBe(false)
+    expect(page._favoriteStatusTimer).toBeNull()
+  })
+
   test("初始收藏状态同步异常时保持默认值并清理计时器", () => {
     global.wx = {
       cloud: {

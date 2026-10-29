@@ -176,7 +176,9 @@ Page({
       if (input && typeof input.done === "function") {
         try {
           input.done()
-        } catch (error) {}
+        } catch (error) {
+          console.error("Error executing input done callback:", error)
+        }
       }
       return
     }

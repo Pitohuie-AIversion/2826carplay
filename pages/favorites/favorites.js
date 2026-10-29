@@ -392,7 +392,9 @@ Page({
         if (app && app.globalData) {
           app.globalData._tempCarDetailPreview = targetCar
         }
-      } catch (e) {}
+      } catch (e) {
+        console.error("Failed to set _tempCarDetailPreview:", e)
+      }
     }
     const action = beginPageNativeAction(this, { requireCurrent: true })
     wx.navigateTo({

@@ -68,7 +68,9 @@ Page({
           env,
           traceUser: true
         })
-      } catch (error) {}
+      } catch (error) {
+        console.error("[bookings] cloud init failed:", error)
+      }
     }
 
     try {
@@ -85,7 +87,9 @@ Page({
           this._lastBookingsLoadedAt = 0
         }
       }
-    } catch (e) {}
+    } catch (error) {
+      console.error("[bookings] getStorageSync failed:", error)
+    }
 
     this._unsubscribeNetwork = onNetworkReconnect(() => {
       if (this.data.loadFailed) {
@@ -140,7 +144,13 @@ Page({
     this._bookingCancelSerial = Number(this._bookingCancelSerial || 0) + 1
     this.finishBookingsLoadEffects()
     this.clearBookingCancelTimer()
-    if (this._perf && typeof this._perf.dispose === 'function') try { this._perf.dispose(); } catch(e) {}
+    if (this._perf && typeof this._perf.dispose === 'function') {
+      try {
+        this._perf.dispose();
+      } catch (error) {
+        console.error("[bookings] perf dispose failed:", error)
+      }
+    }
   },
 
   finishBookingsLoadEffects() {
@@ -150,7 +160,9 @@ Page({
       this._bookingsLoadDone = null
       try {
         done()
-      } catch (error) {}
+      } catch (error) {
+        console.error("[bookings] done callback failed:", error)
+      }
     }
   },
 
@@ -269,7 +281,11 @@ Page({
         })
         const nextList = append ? this.data.list.concat(list) : list
         if (!append && typeof wx !== "undefined" && typeof wx.setStorageSync === "function") {
-          try { wx.setStorageSync("bookings_last_snapshot", nextList) } catch (e) {}
+          try {
+            wx.setStorageSync("bookings_last_snapshot", nextList)
+          } catch (error) {
+            console.error("[bookings] setStorageSync failed:", error)
+          }
         }
         this.applyBookingList(nextList, {
           page: Number.isInteger(result.page) ? result.page : nextPage,

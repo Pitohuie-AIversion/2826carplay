@@ -194,6 +194,8 @@ function normalizeConflictBooking(item) {
     coordinationClass: `coordination-${coordinationStatus}`
   }
 }
+const { reportDiagnostic } = require("../../shared/diagnostics")
+
 Page({
   data: {
     id: "",
@@ -392,7 +394,7 @@ Page({
       try {
         this._perf.dispose();
       } catch (e) {
-        console.error("[booking-manage-detail] perf dispose failed:", e);
+        reportDiagnostic("[booking-manage-detail] perf dispose failed")
       }
     }
   },

@@ -135,6 +135,8 @@ function normalizeBooking(item) {
     updatedAt: booking.updatedAt || ""
   }
 }
+const { reportDiagnostic } = require("../../shared/diagnostics")
+
 Page({
   data: {
     id: "",
@@ -361,7 +363,7 @@ Page({
       try {
         this._perf.dispose();
       } catch (e) {
-        console.error("[booking-detail] perf dispose failed:", e);
+        reportDiagnostic("[booking-detail] perf dispose failed")
       }
     }
   },

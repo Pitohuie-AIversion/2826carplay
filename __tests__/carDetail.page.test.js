@@ -933,9 +933,10 @@ describe("pages/car-detail 客户侧车辆状态", () => {
 
   test("finishCarDetailLoadEffects safely catches errors from done callback", () => {
     const page = createPage(loadPageDefinition())
-    page._carDetailLoadDone = jest.fn(() => {
+    const done = jest.fn(() => {
       throw new Error("Simulated callback error")
     })
+    page._carDetailLoadDone = done
     page.clearCarDetailLoadTimer = jest.fn()
 
     expect(() => {
@@ -944,6 +945,9 @@ describe("pages/car-detail 客户侧车辆状态", () => {
 
     expect(page.clearCarDetailLoadTimer).toHaveBeenCalled()
     expect(page._carDetailLoadDone).toBeNull()
+    expect(done).toHaveBeenCalledTimes(1)
+    page.finishCarDetailLoadEffects()
+    expect(done).toHaveBeenCalledTimes(1)
   })
 })
 

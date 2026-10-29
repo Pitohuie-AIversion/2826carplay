@@ -179,6 +179,8 @@ function blockDateIds(block) {
 
 async function readBlockDays(transaction, blockId, ids, dayCache) {
   const days = []
+  // Finish each request before issuing another on the same transaction so a
+  // rejected operation cannot leave requests running after rollback starts.
   for (const id of ids) {
     const day = await getDocOrNull(transaction.collection("vehicle_calendar_days"), id, { blockId: true, kind: true, date: true })
     dayCache.set(id, day)

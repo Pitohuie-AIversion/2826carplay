@@ -1,7 +1,7 @@
 const cloud = require("wx-server-sdk")
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
-const db = cloud.database()
+const db = cloud.database({ throwOnNotFound: false })
 const AUTH_ROLE_FIELDS = { role: true, roles: true, permissions: true, isAdmin: true, admin: true }
 const CONTENT_TYPES = ["route", "guide", "vehicle_advice", "handover_guide", "vehicle_tip"]
 const SCENARIOS = ["weekend_trip", "business_reception", "group_travel", "ev_experience", "handover_tips"]
@@ -80,12 +80,33 @@ async function audit(openid, action, contentId) {
   } catch (ignored) {}
 }
 
-async function updateExistingGuide(id, data) {
-  const result = await db.collection("content_guides").doc(id).update({ data })
+async function updateExistingGuide(id, data, source = db) {
+  const result = await source.collection("content_guides").doc(id).update({ data })
   const updated = result && result.stats && result.stats.updated
   if (updated === 0) return false
   if (updated !== 1) throw new Error("Unexpected content update result")
   return true
+}
+
+async function changeGuideStatus(id, nextStatus) {
+  return db.runTransaction(async (transaction) => {
+    const result = await transaction.collection("content_guides").doc(id)
+      .field({ _id: true, status: true }).get()
+    if (!result || !Object.prototype.hasOwnProperty.call(result, "data")) {
+      throw new Error("Unexpected content read result")
+    }
+    const current = result.data
+    if (current === null) return { found: false, changed: false }
+    if (!current || typeof current !== "object" || Array.isArray(current) || current._id !== id) {
+      throw new Error("Unexpected content read result")
+    }
+    if (current.status === nextStatus) return { found: true, changed: false }
+
+    const data = { status: nextStatus, updatedAt: db.serverDate() }
+    if (nextStatus === "published") data.publishedAt = db.serverDate()
+    const found = await updateExistingGuide(id, data, transaction)
+    return { found, changed: found }
+  })
 }
 
 module.exports._test = { normalizeGuide, text, strings, validateGuide }
@@ -108,7 +129,10 @@ exports.main = async (event) => {
       let contentId = id
       if (action === "create") {
         const res = await db.collection("content_guides").add({ data: { ...guide, status: "draft", createdAt: db.serverDate(), updatedAt: db.serverDate() } })
-        contentId = String(res && (res._id || res.id) || "")
+        contentId = res && (res._id === undefined ? res.id : res._id)
+        if (typeof contentId !== "string" || !ID_PATTERN.test(contentId)) {
+          throw new Error("Unexpected content create result")
+        }
       } else {
         if (!(await updateExistingGuide(id, { ...guide, updatedAt: db.serverDate() }))) {
           return error("NOT_FOUND", "内容不存在或已删除")
@@ -120,12 +144,11 @@ exports.main = async (event) => {
 
     if (!ID_PATTERN.test(id)) return error("VALIDATION_ERROR", "内容 ID 格式不正确")
     const nextStatus = action === "publish" ? "published" : "archived"
-    const data = { status: nextStatus, updatedAt: db.serverDate() }
-    if (action === "publish") data.publishedAt = db.serverDate()
-    if (!(await updateExistingGuide(id, data))) {
+    const outcome = await changeGuideStatus(id, nextStatus)
+    if (!outcome.found) {
       return error("NOT_FOUND", "内容不存在或已删除")
     }
-    await audit(openid, action, id)
+    if (outcome.changed) await audit(openid, action, id)
     return { ok: true, id, status: nextStatus }
   } catch (err) {
     console.error({

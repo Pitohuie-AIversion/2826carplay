@@ -468,10 +468,29 @@ exports.main = async (event) => {
     const topVehicles = Object.values(vehicleScores)
       .sort((prev, next) => next.score - prev.score)
       .slice(0, topN)
-    const names = await Promise.all(topVehicles.map((item) => readVehicleName(item.vehicleId)))
+
+    // Deduplicate vehicle IDs to prevent unnecessary database queries
+    const uniqueVehicleIds = Array.from(new Set(topVehicles.map((item) => item.vehicleId).filter(Boolean)))
+    const fetchedVehicleNames = await Promise.all(
+      uniqueVehicleIds.map((id) => readVehicleName(id))
+    )
+
+    // Map back to the original order
+    const vehicleNameMap = new Map(uniqueVehicleIds.map((id, index) => [id, fetchedVehicleNames[index]]))
+    const names = topVehicles.map(item => vehicleNameMap.get(item.vehicleId) || "已下架车辆")
 
     const contentAnalytics = buildContentAnalytics(events, topN)
-    const contentNames = await Promise.all(contentAnalytics.topContents.map((item) => readContentName(item.key)))
+
+    // Deduplicate content IDs to prevent unnecessary database queries
+    const uniqueContentIds = Array.from(new Set(contentAnalytics.topContents.map((item) => item.key).filter(Boolean)))
+    const fetchedContentNames = await Promise.all(
+      uniqueContentIds.map((id) => readContentName(id))
+    )
+
+    // Map back to the original order
+    const contentNameMap = new Map(uniqueContentIds.map((id, index) => [id, fetchedContentNames[index]]))
+    const contentNames = contentAnalytics.topContents.map(item => contentNameMap.get(item.key) || { title: "已下架或未发布内容", contentType: "" })
+
     const hydratedTopContents = contentAnalytics.topContents.map((item, index) => ({
       ...item,
       title: contentNames[index].title,

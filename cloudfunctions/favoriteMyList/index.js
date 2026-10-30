@@ -206,9 +206,17 @@ exports.main = async (event) => {
 
     const favoritePage = await readFavoritePage(openid, page, pageSize)
     const pageRecords = favoritePage.records
-    const vehicles = await Promise.all(
-      pageRecords.map((item) => readVehicle(String(item.vehicleId || "").trim()))
+
+    // Deduplicate vehicle IDs to prevent unnecessary database queries
+    const uniqueVehicleIds = Array.from(new Set(pageRecords.map((item) => String(item.vehicleId || "").trim()).filter(Boolean)))
+    const fetchedVehicles = await Promise.all(
+      uniqueVehicleIds.map((id) => readVehicle(id))
     )
+
+    // Map back to the original order
+    const vehicleMap = new Map(uniqueVehicleIds.map((id, index) => [id, fetchedVehicles[index]]))
+    const vehicles = pageRecords.map(item => vehicleMap.get(String(item.vehicleId || "").trim()) || null)
+
     const list = vehicles
       .map((vehicle, index) => {
         const car = buildVehicleCard(vehicle)

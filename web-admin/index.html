@@ -3938,6 +3938,13 @@
       dingtalk: 'https://oapi.dingtalk.com/robot/send?access_token=YOUR_WEBHOOK_KEY_HERE'
     };
 
+    const WEBHOOK_KEY_PLACEHOLDER = 'YOUR_WEBHOOK_KEY_HERE';
+
+    function isUnconfiguredWebhookUrl(url) {
+      const value = String(url || '').trim();
+      return !value || value.indexOf(WEBHOOK_KEY_PLACEHOLDER) !== -1;
+    }
+
     function loadPersistedConfigs() {
       try {
         const rawAlert = localStorage.getItem(ALERT_SENTINEL_STORAGE_KEY);
@@ -4215,6 +4222,12 @@
       const targetPlatform = platformNameMap[platform] || '企业微信群机器人';
       const urlInput = document.getElementById('alertWebhookUrl');
       const targetUrl = (urlInput ? urlInput.value.trim() : ALERT_CONFIG.url) || DEFAULT_WEBHOOK_URLS[platform];
+
+      if (isUnconfiguredWebhookUrl(targetUrl)) {
+        showToast('请先填写真实的 Webhook 机器人地址（替换 YOUR_WEBHOOK_KEY_HERE）后再发送测试告警', '⚠️');
+        if (urlInput) urlInput.focus();
+        return;
+      }
 
       const config = {
         slaMin: parseFloat(document.getElementById('alertSlaInput') ? document.getElementById('alertSlaInput').value : ALERT_CONFIG.slaMin) || ALERT_CONFIG.slaMin,

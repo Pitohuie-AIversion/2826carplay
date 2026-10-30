@@ -2479,7 +2479,7 @@
         </div>
         <div class="modal-field">
           <label>Webhook 机器人推送地址 (URL)</label>
-          <input type="text" class="search-input" id="alertWebhookUrl" style="width: 100%;" value="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=8e29a0f4-aijia-sentinel" oninput="updateWebhookCardPreview()">
+          <input type="text" class="search-input" id="alertWebhookUrl" style="width: 100%;" value="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=YOUR_WEBHOOK_KEY_HERE" oninput="updateWebhookCardPreview()">
         </div>
       </div>
 
@@ -3927,16 +3927,23 @@
       errorMax: 3.0,
       p95Max: 80,
       platform: 'wecom',
-      url: 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=8e29a0f4-aijia-sentinel'
+      url: 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=YOUR_WEBHOOK_KEY_HERE'
     };
 
     let activeWebhookPreviewMode = 'visual'; // 'visual' | 'json' | 'curl'
 
     const DEFAULT_WEBHOOK_URLS = {
-      wecom: 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=8e29a0f4-aijia-sentinel',
-      feishu: 'https://open.feishu.cn/open-apis/bot/v2/hook/8e29a0f4-aijia-sentinel',
-      dingtalk: 'https://oapi.dingtalk.com/robot/send?access_token=8e29a0f4-aijia-sentinel'
+      wecom: 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=YOUR_WEBHOOK_KEY_HERE',
+      feishu: 'https://open.feishu.cn/open-apis/bot/v2/hook/YOUR_WEBHOOK_KEY_HERE',
+      dingtalk: 'https://oapi.dingtalk.com/robot/send?access_token=YOUR_WEBHOOK_KEY_HERE'
     };
+
+    const WEBHOOK_KEY_PLACEHOLDER = 'YOUR_WEBHOOK_KEY_HERE';
+
+    function isUnconfiguredWebhookUrl(url) {
+      const value = String(url || '').trim();
+      return !value || value.indexOf(WEBHOOK_KEY_PLACEHOLDER) !== -1;
+    }
 
     function loadPersistedConfigs() {
       try {
@@ -4215,6 +4222,12 @@
       const targetPlatform = platformNameMap[platform] || '企业微信群机器人';
       const urlInput = document.getElementById('alertWebhookUrl');
       const targetUrl = (urlInput ? urlInput.value.trim() : ALERT_CONFIG.url) || DEFAULT_WEBHOOK_URLS[platform];
+
+      if (isUnconfiguredWebhookUrl(targetUrl)) {
+        showToast('请先填写真实的 Webhook 机器人地址（替换 YOUR_WEBHOOK_KEY_HERE）后再发送测试告警', '⚠️');
+        if (urlInput) urlInput.focus();
+        return;
+      }
 
       const config = {
         slaMin: parseFloat(document.getElementById('alertSlaInput') ? document.getElementById('alertSlaInput').value : ALERT_CONFIG.slaMin) || ALERT_CONFIG.slaMin,

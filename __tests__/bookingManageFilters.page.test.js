@@ -524,5 +524,44 @@ describe("pages/booking-manage workflow filters", () => {
     page.onUnload()
     expect(page._bookingListRequestTimer).toBeNull()
   })
+
+  test("catches synchronous exceptions when calling wx.cloud.callFunction", () => {
+    global.wx = {
+      showToast: jest.fn(),
+      cloud: {
+        callFunction: jest.fn(() => {
+          throw new Error("test err")
+        })
+      }
+    }
+    const page = createPage(loadPageDefinition())
+
+    page.runBookingMutation({
+      name: "bookingUpdateStatus",
+      data: { id: "booking_1", status: "contacted" }
+    })
+
+    expect(global.wx.showToast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: expect.stringContaining("test err")
+      })
+    )
+
+    page.handleExport()
+
+    expect(global.wx.showToast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: expect.stringContaining("test err")
+      })
+    )
+
+    page.fetchList()
+
+    expect(global.wx.showToast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: expect.stringContaining("test err")
+      })
+    )
+  })
 })
 

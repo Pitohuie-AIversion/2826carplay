@@ -38,7 +38,7 @@
   <view wx:if="{{guideLoading || contentLoading}}" class="content-card ui-card guide-state">内容加载中…</view>
   <view wx:elif="{{guideError}}" class="content-card ui-card guide-state">
     <view>{{guideError}}</view>
-    <button class="ui-btn ui-btn-ghost guide-retry" bindtap="handleGuideRetry">重新加载</button>
+    <button class="ui-btn ui-btn-ghost guide-retry" bindtap="handleGuideRetry" hover-class="content-control-pressed" aria-label="重新加载场景指南">重新加载</button>
   </view>
   <view wx:elif="{{!guideMode && (contentError || !content)}}" class="content-card ui-card guide-state">
     <view>{{contentError || '内容暂未提供'}}</view>

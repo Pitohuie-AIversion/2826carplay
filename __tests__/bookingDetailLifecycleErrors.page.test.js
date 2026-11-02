@@ -132,4 +132,16 @@ describe("booking-detail page lifecycle error paths", () => {
     expect(wx.showToast).toHaveBeenCalledWith({ title: "留证单已导出", icon: "success" })
     expect(jest.getTimerCount()).toBe(0)
   })
+
+  test("onLoad ignores wx.cloud.init errors", () => {
+    wx.cloud.init = jest.fn(() => { throw new Error("cloud init failed") })
+    expect(() => page.onLoad({})).not.toThrow()
+    expect(wx.cloud.init).toHaveBeenCalledTimes(1)
+  })
+
+  test("onLoad ignores wx.getStorageSync errors when loading cached booking detail", () => {
+    wx.getStorageSync = jest.fn(() => { throw new Error("storage sync failed") })
+    expect(() => page.onLoad({ id: "booking_1" })).not.toThrow()
+    expect(wx.getStorageSync).toHaveBeenCalledWith("booking_detail_booking_1")
+  })
 })

@@ -416,8 +416,10 @@ async function savePriceRule(input, openid, isUpdate) {
         if (existing) return existing
       }
       const vehicles = new Map()
-      for (const vehicleId of vehicleIds) {
-        const vehicle = await getDocOrNull(transaction.collection("vehicles"), vehicleId, VEHICLE_FIELDS)
+      const txVehicles = await Promise.all(vehicleIds.map(id => getDocOrNull(transaction.collection("vehicles"), id, VEHICLE_FIELDS)))
+      for (let i = 0; i < vehicleIds.length; i++) {
+        const vehicleId = vehicleIds[i]
+        const vehicle = txVehicles[i]
         if (priceRuleVersion(vehicle) !== priceRuleVersion(expectedVehicles.get(vehicleId))) return { retry: true }
         vehicles.set(vehicleId, vehicle)
       }

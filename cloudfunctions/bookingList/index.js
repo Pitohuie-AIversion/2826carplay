@@ -330,20 +330,29 @@ async function readBookingsByMode(maxRecords, ordered) {
   const list = []
   const safeMaxRecords = Math.min(Number(maxRecords) || 200, MAX_BOOKING_RECORDS)
 
-  for (let offset = 0; offset <= safeMaxRecords; offset += BOOKING_BATCH_SIZE) {
-    const remaining = safeMaxRecords + 1 - list.length
+  const queries = []
+  let currentOffset = 0
+  while (currentOffset <= safeMaxRecords) {
+    const remaining = safeMaxRecords + 1 - currentOffset
     const batchSize = Math.min(BOOKING_BATCH_SIZE, remaining)
-    let query = db.collection("bookings").field(BOOKING_MANAGE_LIST_FIELDS)
-    if (ordered) {
-      query = query.orderBy("createdAt", "desc")
-    }
-    const res = await query.skip(offset).limit(batchSize).get()
-    const batch = res && Array.isArray(res.data) ? res.data : []
+    queries.push({ offset: currentOffset, limit: batchSize })
+    currentOffset += batchSize
+  }
 
+  const results = await Promise.all(
+    queries.map(async ({ offset, limit }) => {
+      let query = db.collection("bookings").field(BOOKING_MANAGE_LIST_FIELDS)
+      if (ordered) {
+        query = query.orderBy("createdAt", "desc")
+      }
+      const res = await query.skip(offset).limit(limit).get()
+      return res && Array.isArray(res.data) ? res.data : []
+    })
+  )
+
+  for (const batch of results) {
     list.push(...batch)
-    if (batch.length < batchSize || list.length > safeMaxRecords) {
-      break
-    }
+    if (batch.length < BOOKING_BATCH_SIZE || list.length > safeMaxRecords) break
   }
 
   return {

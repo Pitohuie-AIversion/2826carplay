@@ -1,19 +1,21 @@
-const { colorize } = require("./_cloudUtil");
+const { colorize, listCloudfunctions } = require("./_cloudUtil");
+
+const fnCount = listCloudfunctions().length;
 
 const CMDS = [
-  ["cloud:audit", "对 56 个云函数逐个执行 npm audit --audit-level=critical 依赖漏洞审计"],
-  ["cloud:sdk:check", "检查 56 个云函数 wx-server-sdk 版本是否与 target（默认 4.0.2）一致", "可选 --target=4.0.2"],
-  ["cloud:sdk:bump", "批量升级 56 个云函数 wx-server-sdk 版本", "必选 --target=VER；默认 dry-run，需显式 --write 才真正写入 package.json"],
-  ["cloud:nm:check", "检查 56 个云函数下是否存在 node_modules 残留"],
-  ["cloud:nm:clean", "删除 56 个云函数下残留的 node_modules 目录", "默认 dry-run，需显式 --apply 才真正删除"],
+  ["cloud:audit", `对 ${fnCount} 个云函数逐个执行 npm audit --audit-level=critical 依赖漏洞审计`],
+  ["cloud:sdk:check", `检查 ${fnCount} 个云函数 wx-server-sdk 版本是否与 target（默认 4.0.2）一致`, "可选 --target=4.0.2"],
+  ["cloud:sdk:bump", `批量升级 ${fnCount} 个云函数 wx-server-sdk 版本`, "必选 --target=VER；默认 dry-run，需显式 --write 才真正写入 package.json"],
+  ["cloud:nm:check", `检查 ${fnCount} 个云函数下是否存在 node_modules 残留`],
+  ["cloud:nm:clean", `删除 ${fnCount} 个云函数下残留的 node_modules 目录`, "默认 dry-run，需显式 --apply 才真正删除"],
   ["cloud:rc:sync", "核对 cloudbaserc.json functions 条目与 cloudfunctions/ 目录双向一致性", "默认 --dry；需 --write 才按默认规格补齐缺失条目"],
-  ["cloud:auth:audit", "审计 56 个云函数权限校验代码，EXPECTED_PUBLIC 白名单 vs UNEXPECTED_PUBLIC"],
-  ["cloud:spec:check", "输出 56 云函数规格体检表（代码行数/日志数/timeout/memorySize/建议）"],
+  ["cloud:auth:audit", `审计 ${fnCount} 个云函数权限校验代码，EXPECTED_PUBLIC 白名单 vs UNEXPECTED_PUBLIC`],
+  ["cloud:spec:check", `输出 ${fnCount} 项云函数规格体检表（代码行数/日志数/timeout/memorySize/建议）`],
   ["cloud:check", "一键汇总 SDK+NM+RC+AUTH 四项检查（不跑耗时的 cloud:audit）"],
   ["cloud:backup", "云数据库异地冷备导出（核心集合/全量16集合归档至 backups/）", "默认 --dry；加 --apply 真正拉取，加 --all 导出全集合"],
   ["cloud:admin:deploy", "构建并一键部署 Web 运营指挥中心大屏至云开发静态托管 CDN", "默认 --dry；加 --apply 真正发布"],
   ["cloud:trigger:check", "巡检 cloudbaserc.json 中配置的自动化 Cron 定时触发器"],
-  ["cloud:deploy", "57 项云函数增量指纹比对 + 本地安全规则文件校验 + Web 后台检查（演练，不改线上）", "--fn=<name> 仅指定函数；--env=<id> 指定环境；三类 --*-only 范围互斥；演练 --clean-cache 保留原缓存"],
+  ["cloud:deploy", `${fnCount} 项云函数增量指纹比对 + 本地安全规则文件校验 + Web 后台检查（演练，不改线上）`, "--fn=<name> 仅指定函数；--env=<id> 指定环境；三类 --*-only 范围互斥；演练 --clean-cache 保留原缓存"],
   ["cloud:deploy:apply", "逐个部署有变化的云函数并发布 Web 后台；安全规则不自动下发，仅打印人工步骤", "真正上传云端；任一失败退出码为 1"],
   ["cloud:help", "输出本帮助"],
 ];

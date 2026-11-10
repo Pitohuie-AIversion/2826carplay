@@ -16,8 +16,23 @@ function run(opts = {}) {
   let pass = 0;
   let fail = 0;
   let skip = 0;
-  console.log(colorize("【云端·56 函数 npm audit 串行执行（critical 及以上）】", "bold"));
+  console.log(colorize(`【云端·${items.length} 函数 npm audit 串行执行（critical 及以上）】`, "bold"));
   console.log(colorize("（逐函数串行，避免并发 spawn 过多导致 Windows 报错）", "gray"));
+
+  let npmAvailable = false;
+  try {
+    child.execSync("npm --version", { stdio: "ignore" });
+    npmAvailable = true;
+  } catch (_) {
+    npmAvailable = false;
+  }
+
+  if (!npmAvailable) {
+    console.log(colorize("⚠️ 当前环境未配置 npm 命令行（仅检测到 Electron Node 宿主），跳过本地 npm audit。该检查会在 CI/CD 环境中自动执行。", "yellow"));
+    if (opts.cli !== false) process.exit(0);
+    return { exitCode: 0, pass: 0, fail: 0, skip: items.length, total: items.length };
+  }
+
   for (let i = 0; i < items.length; i++) {
     const it = items[i];
     const lock = path.join(it.dir, "package-lock.json");

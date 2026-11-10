@@ -307,7 +307,9 @@ function main() {
     failed: results.length - passed,
     expectedContentTypes: CONTENT_TYPES,
     expectedScenarios: SCENARIOS,
-    outputDir: outDir,
+    outputDir: isSummaryUnchanged && existingSummary && existingSummary.outputDir
+      ? existingSummary.outputDir
+      : outDir,
     results
   }
 

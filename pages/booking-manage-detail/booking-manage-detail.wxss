@@ -6,7 +6,7 @@
 .conflict-card,
 .note-card,
 .action-card { padding: 26rpx 24rpx; margin-bottom: 18rpx; box-sizing: border-box; }
-.coordination-card { border-color: rgba(88, 137, 211, 0.16); background: linear-gradient(145deg, rgba(27, 37, 52, 0.96), rgba(19, 22, 27, 0.98)); }
+.coordination-card { border-color: rgba(88, 137, 211, 0.22); background: linear-gradient(145deg, rgba(27, 37, 52, 0.96), rgba(19, 22, 27, 0.98)); box-shadow: 0 20rpx 48rpx rgba(0, 0, 0, 0.3), inset 0 1rpx 0 rgba(88, 137, 211, 0.18); }
 .coordination-heading,
 .coordination-options { display: flex; align-items: center; }
 .coordination-heading { justify-content: space-between; }
@@ -50,7 +50,7 @@
 .help-info-mark { position: relative; width: 3rpx; height: 9rpx; margin-top: 5rpx; border-radius: 2rpx; background: currentColor; }
 .help-info-mark::before { position: absolute; top: -6rpx; left: 0; width: 3rpx; height: 3rpx; border-radius: 50%; background: currentColor; content: ""; }
 .conflict-card { border-color: rgba(92, 137, 202, 0.13); }
-.conflict-card-warning { border-color: rgba(232, 157, 78, 0.22); background: linear-gradient(145deg, rgba(63, 45, 28, 0.52), rgba(23, 24, 27, 0.96)); }
+.conflict-card-warning { border-color: rgba(232, 157, 78, 0.28); background: linear-gradient(145deg, rgba(63, 45, 28, 0.52), rgba(23, 24, 27, 0.96)); box-shadow: 0 20rpx 48rpx rgba(0, 0, 0, 0.32), inset 0 1rpx 0 rgba(232, 157, 78, 0.2); }
 .conflict-heading,
 .conflict-item-top,
 .conflict-clear,

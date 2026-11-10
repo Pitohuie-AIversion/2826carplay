@@ -5,7 +5,8 @@
 .desc { font-size: 22rpx; color: rgba(255, 255, 255, 0.7); margin-top: 8rpx; line-height: 1.6; word-break: break-word; }
 .filter-card { padding: 20rpx; margin-bottom: 18rpx; }
 .dashboard-card { padding: 20rpx; margin-bottom: 18rpx; }
-.keyword-input { width: 100%; box-sizing: border-box; }
+.keyword-input { width: 100%; box-sizing: border-box; transition: border-color 150ms ease, box-shadow 150ms ease; }
+.keyword-input:focus { border-color: rgba(84, 143, 255, 0.55); box-shadow: 0 0 0 5rpx rgba(84, 143, 255, 0.12), 0 8rpx 20rpx rgba(0, 0, 0, 0.25); }
 .status-row { display: flex; flex-wrap: wrap; margin-top: 18rpx; }
 .status-chip { max-width: 220rpx; font-size: 22rpx; line-height: 1.3; padding: 10rpx 16rpx; margin-right: 14rpx; margin-bottom: 12rpx; box-sizing: border-box; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .workflow-filter { margin-top: 12rpx; padding-top: 16rpx; border-top: 1rpx solid rgba(255, 255, 255, 0.055); }
@@ -33,7 +34,7 @@
 .dashboard-title { font-size: 30rpx; font-weight: 600; line-height: 1.35; }
 .dashboard-desc { margin-top: 8rpx; font-size: 22rpx; line-height: 1.6; color: rgba(255, 255, 255, 0.7); word-break: break-word; }
 .summary-grid { display: flex; flex-wrap: wrap; margin: 0 -6rpx 4rpx; }
-.summary-item { width: calc(50% - 12rpx); margin: 0 6rpx 12rpx; padding: 24rpx 20rpx 22rpx; border-radius: 16rpx; border: 1rpx solid rgba(255, 255, 255, 0.08); background: rgba(255, 255, 255, 0.04); box-sizing: border-box; }
+.summary-item { width: calc(50% - 12rpx); margin: 0 6rpx 12rpx; padding: 24rpx 20rpx 22rpx; border-radius: 16rpx; border: 1rpx solid rgba(255, 255, 255, 0.08); background: rgba(255, 255, 255, 0.04); box-shadow: 0 12rpx 28rpx rgba(0, 0, 0, 0.22), inset 0 1rpx 0 rgba(255, 255, 255, 0.06); box-sizing: border-box; }
 .summary-value { font-size: 46rpx; font-weight: 700; line-height: 1.06; color: #ffffff; }
 .summary-label { margin-top: 10rpx; font-size: 22rpx; line-height: 1.5; color: #9fa5b0; }
 .ratio-card,

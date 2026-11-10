@@ -286,7 +286,7 @@
 .description-input:focus {
   border-color: rgba(84, 143, 255, 0.55);
   background: #121720;
-  box-shadow: 0 0 0 5rpx rgba(84, 143, 255, 0.08);
+  box-shadow: 0 0 0 5rpx rgba(84, 143, 255, 0.14), 0 8rpx 20rpx rgba(0, 0, 0, 0.25);
 }
 .description-input-ready {
   border-color: rgba(84, 143, 255, 0.24);
@@ -582,7 +582,8 @@
 .request-overview {
   margin-top: 20rpx;
   padding: 24rpx;
-  border-color: rgba(82, 143, 255, 0.14);
+  border-color: rgba(82, 143, 255, 0.18);
+  box-shadow: 0 16rpx 40rpx rgba(0, 0, 0, 0.28), inset 0 1rpx 0 rgba(82, 143, 255, 0.14);
   background:
     radial-gradient(circle at 92% 0%, rgba(75, 132, 224, 0.1), transparent 42%),
     rgba(20, 25, 33, 0.96);
@@ -672,6 +673,7 @@
 }
 .record-card {
   background: linear-gradient(145deg, #181d24, #14171c 74%);
+  box-shadow: 0 16rpx 40rpx rgba(0, 0, 0, 0.28), inset 0 1rpx 0 rgba(255, 255, 255, 0.06);
 }
 .record-head {
   display: flex;

@@ -8,7 +8,7 @@
 .openid-input[disabled]{opacity:0.58;}
 .permission-row{display:flex;gap:14rpx;margin-top:20rpx;}
 .permission-option{display:flex;align-items:center;flex:1;min-width:0;padding:20rpx 17rpx;border:1rpx solid rgba(255,255,255,0.07);border-radius:18rpx;background:rgba(255,255,255,0.022);transition:opacity 120ms ease,transform 120ms ease,border-color 150ms ease,background 150ms ease;}
-.permission-option-active{border-color:rgba(82,143,255,0.42);background:linear-gradient(145deg,rgba(55,112,204,0.15),rgba(55,112,204,0.055));box-shadow:0 12rpx 28rpx rgba(20,69,145,0.12);}
+.permission-option-active{border-color:rgba(82,143,255,0.48);background:linear-gradient(145deg,rgba(55,112,204,0.18),rgba(55,112,204,0.065));box-shadow:0 12rpx 28rpx rgba(20,69,145,0.18),inset 0 1rpx 0 rgba(101,157,243,0.22);}
 .permission-option-pressed{opacity:0.76;transform:scale(0.98);}
 .permission-option-disabled{opacity:0.52;}
 .permission-option-icon{display:flex;align-items:center;justify-content:center;flex-shrink:0;width:48rpx;height:48rpx;border:1rpx solid rgba(100,146,215,0.18);border-radius:15rpx;background:rgba(70,121,199,0.08);color:#789bce;}
@@ -73,10 +73,11 @@
 .role-complete-native-icon::after{position:absolute;top:3rpx;left:6rpx;width:4rpx;height:8rpx;border-right:2rpx solid currentColor;border-bottom:2rpx solid currentColor;content:"";transform:rotate(45deg);}
 .role-page.management-page .hero-card,.role-page.management-page .form-card,.role-page.management-page .list-card{margin-bottom:22rpx;padding:28rpx;border-color:rgba(255,255,255,0.075);border-radius:26rpx;}
 .role-page.management-page .form-card,.role-page.management-page .list-card{background:#15181d;}
-.role-page.management-page .openid-input{height:82rpx;margin-top:4rpx;}
+.role-page.management-page .openid-input{height:82rpx;margin-top:4rpx;transition:border-color 150ms ease,box-shadow 150ms ease;}
+.role-page.management-page .openid-input:focus{border-color:rgba(84,143,255,0.55);box-shadow:0 0 0 5rpx rgba(84,143,255,0.12),0 8rpx 20rpx rgba(0,0,0,0.25);}
 .role-page.management-page .form-tip,.role-page.management-page .section-desc,.role-page.management-page .role-permission,.role-page.management-page .loading-text,.role-page.management-page .empty-desc{color:#737e8c;font-size:21rpx;}
 .role-page.management-page .save-btn,.role-page.management-page .reset-btn,.role-page.management-page .load-more-btn{height:82rpx;border-radius:18rpx;font-size:23rpx;line-height:82rpx;}
-.role-page.management-page .role-item{margin-bottom:12rpx;padding:20rpx;border:1rpx solid rgba(255,255,255,0.065);border-radius:18rpx;background:rgba(255,255,255,0.025);}
+.role-page.management-page .role-item{margin-bottom:12rpx;padding:20rpx;border:1rpx solid rgba(255,255,255,0.075);border-radius:18rpx;background:rgba(255,255,255,0.028);box-shadow:0 8rpx 20rpx rgba(0,0,0,0.2),inset 0 1rpx 0 rgba(255,255,255,0.06);}
 .role-page.management-page .role-openid{color:#e5e9ef;font-family:monospace;font-size:21rpx;}
 .role-page.management-page .admin-tag{border:1rpx solid rgba(84,143,255,0.24);background:rgba(47,128,237,0.1);color:#83b0fb;}
 .role-skeleton{margin-top:20rpx;}

@@ -17,7 +17,8 @@
 .config-page.management-page .form-card{background:#15181d;}
 .config-page.management-page .form-item{margin-top:24rpx;}
 .config-page.management-page .form-label{margin-bottom:10rpx;color:#c8cdd5;font-size:22rpx;font-weight:500;}
-.config-page.management-page .form-input,.config-page.management-page .form-textarea{margin-top:0;border-color:rgba(255,255,255,0.09);border-radius:18rpx;background:#101318;color:#edf0f4;font-size:23rpx;}
+.config-page.management-page .form-input,.config-page.management-page .form-textarea{margin-top:0;border-color:rgba(255,255,255,0.09);border-radius:18rpx;background:#101318;color:#edf0f4;font-size:23rpx;transition:border-color 150ms ease,box-shadow 150ms ease;}
+.config-page.management-page .form-input:focus,.config-page.management-page .form-textarea:focus{border-color:rgba(84,143,255,0.55);box-shadow:0 0 0 5rpx rgba(84,143,255,0.12),0 8rpx 20rpx rgba(0,0,0,0.25);}
 .config-page.management-page .form-input{height:82rpx;}
 .config-page.management-page .form-textarea{min-height:156rpx;padding:20rpx;}
 .config-page.management-page .form-textarea-lg{min-height:230rpx;}
@@ -75,7 +76,7 @@
 .template-state-active .template-state-icon{border-color:#62c28f;background:#62c28f;}
 .template-state-check{position:absolute;top:2rpx;left:5rpx;width:4rpx;height:8rpx;border-right:2rpx solid transparent;border-bottom:2rpx solid transparent;transform:rotate(45deg);}
 .template-state-active .template-state-check{border-color:#ffffff;}
-.action-dock{position:sticky;z-index:8;bottom:calc(env(safe-area-inset-bottom) + 12rpx);margin-top:8rpx;padding:22rpx;border-color:rgba(91,143,224,0.2);border-radius:25rpx;background:rgba(20,25,33,0.97);box-shadow:0 22rpx 54rpx rgba(0,0,0,0.35);box-sizing:border-box;}
+.action-dock{position:sticky;z-index:8;bottom:calc(env(safe-area-inset-bottom) + 12rpx);margin-top:8rpx;padding:22rpx;border-color:rgba(91,143,224,0.25);border-radius:25rpx;background:rgba(20,25,33,0.92);backdrop-filter:blur(24rpx);box-shadow:0 22rpx 54rpx rgba(0,0,0,0.4),inset 0 1rpx 0 rgba(91,143,224,0.2);box-sizing:border-box;}
 .save-state{display:flex;align-items:center;}
 .save-state-mark{position:relative;display:flex;align-items:center;justify-content:center;flex-shrink:0;width:43rpx;height:43rpx;margin-right:14rpx;border:1rpx solid rgba(91,190,139,0.25);border-radius:14rpx;background:rgba(71,173,120,0.1);color:#6dca99;}
 .save-state-mark-dirty{border-color:rgba(224,170,79,0.3);background:rgba(194,134,44,0.12);color:#e3b35f;}
@@ -97,7 +98,7 @@
 .service-hubs-heading,.service-hub-heading{display:flex;align-items:center;justify-content:space-between;gap:16rpx;margin-top:26rpx;}
 .service-hubs-heading .form-label{margin:0;}
 .hub-add-btn{flex-shrink:0;margin:0;padding:0 22rpx;height:66rpx;line-height:66rpx;font-size:22rpx;}
-.service-hub-card{margin-top:22rpx;padding:22rpx;border:1rpx solid rgba(255,255,255,0.09);border-radius:20rpx;background:#11151b;}
+.service-hub-card{margin-top:22rpx;padding:22rpx;border:1rpx solid rgba(255,255,255,0.09);border-radius:20rpx;background:#11151b;box-shadow:0 12rpx 28rpx rgba(0,0,0,0.22),inset 0 1rpx 0 rgba(255,255,255,0.06);}
 .service-hub-heading{margin-top:0;}
 .service-hub-title{font-size:25rpx;color:#edf0f4;}
 .hub-remove-btn{margin:0;padding:0 18rpx;background:transparent;color:#e39898;font-size:22rpx;line-height:54rpx;}

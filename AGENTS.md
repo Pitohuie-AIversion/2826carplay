@@ -23,4 +23,4 @@
 
 - **严守 1.75 MiB 安全水位线**：主包体积硬性上限为 2.0 MiB，开发时严禁将大于 100 KB 的未压缩位图、大体积离线字典或全量测试脚本打入主包。管理端功能统一收敛至 `pages-admin` 独立分包。
 - **发布前执行体积校验**：任何涉及页面增删或依赖调整的改动，必须运行 `npm run check:package`，确保主包保持在 1.75 MiB 安全警戒线以下。
-- **全量无头点击自动化回归**：提交核心页面修改后，必须运行 `npm run simulate:clicks`（`node scripts/simulateAllComponentClicks.js`），确保全量 26 个页面的 320+ 项用户交互点击断言 100% 通过。
+- **全量无头点击自动化回归**：提交核心页面修改后，必须运行 `npm run simulate:clicks`（`node scripts/simulateAllComponentClicks.js`），确保全量 26 个页面的 369 项用户交互点击断言 100% 通过。

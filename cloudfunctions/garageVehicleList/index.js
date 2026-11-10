@@ -347,19 +347,23 @@ async function readVehiclesByMode(ordered) {
   }
 }
 
+function logFallbackWarn(stage, error) {
+  console.warn({
+    function: "garageVehicleList",
+    stage,
+    errorMessage:
+      error && (error.message || error.errMsg)
+        ? error.message || error.errMsg
+        : String(error),
+    createdAt: new Date().toISOString()
+  })
+}
+
 async function readVehicles() {
   try {
     return await readVehiclesByMode(true)
   } catch (indexError) {
-    console.warn({
-      function: "garageVehicleList",
-      stage: "indexFallback",
-      errorMessage:
-        indexError && (indexError.message || indexError.errMsg)
-          ? indexError.message || indexError.errMsg
-          : String(indexError),
-      createdAt: new Date().toISOString()
-    })
+    logFallbackWarn("indexFallback", indexError)
     return readVehiclesByMode(false)
   }
 }
@@ -393,15 +397,7 @@ async function queryNativePageWithFallback(page, pageSize) {
   try {
     return await queryNativePage(page, pageSize, true)
   } catch (indexError) {
-    console.warn({
-      function: "garageVehicleList",
-      stage: "nativeOrderByFallback",
-      errorMessage:
-        indexError && (indexError.message || indexError.errMsg)
-          ? indexError.message || indexError.errMsg
-          : String(indexError),
-      createdAt: new Date().toISOString()
-    })
+    logFallbackWarn("nativeOrderByFallback", indexError)
     // Without the ordering index, sort the complete bounded fallback dataset.
     // Sorting each independently selected page would omit newer vehicles.
     throw indexError
@@ -499,15 +495,7 @@ async function queryStatsProjectionWithFallback() {
   try {
     return await queryStatsProjection(true)
   } catch (indexError) {
-    console.warn({
-      function: "garageVehicleList",
-      stage: "statsOrderByFallback",
-      errorMessage:
-        indexError && (indexError.message || indexError.errMsg)
-          ? indexError.message || indexError.errMsg
-          : String(indexError),
-      createdAt: new Date().toISOString()
-    })
+    logFallbackWarn("statsOrderByFallback", indexError)
     return queryStatsProjection(false)
   }
 }
@@ -681,15 +669,7 @@ exports.main = async (event) => {
     try {
       return await runNativeOptimized(page, pageSize, keyword, category, availableOnly, skipStats, city, sortBy)
     } catch (nativeError) {
-      console.warn({
-        function: "garageVehicleList",
-        stage: "nativeToLegacyFallback",
-        errorMessage:
-          nativeError && (nativeError.message || nativeError.errMsg)
-            ? nativeError.message || nativeError.errMsg
-            : String(nativeError),
-        createdAt: new Date().toISOString()
-      })
+      logFallbackWarn("nativeToLegacyFallback", nativeError)
       return await runLegacyFallback(page, pageSize, keyword, category, availableOnly, city, sortBy)
     }
   } catch (error) {

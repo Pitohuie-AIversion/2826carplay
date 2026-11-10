@@ -64,9 +64,9 @@
 .action-row{align-items:center;margin-top:8rpx;}
 .primary-button,.secondary-button{width:calc(50% - 8rpx);height:88rpx;padding:0 16rpx;font-size:26rpx;line-height:88rpx;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .vehicle-detail-page.management-page .hero-card,.vehicle-detail-page.management-page .summary-card,.vehicle-detail-page.management-page .section-card,.vehicle-detail-page.management-page .loading-card{margin-bottom:22rpx;border-color:rgba(255,255,255,0.075);border-radius:26rpx;}
-.vehicle-detail-page.management-page .summary-card{border-color:rgba(84,136,220,0.14);background:linear-gradient(145deg,#19202a,#14171c 75%);}
+.vehicle-detail-page.management-page .summary-card{border-color:rgba(84,136,220,0.2);background:linear-gradient(145deg,#19202a,#14171c 75%);box-shadow:0 20rpx 46rpx rgba(0,0,0,0.28),inset 0 1rpx 0 rgba(84,136,220,0.15);}
 .vehicle-detail-page.management-page .section-card{background:#15181d;}
-.vehicle-detail-page.management-page .info-item-inner,.vehicle-detail-page.management-page .note-box,.vehicle-detail-page.management-page .image-card,.vehicle-detail-page.management-page .empty-image-box{border-color:rgba(255,255,255,0.065);border-radius:18rpx;background:rgba(255,255,255,0.025);}
+.vehicle-detail-page.management-page .info-item-inner,.vehicle-detail-page.management-page .note-box,.vehicle-detail-page.management-page .image-card,.vehicle-detail-page.management-page .empty-image-box{border-color:rgba(255,255,255,0.075);border-radius:18rpx;background:rgba(255,255,255,0.028);box-shadow:0 8rpx 20rpx rgba(0,0,0,0.2),inset 0 1rpx 0 rgba(255,255,255,0.06);}
 .vehicle-detail-page.management-page .vehicle-image{border-radius:16rpx;}
 .vehicle-detail-page.management-page .status-op-btn,.vehicle-detail-page.management-page .mini-button{border-radius:16rpx;background:#101318;}
 .vehicle-detail-page.management-page .primary-button,.vehicle-detail-page.management-page .secondary-button{border-radius:20rpx;}

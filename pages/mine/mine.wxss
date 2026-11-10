@@ -13,12 +13,12 @@
 .member-services,
 .operation-pulse,
 .section-card { margin-bottom: 22rpx; padding: 30rpx; box-sizing: border-box; }
-.profile-card { position: relative; display: flex; align-items: center; overflow: hidden; min-height: 190rpx; }
-.member-services { overflow: hidden; border-color: rgba(90, 145, 230, 0.15); background: radial-gradient(circle at 8% 0%, rgba(78, 132, 216, 0.1), transparent 38%), rgba(18, 23, 31, 0.94); }
+.profile-card { position: relative; display: flex; align-items: center; overflow: hidden; min-height: 190rpx; border: 1rpx solid rgba(255, 255, 255, 0.08); border-radius: 26rpx; background: linear-gradient(145deg, #191f2a, #13171e 75%); box-shadow: 0 20rpx 48rpx rgba(0, 0, 0, 0.32), inset 0 1rpx 0 rgba(255, 255, 255, 0.08); }
+.member-services { overflow: hidden; border-color: rgba(90, 145, 230, 0.18); background: radial-gradient(circle at 8% 0%, rgba(78, 132, 216, 0.12), transparent 38%), rgba(18, 23, 31, 0.94); box-shadow: 0 16rpx 40rpx rgba(0, 0, 0, 0.32), inset 0 1rpx 0 rgba(90, 145, 230, 0.18); }
 .member-services-heading { padding-bottom: 20rpx; }
 .member-services-note { flex-shrink: 0; margin-left: 18rpx; color: #68768a; font-size: 16rpx; line-height: 1.4; }
 .member-shortcuts { display: flex; gap: 12rpx; }
-.member-shortcut { position: relative; flex: 1; min-width: 0; padding: 18rpx 15rpx 17rpx; overflow: hidden; border: 1rpx solid rgba(255, 255, 255, 0.075); border-radius: 18rpx; background: rgba(255, 255, 255, 0.026); transition: opacity 120ms ease, transform 120ms ease; box-sizing: border-box; }
+.member-shortcut { position: relative; flex: 1; min-width: 0; padding: 18rpx 15rpx 17rpx; overflow: hidden; border: 1rpx solid rgba(255, 255, 255, 0.08); border-radius: 18rpx; background: rgba(255, 255, 255, 0.026); box-shadow: 0 8rpx 20rpx rgba(0, 0, 0, 0.18), inset 0 1rpx 0 rgba(255, 255, 255, 0.06); transition: opacity 120ms ease, transform 120ms ease; box-sizing: border-box; }
 .member-shortcut::after { position: absolute; right: -28rpx; bottom: -42rpx; width: 100rpx; height: 100rpx; border-radius: 50%; background: rgba(92, 149, 239, 0.06); content: ""; }
 .member-shortcut-green::after { background: rgba(94, 191, 142, 0.055); }
 .member-shortcut-violet::after { background: rgba(151, 115, 222, 0.06); }
@@ -67,7 +67,7 @@
 .profile-access.profile-role-operations .profile-access-dot { background: #65b187; box-shadow: 0 0 12rpx rgba(101, 177, 135, 0.42); }
 .profile-access.profile-role-loading .profile-access-dot { background: #77818e; animation: profileAccessPulse 1.2s ease-in-out infinite; }
 .profile-watermark { position: absolute; right: -28rpx; bottom: -48rpx; width: 190rpx; height: 190rpx; border-radius: 50%; opacity: 0.07; }
-.operation-pulse { overflow: hidden; border-color: rgba(84, 143, 255, 0.18); background: radial-gradient(circle at 88% 0%, rgba(70, 129, 224, 0.14), transparent 42%), rgba(20, 27, 37, 0.94); transition: opacity 120ms ease, transform 120ms ease; }
+.operation-pulse { overflow: hidden; border-color: rgba(84, 143, 255, 0.22); background: radial-gradient(circle at 88% 0%, rgba(70, 129, 224, 0.16), transparent 42%), rgba(20, 27, 37, 0.94); box-shadow: 0 18rpx 44rpx rgba(0, 0, 0, 0.32), inset 0 1rpx 0 rgba(84, 143, 255, 0.2); transition: opacity 120ms ease, transform 120ms ease; }
 .operation-pulse-priority::before { position: absolute; top: 28rpx; bottom: 28rpx; left: 0; width: 4rpx; border-radius: 0 999rpx 999rpx 0; background: #528fff; box-shadow: 0 0 18rpx rgba(82, 143, 255, 0.42); content: ""; }
 .operation-pulse-pressed { opacity: 0.78; transform: scale(0.992); }
 .operation-pulse-top,

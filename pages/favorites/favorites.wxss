@@ -5,7 +5,7 @@
 .favorite-list,
 .empty-card,
 .loading-list { position: relative; z-index: 1; }
-.hero-card { margin-bottom: 24rpx; padding: 30rpx; border-color: rgba(96, 148, 232, 0.18); }
+.hero-card { margin-bottom: 24rpx; padding: 30rpx; border-color: rgba(96, 148, 232, 0.22); box-shadow: 0 20rpx 48rpx rgba(0, 0, 0, 0.32), inset 0 1rpx 0 rgba(96, 148, 232, 0.18); }
 .hero-top { display: flex; align-items: center; justify-content: space-between; }
 .page-kicker,
 .empty-kicker { color: #6b809e; font-size: 15rpx; font-weight: 650; line-height: 1.4; letter-spacing: 2.5rpx; }
@@ -13,7 +13,7 @@
 .hero-desc { margin-top: 10rpx; padding-right: 18rpx; color: #8995a5; font-size: 21rpx; line-height: 1.6; }
 .hero-emblem,
 .empty-emblem { flex-shrink: 0; width: 78rpx; height: 78rpx; border: 1rpx solid rgba(105, 155, 236, 0.25); border-radius: 50%; }
-.collection-overview { margin-bottom: 24rpx; padding: 25rpx; border-color: rgba(96, 148, 232, 0.14); background: radial-gradient(circle at 90% 0%, rgba(67, 123, 211, 0.11), transparent 44%), rgba(18, 23, 31, 0.92); }
+.collection-overview { margin-bottom: 24rpx; padding: 25rpx; border-color: rgba(96, 148, 232, 0.18); background: radial-gradient(circle at 90% 0%, rgba(67, 123, 211, 0.14), transparent 44%), rgba(18, 23, 31, 0.94); box-shadow: 0 16rpx 40rpx rgba(0, 0, 0, 0.32), inset 0 1rpx 0 rgba(96, 148, 232, 0.16); }
 .collection-summary { display: flex; align-items: center; justify-content: space-between; }
 .summary-kicker { color: #62738b; font-size: 14rpx; font-weight: 650; line-height: 1.4; letter-spacing: 2.2rpx; }
 .summary-title { margin-top: 7rpx; color: #edf2f8; font-size: 25rpx; font-weight: 650; line-height: 1.4; }
@@ -27,10 +27,10 @@
 .filter-count-active { border-color: rgba(255, 255, 255, 0.16); background: rgba(255, 255, 255, 0.14); color: #ffffff; }
 .filter-button-pressed { opacity: 0.72; transform: scale(0.975); }
 .filter-button::after { border: 0; }
-.filter-button-active { background: linear-gradient(135deg, rgba(57, 115, 209, 0.88), rgba(54, 91, 153, 0.86)); color: #f7faff; box-shadow: 0 8rpx 20rpx rgba(30, 78, 151, 0.24); }
+.filter-button-active { background: linear-gradient(135deg, rgba(57, 115, 209, 0.88), rgba(54, 91, 153, 0.86)); color: #f7faff; box-shadow: 0 8rpx 20rpx rgba(30, 78, 151, 0.3), inset 0 1rpx 0 rgba(255, 255, 255, 0.2); }
 .favorite-item { position: relative; margin-bottom: 22rpx; }
 .favorite-action-row { display: flex; justify-content: flex-end; margin-top: -12rpx; }
-.remove-button { min-width: 116rpx; height: 48rpx; margin: 0; padding: 0 18rpx; border: 1rpx solid rgba(255, 255, 255, 0.16); border-radius: 999rpx; background: rgba(10, 13, 18, 0.72); color: #aeb8c6; font-size: 17rpx; line-height: 48rpx; backdrop-filter: blur(12rpx); transition: opacity 120ms ease, transform 120ms ease; }
+.remove-button { min-width: 116rpx; height: 48rpx; margin: 0; padding: 0 18rpx; border: 1rpx solid rgba(255, 255, 255, 0.18); border-radius: 999rpx; background: rgba(10, 13, 18, 0.72); color: #c5d0de; font-size: 17rpx; line-height: 48rpx; backdrop-filter: blur(14rpx); box-shadow: 0 6rpx 16rpx rgba(0, 0, 0, 0.25), inset 0 1rpx 0 rgba(255, 255, 255, 0.12); transition: opacity 120ms ease, transform 120ms ease; }
 .remove-button-pressed { opacity: 0.72; transform: scale(0.975); }
 .remove-button::after { border: 0; }
 .favorite-action-content { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; line-height: 1; }

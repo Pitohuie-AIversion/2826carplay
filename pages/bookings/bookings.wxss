@@ -12,7 +12,7 @@
 .page-desc { margin-top: 8rpx; color: #838d9b; font-size: 22rpx; line-height: 1.55; }
 .header-emblem { flex-shrink: 0; width: 82rpx; height: 82rpx; margin-left: 22rpx; border: 1rpx solid rgba(105, 154, 235, 0.25); border-radius: 50%; box-shadow: 0 12rpx 32rpx rgba(0, 0, 0, 0.28); }
 .list-heading { display: flex; align-items: flex-end; justify-content: space-between; margin: 2rpx 8rpx 20rpx; }
-.journey-summary { margin-bottom: 20rpx; padding: 18rpx 16rpx 16rpx; border-color: rgba(95, 147, 231, 0.13); background: rgba(20, 27, 37, 0.94); }
+.journey-summary { margin-bottom: 20rpx; padding: 18rpx 16rpx 16rpx; border-color: rgba(95, 147, 231, 0.18); background: rgba(20, 27, 37, 0.94); box-shadow: 0 16rpx 40rpx rgba(0, 0, 0, 0.32), inset 0 1rpx 0 rgba(95, 147, 231, 0.2); }
 .journey-summary-caption { margin-bottom: 16rpx; color: #5d6c82; font-size: 14rpx; font-weight: 600; line-height: 1.4; text-align: center; letter-spacing: 2rpx; }
 .journey-summary-grid { display: flex; align-items: center; }
 .journey-summary-item { flex: 1; min-width: 0; text-align: center; }
@@ -32,10 +32,10 @@
 .booking-filter { flex: 1; min-width: 0; height: 58rpx; margin: 0; padding: 0 5rpx; border: 0; border-radius: 12rpx; background: transparent; color: #697586; font-size: 16rpx; line-height: 58rpx; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: opacity 120ms ease, transform 120ms ease; }
 .booking-filter-pressed { opacity: 0.72; transform: scale(0.975); }
 .booking-filter::after { border: 0; }
-.booking-filter-active { background: linear-gradient(135deg, rgba(58, 118, 214, 0.22), rgba(47, 88, 153, 0.14)); color: #a6c7fb; box-shadow: 0 8rpx 18rpx rgba(27, 68, 133, 0.12); }
+.booking-filter-active { background: linear-gradient(135deg, rgba(58, 118, 214, 0.24), rgba(47, 88, 153, 0.16)); color: #a6c7fb; box-shadow: 0 8rpx 18rpx rgba(27, 68, 133, 0.2), inset 0 1rpx 0 rgba(255, 255, 255, 0.12); }
 .list-title { margin-top: 4rpx; color: #f4f6f9; font-size: 30rpx; font-weight: 650; line-height: 1.4; }
 .list-count { padding-bottom: 4rpx; color: #66717f; font-size: 19rpx; line-height: 1.4; }
-.booking-item { position: relative; margin-bottom: 20rpx; padding: 28rpx; overflow: hidden; border-color: rgba(255, 255, 255, 0.075); background: linear-gradient(145deg, #181d25, #14171c 72%); box-sizing: border-box; }
+.booking-item { position: relative; margin-bottom: 20rpx; padding: 28rpx; overflow: hidden; border-color: rgba(255, 255, 255, 0.08); background: linear-gradient(145deg, #181d25, #14171c 72%); box-shadow: 0 18rpx 44rpx rgba(0, 0, 0, 0.28), inset 0 1rpx 0 rgba(255, 255, 255, 0.06); box-sizing: border-box; }
 .booking-accent { position: absolute; top: 30rpx; left: 0; width: 5rpx; height: 56rpx; border-radius: 0 999rpx 999rpx 0; background: #528fff; box-shadow: 0 0 20rpx rgba(82, 143, 255, 0.35); }
 .booking-accent-contacted { background: #57ba89; box-shadow: 0 0 20rpx rgba(87, 186, 137, 0.3); }
 .booking-accent-completed { background: #4f9f72; box-shadow: 0 0 18rpx rgba(79, 159, 114, 0.22); }

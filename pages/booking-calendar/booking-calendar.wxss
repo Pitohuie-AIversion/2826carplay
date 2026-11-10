@@ -185,9 +185,10 @@
   align-items: center;
   margin: -5rpx 0 22rpx;
   padding: 18rpx 21rpx;
-  border: 1rpx solid rgba(235, 157, 75, 0.22);
+  border: 1rpx solid rgba(235, 157, 75, 0.26);
   border-radius: 18rpx;
   background: rgba(213, 127, 38, 0.08);
+  box-shadow: 0 12rpx 28rpx rgba(0, 0, 0, 0.22), inset 0 1rpx 0 rgba(235, 157, 75, 0.18);
   color: #dca05f;
   font-size: 17rpx;
   line-height: 1.55;
@@ -224,6 +225,8 @@
 .summary-card {
   width: calc(33.333% - 9rpx);
   padding: 18rpx 10rpx 21rpx;
+  border-radius: 18rpx;
+  box-shadow: 0 12rpx 28rpx rgba(0, 0, 0, 0.22), inset 0 1rpx 0 rgba(255, 255, 255, 0.06);
   text-align: center;
   box-sizing: border-box;
 }
@@ -972,9 +975,10 @@
   justify-content: space-between;
   gap: 18rpx;
   padding: 18rpx;
-  border: 1rpx solid rgba(255, 255, 255, 0.07);
+  border: 1rpx solid rgba(255, 255, 255, 0.08);
   border-radius: 16rpx;
-  background: rgba(255, 255, 255, 0.025);
+  background: rgba(255, 255, 255, 0.028);
+  box-shadow: 0 8rpx 20rpx rgba(0, 0, 0, 0.2), inset 0 1rpx 0 rgba(255, 255, 255, 0.06);
 }
 .resource-main {
   min-width: 0;
@@ -1031,6 +1035,12 @@
   color: #cbd5e2;
   font-size: 19rpx;
   box-sizing: border-box;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.calendar-form-control:focus,
+.calendar-form-textarea:focus {
+  border-color: rgba(84, 143, 255, 0.55);
+  box-shadow: 0 0 0 5rpx rgba(84, 143, 255, 0.12), 0 8rpx 20rpx rgba(0, 0, 0, 0.25);
 }
 .calendar-form-control-pressed {
   border-color: rgba(91, 143, 210, 0.35);

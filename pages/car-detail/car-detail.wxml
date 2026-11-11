@@ -356,7 +356,7 @@
         <view class="trust-channel-row"><text>服务品牌</text><text>{{brandName}}</text></view>
         <view class="trust-channel-row"><text>客服、监督与投诉</text><text>{{servicePhone || '电话暂未提供'}}</text></view>
         <view class="trust-channel-note">经营主体材料可通过该渠道进一步核验；来电由人工登记处理，不承诺实时道路救援调度。</view>
-        <button class="trust-channel-call ui-btn ui-btn-ghost" bindtap="handlePhoneCall">电话咨询 / 投诉</button>
+        <button class="trust-channel-call ui-btn ui-btn-ghost" bindtap="handlePhoneCall" hover-class="button-hover" aria-label="拨打人工服务电话进行咨询或投诉">电话咨询 / 投诉</button>
       </view>
     </view>
   </view>
@@ -452,7 +452,7 @@
           </view>
         </view>
       </view>
-      <button class="privilege-confirm-btn ui-btn ui-btn-primary" bindtap="handleClosePrivilegeModal">我知道了</button>
+      <button class="privilege-confirm-btn ui-btn ui-btn-primary" bindtap="handleClosePrivilegeModal" hover-class="button-hover">我知道了</button>
     </view>
   </view>
 </view>

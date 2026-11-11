@@ -444,10 +444,10 @@ pages/garage/garage
 ## 常用命令与自动化验证 (CLI Playbook)
 
 ```bash
-# 执行完整自动化测试套件 (154 suites / 1841 tests)
+# 执行完整自动化测试套件 (203 suites / 3299 tests)
 npm test
 
-# 执行全量 26 个页面与组件的 333 项无头用户交互点击仿真
+# 执行全量 26 个页面与组件的 369 项无头用户交互点击仿真
 npm run simulate:clicks
 
 # 实时监测小程序真实主包与分包体积 (严守 1.75 MiB 安全线)

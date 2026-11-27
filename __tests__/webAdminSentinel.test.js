@@ -799,7 +799,7 @@ describe('Web Admin Gateway Sentinel & Operations Center', () => {
     ).toEqual(secretScan.findContentViolations(placeholderSample, 'cfg.js'));
   });
 
-  test('云函数 Node.js 运行时生命周期守卫、37条推荐索引清单与全栈增量发布参数守卫与 scripts 完全一致', () => {
+  test('云函数 Node.js 运行时生命周期守卫、38条推荐索引清单与全栈增量发布参数守卫与 scripts 完全一致', () => {
     const runtimeCheck = require('../scripts/cloudRuntimeCheck');
     const dbIndexCheck = require('../scripts/checkDatabaseIndexes');
 
@@ -823,10 +823,10 @@ describe('Web Admin Gateway Sentinel & Operations Center', () => {
     expect(webRuntimeRes.exitCode).toBe(1);
     expect(webRuntimeRes.issues.map((i) => i.code)).toEqual(['RUNTIME_EOL', 'RUNTIME_MISSING']);
 
-    // 2. 37 recommended database indexes parity
+    // 2. 38 recommended database indexes parity
     const webIndexes = JSON.parse(vm.runInContext('JSON.stringify(RECOMMENDED_INDEXES)', sandbox));
     expect(webIndexes).toEqual(dbIndexCheck.RECOMMENDED_INDEXES);
-    expect(webIndexes.length).toBe(37);
+    expect(webIndexes.length).toBe(38);
 
     // 3. Deployment option validation (--apply vs --dry-run, mutually exclusive scopes, unknown cloud function)
     const conflictIssues = JSON.parse(

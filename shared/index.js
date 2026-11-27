@@ -25,6 +25,7 @@ const dateUtils = require("./dateUtils")
 const csvFile = require("./csvFile")
 const pageCsvFileActions = require("./pageCsvFileActions")
 const unsavedChanges = require("./unsavedChanges")
+const canvasPoster = require("./canvasPoster")
 
 const core = {
   performance,
@@ -37,7 +38,8 @@ const core = {
   dateUtils,
   csvFile,
   pageCsvFileActions,
-  unsavedChanges
+  unsavedChanges,
+  canvasPoster
 }
 
 // 2. 云端通信与数据服务 (Services)

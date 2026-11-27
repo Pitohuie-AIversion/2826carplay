@@ -63,6 +63,28 @@ function buildRequestJourney(item) {
   }
 }
 
+function normalizeRequestItem(item) {
+  const statusMeta = STATUS_META[item.status] || STATUS_META.pending
+  const typeMeta = TYPE_META[item.type] || {
+    label: "隐私申请",
+    className: "request-type-default",
+    iconClass: "request-type-icon-default"
+  }
+  return {
+    ...item,
+    typeLabel: typeMeta.label,
+    typeClass: typeMeta.className,
+    typeIconClass: typeMeta.iconClass,
+    statusLabel: statusMeta.label,
+    statusClass: statusMeta.className,
+    cardStatusClass: `request-status-${item.status || "pending"}`,
+    createdAtText: formatDisplayTime(item.createdAt),
+    dataExportedAtText: formatDisplayTime(item.dataExportedAt),
+    canHandle: ["pending", "processing"].includes(item.status),
+    ...buildRequestJourney(item)
+  }
+}
+
 Page({
   data: {
     pageAuthorized: false,
@@ -93,6 +115,8 @@ Page({
     })
   },
   onShow() {
+    const needsRefresh = this._privacyManageNeedsRefresh === true
+    this._privacyManageNeedsRefresh = false
     if (typeof this._privacyManageDeferredResult === "function") {
       const resume = this._privacyManageDeferredResult
       this._privacyManageDeferredResult = null
@@ -101,14 +125,15 @@ Page({
     }
     if (
       this.data.pageAuthorized &&
-      this.data.hasLoaded &&
-      !this.data.loading &&
+      (this.data.hasLoaded || needsRefresh) &&
+      (!this.data.loading || needsRefresh) &&
       !this.data.updatingId
     ) {
-      this.fetchList()
+      this.fetchList(this._privacyManageReadFilters || this._privacyManageListFilters || {})
     }
   },
   onHide() {
+    this._privacyManageNeedsRefresh = true
     this._privacyManageConfirmationAction = null
   },
   onUnload() {
@@ -374,6 +399,11 @@ Page({
       failureFallback: "更新失败",
       onResult: (result, isCurrent) => {
         if (!result || !result.ok) {
+          if (result && result.code === "FORBIDDEN") {
+            this._privacyManageConfirmedFilters = null
+            this._privacyManageListFilters = null
+            this.setData({ list: [], page: 0, total: 0, hasMore: false, truncated: false })
+          }
           wx.showToast({
             title: formatToastTitle(result && result.message, "更新失败"),
             icon: "none"
@@ -381,15 +411,36 @@ Page({
           this.setData({ updatingId: "" })
           return
         }
+        this.applyConfirmedPrivacyStatus(result, payload)
         this.setData({ updatingId: "" })
         wx.showToast({
           title: "状态已更新",
           icon: "success"
         })
         if (isCurrent()) {
-          this.fetchList()
+          this.fetchList(this._privacyManageListFilters || {})
         }
       }
+    })
+  },
+  applyConfirmedPrivacyStatus(result, payload) {
+    if (
+      typeof result.id !== "string" || result.id.trim() !== payload.id.trim() ||
+      !["processing", "completed", "rejected"].includes(result.status) ||
+      result.status !== payload.status.trim() ||
+      !this._privacyManageListFilters
+    ) return
+    const record = this.data.list.find((item) => item.id === result.id.trim())
+    if (!record) return
+    const filters = this._privacyManageListFilters
+    const remove = Boolean(filters.status && filters.status !== result.status)
+    const updated = normalizeRequestItem({ ...record, status: result.status, resolutionNote: payload.resolutionNote.trim() })
+    this._privacyManageConfirmedFilters = { ...filters }
+    this.setData({
+      list: remove
+        ? this.data.list.filter((item) => item.id !== record.id)
+        : this.data.list.map((item) => item.id === record.id ? updated : item),
+      total: remove ? Math.max(0, this.data.total - 1) : this.data.total
     })
   },
   runPrivacyManageWrite(options) {
@@ -474,22 +525,12 @@ Page({
   fetchList(options) {
     const input = options && typeof options === "object" ? options : {}
     let append = Boolean(input.append)
-    this.finishPrivacyManageListEffects()
     const requestId = Number(this._privacyManageListRequestId || 0) + 1
     this._privacyManageListRequestId = requestId
+    this.finishPrivacyManageListEffects()
     this._privacyManageListDone =
       typeof input.done === "function" ? input.done : null
     if (this.data.updatingId) {
-      this.finishPrivacyManageListEffects()
-      return
-    }
-    if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
-      this.setData({
-        initialLoading: false,
-        loading: false,
-        hasLoaded: true,
-        list: []
-      })
       this.finishPrivacyManageListEffects()
       return
     }
@@ -509,9 +550,36 @@ Page({
       Object.keys(query).some((key) => query[key] !== this._privacyManageListFilters[key])) {
       append = false
     }
+    const preserveFacts = this._privacyManageConfirmedFilters &&
+      Object.keys(query).every((key) => query[key] === this._privacyManageConfirmedFilters[key])
+    if (preserveFacts) append = false
+    else this._privacyManageConfirmedFilters = null
     const nextPage = append ? this.data.page + 1 : 0
-    if (!append) this._privacyManageListFilters = null
+    if (!append && !preserveFacts) this._privacyManageListFilters = null
+    this._privacyManageReadFilters = query
     const filters = { ...query, page: nextPage, pageSize: this.data.pageSize }
+    const applyFailureState = (forceClear) => {
+      const keepList = !forceClear && (append || preserveFacts)
+      if (forceClear) {
+        this._privacyManageConfirmedFilters = null
+        this._privacyManageListFilters = null
+      }
+      this.setData({
+        initialLoading: false,
+        loading: false,
+        hasLoaded: true,
+        page: keepList ? this.data.page : 0,
+        list: keepList ? this.data.list : [],
+        total: keepList ? this.data.total : 0,
+        hasMore: keepList ? this.data.hasMore : false,
+        truncated: keepList ? this.data.truncated : false
+      })
+    }
+    if (!wx.cloud || typeof wx.cloud.callFunction !== "function") {
+      applyFailureState()
+      this.finishPrivacyManageListEffects()
+      return
+    }
     this.setData({ loading: true })
     let settled = false
     const finishRequest = () => {
@@ -530,16 +598,7 @@ Page({
         title: formatToastTitle(message, "加载失败"),
         icon: "none"
       })
-      this.setData({
-        initialLoading: false,
-        loading: false,
-        hasLoaded: true,
-        page: append ? this.data.page : 0,
-        list: append ? this.data.list : [],
-        total: append ? this.data.total : 0,
-        hasMore: append ? this.data.hasMore : false,
-        truncated: append ? this.data.truncated : false
-      })
+      applyFailureState()
     }
     this._privacyManageListTimer = setTimeout(() => {
       handleFailure("加载超时，请重试")
@@ -552,46 +611,16 @@ Page({
           return
         }
         const result = res && res.result ? res.result : null
-        if (!result || !result.ok) {
+        if (!result || !result.ok || !Array.isArray(result.list)) {
           wx.showToast({
             title: formatToastTitle(result && result.message, "加载失败"),
             icon: "none"
           })
-          this.setData({
-            initialLoading: false,
-            loading: false,
-            hasLoaded: true,
-            page: append ? this.data.page : 0,
-            list: append ? this.data.list : [],
-            total: append ? this.data.total : 0,
-            hasMore: append ? this.data.hasMore : false,
-            truncated: append ? this.data.truncated : false
-          })
+          applyFailureState(result && result.code === "FORBIDDEN")
           return
         }
-        const list = Array.isArray(result.list)
-            ? result.list.map((item) => {
-              const statusMeta = STATUS_META[item.status] || STATUS_META.pending
-              const typeMeta = TYPE_META[item.type] || {
-                label: "隐私申请",
-                className: "request-type-default",
-                iconClass: "request-type-icon-default"
-              }
-              return {
-                ...item,
-                typeLabel: typeMeta.label,
-                typeClass: typeMeta.className,
-                typeIconClass: typeMeta.iconClass,
-                statusLabel: statusMeta.label,
-                statusClass: statusMeta.className,
-                cardStatusClass: `request-status-${item.status || "pending"}`,
-                createdAtText: formatDisplayTime(item.createdAt),
-                dataExportedAtText: formatDisplayTime(item.dataExportedAt),
-                canHandle: ["pending", "processing"].includes(item.status),
-                ...buildRequestJourney(item)
-              }
-            })
-          : []
+        const list = result.list.map(normalizeRequestItem)
+        if (!append) this._privacyManageConfirmedFilters = null
         this._privacyManageListFilters = query
         this.setData({
           initialLoading: false,

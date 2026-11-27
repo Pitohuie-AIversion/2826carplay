@@ -10,6 +10,10 @@ const { requestOperationConfig } = require("../../shared/operationConfigRequest"
 const { normalizeFavoriteVehicleStatus } = require("../../shared/vehicleLabels")
 const { triggerHapticFeedback } = require("../../shared/hapticFeedback")
 const { handleAlbumSaveError } = require("../../shared/albumPermission")
+const {
+  drawComparePosterRoundedRect,
+  savePosterImageToPhotosAlbum
+} = require("../../shared/canvasPoster")
 const FAVORITES_LOAD_TIMEOUT_MS = 15 * 1000
 const FAVORITE_MUTATION_TIMEOUT_MS = 12 * 1000
 
@@ -159,21 +163,6 @@ function buildCompareState(car1, car2, diffOnly) {
   }
 }
 
-function drawComparePosterRoundedRect(ctx, x, y, width, height, radius) {
-  const r = Math.min(radius, width / 2, height / 2)
-  ctx.beginPath()
-  ctx.moveTo(x + r, y)
-  ctx.lineTo(x + width - r, y)
-  ctx.arcTo(x + width, y, x + width, y + r, r)
-  ctx.lineTo(x + width, y + height - r)
-  ctx.arcTo(x + width, y + height, x + width - r, y + height, r)
-  ctx.lineTo(x + r, y + height)
-  ctx.arcTo(x, y + height, x, y + height - r, r)
-  ctx.lineTo(x + r, y)
-  ctx.arcTo(x, y, x + r, y, r)
-  ctx.closePath()
-}
-
 Page({
   data: {
     initialLoading: true,
@@ -266,6 +255,7 @@ Page({
   },
 
   onShow() {
+    this._favoritesPageHidden = false
     this.loadOperationConfig()
     if (this.data.comparePosterVisible && this.data.comparePosterGenerating) {
       this.handleCloseComparePosterModal()
@@ -278,9 +268,12 @@ Page({
     ) {
       this.fetchList()
     }
+    this.startUndoFavoriteWindow()
   },
 
   onHide() {
+    this._favoritesPageHidden = true
+    this.pauseUndoFavoriteWindow()
     this.cancelComparePosterGeneration()
   },
 
@@ -298,6 +291,7 @@ Page({
   },
 
   onUnload() {
+    this._favoritesPageHidden = true
     cancelPageNativeActions(this)
     this.cancelComparePosterGeneration()
     this.cancelOperationConfigRequest()
@@ -307,10 +301,8 @@ Page({
     this.finishFavoritesLoadEffects()
     this.clearFavoriteRemoveTimer()
     this.clearFavoriteUndoTimer()
-    if (this._undoFavoriteTimer) {
-      clearTimeout(this._undoFavoriteTimer)
-      this._undoFavoriteTimer = null
-    }
+    this.pauseUndoFavoriteWindow()
+    this._favoriteUndoWindow = null
   },
 
   handleRetry() {
@@ -821,52 +813,17 @@ Page({
   },
 
   async handleSaveComparePoster() {
-    if (this._comparePosterSaveTask) return
-    const action = beginPageNativeAction(this, { requireCurrent: true, exclusiveKey: "compare-poster-save" })
     const serial = Number(this._comparePosterRenderSerial || 0)
-    const isActive = () => isPageNativeActionActive(this, action) &&
-      Number(this._comparePosterRenderSerial || 0) === serial &&
-      this.data.comparePosterVisible
-    if (!isActive()) return
-    const filePath = this.data.comparePosterImagePath
-    if (!filePath) {
-      wx.showToast({ title: "海报生成中", icon: "none" })
-      return
-    }
-    const saveTask = {}
-    this._comparePosterSaveTask = saveTask
-    const finishSave = () => {
-      if (this._comparePosterSaveTask !== saveTask) return false
-      this._comparePosterSaveTask = null
-      if (this._comparePosterSaveTimer) clearTimeout(this._comparePosterSaveTimer)
-      this._comparePosterSaveTimer = null
-      return isActive()
-    }
-    const handleFailure = (error) => {
-      if (finishSave()) handleAlbumSaveError(this, error, isActive)
-    }
-    this._comparePosterSaveTimer = setTimeout(() => {
-      if (finishSave()) wx.showToast({ title: "保存未确认，请重试", icon: "none" })
-    }, 60000)
-
-    if (typeof wx.saveImageToPhotosAlbum === "function") {
-      try {
-        wx.saveImageToPhotosAlbum({
-          filePath,
-          success: () => {
-            if (finishSave()) {
-              triggerHapticFeedback("medium")
-              wx.showToast({ title: "海报已保存相册", icon: "success" })
-              this.handleCloseComparePosterModal()
-            }
-          },
-          fail: handleFailure
-        })
-      } catch (error) { handleFailure(error) }
-    } else {
-      finishSave()
-      wx.showToast({ title: "系统暂不支持", icon: "none" })
-    }
+    await savePosterImageToPhotosAlbum(this, {
+      filePath: this.data.comparePosterImagePath,
+      exclusiveKey: "compare-poster-save",
+      isActive: (action) => isPageNativeActionActive(this, action) &&
+        Number(this._comparePosterRenderSerial || 0) === serial &&
+        this.data.comparePosterVisible,
+      taskField: "_comparePosterSaveTask",
+      timerField: "_comparePosterSaveTimer",
+      onCloseModal: () => this.handleCloseComparePosterModal()
+    })
   },
 
   handleCallConsultant() {
@@ -1012,6 +969,7 @@ Page({
     this.finishFavoritesLoadEffects()
     this.clearFavoriteRemoveTimer()
     this.setData({ removingId: targetVehicleId, loading: false })
+    this.startUndoFavoriteWindow()
 
     let settled = false
     const finishRequest = () => {
@@ -1027,6 +985,7 @@ Page({
         return
       }
       this.setData({ removingId: "" })
+      this.startUndoFavoriteWindow()
       if (isPageNativeActionActive(this, feedbackAction)) wx.showToast({
         title: formatToastTitle(message, "取消收藏失败"),
         icon: "none"
@@ -1050,6 +1009,7 @@ Page({
         const result = res && res.result ? res.result : null
         if (!result || !result.ok) {
           this.setData({ removingId: "" })
+          this.startUndoFavoriteWindow()
           if (isPageNativeActionActive(this, feedbackAction)) wx.showToast({
             title: formatToastTitle(result && result.message, "取消收藏失败"),
             icon: "none"
@@ -1060,9 +1020,6 @@ Page({
           availableOnly: this.data.availableOnly
         })
         this.invalidateFavoritePagination()
-        if (this._undoFavoriteTimer) {
-          clearTimeout(this._undoFavoriteTimer)
-        }
         if (removedCar) {
           this.setData({
             undoFavorite: {
@@ -1070,13 +1027,13 @@ Page({
               index: removedIndex
             }
           })
-          this.startUndoFavoriteWindow()
         }
         if (isPageNativeActionActive(this, feedbackAction)) wx.showToast({
           title: "已取消，可撤销",
           icon: "none"
         })
         this.setData({ removingId: "" })
+        this.startUndoFavoriteWindow()
       },
       fail: (error) => {
         handleFailure(error && (error.errMsg || error.message))
@@ -1107,10 +1064,9 @@ Page({
     this._favoritesRequestId = Number(this._favoritesRequestId || 0) + 1
     this.finishFavoritesLoadEffects()
     this.clearFavoriteUndoTimer()
-    if (this._undoFavoriteTimer) {
-      clearTimeout(this._undoFavoriteTimer)
-      this._undoFavoriteTimer = null
-    }
+    this.pauseUndoFavoriteWindow()
+    // A failed undo gets a fresh retry window once the user can act again.
+    this._favoriteUndoWindow = null
     this.setData({ undoingFavorite: true, loading: false })
 
     let settled = false
@@ -1162,11 +1118,8 @@ Page({
         nextList.splice(Math.min(Math.max(Number(undo.index) || 0, 0), nextList.length), 0, undo.car)
         this.applyFavoriteList(nextList, { availableOnly: this.data.availableOnly })
         this.invalidateFavoritePagination()
-        if (this._undoFavoriteTimer) {
-          clearTimeout(this._undoFavoriteTimer)
-          this._undoFavoriteTimer = null
-        }
         this.setData({ undoFavorite: null, undoingFavorite: false })
+        this.startUndoFavoriteWindow()
         if (isPageNativeActionActive(this, feedbackAction)) wx.showToast({ title: "已恢复收藏", icon: "success" })
       },
       fail: (error) => {
@@ -1181,13 +1134,38 @@ Page({
     }
   },
 
+  pauseUndoFavoriteWindow() {
+    if (!this._undoFavoriteTimer) return
+    clearTimeout(this._undoFavoriteTimer)
+    this._undoFavoriteTimer = null
+    if (this._favoriteUndoWindow) {
+      // Only time with an available undo button consumes the five-second window.
+      this._favoriteUndoWindow.remainingMs = Math.max(0, this._favoriteUndoWindow.expiresAt - Date.now())
+    }
+  },
+
   startUndoFavoriteWindow() {
-    if (this._undoFavoriteTimer) clearTimeout(this._undoFavoriteTimer)
-    if (!this.data.undoFavorite) return
+    this.pauseUndoFavoriteWindow()
+    const undo = this.data.undoFavorite
+    if (!undo) {
+      this._favoriteUndoWindow = null
+      return
+    }
+    if (!this._favoriteUndoWindow || this._favoriteUndoWindow.undo !== undo) {
+      this._favoriteUndoWindow = { undo, remainingMs: 5000 }
+    }
+    if (this._favoritesPageHidden || this.data.loading || this.data.removingId || this.data.undoingFavorite) return
+    const action = beginPageNativeAction(this, { requireCurrent: true })
+    if (!isPageNativeActionActive(this, action)) return
+    const window = this._favoriteUndoWindow
+    window.expiresAt = Date.now() + window.remainingMs
     this._undoFavoriteTimer = setTimeout(() => {
+      if (this._favoriteUndoWindow !== window) return
       this._undoFavoriteTimer = null
+      if (this._favoritesPageHidden || !isPageNativeActionActive(this, action)) return
+      this._favoriteUndoWindow = null
       this.setData({ undoFavorite: null })
-    }, 5000)
+    }, window.remainingMs)
   },
 
   clearFavoriteRemoveTimer() {
@@ -1257,6 +1235,7 @@ Page({
         loadedOnce: true,
         loadError: "云能力未初始化"
       })
+      this.startUndoFavoriteWindow()
       if (typeof input.done === "function") {
         input.done()
       }
@@ -1268,6 +1247,7 @@ Page({
       loading: true,
       loadError: append ? this.data.loadError : ""
     })
+    this.startUndoFavoriteWindow()
 
     let settled = false
     const finishRequest = () => {
@@ -1288,6 +1268,7 @@ Page({
         loadedOnce: true,
         loadError: String(message || "收藏列表加载失败")
       })
+      this.startUndoFavoriteWindow()
       if (!append) this._favoritesPaginationDirty = true
     }
 
@@ -1333,6 +1314,7 @@ Page({
           loadedOnce: true,
           loadError: ""
         })
+        this.startUndoFavoriteWindow()
       },
       fail: (error) => {
         handleFailure((error && (error.errMsg || error.message)) || "收藏列表加载失败")

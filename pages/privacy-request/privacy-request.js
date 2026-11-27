@@ -132,6 +132,10 @@ Page({
     }
   },
 
+  onHide() {
+    this._privacyCancelConfirmation = null
+  },
+
   onReachBottom() {
     this.handleLoadMore()
   },
@@ -149,6 +153,7 @@ Page({
   },
 
   onUnload() {
+    this._privacyCancelConfirmation = null
     disposeUnsavedChanges(this)
     cancelPageNativeActions(this)
     this._listRequestId = Number(this._listRequestId || 0) + 1
@@ -363,22 +368,39 @@ Page({
     if (!id || this.data.loading || this.data.submitting || this.data.cancellingId) {
       return
     }
+    if (this._privacyCancelConfirmation && isPageNativeActionActive(this, this._privacyCancelConfirmation)) return
 
     const action = beginPageNativeAction(this, {
       exclusiveKey: "privacy-request-cancel-confirmation",
       requireCurrent: true
     })
-    wx.showModal({
-      title: "撤回隐私申请",
-      content: "仅待处理申请可以撤回。撤回后如仍有需要，可稍后重新提交。",
-      confirmText: "确认撤回",
-      confirmColor: "#d46868",
-      success: (res) => {
-        if (isPageNativeActionActive(this, action) && res && res.confirm) {
-          this.cancelRequest(id)
-        }
-      }
-    })
+    if (!isPageNativeActionActive(this, action)) return
+    this._privacyCancelConfirmation = action
+    const finish = () => {
+      if (this._privacyCancelConfirmation !== action) return false
+      this._privacyCancelConfirmation = null
+      return true
+    }
+    const handleFailure = (error) => {
+      if (!finish() || !isPageNativeActionActive(this, action)) return
+      if (/cancel/i.test(String(error && (error.errMsg || error.message) || ""))) return
+      wx.showToast({ title: "撤回窗口打开失败", icon: "none" })
+    }
+    try {
+      wx.showModal({
+        title: "撤回隐私申请",
+        content: "仅待处理申请可以撤回。撤回后如仍有需要，可稍后重新提交。",
+        confirmText: "确认撤回",
+        confirmColor: "#d46868",
+        success: (res) => {
+          if (!finish() || !isPageNativeActionActive(this, action)) return
+          if (res && res.confirm) this.cancelRequest(id)
+        },
+        fail: handleFailure
+      })
+    } catch (error) {
+      handleFailure(error)
+    }
   },
 
   cancelRequest(id) {

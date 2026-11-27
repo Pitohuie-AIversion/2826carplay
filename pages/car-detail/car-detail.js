@@ -9,6 +9,12 @@ const { onNetworkReconnect } = require("../../shared/networkStatus")
 const { triggerHapticFeedback } = require("../../shared/hapticFeedback")
 const { handleAlbumSaveError } = require("../../shared/albumPermission")
 const {
+  drawPosterRoundedRect,
+  drawPosterAspectFillImage,
+  drawPosterTextEllipsis,
+  savePosterImageToPhotosAlbum
+} = require("../../shared/canvasPoster")
+const {
   activatePageNativeActions,
   beginPageNativeAction,
   cancelPageNativeActions,
@@ -228,65 +234,6 @@ function formatCarViewModel(car) {
     trustArchive: buildTrustArchiveView(car.trustArchive),
     vehicleYear: car.vehicleYear || (car.registerDate ? String(car.registerDate).slice(0, 4) : "—")
   }
-}
-
-function drawPosterRoundedRect(ctx, x, y, width, height, radius) {
-  const r = Math.min(radius, width / 2, height / 2)
-  ctx.beginPath()
-  ctx.moveTo(x + r, y)
-  ctx.lineTo(x + width - r, y)
-  ctx.arcTo(x + width, y, x + width, y + r, r)
-  ctx.lineTo(x + width, y + height - r)
-  ctx.arcTo(x + width, y + height, x + width - r, y + height, r)
-  ctx.lineTo(x + r, y + height)
-  ctx.arcTo(x, y + height, x, y + height - r, r)
-  ctx.lineTo(x + r, y)
-  ctx.arcTo(x, y, x + r, y, r)
-  ctx.closePath()
-}
-
-function drawPosterAspectFillImage(ctx, img, x, y, width, height, radius) {
-  ctx.save()
-  drawPosterRoundedRect(ctx, x, y, width, height, radius)
-  ctx.clip()
-
-  const imgW = (img && (img.width || img.naturalWidth)) || width
-  const imgH = (img && (img.height || img.naturalHeight)) || height
-  const scale = Math.max(width / imgW, height / imgH)
-  const drawW = imgW * scale
-  const drawH = imgH * scale
-  const drawX = x + (width - drawW) / 2
-  const drawY = y + (height - drawH) / 2
-
-  ctx.drawImage(img, drawX, drawY, drawW, drawH)
-  ctx.restore()
-}
-
-function drawPosterTextEllipsis(ctx, text, x, y, maxWidth) {
-  if (!text) return
-  const str = String(text).trim()
-  if (!str) return
-  try {
-    if (ctx.measureText && ctx.measureText(str).width <= maxWidth) {
-      ctx.fillText(str, x, y)
-      return
-    }
-  } catch (e) {
-    ctx.fillText(str, x, y)
-    return
-  }
-  let truncated = str
-  while (truncated.length > 1) {
-    try {
-      if (ctx.measureText(truncated + "…").width <= maxWidth) {
-        break
-      }
-    } catch (e) {
-      break
-    }
-    truncated = truncated.slice(0, -1)
-  }
-  ctx.fillText(truncated + "…", x, y)
 }
 
 Page({
@@ -1689,76 +1636,18 @@ Page({
   },
 
   async handleSavePoster() {
-    if (this._posterSaveTask) return
-    const action = beginPageNativeAction(this, { requireCurrent: true, exclusiveKey: "poster-save" })
     const serial = Number(this._posterRenderSerial || 0)
     const vehicleId = String(this.data.car && this.data.car.id || this.data.carId || "")
-    const isActive = () => this.isPosterActionActive(action, serial, vehicleId)
-    if (!isActive()) return
-    let filePath = this.data.posterImagePath
-    if (!filePath) {
-      wx.showToast({ title: "海报生成中", icon: "none" })
-      return
-    }
-    const saveTask = {}
-    this._posterSaveTask = saveTask
-    const finishSave = () => {
-      if (this._posterSaveTask !== saveTask) return false
-      this._posterSaveTask = null
-      if (this._posterSaveTimer) clearTimeout(this._posterSaveTimer)
-      this._posterSaveTimer = null
-      return isActive()
-    }
-    const handleFailure = (error) => {
-      if (finishSave()) handleAlbumSaveError(this, error, isActive)
-    }
-    this._posterSaveTimer = setTimeout(() => {
-      if (!finishSave()) return
-      if (this._posterSaveLoadingAction === action) {
-        this._posterSaveLoadingAction = null
-        if (typeof wx.hideLoading === "function") wx.hideLoading()
-      }
-      wx.showToast({ title: "保存未确认，请重试", icon: "none" })
-    }, 60000)
-
-    if (filePath.startsWith("http://") || filePath.startsWith("https://") || filePath.startsWith("cloud://")) {
-      try {
-        if (typeof wx.showLoading === "function") {
-          this._posterSaveLoadingAction = action
-          wx.showLoading({ title: "保存中…", mask: true })
-        }
-        filePath = await this.resolvePosterCover(filePath)
-      } catch (e) {
-      } finally {
-        if (this._posterSaveLoadingAction === action) {
-          this._posterSaveLoadingAction = null
-          if (typeof wx.hideLoading === "function") wx.hideLoading()
-        }
-      }
-    }
-
-    if (this._posterSaveTask !== saveTask || !isActive()) {
-      finishSave()
-      return
-    }
-    if (typeof wx.saveImageToPhotosAlbum === "function") {
-      try {
-        wx.saveImageToPhotosAlbum({
-          filePath,
-          success: () => {
-            if (finishSave()) {
-              triggerHapticFeedback("medium")
-              wx.showToast({ title: "海报已保存相册", icon: "success" })
-              this.handleClosePosterModal()
-            }
-          },
-          fail: handleFailure
-        })
-      } catch (error) { handleFailure(error) }
-    } else {
-      finishSave()
-      wx.showToast({ title: "系统暂不支持", icon: "none" })
-    }
+    await savePosterImageToPhotosAlbum(this, {
+      filePath: this.data.posterImagePath,
+      exclusiveKey: "poster-save",
+      isActive: (action) => this.isPosterActionActive(action, serial, vehicleId),
+      taskField: "_posterSaveTask",
+      timerField: "_posterSaveTimer",
+      loadingActionField: "_posterSaveLoadingAction",
+      resolveCover: (path) => this.resolvePosterCover(path),
+      onCloseModal: () => this.handleClosePosterModal()
+    })
   },
 
   handleOpenLocation() {

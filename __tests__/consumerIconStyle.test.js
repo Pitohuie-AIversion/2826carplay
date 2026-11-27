@@ -717,8 +717,8 @@ describe("用户主流程原生图标", () => {
     )
     const bookingDetailSource = read("pages/booking-detail/booking-detail.js")
 
-    // 六个 CSV 入口迁入共享守卫；联系人清理、工具请求及订阅回调各保留页面守卫。
-    expect(currentOnlyActionCount).toBe(108)
+    // 六个 CSV 入口迁入共享守卫；收藏撤销计时也必须核对当前页面。
+    expect(currentOnlyActionCount).toBe(109)
     const csvActions = read("shared/pageCsvFileActions.js")
     expect(csvActions).toContain("beginPageNativeAction(page, { requireCurrent: true })")
     expect(csvActions).toContain("isPageNativeActionActive(page, nativeAction)")

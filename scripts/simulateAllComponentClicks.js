@@ -1357,6 +1357,25 @@ simulateClick("点击撤销已提交申请 (handleCancelRequest)", () => {
   privacyReqPage.handleCancelRequest(makeEvent({ id: "req-001" }))
 })
 
+simulateClick("撤回确认连续点击仍只提交首个申请，重复回调不重发", () => {
+  const originalShowModal = wx.showModal
+  const confirmations = []
+  const before = cloudCalls.filter((call) => call.name === "privacyRequestCancel").length
+  try {
+    wx.showModal = (options) => confirmations.push(options)
+    privacyReqPage.applyRequestList(["req-cancel-a", "req-cancel-b"].map((id) => ({ id, type: "access", status: "pending" })))
+    privacyReqPage.handleCancelRequest(makeEvent({ id: "req-cancel-a" }))
+    privacyReqPage.handleCancelRequest(makeEvent({ id: "req-cancel-b" }))
+    if (confirmations.length !== 1) throw new Error("连点打开了多个撤回窗口")
+    confirmations[0].success({ confirm: true })
+    confirmations[0].success({ confirm: true })
+    const writes = cloudCalls.filter((call) => call.name === "privacyRequestCancel")
+    if (writes.length !== before + 1 || writes[writes.length - 1].data.id !== "req-cancel-a") throw new Error("撤回对象错误或重复提交")
+  } finally {
+    wx.showModal = originalShowModal
+  }
+})
+
 simulateClick("点击申请记录状态过滤:「已完成」(handleRecordFilterTap: completed)", () => {
   privacyReqPage.handleRecordFilterTap(makeEvent({ filter: "completed" }))
 })
